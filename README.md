@@ -2,7 +2,7 @@
 
 **A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-Status: **design stage.** [RFC 0001](docs/rfcs/0001-threaded-runtime.md) is drafted and a proof of concept works; M0 (repo foundations) is next.
+Status: **design stage, no code in this repo yet.** The design is written: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) (6 accepted, 2 under review) and [milestone plans](docs/plans/README.md). A single-file proof of concept works and gets ported in M0 (repo foundations), which is next.
 
 ## Why
 
@@ -91,19 +91,23 @@ export default defineIsolate({
 
 ## Roadmap
 
+Details, dependencies and task lists are in the [plans index](docs/plans/README.md).
+
 1. **M0 Foundations:** pnpm workspaces, TypeScript, Vite, Vitest, Playwright, GitHub Actions; protocol types; proof of concept ported to TypeScript.
 2. **M1 Kernel:** loader, supervisor, heartbeats, frame-batched compositor on Remote DOM.
-3. **M2 Bus:** topics, schemas, retention, offsets, replay, backpressure; bus worker with the TS log engine.
-4. **M3 Adapters and dashboard sandbox:** Preact and React adapters; a sales dashboard that runs single-threaded or on Isoloop at the flip of a toggle, with live metrics (main-thread fps, long tasks, input latency, loop lag per worker, memory, bus throughput).
-5. **M4 Devtools and 0.1:** health and bus overlay, docs site, npm release.
-6. **M5 Shared-memory engine:** opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
+3. **M2 Bus:** topics, schemas, retention, offsets, replay, backpressure; bus worker with the TS log engine; opt-in suspension of idle isolates.
+4. **M2b Durable log:** persistent topics in OPFS that survive a bus crash or a page reload. Required for 0.1.
+5. **M2c Worker pools:** opt-in named pools for small headless isolates, if a benchmark shows they pay off.
+6. **M3 Adapters and dashboard sandbox:** Preact and React adapters; a sales dashboard that runs single-threaded or on Isoloop at the flip of a toggle, with live metrics (main-thread fps, long tasks, input latency, loop lag per worker, memory, bus throughput).
+7. **M4 Devtools and 0.1:** health and bus overlay, docs site, npm release.
+8. **M5 Shared-memory engine:** opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
 
 ## Planned repo layout
 
 Plain pnpm workspaces.
 
 ```text
-packages/  protocol · host · runtime · bus · bus-wasm (M5) · react · preact · devtools
+packages/  protocol · host · runtime · bus · codec (M2b) · bus-wasm (M5) · react · preact · devtools
 examples/  four-loops (minimal) · dashboard (flagship sandbox)
 docs/      site + rfcs/
 bench/     click-to-paint, throughput, memory per isolate
