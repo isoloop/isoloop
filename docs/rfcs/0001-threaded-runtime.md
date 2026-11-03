@@ -249,7 +249,7 @@ The biggest risk is input latency: if typing or clicking feels slower than a nor
 - [ ] Workers per isolate, or a pool that can host several trusted isolates per worker? Decided: own worker by default, opt-in named pools after M2 ([ADR 0001](../adr/0001-one-worker-per-isolate.md)).
 - [ ] How does routing work: does the host own the URL and pass route events to isolates? Proposed: yes, via the `isoloop.route.v1` topic and a `navigate` call ([ADR 0002](../adr/0002-host-owns-routing.md)).
 - [ ] Which schema format: Zod only, or JSON Schema so non-JS tools can read contracts? Proposed: Standard Schema at runtime, JSON Schema exported ([ADR 0003](../adr/0003-schema-format-standard-schema.md)).
-- [ ] Is the name free on npm? `federa` was, but the `@federa` scope is taken, so the project is renamed **Isoloop**: `isoloop` and `@isoloop` are free on npm and GitHub ([ADR 0004](../adr/0004-npm-name.md)). Not yet claimed.
+- [x] Is the name free on npm? `federa` was, but the `@federa` scope is taken, so the project is renamed **Isoloop** ([ADR 0004](../adr/0004-npm-name.md)). Claimed: the `@isoloop` npm scope, the unscoped `isoloop` package and the `isoloop` GitHub org.
 
 ## MVP roadmap and repo structure
 

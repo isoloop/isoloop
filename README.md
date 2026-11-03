@@ -1,7 +1,5 @@
 # Isoloop
 
-> npm: `isoloop` and the `@isoloop` scope are free but not yet claimed ([ADR 0004](docs/adr/0004-npm-name.md)).
-
 **A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
 Status: **design stage.** [RFC 0001](docs/rfcs/0001-threaded-runtime.md) is drafted and a proof of concept works; M0 (repo foundations) is next.
