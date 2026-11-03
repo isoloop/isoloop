@@ -1,12 +1,12 @@
 # ADR 0004: Project and package name: Isoloop
 
-- **Status:** Accepted (names still to be claimed)
+- **Status:** Accepted
 - **Date:** 2026-11-03
 - **Answers:** RFC 0001 open question "Is the name `federa` free on npm?"
 
 ## Context
 
-The working name was **Federa**. Checked on 2026-11-03:
+The working name was **Federa**. It appears below only as history; everything else in the repo uses Isoloop. Checked on 2026-11-03:
 
 | Name | Result |
 | --- | --- |
@@ -34,8 +34,12 @@ Every real word we checked was taken on at least one of those (bulkhead, mullion
 - All docs use the new name. The PoC artifact keeps its original identifiers (`FederatedContainer`, `fed-runtime`); they disappear in the M0 port.
 - The lifecycle diagram PNG still says "pane" and "unmount"; redraw it when the diagrams are next updated.
 
-## Action for the maintainer
+## Claimed names
 
-1. Create the `isoloop` org on npmjs.com and on GitHub.
-2. Publish a placeholder `isoloop@0.0.0` pointing at the repo.
-3. Rename or transfer the GitHub repo to `isoloop/isoloop`, and optionally rename the local folder.
+Checked 2026-11-03:
+
+- [x] npm org `isoloop` (scope `@isoloop/*`).
+- [x] GitHub org `isoloop`, repo `isoloop/isoloop`.
+- [x] Old `sabbin/federa` repo no longer public.
+- [ ] Placeholder `isoloop@0.0.0` (unscoped, for the CLI) published to reserve the name. Until then anyone can take it.
+- [x] Local folder renamed to `isoloop`.
