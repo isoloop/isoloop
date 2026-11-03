@@ -253,14 +253,16 @@ The biggest risk is input latency: if typing or clicking feels slower than a nor
 
 ## MVP roadmap and repo structure
 
-Six milestones, each ending in something that can be demoed, released and written about. No dates yet; each is roughly 2 to 4 weeks of evenings.
+Eight milestones, each ending in something that can be demoed, released and written about. No dates yet; each is roughly 2 to 4 weeks of evenings. The [plans index](../plans/README.md) is the source of truth for milestone order, dependencies and task lists; this list is kept in sync with it.
 
 1. **M0, foundations:** pnpm workspaces, TypeScript, Vite, Vitest, Playwright and GitHub Actions; the wire protocol types; the proof of concept ported to TypeScript. Done when the four-loops demo runs from the repo and CI is green.
 2. **M1, kernel:** loader, supervisor with one-for-one restarts, heartbeats, frame-batched compositor on Remote DOM. Done when a blocked or crashed isolate never affects the others, proven by Playwright tests.
 3. **M2, bus:** topics with schemas, retention, offsets, replay and backpressure, in a dedicated bus worker behind the engine interface, with the TS engine. Done when a restarted isolate rebuilds its state from the log in a test.
-4. **M3, adapters and dashboard sandbox:** Preact and React adapters with `useTopic` and `usePublish`, plus `examples/dashboard`, the flagship demo: a sales dashboard with a data isolate, 3 `OffscreenCanvas` charts, a virtualized orders table, a shared filter topic and stress controls per widget. A toggle runs the same dashboard single-threaded or on Isoloop, beside a live metrics panel: main-thread fps, long tasks, input latency, loop lag per worker, memory and bus throughput. Done when it's live on a public URL and a recorded comparison is in the README.
-5. **M4, devtools and 0.1 release:** an overlay showing each isolate's loop health and a live bus log with replay; docs site; npm publish. Done at `0.1.0` with a launch post.
-6. **M5, shared-memory engine:** the opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine. Done when the benchmark results are published, whichever engine wins.
+4. **M2b, durable log:** topics with `durability: 'persistent'` written to OPFS, surviving a bus worker crash and a page reload, with flush on `freeze`/`pagehide` ([ADR 0007](../adr/0007-bus-worker-supervision.md)). Depends on M2; must land before the 0.1 release. Done when a persistent topic loses no acknowledged record across a bus crash or a page reload in an E2E test.
+5. **M2c, worker pools:** opt-in named pools for headless isolates (`manifest.pool`), supervised as a group, starting with a benchmark gate that can drop pools if they don't pay off ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). Depends on M2; not required for 0.1. Done when pooled and own-worker isolates run side by side and a pool crash restarts only that pool.
+6. **M3, adapters and dashboard sandbox:** Preact and React adapters with `useTopic` and `usePublish`, plus `examples/dashboard`, the flagship demo: a sales dashboard with a data isolate, 3 `OffscreenCanvas` charts, a virtualized orders table, a shared filter topic and stress controls per widget. A toggle runs the same dashboard single-threaded or on Isoloop, beside a live metrics panel: main-thread fps, long tasks, input latency, loop lag per worker, memory and bus throughput. Done when it's live on a public URL and a recorded comparison is in the README.
+7. **M4, devtools and 0.1 release:** an overlay showing each isolate's loop health and a live bus log with replay; docs site; npm publish. Done at `0.1.0` with a launch post.
+8. **M5, shared-memory engine:** the opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine. Done when the benchmark results are published, whichever engine wins.
 
 **Repo structure** (plain pnpm workspaces; Turborepo can be added later if builds slow down)
 
@@ -271,6 +273,7 @@ isoloop/
     host/          kernel: loader, compositor, supervisor
     runtime/       worker runtime, DOM polyfill wiring, bus client
     bus/           broker, log engine interface, TS engine (no DOM, easy to test)
+    codec/         (M2b) binary value codec for OPFS records, shared with M5
     bus-wasm/      (M5) Rust/WASM shared-memory log engine
     react/         adapter
     preact/        adapter
