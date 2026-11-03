@@ -1,0 +1,86 @@
+# M1: Kernel
+
+**Goal:** the real host kernel: loader, supervisor with one-for-one restarts, heartbeats, and a frame-budgeted compositor on Remote DOM.
+
+**Done when** (RFC 0001): a blocked or crashed isolate never affects the others, proven by Playwright tests.
+
+## Scope
+
+**In:** design sections [§4](../design/system-design.md#4-isoloophost) and [§5](../design/system-design.md#5-isoloopruntime) except the bus client: Loader, Supervisor state machine, Compositor with budget, `RenderBridge` on Remote DOM ([ADR 0006](../adr/0006-render-bridge-over-remote-dom.md)), component registry, EventBridge, host-owned inputs, host calls (`measure`, `focus`, `scrollIntoView`), Shadow DOM styles, and a vanilla isolate API. `four-loops` moves onto all of it.
+
+**Out:** the log bus (M2; `legacy-bus` stays until then), adapters (M3), `requestCanvas` and `navigate` (M3), devtools (M4).
+
+## Tasks
+
+### 1. Supervisor state machine
+- **Files:** `packages/host/src/supervisor/{machine.ts,timers.ts,index.ts}`.
+- A pure `step(state, input) → { state, effects }` following the [transition table](../design/system-design.md#43-supervisor), plus a sliding restart window and exponential backoff.
+- **Tests (unit, fake clock):** one test per row of the table; restart limit (3 in 60 s → `failed`); window slides; `never` strategy; `respawn` resets.
+
+### 2. Supervisor runtime wiring
+- Connect the machine to real workers: worker `error`/`messageerror` events, heartbeat ingestion, a 50 ms tick, effects carried out by the kernel. Kernel events `isolate:state`, `isolate:crash`, `isolate:failed`, `isolate:error`.
+- Busy overlay and failed fallback UI in the isolate shell. The host can override the fallback via `manifest.fallback` (a render function on the host).
+- **Tests (browser):** a fixture isolate that loops forever → `blocked` then `crashed` after `killAfterMs` (set short in tests); an isolate that throws in `start` → `failed` after the limit.
+
+### 3. Loader hardening
+- Bootstrap module worker ([design §4.2](../design/system-design.md#42-loader)). Cross-origin `src` via `import()`; ready timeout; `shutdown` with grace on stop.
+- Docs page `docs/guide/hosting.md` with the required CSP and CORS headers.
+- **Tests (E2E):** an isolate served from a second origin (a second Vite server on another port) with CORS loads; without CORS it fails with a clear `isolate:crash` reason.
+
+### 4. Remote DOM spike (timebox: one evening)
+- Pin the current `@remote-dom/core` version. In a scratch branch, render a vanilla tree in a worker and mirror it on the host through its connection API.
+- Answer three questions in the PR description: how mutation records serialize; how to attach our own node ids; how to intercept listener registration (for [ADR 0006](../adr/0006-render-bridge-over-remote-dom.md) point 3).
+- **Exit:** if any answer is "can't", stop and write an ADR choosing between patching Remote DOM and extending `legacy-vdom`.
+
+### 5. RenderBridge (isolate and host)
+- **Files:** `packages/runtime/src/render/remote-dom.ts`, `packages/host/src/render/remote-dom.ts`, the shared fmt constant `remote-dom@1`.
+- The isolate side installs the polyfill, exposes `ctx.root`, and batches mutations per microtask into one `patch`. The host side implements `HostRenderBridge`.
+- **Tests (browser):** create / update / move / remove nodes and attributes, text; a 1,000-node list; a batch round-trip leaves identical `innerHTML` on both sides.
+
+### 6. Component registry and sanitising
+- **Files:** `packages/host/src/render/registry.ts`.
+- Safe-tag allow-list, attribute and URL rules, unknown tags → `div`, host components via `KernelConfig.components`.
+- **Tests (unit):** sanitiser tables (invariant I9) including `javascript:` URLs, `srcdoc`, `on*`, SVG `<script>`, and `<use href>`.
+
+### 7. Compositor with frame budget
+- Per-isolate FIFO, rotating start index, budget check, at-least-one rule ([design §4.4](../design/system-design.md#44-compositor)); `stats()`.
+- **Tests (unit, fake rAF/clock):** invariant I8; fairness (a chatty isolate with 100 queued batches doesn't starve an isolate with 1); stopping an isolate drops its queue.
+
+### 8. EventBridge, default actions, inputs
+- Per-root delegated listeners; listener registrations from the isolate; event serialization; `submit`/link prevention; host-owned input rules ([design §4.6](../design/system-design.md#46-eventbridge-and-inputs)).
+- **Tests (E2E):** typing fast into an isolate input never loses characters or jumps the caret while the isolate is blocked for 1 s; a form submit never navigates the page.
+
+### 9. Host calls
+- `call`/`result` plumbing with timeouts; `measure`, `focus`, `scrollIntoView` applied after pending patches.
+- **Tests (browser):** `measure` returns the rect after a pending resize patch, not before.
+
+### 10. Styles
+- `ctx.styles(css)` → constructable stylesheets on the shadow root; design tokens via custom properties.
+- **Tests (browser):** isolate CSS doesn't leak out; host token variables reach in.
+
+### 11. Vanilla isolate API and four-loops migration
+- `packages/runtime/src/vanilla.ts`: `export default { start(ctx) }` with plain DOM calls on `ctx.root`.
+- Rewrite the four isolates on it and delete the `legacy-vdom` paths from the example (they stay in packages only for benchmarks).
+- Change the PoC's crash behaviour to the real supervisor (backoff, limit, Failed state) and update the e2e expectations to match.
+
+### 12. Isolation test suite (the done-criterion)
+- **File:** `e2e/isolation.spec.ts`.
+- Invariant I2: block C for 3 s → B's displayed clock advances by at least 2.5 s within that window, and main-thread fps stays ≥ 55 (sampled by a rAF counter in the page).
+- Invariant I3: crash C 4 times in 60 s → C reaches `failed` and shows the fallback; A, B and D never leave `running`, and their click-to-paint stays within budget.
+- Invariant I1: a `MutationObserver` shows no DOM writes to other isolates' surfaces while C restarts.
+- Kill path: C in an infinite loop → `crashed` after `killAfterMs`, restarted, others unaffected.
+- Headless: a headless fixture isolate (no `surface`) reaches `running`, is supervised the same way (block → kill → restart), never produces DOM writes, and gets `no_surface` from `measure` ([ADR 0008](../adr/0008-isolates-and-surfaces.md)).
+
+### 13. Click-to-paint bench (first cut)
+- **Files:** `bench/click-to-paint/`. A Playwright script with 200 clicks on a counter, timing `pointerdown` → applied frame, compared with the same counter rendered directly in the main thread.
+- Run it in CI as a report only (no threshold yet). This calibrates the [budget](../design/system-design.md#9-performance-budgets).
+
+## Risks
+
+- **Remote DOM fit** (task 4 is the gate). Fallback: keep `legacy-vdom` and extend it with keyed diffing, as ADR 0006 allows.
+- **Input latency** is the RFC's biggest risk. Task 8's tests and task 13's numbers are the evidence; publish them even if they're unflattering.
+- **Firefox/WebKit heartbeat timing:** background tabs throttle timers, so blocked detection must ignore hidden documents (`document.visibilityState`).
+
+## Demo / write-up
+
+A recording of four-loops: block C, crash C repeatedly until Failed, while B keeps ticking and typing in D stays smooth, with the click-to-paint numbers. Post: "Crashing an isolate on purpose."

@@ -1,4 +1,4 @@
-# RFC 0001: A threaded runtime for isolated UI panes
+# RFC 0001: A threaded runtime for isolated front-end code
 
 - **Status:** Draft
 - **Author:** Sabin Pandelovitch
@@ -7,55 +7,56 @@
 
 ## Summary
 
-Federa is an open-source browser runtime that runs every UI pane in its own Web Worker, so no pane can freeze, crash or read another. The main thread keeps one job: drawing what panes describe. Panes talk only through a log-based message bus with typed topics and replay, so a pane that restarts rebuilds its state from the log.
+Isoloop is an open-source browser runtime that runs every isolate (a UI widget, a micro-frontend, or headless logic such as a state store) in its own Web Worker, so no isolate can freeze, crash or read another. The main thread keeps one job: drawing what visual isolates describe; headless isolates never touch it except for heartbeats. Isolates talk only through a log-based message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-- **Pitch:** run any UI you don't fully control (third-party extensions, AI-generated widgets, heavy dashboard panes) without letting it break the host.
+- **Pitch:** run any UI you don't fully control (third-party extensions, AI-generated widgets, heavy dashboard widgets, headless state managers) without letting it break the host.
 - **Who it is for:** heavy dashboards whose widgets share data but shouldn't share an event loop, and platform teams that host other teams' or other companies' UI.
-- **Working name:** Federa (from "federation"). The npm name still needs checking.
-- **Where it stands:** a working proof of concept exists (four panes, bus, heartbeats, restart supervisor).
+- **Name:** Isoloop, for an isolated event loop per unit. It was called Federa until 2026-11-03, when the `@federa` npm scope turned out to be taken ([ADR 0004](../adr/0004-npm-name.md)). The unit of isolation is an *isolate*; an isolate that draws UI has a *surface* ([ADR 0008](../adr/0008-isolates-and-surfaces.md)).
+- **Where it stands:** a working proof of concept exists (four isolates, bus, heartbeats, restart supervisor).
 
 ## Problem, goals and non-goals
 
-Today every micro-frontend shares one main thread, one heap and one event loop. One slow or broken pane makes the whole page janky or blank, and sandboxes built from JS proxies or Shadow DOM isolate globals and styles, not CPU time or crashes.
+Today every micro-frontend shares one main thread, one heap and one event loop. One slow or broken isolate makes the whole page janky or blank, and sandboxes built from JS proxies or Shadow DOM isolate globals and styles, not CPU time or crashes.
 
 **Goals**
 
-1. **Thread isolation:** each pane gets its own worker, so a blocked or crashed pane affects only itself.
-2. **Single-writer rendering:** only the host touches the DOM; panes send UI descriptions.
-3. **Messages as the only contract:** panes never import each other; they depend on versioned topic schemas.
+1. **Thread isolation:** each isolate gets its own worker, so a blocked or crashed isolate affects only itself.
+2. **Single-writer rendering:** only the host touches the DOM; isolates send UI descriptions.
+3. **Messages as the only contract:** isolates never import each other; they depend on versioned topic schemas.
 4. **Durable, replayable bus:** topics are append-only logs with retention and consumer offsets.
 5. **Supervision:** liveness heartbeats, crash detection and restart strategies, built in.
-6. **Framework-agnostic panes:** a pane can be written in React, Preact, Svelte, Solid or plain JS.
+6. **Framework-agnostic isolates:** an isolate can be written in React, Preact, Svelte, Solid or plain JS.
 
 **Non-goals for v1**
 
-- Parallel painting of DOM panes. The DOM still has one writer; canvas panes can already paint in parallel through `OffscreenCanvas`, and cross-origin iframes are the later route for DOM.
+- Parallel painting of DOM surfaces. The DOM still has one writer; canvas isolates can already paint in parallel through `OffscreenCanvas`, and cross-origin iframes are the later route for DOM.
 - Replacing Module Federation for code sharing between trusted teams.
 - Angular, or any framework that needs a real DOM at runtime.
-- Server-side rendering of panes.
+- Server-side rendering of isolates.
 - A security boundary against hostile code. Workers are same-origin; untrusted code needs the iframe tier (see Risks).
 
 ## Architecture overview
 
-Federa is a small kernel on the main thread with four parts, a dedicated bus worker, and one dedicated worker per pane.
+Isoloop is a small kernel on the main thread with four parts, a dedicated bus worker, and one dedicated worker per isolate.
 
-![Architecture: the host kernel on the main thread and one worker per pane](assets/0001-architecture.png)
+![Architecture: the host kernel on the main thread and one worker per isolate](assets/0001-architecture.png)
 
-- **Loader:** resolves a pane's manifest, fetches its code (URL or Module Federation remote), and starts it in a module worker with the runtime prepended.
-- **Compositor:** owns every pane root in the DOM and applies patches in a frame-budgeted batch.
-- **Bus bridge:** passes records between panes and the dedicated bus worker, which holds the topic logs, checks schemas and access rules, and delivers records to subscribers.
+- **Loader:** resolves an isolate's manifest, fetches its code (URL or Module Federation remote), and starts it in a module worker with the runtime prepended.
+- **Compositor:** owns every surface in the DOM and applies patches in a frame-budgeted batch.
+- **Bus bridge:** passes records between isolates and the dedicated bus worker, which holds the topic logs, checks schemas and access rules, and delivers records to subscribers. *Refined by [ADR 0005](../adr/0005-bus-topology-message-channels.md): the bridge only wires a direct `MessageChannel` between each isolate and the bus worker, so records never cross the main thread.*
 - **Supervisor:** watches heartbeats, catches errors and applies restart strategies.
 
 The kernel is framework-agnostic and has no dependencies beyond Remote DOM. The host app around it can be written in anything.
 
-## Pane model and lifecycle
+## Isolate model and lifecycle
 
-A pane is a manifest plus a code bundle; the supervisor moves it through seven states and restarts it on its own after a crash.
+An isolate is a manifest plus a code bundle, with or without a surface; the supervisor moves it through seven states and restarts it on its own after a crash.
 
 ```ts
-type PaneManifest = {
+type IsolateManifest = {
   id: string;                       // unique in the host
   src: string;                      // ES module URL or federation remote
+  surface?: string | Element;       // where it renders; omit for a headless isolate
   adapter?: 'react' | 'preact' | 'vanilla';
   topics: { publish: string[]; subscribe: string[] };
   restart?: { strategy: 'one-for-one' | 'never'; max: number; withinMs: number };
@@ -63,52 +64,52 @@ type PaneManifest = {
 };
 ```
 
-![Pane lifecycle: Loading, Running, Blocked, Stopped, Crashed, Restarting, Failed](assets/0001-pane-lifecycle.png)
+![Isolate lifecycle: Loading, Running, Blocked, Stopped, Crashed, Restarting, Failed](assets/0001-isolate-lifecycle.png)
 
-A "blocked" pane is still alive: its loop is busy, so the host shows a subtle busy state and queues its messages. Only a pane that stays blocked past the kill timeout is terminated and treated as crashed.
+A "blocked" isolate is still alive: its loop is busy, so the host shows a subtle busy state and queues its messages. Only an isolate that stays blocked past the kill timeout is terminated and treated as crashed.
 
 ## Rendering bridge
 
-Panes render into an invisible remote tree inside the worker; the host mirrors it to the real DOM. Federa builds this on [Shopify Remote DOM](https://github.com/Shopify/remote-dom) rather than writing its own, which saves the hardest maintenance work.
+Isolates render into an invisible remote tree inside the worker; the host mirrors it to the real DOM. Isoloop builds this on [Shopify Remote DOM](https://github.com/Shopify/remote-dom) rather than writing its own, which saves the hardest maintenance work.
 
 - **Remote tree:** a DOM polyfill in the worker lets ordinary framework code create elements. A mutation observer turns changes into a stream of small patches.
-- **Host component registry:** the host decides which elements a pane may render. Built-in safe HTML tags, plus host components such as `<fed-button>` that map to the design system. Unknown tags render as `div`; `script`, `iframe` and inline handlers are never created.
-- **Frame batching:** patches queue per pane and apply once per animation frame. A frame budget (default 8 ms of DOM work) stops one chatty pane from starving the others; leftover patches roll to the next frame.
-- **Events:** the host listens once per pane root, serializes the event (type, target node id, value, key, pointer position) and posts it to the worker. Default actions such as form submit are prevented on the host and handled by the pane.
-- **Inputs:** text fields are host-owned and uncontrolled. The host keeps the caret and value; the pane gets `input` events and may send a value back, applied only if it differs. This avoids the lag of a full round trip per keystroke.
-- **Layout queries:** `measure(nodeId)` and `focus(nodeId)` are async calls to the host, returning a promise in the pane.
-- **Styles:** each pane root is a Shadow DOM host, so pane CSS can't leak out. Pane styles are sent as text and adopted as constructable stylesheets.
-- **Canvas panes:** a pane can take an `OffscreenCanvas` transferred from the host and draw charts entirely inside its worker, in parallel with the main thread.
+- **Host component registry:** the host decides which elements an isolate may render. Built-in safe HTML tags, plus host components such as `<iso-button>` that map to the design system. Unknown tags render as `div`; `script`, `iframe` and inline handlers are never created.
+- **Frame batching:** patches queue per isolate and apply once per animation frame. A frame budget (default 8 ms of DOM work) stops one chatty isolate from starving the others; leftover patches roll to the next frame.
+- **Events:** the host listens once per surface, serializes the event (type, target node id, value, key, pointer position) and posts it to the worker. Default actions such as form submit are prevented on the host and handled by the isolate.
+- **Inputs:** text fields are host-owned and uncontrolled. The host keeps the caret and value; the isolate gets `input` events and may send a value back, applied only if it differs. This avoids the lag of a full round trip per keystroke.
+- **Layout queries:** `measure(nodeId)` and `focus(nodeId)` are async calls to the host, returning a promise in the isolate.
+- **Styles:** each surface is a Shadow DOM host, so isolate CSS can't leak out. Isolate styles are sent as text and adopted as constructable stylesheets.
+- **Canvas isolates:** an isolate can take an `OffscreenCanvas` transferred from the host and draw charts entirely inside its worker, in parallel with the main thread.
 
 ## Message bus
 
-The bus is a small in-browser log, modelled on Kafka: each topic is an append-only log, and each consumer tracks its own position in it. Replay is what makes restarts cheap: a restarted pane reads its topics from its last committed offset, or from the start, and rebuilds its state.
+The bus is a small in-browser log, modelled on Kafka: each topic is an append-only log, and each consumer tracks its own position in it. Replay is what makes restarts cheap: a restarted isolate reads its topics from its last committed offset, or from the start, and rebuilds its state.
 
-| Concept | Federa meaning | Kafka equivalent |
+| Concept | Isoloop meaning | Kafka equivalent |
 | --- | --- | --- |
 | Topic | Named, typed, append-only log, e.g. `cart.items.v1` | Topic |
 | Record | `{offset, key, value, ts, producer}` | Record |
 | Retention | Per topic: `last-n`, `time`, or `compacted` (latest record per key) | Retention / log compaction |
-| Consumer | A pane subscription with a committed offset | Consumer + offset |
-| Group | Several pane instances sharing one subscription, each record to one of them | Consumer group |
+| Consumer | An isolate subscription with a committed offset | Consumer + offset |
+| Group | Several isolate instances sharing one subscription, each record to one of them | Consumer group |
 | Start position | `latest`, `earliest` or `committed` | `auto.offset.reset` |
 | Schema | Zod or JSON Schema per topic version, checked on publish | Schema registry |
 
 **Semantics**
 
 - **Ordering:** guaranteed per topic, and per key within a topic.
-- **Delivery:** at-least-once to a live pane. Consumers commit offsets after handling, so handlers must be idempotent.
-- **Validation:** the broker rejects a record that fails its topic schema and reports it to the producer. A bad pane can't poison other panes' state.
-- **Backpressure:** each pane has an inbox limit (default 1,000 records). When a blocked pane's inbox is full, the broker stops pushing and the pane catches up from the log when it's free; nothing is lost while retention allows.
+- **Delivery:** at-least-once to a live isolate. Consumers commit offsets after handling, so handlers must be idempotent.
+- **Validation:** the broker rejects a record that fails its topic schema and reports it to the producer. A bad isolate can't poison other isolates' state.
+- **Backpressure:** each isolate has an inbox limit (default 1,000 records). When a blocked isolate's inbox is full, the broker stops pushing and the isolate catches up from the log when it's free; nothing is lost while retention allows.
 - **Request/response:** a thin layer on top: a `requests` topic plus a reply sent to the caller with a correlation id and a timeout.
 - **Persistence (later):** compacted topics can be written to IndexedDB, so state survives a page reload.
-- **Access control:** the pane manifest declares which topics it may publish and subscribe to; the broker enforces it.
+- **Access control:** the isolate manifest declares which topics it may publish and subscribe to; the broker enforces it.
 
-**Placement and engines.** The broker runs in a dedicated bus worker from v1, so the main thread only draws. Log storage sits behind a pluggable engine interface (`append`, `read(fromOffset)`, `commit`, `compact`). v1 ships a plain TypeScript engine. A later Rust/WASM engine keeps the log in a `SharedArrayBuffer` ring buffer, so panes read records straight from shared memory with no copy per subscriber. That engine needs a cross-origin-isolated host (COOP/COEP headers), so it stays opt-in and ships only if published benchmarks show it beating the TS engine.
+**Placement and engines.** The broker runs in a dedicated bus worker from v1, so the main thread only draws. Log storage sits behind a pluggable engine interface (`append`, `read(fromOffset)`, `commit`, `compact`). v1 ships a plain TypeScript engine. A later Rust/WASM engine keeps the log in a `SharedArrayBuffer` ring buffer, so isolates read records straight from shared memory with no copy per subscriber. That engine needs a cross-origin-isolated host (COOP/COEP headers), so it stays opt-in and ships only if published benchmarks show it beating the TS engine.
 
 ## Wire protocol
 
-Every message between host and pane uses one envelope, versioned from day one so hosts and panes can be deployed separately.
+Every message between host and isolate uses one envelope, versioned from day one so hosts and isolates can be deployed separately.
 
 ```ts
 type Envelope<T extends string, P> = {
@@ -122,29 +123,29 @@ type Envelope<T extends string, P> = {
 
 | Type | Direction | Payload | Purpose |
 | --- | --- | --- | --- |
-| `init` | host → pane | pane id, config, granted topics | Boot the pane |
-| `ready` | pane → host | runtime version, adapter | Pane is up |
-| `patch` | pane → host | Remote DOM mutations | Update the UI |
-| `event` | host → pane | node id, event type, serialized event | User input |
+| `init` | host → isolate | isolate id, config, granted topics | Boot the isolate |
+| `ready` | isolate → host | runtime version, adapter | Isolate is up |
+| `patch` | isolate → host | Remote DOM mutations | Update the UI |
+| `event` | host → isolate | node id, event type, serialized event | User input |
 | `call` / `result` | both ways | method, args / value or error | Async host APIs (`measure`, `focus`, `navigate`) |
-| `publish` | pane → host | topic, key, value | Append to a topic |
-| `subscribe` / `unsubscribe` | pane → host | topic, start position | Manage a subscription |
-| `deliver` | host → pane | topic, records[] | Batch of records |
-| `commit` | pane → host | topic, offset | Acknowledge records |
-| `beat` | pane → host | loop lag in ms, heap size if available | Liveness |
-| `error` | pane → host | message, stack | Reported failure |
-| `shutdown` | host → pane | reason, grace period | Clean stop before terminate |
+| `publish` | isolate → host | topic, key, value | Append to a topic |
+| `subscribe` / `unsubscribe` | isolate → host | topic, start position | Manage a subscription |
+| `deliver` | host → isolate | topic, records[] | Batch of records |
+| `commit` | isolate → host | topic, offset | Acknowledge records |
+| `beat` | isolate → host | loop lag in ms, heap size if available | Liveness |
+| `error` | isolate → host | message, stack | Reported failure |
+| `shutdown` | host → isolate | reason, grace period | Clean stop before terminate |
 
 Payloads are copied with structured clone. Large binary data travels as `ArrayBuffer` transferables, never copied.
 
 ## Public API sketch
 
-The host API is a few lines and works without any framework. The pane API feels like normal framework code; the adapter hides the worker.
+The host API is a few lines and works without any framework. The isolate API feels like normal framework code; the adapter hides the worker.
 
 **Host**
 
 ```ts
-import { createKernel, topic } from '@federa/host';
+import { createKernel, topic } from '@isoloop/host';
 import { z } from 'zod';
 
 export const cartItems = topic('cart.items.v1', {
@@ -154,38 +155,39 @@ export const cartItems = topic('cart.items.v1', {
 
 const kernel = createKernel({
   topics: [cartItems],
-  components: { 'fed-button': DsButton },   // host component registry
+  components: { 'iso-button': DsButton },   // host component registry
   supervisor: { strategy: 'one-for-one', maxRestarts: 3, withinMs: 60_000 },
   heartbeat: { everyMs: 100, blockedAfterMs: 400, killAfterMs: 10_000 },
 });
 
-kernel.mount('#cart', {
+kernel.spawn({
   id: 'cart',
-  src: 'https://cdn.example.com/cart/pane.js',
+  surface: '#cart',          // omit for a headless isolate
+  src: 'https://cdn.example.com/cart/isolate.js',
   topics: { publish: ['cart.items.v1'], subscribe: ['catalog.selected.v1'] },
 });
 
-kernel.on('pane:crash', ({ id, error }) => report(id, error));
+kernel.on('isolate:crash', ({ id, error }) => report(id, error));
 ```
 
-**Pane (React adapter)**
+**Isolate (React adapter)**
 
 ```tsx
-import { definePane, useTopic, usePublish } from '@federa/react';
+import { defineIsolate, useTopic, usePublish } from '@isoloop/react';
 import { cartItems } from '@acme/contracts';
 
-export default definePane(() => {
+export default defineIsolate(() => {
   const items = useTopic(cartItems, { from: 'earliest' }); // replayed after restart
   const add = usePublish(cartItems);
   return (
-    <fed-button onClick={() => add({ key: 'sku-1', value: { sku: 'sku-1', qty: 1 } })}>
+    <iso-button onClick={() => add({ key: 'sku-1', value: { sku: 'sku-1', qty: 1 } })}>
       Add ({items.length})
-    </fed-button>
+    </iso-button>
   );
 });
 ```
 
-Topic definitions live in a shared contracts package, the only code host and panes share. It holds types and schemas, never behaviour.
+Topic definitions live in a shared contracts package, the only code host and isolates share. It holds types and schemas, never behaviour.
 
 ## Framework adapters
 
@@ -195,7 +197,7 @@ An adapter is a thin package that boots a framework inside the worker's DOM poly
 | --- | --- | --- |
 | Plain JS / Web Components | Good | Reference adapter; smallest |
 | Preact | Good | Small runtime, works on Remote DOM today; best first adapter |
-| React | Good, heavier | Needs Remote DOM's React polyfill; bigger bundle per pane |
+| React | Good, heavier | Needs Remote DOM's React polyfill; bigger bundle per isolate |
 | Solid | Likely good | Fine-grained updates map well to small patches; to verify |
 | Svelte | Likely good | Compiled output uses plain DOM calls; to verify |
 | Vue | Uncertain | Runtime DOM renderer probably works; custom renderer possible |
@@ -205,15 +207,15 @@ An adapter is a thin package that boots a framework inside the worker's DOM poly
 
 - Synchronous layout reads (`getBoundingClientRect`, `offsetWidth`), synchronous focus and scroll.
 - Third-party widgets that reach for `window`, `document.body` or `localStorage`.
-- Drag and drop, text selection and canvas drawing tied to pointer timing. Canvas panes can use `OffscreenCanvas` instead.
+- Drag and drop, text selection and canvas drawing tied to pointer timing. Canvas isolates can use `OffscreenCanvas` instead.
 
 The docs should state these limits up front; they are what will decide whether people trust the project.
 
 ## Prior art
 
-No existing project combines a thread per pane, a supervisor and a replayable bus; each of the closest ones covers one part.
+No existing project combines a thread per isolate, a supervisor and a replayable bus; each of the closest ones covers one part.
 
-| Project | What it does | Thread per pane | Supervision | Replayable bus |
+| Project | What it does | Thread per isolate | Supervision | Replayable bus |
 | --- | --- | --- | --- | --- |
 | [Shopify Remote DOM](https://github.com/Shopify/remote-dom) | Mirrors a DOM tree built in a worker or iframe onto the host page | Possible, not managed | No | No |
 | [Neo.mjs](https://github.com/neomjs/neo) | Whole app runs in an App Worker; a VDom Worker diffs; main thread applies deltas | No, one App Worker per app | No | No |
@@ -222,7 +224,7 @@ No existing project combines a thread per pane, a supervisor and a replayable bu
 | [Garfish](https://github.com/web-infra-dev/garfish), qiankun | Proxy and Shadow DOM sandboxes on the main thread | No | No | No |
 | Module Federation | Loads and shares code between builds | No | No | No |
 
-Federa uses Remote DOM for rendering and adds the kernel around it. Its pitch against Neo.mjs: isolation between panes and teams, not just off-main-thread speed.
+Isoloop uses Remote DOM for rendering and adds the kernel around it. Its pitch against Neo.mjs: isolation between isolates and teams, not just off-main-thread speed.
 
 ## Risks and open questions
 
@@ -231,8 +233,8 @@ The biggest risk is input latency: if typing or clicking feels slower than a nor
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
 | Input latency from the worker round trip | High | Host-owned inputs; a benchmark for click-to-paint in CI |
-| Memory: one heap and framework copy per pane | Medium | Lazy mount, idle panes suspended, a shared runtime bundle cached per origin |
-| Main thread still a single point of failure | Medium | Frame budget per pane; document it honestly |
+| Memory: one heap and framework copy per isolate | Medium | lazy start, idle isolates suspended, a shared runtime bundle cached per origin |
+| Main thread still a single point of failure | Medium | Frame budget per isolate; document it honestly |
 | Same-origin workers are not a security boundary | High for untrusted code | An iframe tier later, with workers inside cross-origin iframes |
 | Remote DOM API changes | Medium | Pin versions; keep it behind an internal interface |
 | Scope creep: devtools, adapters, persistence | High for a solo maintainer | Strict MVP; adapters beyond Preact and React left to contributors |
@@ -242,32 +244,32 @@ The biggest risk is input latency: if typing or clicking feels slower than a nor
 - [x] Broker placement: a dedicated bus worker from v1, with a pluggable log engine.
 - [x] Monorepo tooling: plain pnpm workspaces.
 
-**Open questions**
+**Open questions** (each now has a proposed answer in an ADR; see the [system design](../design/system-design.md))
 
-- [ ] Workers per pane, or a pool that can host several trusted panes per worker?
-- [ ] How does routing work: does the host own the URL and pass route events to panes?
-- [ ] Which schema format: Zod only, or JSON Schema so non-JS tools can read contracts?
-- [ ] Is the name `federa` free on npm?
+- [ ] Workers per isolate, or a pool that can host several trusted isolates per worker? Proposed: one per isolate in v1 ([ADR 0001](../adr/0001-one-worker-per-isolate.md)).
+- [ ] How does routing work: does the host own the URL and pass route events to isolates? Proposed: yes, via the `isoloop.route.v1` topic and a `navigate` call ([ADR 0002](../adr/0002-host-owns-routing.md)).
+- [ ] Which schema format: Zod only, or JSON Schema so non-JS tools can read contracts? Proposed: Standard Schema at runtime, JSON Schema exported ([ADR 0003](../adr/0003-schema-format-standard-schema.md)).
+- [ ] Is the name free on npm? `federa` was, but the `@federa` scope is taken, so the project is renamed **Isoloop**: `isoloop` and `@isoloop` are free on npm and GitHub ([ADR 0004](../adr/0004-npm-name.md)). Not yet claimed.
 
 ## MVP roadmap and repo structure
 
 Six milestones, each ending in something that can be demoed, released and written about. No dates yet; each is roughly 2 to 4 weeks of evenings.
 
-1. **M0, foundations:** pnpm workspaces, TypeScript, Vite, Vitest, Playwright and GitHub Actions; the wire protocol types; the proof of concept ported to TypeScript. Done when the 4-pane demo runs from the repo and CI is green.
-2. **M1, kernel:** loader, supervisor with one-for-one restarts, heartbeats, frame-batched compositor on Remote DOM. Done when a blocked or crashed pane never affects the others, proven by Playwright tests.
-3. **M2, bus:** topics with schemas, retention, offsets, replay and backpressure, in a dedicated bus worker behind the engine interface, with the TS engine. Done when a restarted pane rebuilds its state from the log in a test.
-4. **M3, adapters and dashboard sandbox:** Preact and React adapters with `useTopic` and `usePublish`, plus `examples/dashboard`, the flagship demo: a sales dashboard with a data pane, 3 `OffscreenCanvas` charts, a virtualized orders table, a shared filter topic and stress controls per widget. A toggle runs the same dashboard single-threaded or on Federa, beside a live metrics panel: main-thread fps, long tasks, input latency, loop lag per worker, memory and bus throughput. Done when it's live on a public URL and a recorded comparison is in the README.
-5. **M4, devtools and 0.1 release:** an overlay showing each pane's loop health and a live bus log with replay; docs site; npm publish. Done at `0.1.0` with a launch post.
+1. **M0, foundations:** pnpm workspaces, TypeScript, Vite, Vitest, Playwright and GitHub Actions; the wire protocol types; the proof of concept ported to TypeScript. Done when the four-loops demo runs from the repo and CI is green.
+2. **M1, kernel:** loader, supervisor with one-for-one restarts, heartbeats, frame-batched compositor on Remote DOM. Done when a blocked or crashed isolate never affects the others, proven by Playwright tests.
+3. **M2, bus:** topics with schemas, retention, offsets, replay and backpressure, in a dedicated bus worker behind the engine interface, with the TS engine. Done when a restarted isolate rebuilds its state from the log in a test.
+4. **M3, adapters and dashboard sandbox:** Preact and React adapters with `useTopic` and `usePublish`, plus `examples/dashboard`, the flagship demo: a sales dashboard with a data isolate, 3 `OffscreenCanvas` charts, a virtualized orders table, a shared filter topic and stress controls per widget. A toggle runs the same dashboard single-threaded or on Isoloop, beside a live metrics panel: main-thread fps, long tasks, input latency, loop lag per worker, memory and bus throughput. Done when it's live on a public URL and a recorded comparison is in the README.
+5. **M4, devtools and 0.1 release:** an overlay showing each isolate's loop health and a live bus log with replay; docs site; npm publish. Done at `0.1.0` with a launch post.
 6. **M5, shared-memory engine:** the opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine. Done when the benchmark results are published, whichever engine wins.
 
 **Repo structure** (plain pnpm workspaces; Turborepo can be added later if builds slow down)
 
 ```text
-federa/
+isoloop/
   packages/
     protocol/      wire types, envelope, versioning
     host/          kernel: loader, compositor, supervisor
-    pane/          worker runtime, DOM polyfill wiring, bus client
+    runtime/       worker runtime, DOM polyfill wiring, bus client
     bus/           broker, log engine interface, TS engine (no DOM, easy to test)
     bus-wasm/      (M5) Rust/WASM shared-memory log engine
     react/         adapter
@@ -275,9 +277,9 @@ federa/
     devtools/      overlay panel
   examples/
     four-loops/    the original minimal demo
-    dashboard/     sales dashboard sandbox: single-thread vs Federa, live metrics
+    dashboard/     sales dashboard sandbox: single-thread vs Isoloop, live metrics
   docs/            site + RFCs
-  bench/           click-to-paint, bus throughput, memory per pane
+  bench/           click-to-paint, bus throughput, memory per isolate
 ```
 
 Keep `bus` free of browser APIs so it can be unit-tested in Node and reused in other hosts later.

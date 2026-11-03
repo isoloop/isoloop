@@ -1,0 +1,6 @@
+# Always LF in the repo and the working tree, whatever the local autocrlf setting
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.wasm binary

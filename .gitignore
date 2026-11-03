@@ -1,0 +1,20 @@
+# Editors
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Dependencies and builds
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Test output
+playwright-report/
+test-results/
+
+# Env
+.env
+.env.*
+!.env.example
