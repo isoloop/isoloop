@@ -68,6 +68,17 @@ Tasks 1–6 are pure TypeScript in Node and can start right after M0, in paralle
 - D (Messages) subscribes to `count.v1` and `note.v1` with `from: 'committed'` and keeps a log. Click A five times, send two notes, crash D. After restart D shows the same log without new events, and the bus metrics show D replayed from its committed offsets.
 - Also: a headless store isolate that publishes snapshots to a compacted topic is crashed, and a visual isolate reading it with `from: 'earliest'` keeps showing the latest state throughout; the restarted store rebuilds its state from its command topics; I7 holds (no `deliver` seen on the main thread).
 
+### 12b. Opt-in suspension
+- Implements [ADR 0001 § Suspension](../adr/0001-one-worker-per-isolate.md#suspension-opt-in). Lifts the M1 `suspend_unsupported` guard: `manifest.suspend: 'never' | 'when-idle' | { whenIdle: { afterMs } }`, default `'never'`, `'when-idle'` = 60 s.
+- **Idle** = no visible surface (off-screen, `display: none` or hidden tab; headless counts as never visible), nothing delivered for `afterMs`, no open `ctx.keepAwake()` hold, and no host call or unacknowledged publish in flight.
+- **Suspend:** `shutdown { reason: 'suspend' }` with the usual grace, `detach { keepOffsets: true }` (the broker removes the isolate from its consumer groups and rebalances), terminate; new supervisor state `suspended`, which never counts towards the restart limit. The host keeps the last mirrored surface as an inert snapshot.
+- **Wake:** visual isolates on surface visible again; headless isolates on a record for a subscribed topic, or a request when it was the last member of its group (the bus sends `wake` on the control port instead of buffering for the detached port); both on `kernel.resume(id)`. A wake queue starts at most 4 workers at once (`kernel.config.suspend.maxConcurrentWakes`), visible surfaces first in on-screen order. Resubscribe with `from: 'committed'`.
+- **`keepAwake`:** `ctx.keepAwake()` returns a release function; the isolate runtime reports open holds in its `beat`; devtools metrics list each hold's age and creation stack; dev builds warn once a hold passes 10 minutes.
+- **Spawn failures:** before retrying a `spawn-failed` isolate, suspend every idle suspendable isolate.
+- **Warnings at registration:** a suspendable isolate subscribing to a `last-n` or `time` topic.
+- **Files:** `packages/host/src/supervisor/` (state, transitions, wake queue), `packages/host/src/bus/controller.ts` (`wake`), `packages/bus/src/broker.ts` (wake for detached-with-offsets subscribers, group leave/rejoin), `packages/runtime/src/keep-awake.ts`.
+- **Tests:** unit rows for `running → suspended → loading` and the wake queue order; browser: a `'when-idle'` headless isolate suspends after the idle time and wakes on a publish to its topic, with the missed records replayed in order (I13); a held `keepAwake` prevents suspension, releasing it allows it; a hidden visual isolate is not woken by records but replays them when shown; a `last-n: 3` topic with 5 publishes while suspended delivers a `gap`; 10 suspended visual isolates shown together start at most 4 at a time; an isolate with `suspend: 'never'` is never suspended; a suspended group member leaves and rejoins its group.
+
 ### 13. Throughput bench
 - `bench/throughput`: 10 isolate workers subscribed and one publisher, 200-byte records; report records/s and p95 delivery latency. Report only, used to set the [budget](../design/system-design.md#9-performance-budgets) and as the M5 baseline.
 

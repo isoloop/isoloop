@@ -233,7 +233,7 @@ The biggest risk is input latency: if typing or clicking feels slower than a nor
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
 | Input latency from the worker round trip | High | Host-owned inputs; a benchmark for click-to-paint in CI |
-| Memory: one heap and framework copy per isolate | Medium | lazy start, idle isolates suspended, a shared runtime bundle cached per origin |
+| Memory: one heap and framework copy per isolate | Medium | lazy start, opt-in suspension of idle isolates (`suspend`), a soft worker budget warning, a shared runtime bundle cached per origin |
 | Main thread still a single point of failure | Medium | Frame budget per isolate; document it honestly |
 | Same-origin workers are not a security boundary | High for untrusted code | An iframe tier later, with workers inside cross-origin iframes |
 | Remote DOM API changes | Medium | Pin versions; keep it behind an internal interface |
@@ -246,7 +246,7 @@ The biggest risk is input latency: if typing or clicking feels slower than a nor
 
 **Open questions** (each now has a proposed answer in an ADR; see the [system design](../design/system-design.md))
 
-- [ ] Workers per isolate, or a pool that can host several trusted isolates per worker? Proposed: one per isolate in v1 ([ADR 0001](../adr/0001-one-worker-per-isolate.md)).
+- [ ] Workers per isolate, or a pool that can host several trusted isolates per worker? Decided: own worker by default, opt-in named pools after M2 ([ADR 0001](../adr/0001-one-worker-per-isolate.md)).
 - [ ] How does routing work: does the host own the URL and pass route events to isolates? Proposed: yes, via the `isoloop.route.v1` topic and a `navigate` call ([ADR 0002](../adr/0002-host-owns-routing.md)).
 - [ ] Which schema format: Zod only, or JSON Schema so non-JS tools can read contracts? Proposed: Standard Schema at runtime, JSON Schema exported ([ADR 0003](../adr/0003-schema-format-standard-schema.md)).
 - [ ] Is the name free on npm? `federa` was, but the `@federa` scope is taken, so the project is renamed **Isoloop**: `isoloop` and `@isoloop` are free on npm and GitHub ([ADR 0004](../adr/0004-npm-name.md)). Not yet claimed.

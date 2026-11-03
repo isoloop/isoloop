@@ -131,6 +131,7 @@ export type HostToBus =
 export type BusToHost =
   | Envelope<'ready', { engine: string; storage: 'memory' | 'opfs'; restored: { topic: string; head: number }[] }>
   | Envelope<'beat', { lagMs: number }>
+  | Envelope<'wake', { isolateId: string; topic: string }>   // record for a suspended isolate (ADR 0001)
   | Envelope<'metrics', BusMetrics>
   | Envelope<'error', { message: string; stack?: string; fatal: boolean }>;
 
@@ -172,14 +173,16 @@ type KernelConfig = {
   supervisor?: { strategy: 'one-for-one' | 'never'; maxRestarts: number; withinMs: number; backoff?: Backoff };
   heartbeat?: { everyMs: number; blockedAfterMs: number; killAfterMs: number; readyTimeoutMs: number };
   compositor?: { frameBudgetMs: number };
-  workers?: { bus: string; isolateBootstrap: string };   // URLs of the shipped worker bundles
+  workers?: { bus: string; isolateBootstrap: string; budget?: number };   // bundle URLs; budget = soft worker-count warning, default 32 (ADR 0001)
   onNavigate?: (req: NavigateRequest) => boolean | Promise<boolean>;
 };
 
 interface Kernel {
-  spawn(manifest: IsolateManifest): IsolateHandle;     // manifest.surface optional (ADR 0008)
+  spawn(manifest: IsolateManifest): IsolateHandle;     // manifest.surface optional (ADR 0008); manifest.pool reserved, rejected with pools_unsupported until M2c;
+                                                       // manifest.suspend: 'never' (default) | 'when-idle' | { whenIdle: { afterMs } } (ADR 0001)
   stop(id: string): Promise<void>;
   restart(id: string): Promise<void>;
+  resume(id: string): Promise<void>;                   // wake a suspended isolate (ADR 0001); no-op unless suspended
   publish<T>(topic: TopicDef<T>, rec: { key?: string; value: T }): Promise<void>;
   subscribe<T>(topic: TopicDef<T>, fn: (r: BusRecord) => void, opts?: { from?: StartPosition }): () => void;
   on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:crash, isolate:failed, bus:crash, ...
@@ -235,6 +238,11 @@ Transitions (matching the RFC lifecycle diagram):
 | restarting | (spawned) | loading | – |
 | any but failed | `stop` | stopped | `shutdown` with grace, then terminate |
 | failed / stopped | `respawn` | loading | resets restart window |
+| running | `suspend` set, idle for `afterMs` (no visible surface, no deliveries, no `keepAwake` hold, nothing in flight; ADR 0001) | suspended | `shutdown` with grace, `detach { keepOffsets: true }` (leaves consumer groups), terminate, keep surface snapshot |
+| suspended | surface visible (visual), bus `wake` (headless), or `resume` | loading | queued: at most 4 spawns at once, visible first; subscriptions use `from: 'committed'`; restart window untouched |
+| any | `spawn-failed` | crashed | reason `spawn-failed`; before the retry, suspend every idle suspendable isolate |
+| any | document hidden | (same) | pause hang judgement (no showBusy, no kill) |
+| any | document visible, or Page Lifecycle `resume` | (same) | reset every heartbeat clock (isolates and bus) |
 
 Non-fatal `error` messages (a caught exception in a handler) are only reported (`isolate:error`). They don't change state.
 
@@ -309,7 +317,8 @@ interface IsolateContext {
           navigate(href: string, o?: { replace?: boolean }): Promise<boolean>;
           requestCanvas(el: Element, size: Size): Promise<OffscreenCanvas> };
   styles(css: string | string[]): void;
-  onShutdown(fn: (reason: ShutdownReason) => void | Promise<void>): void;
+  onShutdown(fn: (reason: ShutdownReason) => void | Promise<void>): void;   // reason includes 'suspend'
+  keepAwake(): () => void;                         // hold against suspension; call the result to release (ADR 0001)
 }
 
 interface BusClient {
@@ -552,6 +561,8 @@ Each invariant has at least one automated test (unit **U**, browser **B**, Playw
 | I10 | Protocol mismatch fails at `init` with a clear error, never mid-render | U |
 | I11 | A bus restart never restarts an isolate (unless it opted in); every subscription to a memory topic gets exactly one `reset` | B + E2E (M2) |
 | I12 | A persistent topic loses no acknowledged record across a bus crash or a page reload | U (storage fault injection) + E2E (M2b) |
+| I13 | An isolate is suspended only if `suspend` is set and it is idle (including no `keepAwake` hold); on resume it sees every retained record since its committed offset, and any loss arrives as `gap` or `reset`, never silently | B + E2E (M2) |
+| I14 | Hiding or freezing the tab for longer than `killAfterMs` never restarts an isolate or the bus once the tab is visible again | E2E (M1) |
 
 ## 9. Performance budgets
 

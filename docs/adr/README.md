@@ -8,7 +8,7 @@ Short records of decisions that shape Isoloop's design. Each has a status:
 
 | ADR | Decision | Status |
 | --- | --- | --- |
-| [0001](0001-one-worker-per-isolate.md) | One dedicated worker per isolate in v1 | Proposed |
+| [0001](0001-one-worker-per-isolate.md) | Own worker per isolate by default; opt-in named pools (field reserved in v1, built in M2c); opt-in suspension (`suspend`); soft worker budget | Accepted |
 | [0002](0002-host-owns-routing.md) | The host owns the URL; isolates see routes through a system topic | Proposed |
 | [0003](0003-schema-format-standard-schema.md) | Standard Schema at runtime, JSON Schema exported for tools | Proposed |
 | [0004](0004-npm-name.md) | Project renamed Federa → Isoloop; `@isoloop/*` packages | Accepted (names to claim) |

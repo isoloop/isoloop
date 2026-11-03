@@ -20,12 +20,14 @@
 ### 2. Supervisor runtime wiring
 - Connect the machine to real workers: worker `error`/`messageerror` events, heartbeat ingestion, a 50 ms tick, effects carried out by the kernel. Kernel events `isolate:state`, `isolate:crash`, `isolate:failed`, `isolate:error`.
 - Busy overlay and failed fallback UI in the isolate shell. The host can override the fallback via `manifest.fallback` (a render function on the host).
-- **Tests (browser):** a fixture isolate that loops forever → `blocked` then `crashed` after `killAfterMs` (set short in tests); an isolate that throws in `start` → `failed` after the limit.
+- Hidden and frozen tabs ([ADR 0001](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls)): pause hang judgement while `document.hidden`; reset every heartbeat clock on `visibilitychange` to visible and on the Page Lifecycle `resume` event.
+- **Tests (browser):** a fixture isolate that loops forever → `blocked` then `crashed` after `killAfterMs` (set short in tests); an isolate that throws in `start` → `failed` after the limit; hiding the page (Playwright page visibility emulation) for longer than `killAfterMs` and showing it again restarts nothing (I14).
 
 ### 3. Loader hardening
 - Bootstrap module worker ([design §4.2](../design/system-design.md#42-loader)). Cross-origin `src` via `import()`; ready timeout; `shutdown` with grace on stop.
 - Docs page `docs/guide/hosting.md` with the required CSP and CORS headers.
-- **Tests (E2E):** an isolate served from a second origin (a second Vite server on another port) with CORS loads; without CORS it fails with a clear `isolate:crash` reason.
+- Placement rules from [ADR 0001](../adr/0001-one-worker-per-isolate.md): `manifest.pool` is typed and validated but rejected with `pools_unsupported`; the soft worker budget (`workers.budget`, default 32) emits a warning when passed and never blocks a spawn; a failed `new Worker` becomes `isolate:crash` with reason `spawn-failed`, using the normal backoff and restart limit (freeing memory by suspending idle isolates arrives with suspension in M2). `manifest.suspend` is typed now; any value other than `'never'` is rejected with `suspend_unsupported` until M2.
+- **Tests (E2E):** an isolate served from a second origin (a second Vite server on another port) with CORS loads; without CORS it fails with a clear `isolate:crash` reason. A manifest with `pool` is rejected with `pools_unsupported`; spawning past the budget warns once and still starts the isolate.
 
 ### 4. Remote DOM spike (timebox: one evening)
 - Pin the current `@remote-dom/core` version. In a scratch branch, render a vanilla tree in a worker and mirror it on the host through its connection API.
@@ -85,7 +87,7 @@
 
 - **Remote DOM fit** (task 4 is the gate). Fallback: keep `legacy-vdom` and extend it with keyed diffing, as ADR 0006 allows.
 - **Input latency** is the RFC's biggest risk. Task 8's tests and task 13's numbers are the evidence; publish them even if they're unflattering.
-- **Firefox/WebKit heartbeat timing:** background tabs throttle timers, so blocked detection must ignore hidden documents (`document.visibilityState`).
+- **Firefox/WebKit heartbeat timing:** background tabs throttle timers; task 2 pauses hang judgement while hidden and resets clocks on return (I14).
 
 ## Demo / write-up
 

@@ -19,7 +19,8 @@ Gets a full task list when M2 closes.
 7. **Single writer across tabs:** a Web Lock `isoloop-bus`; the losing tab runs memory-only and emits `bus:durability-degraded`.
 8. **Quota:** report usage in bus metrics; `bus:quota` warning at 80 %; behaviour when full (reject persistent publishes with `quota_exceeded`, keep memory topics working).
 9. **Fallback:** if sync access handles are unavailable, use IndexedDB-backed storage, or memory with a warning; decide based on the browser support data at the time.
-10. **Tests:** storage fault injection (kill during flush, torn writes) in browser tests; the E2E done-criterion; a throughput bench comparing `memory` and `persistent` topics.
+10. **Flush on freeze:** on the Page Lifecycle `freeze` event and on `pagehide`, the kernel sends the bus a flush request and persistent topics are written immediately instead of waiting for group commit ([ADR 0001](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls)). Docs state that memory topics don't survive a discarded tab.
+11. **Tests:** storage fault injection (kill during flush, torn writes) in browser tests; the E2E done-criterion; a record published just before `freeze` is on disk after a simulated discard; a throughput bench comparing `memory` and `persistent` topics.
 
 ## Open risks
 

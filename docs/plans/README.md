@@ -8,6 +8,7 @@ One plan per milestone of [RFC 0001](../rfcs/0001-threaded-runtime.md#mvp-roadma
 | M1 Kernel | [m1-kernel.md](m1-kernel.md) | Full | A blocked or crashed isolate never affects the others, proven by Playwright tests |
 | M2 Bus | [m2-bus.md](m2-bus.md) | Full | A restarted isolate rebuilds its state from the log in a test |
 | M2b Durable log | [m2b-durable-log.md](m2b-durable-log.md) | Outline | A persistent topic loses no acknowledged record across a bus crash or a page reload |
+| M2c Worker pools | [m2c-worker-pools.md](m2c-worker-pools.md) | Outline | Pooled and own-worker isolates run side by side; a pool crash restarts only that pool |
 | M3 Adapters + dashboard | [m3-adapters-dashboard.md](m3-adapters-dashboard.md) | Outline | Dashboard live on a public URL; recorded comparison in the README |
 | M4 Devtools + 0.1 | [m4-devtools-release.md](m4-devtools-release.md) | Outline | `0.1.0` on npm with a launch post |
 | M5 Shared-memory engine | [m5-shared-memory-engine.md](m5-shared-memory-engine.md) | Outline | Benchmark results published, whichever engine wins |
@@ -18,6 +19,7 @@ Outlines get full task lists when the milestone before them closes, so they refl
 flowchart LR
   M0 --> M1 --> M2 --> M3 --> M4
   M2 --> M2b --> M4
+  M2 --> M2c
   M2 --> M5
   M3 -. "dashboard metrics reused" .-> M4
 ```
