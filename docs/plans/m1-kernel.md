@@ -29,13 +29,19 @@
 
 ### 4. Remote DOM spike (timebox: one evening)
 - Pin the current `@remote-dom/core` version. In a scratch branch, render a vanilla tree in a worker and mirror it on the host through its connection API.
-- Answer three questions in the PR description: how mutation records serialize; how to attach our own node ids; how to intercept listener registration (for [ADR 0006](../adr/0006-render-bridge-over-remote-dom.md) point 3).
-- **Exit:** if any answer is "can't", stop and write an ADR choosing between patching Remote DOM and extending `legacy-vdom`.
+- Answer three questions in the PR description ([ADR 0006](../adr/0006-render-bridge-over-remote-dom.md) point 6): (a) are mutation records plain, structured-cloneable data? (b) can remote nodes map to our own ids? (c) can we intercept listener registration?
+- Also **estimate an in-house bridge**: which DOM APIs Preact and React actually call during render (log them through a Proxy on the shim), and a rough line count for our own worker-side DOM subset plus mutation recording. Record it in the PR, so replacing Remote DOM later is a costed option.
+- **Exit:** if (a), (b) or (c) is "no", stop and write a follow-up ADR choosing between patching Remote DOM and building our own bridge (starting from `legacy-vdom` and the estimate).
+
+### 4b. Bridge conformance suite
+- **Files:** `packages/host/test/render-bridge-conformance.ts`: `runBridgeConformance(makeBridgePair)`, run in Vitest browser mode.
+- Cases: create / update / move / remove nodes, attributes and text; keyed list reorders keep node identity and focus; sanitising (I9); node-id mapping both ways; listener registration and event round-trip; host-owned input rules; styles.
+- Run it against `legacy-vdom` first (some cases, such as keyed reorders, are expected to fail there and are marked as known gaps), then against every new bridge.
 
 ### 5. RenderBridge (isolate and host)
 - **Files:** `packages/runtime/src/render/remote-dom.ts`, `packages/host/src/render/remote-dom.ts`, the shared fmt constant `remote-dom@1`.
 - The isolate side installs the polyfill, exposes `ctx.root`, and batches mutations per microtask into one `patch`. The host side implements `HostRenderBridge`.
-- **Tests (browser):** create / update / move / remove nodes and attributes, text; a 1,000-node list; a batch round-trip leaves identical `innerHTML` on both sides.
+- **Tests (browser):** passes the conformance suite (task 4b) with no known gaps; a 1,000-node list; a batch round-trip leaves identical `innerHTML` on both sides.
 
 ### 6. Component registry and sanitising
 - **Files:** `packages/host/src/render/registry.ts`.
