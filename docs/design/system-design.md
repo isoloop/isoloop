@@ -56,23 +56,25 @@ flowchart TB
 flowchart LR
   protocol
   bus --> protocol
+  bus --> codec
   host --> protocol
-  isolate --> protocol
-  react --> isolate
-  preact --> isolate
+  runtime --> protocol
+  react --> runtime
+  preact --> runtime
   devtools --> host
   host -. "starts (URL only)" .-> bus
-  host -. "starts (URL only)" .-> isolate
+  host -. "starts (URL only)" .-> runtime
 ```
 
 | Package | Runs in | Depends on | Must not depend on |
 | --- | --- | --- | --- |
 | `@isoloop/protocol` | everywhere | nothing | anything |
-| `@isoloop/bus` | bus worker, Node | `protocol` | DOM types, `host`, `isolate` |
-| `@isoloop/host` | main thread | `protocol`, `@remote-dom/core` (host side, inside `RenderBridge` only) | `isolate`, `bus` source (it loads their bundles by URL) |
+| `@isoloop/codec` (M2b) | bus worker, Node | nothing | DOM types |
+| `@isoloop/bus` | bus worker, Node | `protocol`, `codec` (M2b) | DOM types, `host`, `runtime` |
+| `@isoloop/host` | main thread | `protocol`, `@remote-dom/core` (host side, inside `RenderBridge` only) | `runtime`, `bus` source (it loads their bundles by URL) |
 | `@isoloop/runtime` | isolate worker | `protocol`, `@remote-dom/core` (polyfill, inside `RenderBridge` only) | `host`, `bus` |
-| `@isoloop/react`, `@isoloop/preact` | isolate worker | `isolate`, the framework (peer dep) | `host` |
-| `@isoloop/devtools` | main thread | `host` | `isolate` |
+| `@isoloop/react`, `@isoloop/preact` | isolate worker | `runtime`, the framework (peer dep) | `host` |
+| `@isoloop/devtools` | main thread | `host` | `runtime` |
 
 Enforced with TypeScript project references plus an ESLint `no-restricted-imports` rule per package. `bus` builds with `lib: ["ES2022", "WebWorker"]` minus DOM, so a stray DOM type fails the build; its tests run in Node.
 
@@ -98,7 +100,8 @@ export type HostToIsolate =
   | Envelope<'init', InitPayload>
   | Envelope<'event', SerializedEvent>
   | Envelope<'result', CallResult>
-  | Envelope<'shutdown', { reason: ShutdownReason; graceMs: number }>;
+  | Envelope<'shutdown', { reason: ShutdownReason; graceMs: number }>
+  | Envelope<'reattach', { busPort: MessagePort }>;             // new bus port after a bus restart (ADR 0007)
 
 // Isolate port: isolate → host
 export type IsolateToHost =
@@ -115,7 +118,8 @@ export type IsolateToBus =
   | Envelope<'unsubscribe', { topic: string }>
   | Envelope<'commit', { topic: string; offset: number }>;
 export type BusToIsolate =
-  | Envelope<'deliver', { topic: string; records: BusRecord[] }>
+  | Envelope<'deliver', { topic: string; records: BusRecord[]; gap?: { from: number; to: number } }>
+  | Envelope<'reset', { topic: string; reason: 'bus_restart' }>    // memory topic lost in a bus restart (ADR 0007)
   | Envelope<'result', CallResult>;
 
 // Control port: host ↔ bus worker
@@ -125,7 +129,7 @@ export type HostToBus =
   | Envelope<'detach', { isolateId: string; keepOffsets: boolean }>
   | Envelope<'publish', { topic: string; key?: string; value: unknown }>;
 export type BusToHost =
-  | Envelope<'ready', { engine: string }>
+  | Envelope<'ready', { engine: string; storage: 'memory' | 'opfs'; restored: { topic: string; head: number }[] }>
   | Envelope<'beat', { lagMs: number }>
   | Envelope<'metrics', BusMetrics>
   | Envelope<'error', { message: string; stack?: string; fatal: boolean }>;
@@ -234,7 +238,7 @@ Transitions (matching the RFC lifecycle diagram):
 
 Non-fatal `error` messages (a caught exception in a handler) are only reported (`isolate:error`). They don't change state.
 
-The supervisor also tracks the bus worker, with all-for-one semantics ([ADR 0007](../adr/0007-bus-worker-supervision.md)).
+The supervisor also tracks the bus worker. A bus crash doesn't restart isolates: they get a new bus port (`reattach`) and keep running ([ADR 0007](../adr/0007-bus-worker-supervision.md), §7.7).
 
 ### 4.4 Compositor
 
@@ -334,6 +338,7 @@ type TopicDef<T> = {
   schema?: StandardSchemaV1<T>;
   retention: { kind: 'last-n'; n: number } | { kind: 'time'; ms: number } | { kind: 'compacted' };
   maxRecordBytes?: number;                       // default 256 KiB, rough estimate by structured size
+  durability?: 'memory' | 'persistent';          // default 'memory'; 'persistent' = OPFS (ADR 0007, M2b)
 };
 function topic<T>(name: string, def: Omit<TopicDef<T>, 'name'>): TopicDef<T>;
 ```
@@ -356,6 +361,22 @@ interface LogEngine {
 ```
 
 The TS engine stores each topic as a chunked array plus, for compacted topics, a `Map<key, offset>`. Retention runs on append (`last-n`), on a 1 s timer (`time`), and at a dirty-ratio threshold (`compacted`). Offsets are monotonic per topic and never reused. The M5 WASM engine implements the same interface, and a shared conformance test suite runs against both.
+
+**Storage under the engine** ([ADR 0007](../adr/0007-bus-worker-supervision.md)). The engine writes through a `LogStorage` for topics with `durability: 'persistent'`:
+
+```ts
+interface LogStorage {
+  open(): Promise<StoredState>;                                   // segments + offsets found on disk
+  appendBatch(topic: string, encoded: Uint8Array[]): void;        // buffered; group commit every 5 ms / 256 records
+  flush(): Promise<void>;                                         // resolves when the batch is durable → publish acked
+  saveOffsets(offsets: Record<string, Record<string, number>>): void;
+  rewrite(topic: string, keep: (offset: number) => boolean): Promise<void>;   // retention/compaction on disk
+  readSegment(topic: string, fromOffset: number): Promise<Uint8Array[]>;      // replay of evicted segments
+  quarantineNewest(): Promise<string[]>;                          // safe mode
+}
+```
+
+`MemoryStorage` (M2) is a no-op. `OpfsStorage` (M2b) keeps one directory per topic, segment files of up to 4 MiB, and an offsets file, all accessed through sync access handles inside the bus worker, under a Web Lock so only one tab writes. Records are encoded by a shared binary codec (`@isoloop/codec`, also used by M5).
 
 ### 6.3 Broker
 
@@ -488,7 +509,30 @@ sequenceDiagram
 
 ### 7.7 Bus worker crash
 
-Covered in [ADR 0007](../adr/0007-bus-worker-supervision.md): every isolate goes to `restarting`, a new bus worker boots, then isolates restart and re-subscribe from `earliest`.
+Isolates keep running; only their bus connection is replaced ([ADR 0007](../adr/0007-bus-worker-supervision.md)).
+
+```mermaid
+sequenceDiagram
+  participant B as Bus worker (old)
+  participant K as Kernel/Supervisor
+  participant B2 as Bus worker (new)
+  participant S as OPFS
+  participant I as Isolate (still running)
+  B-->>K: Worker.onerror, or no beat past killAfterMs
+  K->>B: terminate()
+  Note over I: BusClient buffers publishes
+  K->>B2: new Worker + boot {contractsUrl, topics}
+  B2->>S: open(): load persistent segments + offsets
+  B2->>K: ready {storage:'opfs', restored}
+  K->>B2: attach {isolateId, grants, port}
+  K->>I: reattach {busPort}
+  I->>B2: subscribe (re-sent for every topic)
+  B2->>I: deliver (persistent topic, from committed+1)
+  B2->>I: reset {topic, reason:'bus_restart'} (memory topic)
+  I->>B2: publish (buffered records)
+```
+
+An isolate with `bus: { onReset: 'restart' }` is restarted instead of receiving `reset`. If the new bus crashes again while loading, safe mode sets the newest segments aside and the kernel emits `bus:recovered`.
 
 ## 8. Invariants
 
@@ -506,6 +550,8 @@ Each invariant has at least one automated test (unit **U**, browser **B**, Playw
 | I8 | A frame applies at least one batch, and no more than budget + one batch | U (compositor with fake clock) |
 | I9 | Unknown tags render as `div`; `script`/`iframe`/`on*` never appear | U (registry) + E2E |
 | I10 | Protocol mismatch fails at `init` with a clear error, never mid-render | U |
+| I11 | A bus restart never restarts an isolate (unless it opted in); every subscription to a memory topic gets exactly one `reset` | B + E2E (M2) |
+| I12 | A persistent topic loses no acknowledged record across a bus crash or a page reload | U (storage fault injection) + E2E (M2b) |
 
 ## 9. Performance budgets
 
@@ -541,7 +587,8 @@ Starting targets, to be calibrated in M1/M2 benches and then enforced in CI with
 | Single-writer rendering | §4.4–4.6, ADR 0006 | M1 |
 | Messages as the only contract | §3, §6.1, ADR 0003 | M0–M2 |
 | Durable, replayable bus | §6, §7.3–7.4, ADR 0005 | M2 |
-| Supervision | §4.3, §7.4–7.5, ADR 0007 | M1 (isolates), M2 (bus) |
+| Supervision | §4.3, §7.4–7.5, §7.7, ADR 0007 | M1 (isolates), M2 (bus) |
+| Persistence | §6.2 `LogStorage`, ADR 0007 | M2b |
 | Framework-agnostic isolates | §5, adapters | M3 |
 | Parallel canvas charts | §4.7 `requestCanvas` | M3 |
 | Routing | ADR 0002 | M3 |

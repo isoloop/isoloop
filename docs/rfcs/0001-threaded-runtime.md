@@ -102,7 +102,7 @@ The bus is a small in-browser log, modelled on Kafka: each topic is an append-on
 - **Validation:** the broker rejects a record that fails its topic schema and reports it to the producer. A bad isolate can't poison other isolates' state.
 - **Backpressure:** each isolate has an inbox limit (default 1,000 records). When a blocked isolate's inbox is full, the broker stops pushing and the isolate catches up from the log when it's free; nothing is lost while retention allows.
 - **Request/response:** a thin layer on top: a `requests` topic plus a reply sent to the caller with a correlation id and a timeout.
-- **Persistence (later):** compacted topics can be written to IndexedDB, so state survives a page reload.
+- **Persistence:** topics marked `durability: 'persistent'` are written to the Origin Private File System, so they survive a bus worker crash and a page reload ([ADR 0007](../adr/0007-bus-worker-supervision.md), milestone M2b, before 0.1).
 - **Access control:** the isolate manifest declares which topics it may publish and subscribe to; the broker enforces it.
 
 **Placement and engines.** The broker runs in a dedicated bus worker from v1, so the main thread only draws. Log storage sits behind a pluggable engine interface (`append`, `read(fromOffset)`, `commit`, `compact`). v1 ships a plain TypeScript engine. A later Rust/WASM engine keeps the log in a `SharedArrayBuffer` ring buffer, so isolates read records straight from shared memory with no copy per subscriber. That engine needs a cross-origin-isolated host (COOP/COEP headers), so it stays opt-in and ships only if published benchmarks show it beating the TS engine.

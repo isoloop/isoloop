@@ -4,7 +4,7 @@
 
 **Done when** (RFC 0001): `0.1.0` is published with a launch post.
 
-Gets a full task list when M3 closes.
+Gets a full task list when M3 closes. Requires [M2b](m2b-durable-log.md) (durable log) to have landed.
 
 ## Main work items
 

@@ -8,7 +8,7 @@
 
 **In:** [design §6](../design/system-design.md#6-isoloopbus), the bus worker, direct `MessageChannel` wiring ([ADR 0005](../adr/0005-bus-topology-message-channels.md)), the isolate `BusClient`, `kernel.publish`/`subscribe`, bus supervision ([ADR 0007](../adr/0007-bus-worker-supervision.md)), the `isoloop.route.v1` system topic ([ADR 0002](../adr/0002-host-owns-routing.md)), and removal of `legacy-bus`.
 
-**Out:** IndexedDB persistence, the WASM engine (M5), devtools UI (M4; this milestone only emits metrics).
+**Out:** OPFS persistence ([M2b](m2b-durable-log.md); this milestone ships the `LogStorage` interface and the reattach path it needs), the WASM engine (M5), devtools UI (M4; this milestone only emits metrics).
 
 Tasks 1–6 are pure TypeScript in Node and can start right after M0, in parallel with M1.
 
@@ -21,6 +21,7 @@ Tasks 1–6 are pure TypeScript in Node and can start right after M0, in paralle
 ### 2. `LogEngine` interface and conformance suite
 - **Files:** `packages/bus/src/engine/types.ts`, `packages/bus/test/engine-conformance.ts` (a function `runEngineConformance(makeEngine)` that every engine must pass).
 - Cases: monotonic offsets; `read` ranges; `last-n`, `time` (fake clock) and `compacted` retention; `tail`/`head`; commits per consumer; compaction keeps the latest record per key and order among survivors.
+- Also define the `LogStorage` interface ([design §6.2](../design/system-design.md#62-logengine-interface)) and ship `MemoryStorage` (no-op), so M2b only adds `OpfsStorage`. Add `durability` to `TopicDef`; `'persistent'` is accepted but behaves as `'memory'` until M2b, with a one-time console warning.
 - Property-based tests (fast-check) for I5: random append/compact sequences preserve per-key order.
 
 ### 3. TS engine
@@ -46,12 +47,12 @@ Tasks 1–6 are pure TypeScript in Node and can start right after M0, in paralle
 
 ### 8. Host bus controller
 - **Files:** `packages/host/src/bus/controller.ts`. Starts the bus worker before isolates, creates a `MessageChannel` per isolate start, sends `attach` / `detach`, and implements `kernel.publish` / `kernel.subscribe` over the control port. Kernel config gains `topics` and `contracts`.
-- Supervisor: watch the bus heartbeat; all-for-one restart; `bus:crash`, `bus:restart`, `bus:failed` events.
-- **Tests (browser):** a forced bus worker crash (test hook) restarts every isolate, and they resubscribe from `earliest`.
+- Supervisor: watch the bus heartbeat; on a crash, start a new bus worker and send every running isolate `reattach { busPort }` instead of restarting it ([ADR 0007](../adr/0007-bus-worker-supervision.md)); restart only isolates with `bus: { onReset: 'restart' }`; restart limit; `bus:crash`, `bus:restart`, `bus:failed` events.
+- **Tests (browser):** a forced bus worker crash (test hook) leaves every isolate in `running` (I11), each memory-topic subscription gets exactly one `reset`, and an `onReset: 'restart'` isolate is restarted.
 
 ### 9. Isolate `BusClient`
-- **Files:** `packages/runtime/src/bus-client.ts`. `publish` returns a promise settled by `result`; `subscribe` with `autoCommit`; `request`; resubscribing after the bus port is replaced.
-- **Tests (browser):** a handler that throws doesn't commit, and the record is redelivered on the next restart (at-least-once).
+- **Files:** `packages/runtime/src/bus-client.ts`. `publish` returns a promise settled by `result`; `subscribe` with `autoCommit` and `onReset`; `request`; on `reattach`, swap the port, re-send every subscription, and flush publishes buffered while the bus was down (reject past the inbox limit with `bus_unavailable`).
+- **Tests (browser):** a handler that throws doesn't commit, and the record is redelivered on the next restart (at-least-once); publishes made during a bus restart arrive after it, in order.
 
 ### 10. System route topic
 - The kernel publishes `isoloop.route.v1` on start and on `popstate`/`navigate`. The `navigate` host call goes through `onNavigate`.

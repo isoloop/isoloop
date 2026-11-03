@@ -6,7 +6,7 @@
 
 ## Scope
 
-**In:** workspace tooling, `@isoloop/protocol` types, a minimal `host` and `isolate` that are just enough to run the PoC (the `legacy-vdom` render path, main-thread pub/sub), `examples/four-loops`, and a Playwright smoke test.
+**In:** workspace tooling, `@isoloop/protocol` types, a minimal `host` and `runtime` that are just enough to run the PoC (the `legacy-vdom` render path, main-thread pub/sub), `examples/four-loops`, and a Playwright smoke test.
 
 **Out:** Remote DOM, the bus worker, schemas and offsets, restart limits, adapters. The M0 host and isolate code is deliberately thin. M1 replaces most of it behind the same package names.
 
@@ -28,7 +28,7 @@ Keep the PoC's behaviour exactly, including its quirks (the pub/sub doesn't echo
 
 ### 1. Workspace skeleton
 - **Files:** `package.json` (private, `packageManager: pnpm@10`), `pnpm-workspace.yaml` (`packages/*`, `examples/*`, `bench`), `.nvmrc` (Node LTS), `.gitignore`, `.editorconfig`, `tsconfig.base.json` (strict, `moduleResolution: bundler`, `verbatimModuleSyntax`, ES2022 target), `tsconfig.json` with project references.
-- Empty packages with `package.json` + `tsconfig.json` + `src/index.ts`: `protocol`, `host`, `isolate`, `bus`. Names follow `@isoloop/*` ([ADR 0004](../adr/0004-npm-name.md)), with `"type": "module"` and `exports` maps.
+- Empty packages with `package.json` + `tsconfig.json` + `src/index.ts`: `protocol`, `host`, `runtime`, `bus`. Names follow `@isoloop/*` ([ADR 0004](../adr/0004-npm-name.md)), with `"type": "module"` and `exports` maps.
 - **Test:** `pnpm -r exec tsc --noEmit` passes.
 
 ### 2. Lint, format, dependency rules
@@ -38,7 +38,7 @@ Keep the PoC's behaviour exactly, including its quirks (the pub/sub doesn't echo
 
 ### 3. Build and unit tests
 - Build each package with Vite library mode (or `tsc -b` for type-only `protocol`), emitting ESM + `.d.ts`.
-- Vitest workspace config: `node` environment for `protocol` and `bus`, browser mode (Playwright provider, Chromium) for `isolate` and `host`.
+- Vitest workspace config: `node` environment for `protocol` and `bus`, browser mode (Playwright provider, Chromium) for `runtime` and `host`.
 - **Test:** one trivial test per package runs in `pnpm test`.
 
 ### 4. `@isoloop/protocol` v1 types
