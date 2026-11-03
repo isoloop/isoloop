@@ -1,6 +1,6 @@
 # ADR 0005: Isolates talk to the bus worker over direct MessageChannels
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-03
 - **Refines:** RFC 0001 "Bus bridge" and "Placement and engines"
 
