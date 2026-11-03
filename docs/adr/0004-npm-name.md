@@ -41,5 +41,5 @@ Checked 2026-11-03:
 - [x] npm org `isoloop` (scope `@isoloop/*`).
 - [x] GitHub org `isoloop`, repo `isoloop/isoloop`.
 - [x] Old `sabbin/federa` repo no longer public.
-- [ ] Placeholder `isoloop@0.0.0` (unscoped, for the CLI) published to reserve the name. Until then anyone can take it.
+- [x] Placeholder `isoloop@0.0.0` (unscoped, for the CLI) published to reserve the name.
 - [x] Local folder renamed to `isoloop`.
