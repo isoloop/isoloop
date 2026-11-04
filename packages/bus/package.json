@@ -10,7 +10,9 @@
     "url": "git+https://github.com/isoloop/isoloop.git",
     "directory": "packages/bus"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "@isoloop/source": "./src/index.ts",
