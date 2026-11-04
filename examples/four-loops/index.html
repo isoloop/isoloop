@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Four loops: one event loop per pane</title>
+  </head>
+  <body>
+    <header>
+      <h1>Four loops</h1>
+      <span class="chip" id="fps">main: -- fps</span>
+      <button id="block-main">Block main thread 1s</button>
+      <div class="buslog" id="buslog">bus: idle</div>
+    </header>
+    <main id="root"></main>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

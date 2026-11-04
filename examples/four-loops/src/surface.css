@@ -1,0 +1,73 @@
+/* Adopted into every isolate's shadow root. Custom properties come from the page. */
+* {
+  box-sizing: border-box;
+}
+button {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+button:hover {
+  border-color: var(--muted);
+}
+button.primary {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: transparent;
+}
+button.small {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+input {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  min-width: 0;
+  flex: 1;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.big {
+  font-size: 34px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.mono {
+  font-family: var(--mono);
+}
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+.log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 12px var(--mono);
+  width: 100%;
+}
+.log li {
+  padding: 3px 0;
+  border-bottom: 1px dashed var(--border);
+}
