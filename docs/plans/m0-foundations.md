@@ -63,7 +63,7 @@ Keep the PoC's behaviour exactly, including its quirks (the pub/sub doesn't echo
 
 ### 7. `examples/four-loops`
 - Vite app. The four isolates are separate entry files, built as worker-importable ES modules. Header chrome and styles come from the PoC.
-- `pnpm --filter four-loops dev` serves it. `vite.config.ts` copies the `isolate-bootstrap.js` bundle into `public/`.
+- `pnpm dev` (`pnpm --filter four-loops dev`) serves it. The bootstrap is imported with `?worker&url`, the isolates with `?isolate`, a small plugin in `vite.config.ts` that emits each isolate as its own chunk with its default export kept (Vite drops a worker entry's exports). Nothing has to be built first.
 - **Check:** compare side by side with the PoC artifact: every button behaves the same.
 
 ### 8. Playwright smoke tests

@@ -1,8 +1,23 @@
 # Isoloop
 
+[![CI](https://github.com/isoloop/isoloop/actions/workflows/ci.yml/badge.svg)](https://github.com/isoloop/isoloop/actions/workflows/ci.yml)
+
 **A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-Status: **design stage, no code in this repo yet.** The design is written: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) (all 8 accepted) and [milestone plans](docs/plans/README.md). A single-file proof of concept works and gets ported in M0 (repo foundations), which is next.
+Status: **M0 done, pre-release.** The proof of concept runs from the repo on a thin first host and runtime, with CI on Chromium, Firefox and WebKit; nothing is on npm yet. M1 (the real kernel) is next. The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
+
+## Run the demo
+
+**Live:** [isoloop.github.io/isoloop](https://isoloop.github.io/isoloop/). Four isolates, four event loops: block one, crash one, or block the main thread, and watch what keeps running.
+
+Locally, with Node 26 and pnpm 12 ([setup](CONTRIBUTING.md#setup)):
+
+```sh
+pnpm install
+pnpm dev
+```
+
+The source is in [`examples/four-loops`](examples/four-loops): each pane is an isolate module in `src/isolates/`, spawned by [`@isoloop/host`](packages/host) into a shadow-DOM surface.
 
 ## Why
 
@@ -130,9 +145,9 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 7. **M4 Devtools and 0.1:** health and bus overlay, docs site, npm release.
 8. **M5 Shared-memory engine:** opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
 
-## Planned repo layout
+## Repo layout
 
-Plain pnpm workspaces.
+Plain pnpm workspaces. M0 has `protocol`, `host`, `runtime`, `bus` (empty until M2) and `four-loops`; the rest arrives with its milestone.
 
 ```text
 packages/  protocol · host · runtime · bus · codec (M2b) · bus-wasm (M5) · react · preact · devtools
@@ -151,6 +166,7 @@ Parallel painting of DOM surfaces (canvas isolates painting through `OffscreenCa
 - [System design](docs/design/system-design.md): packages, interfaces, sequences and invariants
 - [Architecture decision records](docs/adr/README.md)
 - [Implementation plans](docs/plans/README.md), one per milestone
+- [Contributing](CONTRIBUTING.md): setup, scripts, editors and conventions
 - [Would like](docs/would-like.md): ideas deferred or to explore, not planned
 - Prior art: [Shopify Remote DOM](https://github.com/Shopify/remote-dom), [Neo.mjs](https://github.com/neomjs/neo), [Web Fragments](https://github.com/IgorMinar/reframed), [Aiga](https://aiga.js.org/), [Garfish](https://github.com/web-infra-dev/garfish)
 
