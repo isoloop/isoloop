@@ -1,7 +1,9 @@
 {
   "extends": "../../tsconfig.lib.json",
   "compilerOptions": {
-    "lib": ["ES2022"]
+    // WebWorker, not DOM: protocol is shared by the main thread, the workers and
+    // Node, and only needs the cross-context types (MessagePort).
+    "lib": ["ES2022", "WebWorker"]
   },
   "include": ["src"]
 }
