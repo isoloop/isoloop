@@ -148,14 +148,14 @@ export type InitPayload = {
 
 export type BusRecord = { offset: number; key?: string; value: unknown; ts: number; producer: string };
 export type StartPosition = 'latest' | 'earliest' | 'committed';
-export type Grants = { publish: string[]; subscribe: string[] };
+export type Grants = { publish: string[]; subscribe: string[]; navigate?: boolean };   // navigate: programmatic navigate() allowed (ADR 0002), default false
 export type HostMethod = 'measure' | 'focus' | 'navigate' | 'scrollIntoView' | 'requestCanvas';
 export type CallResult = { ok: true; value: unknown } | { ok: false; error: { code: string; message: string } };
 ```
 
 `init` / `ready` are the version handshake. The host sends its supported range. The isolate replies with the runtime version and render format it actually uses, or posts `error { fatal: true, code: 'protocol_mismatch' }`. Each side drops (and counts) envelopes with an unknown `v` or `t`, so old isolates don't crash on new message types.
 
-The package also exports `isEnvelope`, `assertNever`, the error-code enum, and the `Grants` matcher (topic globs like `catalog.*`).
+The package also exports `isEnvelope`, `assertNever`, the error-code enum, the `Grants` matcher (topic globs like `catalog.*`), and `routeTopic` (`isoloop.route.v1`, value `{ href, pathname, path, search, hash, state }`, [ADR 0002](../adr/0002-host-owns-routing.md)). Routing error codes: `cross_origin`, `routing_disabled`, `navigate_failed`.
 
 ## 4. `@isoloop/host`
 
@@ -174,8 +174,12 @@ type KernelConfig = {
   heartbeat?: { everyMs: number; blockedAfterMs: number; killAfterMs: number; readyTimeoutMs: number };
   compositor?: { frameBudgetMs: number };
   workers?: { bus: string; isolateBootstrap: string; budget?: number };   // bundle URLs; budget = soft worker-count warning, default 32 (ADR 0001)
-  onNavigate?: (req: NavigateRequest) => boolean | Promise<boolean>;
+  routing?: boolean;                        // default true; false = no route topic, no link interception, navigate rejects routing_disabled (ADR 0002)
+  basePath?: string;                        // default '/'; must match the host router's basename
+  onNavigate?: (req: NavigateRequest) => boolean | Promise<boolean>;   // default: history.pushState/replaceState; true = accepted, not finished
 };
+
+type NavigateRequest = { href: string; replace: boolean; state?: unknown; from: string };   // href absolute, same-origin; from = isolate id
 
 interface Kernel {
   spawn(manifest: IsolateManifest): IsolateHandle;     // manifest.surface optional (ADR 0008); manifest.pool reserved, rejected with pools_unsupported until M2c;
@@ -185,8 +189,9 @@ interface Kernel {
   resume(id: string): Promise<void>;                   // wake a suspended isolate (ADR 0001); no-op unless suspended
   publish<T>(topic: TopicDef<T>, rec: { key?: string; value: T }): Promise<void>;
   subscribe<T>(topic: TopicDef<T>, fn: (r: BusRecord) => void, opts?: { from?: StartPosition }): () => void;
-  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:crash, isolate:failed, bus:crash, ...
+  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:crash, isolate:failed, bus:crash, route:state_dropped, route:navigate_error, ...
   isolates(): IsolateSnapshot[];                                      // used by devtools
+  syncRoute(): void;                                   // host router changed the URL; republish isoloop.route.v1 if href/state differ (ADR 0002)
   destroy(): Promise<void>;
 }
 ```
@@ -273,14 +278,14 @@ interface HostRenderBridge {
 }
 ```
 
-**Component registry.** An allow-list of safe HTML tags (the PoC's list plus `a`, `img`, `table` family, `form` family, `svg` subset), plus host components (`iso-button` → design-system element) registered through `KernelConfig.components`. Unknown tags render as `div`. `script`, `iframe`, `object`, `embed`, `style` and `on*` attributes are never created. `href`/`src` are restricted to `http(s):`, `mailto:` and relative URLs.
+**Component registry.** An allow-list of safe HTML tags (the PoC's list plus `a`, `img`, `table` family, `form` family, `svg` subset), plus host components (`iso-button` → design-system element) registered through `KernelConfig.components`. Unknown tags render as `div`. `script`, `iframe`, `object`, `embed`, `style` and `on*` attributes are never created. `href`/`src` are restricted to `http(s):`, `mailto:` and relative URLs. With routing on, same-origin `<a href>` is rewritten to the absolute URL from the route resolver (`/x` → `basePath + x`) on render and on every patch that changes it ([ADR 0002](../adr/0002-host-owns-routing.md)).
 
 ### 4.6 EventBridge and inputs
 
 - One listener per event type on each shadow root, for a fixed set: `click`, `dblclick`, `input`, `change`, `keydown`, `keyup`, `submit`, `focusin`, `focusout`, `pointerdown`, `pointerup`. Pointer moves are opt-in per node and throttled to one per frame.
 - An event fires only if the isolate registered a listener for `(nodeId, type)` on the target or an ancestor. Those registrations travel in patches.
 - Serialized event: `{ type, target: nodeId, currentTargets: nodeId[], value?, checked?, key?, code?, mods, x?, y?, button? }`.
-- **Default actions:** `submit` and same-origin `<a>` clicks are always prevented on the host; links become `navigate` ([ADR 0002](../adr/0002-host-owns-routing.md)). Other defaults run normally. An isolate can't call `preventDefault` synchronously, so the docs list this limit.
+- **Default actions:** `submit` and with routing on, plain primary-button clicks on same-origin `<a>` (hash-only included) are always prevented on the host and go to `onNavigate` with `from` set to the isolate; they need no `navigate` grant. Clicks with a modifier key, a non-primary button, `target` other than `_self`, or `download` keep the browser's behaviour ([ADR 0002](../adr/0002-host-owns-routing.md)). Other defaults run normally. An isolate can't call `preventDefault` synchronously, so the docs list this limit.
 - **Host-owned inputs:** `input`, `textarea` and `select` keep their own value and caret on the host. The isolate gets `input` events with the value. A `value` from the isolate is applied only if it differs from the live value and the element isn't focused, or the isolate sets `force`. That avoids caret jumps and the per-keystroke round trip.
 
 ### 4.7 Host calls
@@ -291,7 +296,7 @@ interface HostRenderBridge {
 | --- | --- |
 | `measure(nodeId)` | `getBoundingClientRect` relative to the surface, read in the next rAF after pending patches apply |
 | `focus(nodeId)` / `scrollIntoView(nodeId, opts)` | Applied after pending patches |
-| `navigate({ href, replace })` | Goes through `onNavigate`; result is `true`/`false` |
+| `navigate({ href, replace, state })` | Needs `grants.navigate`, else `forbidden`; `routing_disabled` when routing is off. `/x` resolves against `basePath`, other hrefs against the document URL; cross-origin rejects with `cross_origin`. Otherwise goes through `onNavigate` with `from` set to the isolate id; result is `true` (accepted) / `false` (refused), a throw rejects with `navigate_failed`. After `true` the kernel runs `syncRoute()` and, if it published, replies after the bus commit (at once if the bus is down). Available to headless isolates |
 | `requestCanvas(nodeId, { width, height })` | Host takes a `<canvas>` it rendered for that node, calls `transferControlToOffscreen()`, and returns the `OffscreenCanvas` as a transferable. Resizes arrive later as `event { type: 'resize' }` |
 
 ### 4.8 Styles
@@ -314,7 +319,7 @@ interface IsolateContext {
   root?: RemoteRootElement;                        // render target (Remote DOM); undefined when headless
   bus: BusClient;
   host: { measure(id: string): Promise<Rect>; focus(id: string): Promise<void>;
-          navigate(href: string, o?: { replace?: boolean }): Promise<boolean>;
+          navigate(href: string, o?: { replace?: boolean; state?: unknown }): Promise<boolean>;
           requestCanvas(el: Element, size: Size): Promise<OffscreenCanvas> };
   styles(css: string | string[]): void;
   onShutdown(fn: (reason: ShutdownReason) => void | Promise<void>): void;   // reason includes 'suspend'
@@ -391,7 +396,7 @@ interface LogStorage {
 
 Responsibilities, in order, for a `publish`:
 
-1. **ACL:** the topic must match `grants.publish` for this isolate, or the result is error `forbidden`.
+1. **ACL:** the topic must match `grants.publish` for this isolate, or the result is error `forbidden`. System topics (`isoloop.*`) are always `forbidden` to isolates whatever the grants, and `kernel.publish` rejects them on the main thread; only the kernel's internal path publishes them. Every isolate may subscribe to them without a grant ([ADR 0002](../adr/0002-host-owns-routing.md)).
 2. **Topic exists**, or error `unknown_topic`.
 3. **Size** check, or error `too_large`.
 4. **Schema:** `schema['~standard'].validate(value)`, or error `invalid` with the issues.
@@ -602,7 +607,7 @@ Starting targets, to be calibrated in M1/M2 benches and then enforced in CI with
 | Persistence | §6.2 `LogStorage`, ADR 0007 | M2b |
 | Framework-agnostic isolates | §5, adapters | M3 |
 | Parallel canvas charts | §4.7 `requestCanvas` | M3 |
-| Routing | ADR 0002 | M3 |
+| Routing | §4.1 `syncRoute`, §4.7 `navigate`, ADR 0002 | M2 |
 | Devtools | §6.3 metrics, `Kernel.isolates()`, compositor stats | M4 |
 | Shared-memory engine | §6.2 `LogEngine` | M5 |
 

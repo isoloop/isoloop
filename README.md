@@ -2,7 +2,7 @@
 
 **A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-Status: **design stage, no code in this repo yet.** The design is written: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) (6 accepted, 2 under review) and [milestone plans](docs/plans/README.md). A single-file proof of concept works and gets ported in M0 (repo foundations), which is next.
+Status: **design stage, no code in this repo yet.** The design is written: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) (7 accepted, 1 under review) and [milestone plans](docs/plans/README.md). A single-file proof of concept works and gets ported in M0 (repo foundations), which is next.
 
 ## Why
 
