@@ -1,0 +1,9 @@
+{
+  // Root config files (vitest.config.ts and later playwright.config.ts).
+  // Packages have their own tsconfig.json.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"]
+  },
+  "include": ["*.config.ts"]
+}

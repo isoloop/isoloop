@@ -6,10 +6,15 @@ packages:
 # Every tool version lives here, pinned exactly (ADR 0009, rule 8).
 # Packages reference them with "catalog:".
 catalog:
+  '@vitest/browser-playwright': 5.0.5
   oxfmt: 0.75.0
   oxlint: 1.90.0
   oxlint-tsgolint: 7.0.2005
+  playwright: 1.64.1
+  tsdown: 0.23.4
   typescript: 7.0.2
+  vite: 8.3.5
+  vitest: 5.0.5
 
 # Supply chain (ADR 0009, rule 9).
 minimumReleaseAge: 4320 # minutes: refuse versions younger than 3 days
