@@ -10,7 +10,7 @@
 Isoloop is an open-source browser runtime that runs every isolate (a UI widget, a micro-frontend, or headless logic such as a state store) in its own Web Worker, so no isolate can freeze, crash or read another. The main thread keeps one job: drawing what visual isolates describe; headless isolates never touch it except for heartbeats. Isolates talk only through a log-based message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
 - **Pitch:** code that shares data shouldn't have to share an event loop. Run independent pieces of front-end code (dashboard widgets, plugins, AI-generated widgets, headless engines such as state stores or sync engines) side by side, sharing data through the bus, without letting any one of them break the host.
-- **Who it is for:** heavy dashboards first, whose widgets share data but shouldn't share an event loop; also platform teams that host other teams' or vendors' code (trusted but unreliable, not hostile), and apps with heavy headless engines. Scope is the browser tab only.
+- **Who it is for:** heavy dashboards first, whose widgets share data but shouldn't share an event loop; also platform teams that host other teams' or vendors' code (trusted but unreliable, not hostile), apps with heavy headless engines, and backend-less apps whose fetching and aggregating pipelines run in the tab and ship to a static host. Scope is the browser tab only.
 - **Name:** Isoloop, for an isolated event loop per unit. It was called Federa until 2026-11-03, when the `@federa` npm scope turned out to be taken ([ADR 0004](../adr/0004-npm-name.md)). The unit of isolation is an *isolate*; an isolate that draws UI has a *surface* ([ADR 0008](../adr/0008-isolates-and-surfaces.md)).
 - **Where it stands:** a working proof of concept exists (four isolates, bus, heartbeats, restart supervisor).
 
@@ -268,7 +268,7 @@ Eight milestones, each ending in something that can be demoed, released and writ
 3. **M2, bus:** topics with schemas, retention, offsets, replay and backpressure, in a dedicated bus worker behind the engine interface, with the TS engine. Done when a restarted isolate rebuilds its state from the log in a test.
 4. **M2b, durable log:** topics with `durability: 'persistent'` written to OPFS, surviving a bus worker crash and a page reload, with flush on `freeze`/`pagehide` ([ADR 0007](../adr/0007-bus-worker-supervision.md)). Depends on M2; must land before the 0.1 release. Done when a persistent topic loses no acknowledged record across a bus crash or a page reload in an E2E test.
 5. **M2c, worker pools:** opt-in named pools for headless isolates (`manifest.pool`), supervised as a group, starting with a benchmark gate that can drop pools if they don't pay off ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). Depends on M2; not required for 0.1. Done when pooled and own-worker isolates run side by side and a pool crash restarts only that pool.
-6. **M3, adapters and dashboard sandbox:** Preact and React adapters with `useTopic` and `usePublish`, plus `examples/dashboard`, the flagship demo: a sales dashboard with a data isolate, 3 `OffscreenCanvas` charts, a virtualized orders table, a shared filter topic and stress controls per widget. A toggle runs the same dashboard single-threaded or on Isoloop, beside a live metrics panel: main-thread fps, long tasks, input latency, loop lag per worker, memory and bus throughput. Done when it's live on a public URL and a recorded comparison is in the README.
+6. **M3, adapters and dashboard sandbox:** Preact and React adapters with `useTopic` and `usePublish`, plus `examples/dashboard`, the flagship demo: a backend-less markets dashboard with one headless feed isolate per exchange (public WebSocket feeds, or recorded ticks replayed for reproducible runs), an aggregator, an alerts isolate, 3 `OffscreenCanvas` charts, a virtualized trades table, a shared filter topic and stress controls per widget. A toggle runs the same dashboard single-threaded or on Isoloop, beside a live metrics panel: main-thread fps, long tasks, input latency, loop lag per worker, memory and bus throughput. Done when it's live on a public URL and a recorded comparison is in the README.
 7. **M4, devtools and 0.1 release:** an overlay showing each isolate's loop health and a live bus log with replay; docs site; npm publish. Done at `0.1.0` with a launch post.
 8. **M5, shared-memory engine:** the opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine. Done when the benchmark results are published, whichever engine wins.
 
@@ -288,7 +288,7 @@ isoloop/
     devtools/      overlay panel
   examples/
     four-loops/    the original minimal demo
-    dashboard/     sales dashboard sandbox: single-thread vs Isoloop, live metrics
+    dashboard/     markets dashboard sandbox: single-thread vs Isoloop, live metrics
   docs/            site + RFCs
   bench/           click-to-paint, bus throughput, memory per isolate
 ```
