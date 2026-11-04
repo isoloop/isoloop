@@ -18,6 +18,10 @@
       "@isoloop/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./bootstrap": {
+      "@isoloop/source": "./src/bootstrap.ts",
+      "import": "./dist/bootstrap.js"
     }
   },
   "publishConfig": {
@@ -25,11 +29,14 @@
       ".": {
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"
+      },
+      "./bootstrap": {
+        "import": "./dist/bootstrap.js"
       }
     }
   },
   "scripts": {
-    "build": "tsdown --platform browser --dts",
+    "build": "tsdown",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
