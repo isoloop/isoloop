@@ -1,9 +1,11 @@
 {
-  // Config files: the root ones and per-package build configs. They aren't
-  // published, so they stay out of the packages' isolatedDeclarations configs.
+  // Config files (root and per package) and the e2e tests. None of it is
+  // published, so it stays out of the packages' isolatedDeclarations configs.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2022"]
+    "lib": ["ES2022"],
+    // All of it runs in Node: configs, and the Playwright test runner.
+    "types": ["node"]
   },
-  "include": ["*.config.ts", "packages/*/*.config.ts", "examples/*/*.config.ts"]
+  "include": ["*.config.ts", "packages/*/*.config.ts", "examples/*/*.config.ts", "e2e"]
 }

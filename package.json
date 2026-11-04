@@ -14,12 +14,15 @@
     "test": "vitest run",
     "test:node": "vitest run --project protocol --project bus",
     "test:browser": "vitest run --project host --project runtime",
-    "test:install-browsers": "playwright install chromium",
+    "e2e": "playwright test",
+    "test:install-browsers": "playwright install chromium firefox webkit",
     "build": "pnpm -r build",
     "dev": "pnpm --filter four-loops dev",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
