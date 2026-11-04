@@ -31,6 +31,6 @@ M1 and M2 can overlap: `packages/bus` is pure TypeScript with no browser depende
 - **Task size:** about one evening (2–3 h). If a task grows past two evenings, split it.
 - **Every task names its files and its tests.** A task is done when its tests pass in CI.
 - **Each milestone ends with a demo and a write-up** (a short post or README section). That's the RFC's rule: each milestone ends in something that can be demoed, released and written about.
-- **Branches:** `m<N>/<task-slug>`, squash-merged to `main`. Changesets record user-facing changes from M1 on.
+- **Branches:** `<type>/<slug>`, squash-merged to `main`. Types: `feature/` (new behaviour), `fix/` (a bug), `chore/` (tooling, deps, CI, refactors with no behaviour change), `docs/` (docs only). Milestone tasks put the milestone first in the slug, e.g. `feature/m0-workspace-skeleton`. The squash commit uses the matching conventional prefix (`feat:`, `fix:`, `chore:`, `docs:`). Changesets record user-facing changes from M1 on.
 - **Decisions** made during a milestone become ADRs in [`docs/adr`](../adr/README.md).
 - **Deferred ideas** live in [`docs/would-like.md`](../would-like.md), not in a plan, until a milestone takes them on.
