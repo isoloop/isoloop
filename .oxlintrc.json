@@ -30,7 +30,10 @@
     "typescript/no-unsafe-return": "error",
     "typescript/restrict-plus-operands": "error",
     "typescript/switch-exhaustiveness-check": "error",
-    "typescript/no-deprecated": "error"
+    "typescript/no-deprecated": "error",
+    // For window.postMessage. Isoloop posts to workers and ports, which take no
+    // targetOrigin, so every hit would be a false positive.
+    "unicorn/require-post-message-target-origin": "off"
   },
   // Dependency rules (system design §2). Each package lists the @isoloop/*
   // packages it may import; everything else under the scope is an error.
