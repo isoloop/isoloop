@@ -7,10 +7,16 @@
     "node": ">=26"
   },
   "scripts": {
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint --type-aware",
     "typecheck": "pnpm -r typecheck",
-    "check": "pnpm typecheck"
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck"
   },
   "devDependencies": {
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
     "typescript": "catalog:"
   }
 }

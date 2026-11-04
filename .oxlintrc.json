@@ -1,0 +1,105 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // ADR 0009, rule 5: every rule is an error or off; type-aware on every run.
+  "options": {
+    "typeAware": true,
+    "denyWarnings": true,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error",
+    "pedantic": "off",
+    "style": "off",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  // Type-aware rules outside the categories above, added by name: promise
+  // handling, `any` leaking out of message payloads, and exhaustive switches
+  // over message unions.
+  "rules": {
+    "typescript/no-misused-promises": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/return-await": ["error", "in-try-catch"],
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/restrict-plus-operands": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/no-deprecated": "error"
+  },
+  // Dependency rules (system design §2). Each package lists the @isoloop/*
+  // packages it may import; everything else under the scope is an error.
+  // pnpm's strict node_modules covers third-party packages.
+  "overrides": [
+    {
+      "files": ["packages/protocol/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/*"],
+                "message": "protocol depends on nothing (system design §2)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/bus/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/*", "!@isoloop/protocol", "!@isoloop/codec"],
+                "message": "bus may only import protocol and codec (system design §2)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/host/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/*", "!@isoloop/protocol"],
+                "message": "host may only import protocol; it loads bus and runtime bundles by URL (system design §2)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/runtime/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/*", "!@isoloop/protocol"],
+                "message": "runtime may only import protocol (system design §2)."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "ignorePatterns": ["**/dist/**", "**/coverage/**"]
+}

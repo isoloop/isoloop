@@ -1,0 +1,18 @@
+{
+  // TypeScript 7 from the workspace (ADR 0009). TS 7 ships no tsserver.js, so the
+  // old `typescript.tsdk` doesn't apply: the TypeScript 7 extension reads
+  // `js/ts.tsdk.path` and is switched on by `js/ts.experimental.useTsgo`.
+  "js/ts.experimental.useTsgo": true,
+  "js/ts.tsdk.path": "node_modules/typescript",
+
+  // oxc: oxfmt formats, oxlint lints. Both read their config from the repo root.
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "explicit"
+  },
+  "[markdown]": {
+    // Docs aren't formatted (.oxfmtrc.json ignores *.md).
+    "editor.formatOnSave": false
+  }
+}
