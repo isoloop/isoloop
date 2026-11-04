@@ -6,7 +6,7 @@
 
 ## Scope
 
-**In:** workspace tooling, `@isoloop/protocol` types, a minimal `host` and `runtime` that are just enough to run the PoC (the `legacy-vdom` render path, main-thread pub/sub), `examples/four-loops`, and a Playwright smoke test.
+**In:** workspace tooling ([ADR 0009](../adr/0009-toolchain.md)), `@isoloop/protocol` types, a minimal `host` and `runtime` that are just enough to run the PoC (the `legacy-vdom` render path, main-thread pub/sub), `examples/four-loops`, and a Playwright smoke test.
 
 **Out:** Remote DOM, the bus worker, schemas and offsets, restart limits, adapters. The M0 host and isolate code is deliberately thin. M1 replaces most of it behind the same package names.
 
@@ -27,19 +27,22 @@ Keep the PoC's behaviour exactly, including its quirks (the pub/sub doesn't echo
 ## Tasks
 
 ### 1. Workspace skeleton
-- **Files:** `package.json` (private, `packageManager: pnpm@10`), `pnpm-workspace.yaml` (`packages/*`, `examples/*`, `bench`), `.nvmrc` (Node LTS), `.gitignore`, `.editorconfig`, `tsconfig.base.json` (strict, `moduleResolution: bundler`, `verbatimModuleSyntax`, ES2022 target), `tsconfig.json` with project references.
-- Empty packages with `package.json` + `tsconfig.json` + `src/index.ts`: `protocol`, `host`, `runtime`, `bus`. Names follow `@isoloop/*` ([ADR 0004](../adr/0004-npm-name.md)), with `"type": "module"` and `exports` maps.
-- **Test:** `pnpm -r exec tsc --noEmit` passes.
+- **Files:** `package.json` (private, `packageManager: pnpm@12.16.1`, root scripts `format`, `format:check`, `lint`, `typecheck`, `test`, `build`, `e2e` and `check`), `pnpm-workspace.yaml` (`packages/*`, `examples/*`, `bench`; a `catalog:` with every tool version pinned exactly; `minimumReleaseAge: 4320`, `strictPeerDependencies: true`, lifecycle scripts blocked except an explicit allow-list), `.nvmrc` (`26`), `.gitignore`, `.editorconfig`, `.vscode/{settings,extensions}.json`, `tsconfig.base.json` (strict, `moduleResolution: bundler`, `verbatimModuleSyntax`, ES2022 target, `customConditions: ["@isoloop/source"]`), and `tsconfig.lib.json` (extends the base, adds `declaration` and `isolatedDeclarations` for published packages).
+- Empty packages with `package.json` + `tsconfig.json` + `src/index.ts`: `protocol`, `host`, `runtime`, `bus`. Names follow `@isoloop/*` ([ADR 0004](../adr/0004-npm-name.md)), with `"type": "module"`. `exports` maps `@isoloop/source` → `src/index.ts` and `types`/`import` → `dist`; `publishConfig.exports` has only the `dist` entries.
+- `typescript@7.0.2` from the catalog. The `typecheck` script runs `tsc --noEmit` in every package.
+- **Test:** `pnpm typecheck` passes; a missing return type on an export in a published package fails it, and a package importing another resolves to its `src` (both checked once by hand).
+- Follows [ADR 0009](../adr/0009-toolchain.md) throughout.
 
 ### 2. Lint, format, dependency rules
-- ESLint flat config + typescript-eslint, Prettier.
-- `no-restricted-imports` per package, following the [dependency rules](../design/system-design.md#2-packages-and-dependency-rules). `bus` gets `lib` without `DOM`.
-- **Test:** a deliberate bad import in a scratch file fails lint (checked once by hand, then removed).
+- `oxlint` + `oxlint-tsgolint` (`oxlint --type-aware` on every run) with `.oxlintrc.json`: `correctness`, `suspicious`, `perf` and the type-aware TypeScript rules as errors, no warnings ([ADR 0009 rule 5](../adr/0009-toolchain.md#rules)).
+- `oxfmt` with `.oxfmtrc.json`: `singleQuote`, `semi`, `printWidth: 100`, `trailingComma: 'all'`.
+- `no-restricted-imports` per package (oxlint `overrides`), following the [dependency rules](../design/system-design.md#2-packages-and-dependency-rules). `bus` gets `lib` without `DOM`.
+- **Test:** a deliberate bad import and an un-awaited promise in a scratch file both fail lint (checked once by hand, then removed); `pnpm format:check` is clean.
 
 ### 3. Build and unit tests
-- Build each package with Vite library mode (or `tsc -b` for type-only `protocol`), emitting ESM + `.d.ts`.
-- Vitest workspace config: `node` environment for `protocol` and `bus`, browser mode (Playwright provider, Chromium) for `runtime` and `host`.
-- **Test:** one trivial test per package runs in `pnpm test`.
+- Build each package with tsdown, emitting ESM + `.d.ts`. OXC writes the `.d.ts` files through `isolatedDeclarations`, with no type checker in the build.
+- Vitest 5 `projects` in the root `vitest.config.ts`, resolving the `@isoloop/source` condition: `node` environment for `protocol` and `bus`, browser mode (Playwright provider, Chromium) for `runtime` and `host`.
+- **Test:** one trivial test per package runs in `pnpm test`; `pnpm build` writes `dist/index.js` and `dist/index.d.ts` for each package; `pnpm check` runs green.
 
 ### 4. `@isoloop/protocol` v1 types
 - **Files:** `packages/protocol/src/{envelope,isolate,bus,control,events,errors,grants}.ts`, following [design §3](../design/system-design.md#3-isoloopprotocol).
@@ -68,16 +71,19 @@ Keep the PoC's behaviour exactly, including its quirks (the pub/sub doesn't echo
 - These become the I2/I3 regression tests in M1.
 
 ### 9. CI
-- `.github/workflows/ci.yml`: pnpm cache; `lint`, `typecheck`, `test` (unit + browser), `build`, `e2e` (Playwright, with traces uploaded on failure). Runs on PRs and on `main`.
-- `.github/workflows/pages.yml` (optional): deploy `examples/four-loops` to GitHub Pages so the README can link to a live demo.
+- `.github/workflows/ci.yml`, Ubuntu only, on PRs and on `main`. `pnpm/action-setup` (version from `packageManager`), Node from `.nvmrc`, pnpm store cache. Jobs: `check` (format check, lint, typecheck, unit tests, build); then, once `check` passes, `browser` (Vitest browser mode, Chromium) and `e2e` (matrix over Chromium, Firefox and WebKit against the built example, traces uploaded on failure).
+- Every action pinned by commit SHA, with the tag in a comment.
+- `.github/dependabot.yml`: `npm` and `github-actions`, weekly, one group for minors and patches, majors separate, `cooldown` of 3 days.
+- `.github/workflows/pages.yml` (optional, `main` only): deploy `examples/four-loops` to GitHub Pages so the README can link to a live demo.
 
 ### 10. Docs housekeeping
-- Rename `@isoloop/*` to `@isoloop/*` in the README and RFC code samples ([ADR 0004](../adr/0004-npm-name.md)).
-- `CONTRIBUTING.md`: setup, scripts, branch and changeset conventions.
+- `CONTRIBUTING.md`: setup (nvm, the standalone pnpm install, no corepack), editors other than VS Code, `pnpm check` before pushing, the Baseline-link rule for new web APIs, scripts, branch and changeset conventions.
 - README: "Run the demo" section and CI badge.
 
 ## Risks
 
+- **`@isoloop/source` resolution:** tsconfig, Vite, Vitest and tsgolint all have to honour the condition. Check all four in tasks 1–3 before writing real code.
+- **`isolatedDeclarations` friction:** if a package hits a pattern that is really awkward to annotate, use the [per-package fallback](../adr/0009-toolchain.md#pre-agreed-fallback) instead of loosening the rule for everyone.
 - **Workers in Vitest browser mode:** worker URLs under Vite's dev server can need `?worker&url` imports. If that's fiddly, test workers through Playwright only and keep Vitest browser tests to main-thread code.
 - **WebKit and module workers:** supported in current Safari, but verify `import()` inside workers in Playwright's WebKit early (task 5).
 

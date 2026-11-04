@@ -121,7 +121,7 @@ export default defineIsolate({
 
 Details, dependencies and task lists are in the [plans index](docs/plans/README.md).
 
-1. **M0 Foundations:** pnpm workspaces, TypeScript, Vite, Vitest, Playwright, GitHub Actions; protocol types; proof of concept ported to TypeScript.
+1. **M0 Foundations:** pnpm workspaces, TypeScript 7, OXC (oxlint, oxfmt, tsdown), Vite 8, Vitest, Playwright, GitHub Actions; protocol types; proof of concept ported to TypeScript.
 2. **M1 Kernel:** loader, supervisor, heartbeats, frame-batched compositor on Remote DOM.
 3. **M2 Bus:** topics, schemas, retention, offsets, replay, backpressure; bus worker with the TS log engine; opt-in suspension of idle isolates.
 4. **M2b Durable log:** persistent topics in OPFS that survive a bus crash or a page reload. Required for 0.1.

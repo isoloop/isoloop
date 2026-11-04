@@ -76,7 +76,7 @@ flowchart LR
 | `@isoloop/react`, `@isoloop/preact` | isolate worker | `runtime`, the framework (peer dep) | `host` |
 | `@isoloop/devtools` | main thread | `host` | `runtime` |
 
-Enforced with TypeScript project references plus an ESLint `no-restricted-imports` rule per package. `bus` builds with `lib: ["ES2022", "WebWorker"]` minus DOM, so a stray DOM type fails the build; its tests run in Node.
+Enforced by pnpm's strict `node_modules` (a package can only import what its `package.json` lists) plus an oxlint `no-restricted-imports` rule per package ([ADR 0009](../adr/0009-toolchain.md)). `bus` builds with `lib: ["ES2022", "WebWorker"]` minus DOM, so a stray DOM type fails the build; its tests run in Node.
 
 The host ships two prebuilt worker entry bundles, `bus-worker.js` and `isolate-bootstrap.js`. Users serve them from their origin; a Vite plugin (M3) automates this.
 

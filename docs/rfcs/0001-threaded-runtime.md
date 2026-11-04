@@ -263,7 +263,7 @@ The biggest risk is input latency: if typing or clicking feels slower than a nor
 
 Eight milestones, each ending in something that can be demoed, released and written about. No dates yet; each is roughly 2 to 4 weeks of evenings. The [plans index](../plans/README.md) is the source of truth for milestone order, dependencies and task lists; this list is kept in sync with it.
 
-1. **M0, foundations:** pnpm workspaces, TypeScript, Vite, Vitest, Playwright and GitHub Actions; the wire protocol types; the proof of concept ported to TypeScript. Done when the four-loops demo runs from the repo and CI is green.
+1. **M0, foundations:** pnpm workspaces, TypeScript 7, the OXC tools (oxlint, oxfmt, tsdown), Vite 8, Vitest, Playwright and GitHub Actions ([ADR 0009](../adr/0009-toolchain.md)); the wire protocol types; the proof of concept ported to TypeScript. Done when the four-loops demo runs from the repo and CI is green.
 2. **M1, kernel:** loader, supervisor with one-for-one restarts, heartbeats, frame-batched compositor on Remote DOM. Done when a blocked or crashed isolate never affects the others, proven by Playwright tests.
 3. **M2, bus:** topics with schemas, retention, offsets, replay and backpressure, in a dedicated bus worker behind the engine interface, with the TS engine. Done when a restarted isolate rebuilds its state from the log in a test.
 4. **M2b, durable log:** topics with `durability: 'persistent'` written to OPFS, surviving a bus worker crash and a page reload, with flush on `freeze`/`pagehide` ([ADR 0007](../adr/0007-bus-worker-supervision.md)). Depends on M2; must land before the 0.1 release. Done when a persistent topic loses no acknowledged record across a bus crash or a page reload in an E2E test.

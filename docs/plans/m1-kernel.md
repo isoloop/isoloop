@@ -29,6 +29,11 @@
 - Placement rules from [ADR 0001](../adr/0001-one-worker-per-isolate.md): `manifest.pool` is typed and validated but rejected with `pools_unsupported`; the soft worker budget (`workers.budget`, default 32) emits a warning when passed and never blocks a spawn; a failed `new Worker` becomes `isolate:crash` with reason `spawn-failed`, using the normal backoff and restart limit (freeing memory by suspending idle isolates arrives with suspension in M2). `manifest.suspend` is typed now; any value other than `'never'` is rejected with `suspend_unsupported` until M2.
 - **Tests (E2E):** an isolate served from a second origin (a second Vite server on another port) with CORS loads; without CORS it fails with a clear `isolate:crash` reason. A manifest with `pool` is rejected with `pools_unsupported`; spawning past the budget warns once and still starts the isolate.
 
+### 3b. Browser feature check
+- `createKernel` checks the features Isoloop relies on (module workers, `MessageChannel` transfer, Shadow DOM with `adoptedStyleSheets`, OPFS sync access handles in workers) and throws one error, code `unsupported_browser`, listing what's missing. Add the code to [design §3](../design/system-design.md#3-isoloopprotocol).
+- Record the exact minimum Chrome, Firefox and Safari versions in [ADR 0009 rule 7](../adr/0009-toolchain.md#rules) (Baseline widely available, `target: es2022`).
+- **Tests (browser):** each feature stubbed out in turn makes `createKernel` throw `unsupported_browser` naming it; the real browsers pass.
+
 ### 4. Remote DOM spike (timebox: one evening)
 - Pin the current `@remote-dom/core` version. In a scratch branch, render a vanilla tree in a worker and mirror it on the host through its connection API.
 - Answer three questions in the PR description ([ADR 0006](../adr/0006-render-bridge-over-remote-dom.md) point 6): (a) are mutation records plain, structured-cloneable data? (b) can remote nodes map to our own ids? (c) can we intercept listener registration?

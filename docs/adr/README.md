@@ -16,6 +16,7 @@ Short records of decisions that shape Isoloop's design. Each has a status:
 | [0006](0006-render-bridge-over-remote-dom.md) | Remote DOM sits behind an internal `RenderBridge`; events use Isoloop's own protocol | Accepted (spike-gated) |
 | [0007](0007-bus-worker-supervision.md) | Bus worker is supervised; isolates reattach after a bus crash; per-topic durability in OPFS (no replicas) | Accepted |
 | [0008](0008-isolates-and-surfaces.md) | The unit is an *isolate*; a *surface* (DOM) is optional, so headless isolates are first-class | Accepted |
+| [0009](0009-toolchain.md) | Toolchain: pnpm 12 workspaces, Node 26, TypeScript 7 (`tsc` checks), oxlint + oxfmt, tsdown with `isolatedDeclarations`, Vite 8, Vitest 5, Playwright; Baseline widely available; exact pins, no hooks | Accepted |
 
 Ideas an ADR deferred are collected in [would-like](../would-like.md).
 
