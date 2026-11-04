@@ -1,2 +1,14 @@
-// oxlint-disable-next-line unicorn/require-module-specifiers -- placeholder until M0 task 6
-export {};
+export {
+  createKernel,
+  type IsolateHandle,
+  type IsolateManifest,
+  type IsolateSnapshot,
+  type Kernel,
+  type KernelConfig,
+  type KernelEvent,
+  type KernelEvents,
+} from './kernel';
+export type { IsolateState } from './supervisor';
+export type { SurfaceStats } from './compositor';
+export type { BusDelivery } from './legacy-bus';
+export type { HostRenderBridge } from './render/bridge';
