@@ -1,0 +1,38 @@
+{
+  "name": "@isoloop/runtime",
+  "version": "0.0.0",
+  "description": "Isolate-side runtime that runs inside each worker.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isoloop/isoloop.git",
+    "directory": "packages/runtime"
+  },
+  "files": ["dist"],
+  "exports": {
+    ".": {
+      "@isoloop/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@isoloop/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

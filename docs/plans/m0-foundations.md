@@ -27,7 +27,7 @@ Keep the PoC's behaviour exactly, including its quirks (the pub/sub doesn't echo
 ## Tasks
 
 ### 1. Workspace skeleton
-- **Files:** `package.json` (private, `packageManager: pnpm@12.16.1`, root scripts `format`, `format:check`, `lint`, `typecheck`, `test`, `build`, `e2e` and `check`), `pnpm-workspace.yaml` (`packages/*`, `examples/*`, `bench`; a `catalog:` with every tool version pinned exactly; `minimumReleaseAge: 4320`, `strictPeerDependencies: true`, lifecycle scripts blocked except an explicit allow-list), `.nvmrc` (`26`), `.gitignore`, `.editorconfig`, `.vscode/{settings,extensions}.json`, `tsconfig.base.json` (strict, `moduleResolution: bundler`, `verbatimModuleSyntax`, ES2022 target, `customConditions: ["@isoloop/source"]`), and `tsconfig.lib.json` (extends the base, adds `declaration` and `isolatedDeclarations` for published packages).
+- **Files:** `package.json` (private, `packageManager: pnpm@12.16.1`, root scripts `typecheck` and `check`; each later task adds the scripts for the tools it installs, so no script points at a missing binary), `pnpm-workspace.yaml` (`packages/*`, `examples/*`, `bench`; a `catalog:` with every tool version pinned exactly; `minimumReleaseAge: 4320`, `strictPeerDependencies: true`, lifecycle scripts blocked except an explicit allow-list), `.nvmrc` (`26`), `.gitignore`, `.editorconfig`, `tsconfig.base.json` (strict, `moduleResolution: bundler`, `verbatimModuleSyntax`, ES2022 target, `customConditions: ["@isoloop/source"]`), and `tsconfig.lib.json` (extends the base, adds `declaration` and `isolatedDeclarations` for published packages).
 - Empty packages with `package.json` + `tsconfig.json` + `src/index.ts`: `protocol`, `host`, `runtime`, `bus`. Names follow `@isoloop/*` ([ADR 0004](../adr/0004-npm-name.md)), with `"type": "module"`. `exports` maps `@isoloop/source` → `src/index.ts` and `types`/`import` → `dist`; `publishConfig.exports` has only the `dist` entries.
 - `typescript@7.0.2` from the catalog. The `typecheck` script runs `tsc --noEmit` in every package.
 - **Test:** `pnpm typecheck` passes; a missing return type on an export in a published package fails it, and a package importing another resolves to its `src` (both checked once by hand).
@@ -36,6 +36,7 @@ Keep the PoC's behaviour exactly, including its quirks (the pub/sub doesn't echo
 ### 2. Lint, format, dependency rules
 - `oxlint` + `oxlint-tsgolint` (`oxlint --type-aware` on every run) with `.oxlintrc.json`: `correctness`, `suspicious`, `perf` and the type-aware TypeScript rules as errors, no warnings ([ADR 0009 rule 5](../adr/0009-toolchain.md#rules)).
 - `oxfmt` with `.oxfmtrc.json`: `singleQuote`, `semi`, `printWidth: 100`, `trailingComma: 'all'`.
+- `.vscode/{settings,extensions}.json`: the oxc extension (`oxc.oxc-vscode`) as formatter and linter, format on save, and TS 7 from the workspace. VS Code's TS 7 hook-up isn't the old `typescript.tsdk` (TS 7 ships no `tsserver.js`), so confirm the current setting first.
 - `no-restricted-imports` per package (oxlint `overrides`), following the [dependency rules](../design/system-design.md#2-packages-and-dependency-rules). `bus` gets `lib` without `DOM`.
 - **Test:** a deliberate bad import and an un-awaited promise in a scratch file both fail lint (checked once by hand, then removed); `pnpm format:check` is clean.
 

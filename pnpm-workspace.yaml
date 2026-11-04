@@ -1,0 +1,16 @@
+packages:
+  - packages/*
+  - examples/*
+  - bench
+
+# Every tool version lives here, pinned exactly (ADR 0009, rule 8).
+# Packages reference them with "catalog:".
+catalog:
+  typescript: 7.0.2
+
+# Supply chain (ADR 0009, rule 9).
+minimumReleaseAge: 4320 # minutes: refuse versions younger than 3 days
+strictPeerDependencies: true
+# Lifecycle scripts are blocked unless a package is listed here with `true`.
+allowBuilds: {}
+strictDepBuilds: true

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    // Published packages only (ADR 0009, rule 2): every export carries an
+    // explicit type, so OXC can write .d.ts files without a type checker.
+    "declaration": true,
+    "isolatedDeclarations": true
+  }
+}
