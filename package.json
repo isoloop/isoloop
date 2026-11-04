@@ -10,13 +10,23 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "lint": "oxlint --type-aware",
-    "typecheck": "pnpm -r typecheck",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck"
+    "typecheck": "pnpm -r typecheck && tsc --noEmit",
+    "test": "vitest run",
+    "test:node": "vitest run --project protocol --project bus",
+    "test:browser": "vitest run --project host --project runtime",
+    "test:install-browsers": "playwright install chromium",
+    "build": "pnpm -r build",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
+    "@vitest/browser-playwright": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
-    "typescript": "catalog:"
+    "playwright": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

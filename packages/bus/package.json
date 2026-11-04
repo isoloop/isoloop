@@ -29,6 +29,7 @@
     }
   },
   "scripts": {
+    "build": "tsdown --platform neutral --dts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

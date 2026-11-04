@@ -29,6 +29,7 @@
     }
   },
   "scripts": {
+    "build": "tsdown --platform browser --dts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
