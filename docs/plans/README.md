@@ -33,3 +33,4 @@ M1 and M2 can overlap: `packages/bus` is pure TypeScript with no browser depende
 - **Each milestone ends with a demo and a write-up** (a short post or README section). That's the RFC's rule: each milestone ends in something that can be demoed, released and written about.
 - **Branches:** `m<N>/<task-slug>`, squash-merged to `main`. Changesets record user-facing changes from M1 on.
 - **Decisions** made during a milestone become ADRs in [`docs/adr`](../adr/README.md).
+- **Deferred ideas** live in [`docs/would-like.md`](../would-like.md), not in a plan, until a milestone takes them on.

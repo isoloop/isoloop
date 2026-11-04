@@ -145,16 +145,24 @@ The host API is a few lines and works without any framework. The isolate API fee
 **Host**
 
 ```ts
-import { createKernel, topic } from '@isoloop/host';
+// @acme/contracts: shared by host, isolates and the bus worker
+import { contracts, topic } from '@isoloop/bus';
 import { z } from 'zod';
 
 export const cartItems = topic('cart.items.v1', {
   schema: z.object({ sku: z.string(), qty: z.number().int() }),
   retention: { kind: 'compacted' },
 });
+export default contracts(cartItems);
+```
+
+```ts
+// host
+import { createKernel } from '@isoloop/host';
+import list from '@acme/contracts';
 
 const kernel = createKernel({
-  topics: [cartItems],
+  contracts: { url: '/contracts.js', list },   // the bus worker imports the same module from url (ADR 0003)
   components: { 'iso-button': DsButton },   // host component registry
   supervisor: { strategy: 'one-for-one', maxRestarts: 3, withinMs: 60_000 },
   heartbeat: { everyMs: 100, blockedAfterMs: 400, killAfterMs: 10_000 },
@@ -187,7 +195,7 @@ export default defineIsolate(() => {
 });
 ```
 
-Topic definitions live in a shared contracts package, the only code host and isolates share. It holds types and schemas, never behaviour.
+Topic definitions live in a shared contracts package, the only code host, isolates and the bus worker share. It holds types, schemas and pure seed maps, never I/O or application behaviour ([ADR 0003](../adr/0003-schema-format-standard-schema.md)).
 
 ## Framework adapters
 
@@ -248,7 +256,7 @@ The biggest risk is input latency: if typing or clicking feels slower than a nor
 
 - [x] Workers per isolate, or a pool that can host several trusted isolates per worker? Decided: own worker by default, opt-in named pools after M2 ([ADR 0001](../adr/0001-one-worker-per-isolate.md)).
 - [x] How does routing work: does the host own the URL and pass route events to isolates? Yes, via the opt-in `isoloop.route.v1` topic, a granted `navigate` call and `kernel.syncRoute()` ([ADR 0002](../adr/0002-host-owns-routing.md)).
-- [ ] Which schema format: Zod only, or JSON Schema so non-JS tools can read contracts? Proposed: Standard Schema at runtime, JSON Schema exported ([ADR 0003](../adr/0003-schema-format-standard-schema.md)).
+- [x] Which schema format: Zod only, or JSON Schema so non-JS tools can read contracts? Standard Schema at runtime, JSON Schema exported ([ADR 0003](../adr/0003-schema-format-standard-schema.md)).
 - [x] Is the name free on npm? `federa` was, but the `@federa` scope is taken, so the project is renamed **Isoloop** ([ADR 0004](../adr/0004-npm-name.md)). Claimed: the `@isoloop` npm scope, the unscoped `isoloop` package and the `isoloop` GitHub org.
 
 ## MVP roadmap and repo structure

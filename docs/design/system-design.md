@@ -124,7 +124,7 @@ export type BusToIsolate =
 
 // Control port: host ↔ bus worker
 export type HostToBus =
-  | Envelope<'boot', { contractsUrl?: string; topics: TopicConfig[] }>
+  | Envelope<'boot', { contractsUrl: string; topics: TopicConfig[] }>   // topics = cloneable part of contracts.list, for the boot check (ADR 0003)
   | Envelope<'attach', { isolateId: string; grants: Grants; port: MessagePort }>
   | Envelope<'detach', { isolateId: string; keepOffsets: boolean }>
   | Envelope<'publish', { topic: string; key?: string; value: unknown }>;
@@ -167,8 +167,7 @@ The public façade and wiring point. It owns no logic of its own beyond configur
 createKernel(config: KernelConfig): Kernel
 
 type KernelConfig = {
-  topics: TopicDef[];
-  contracts?: string;                       // ES module URL, imported by the bus worker (ADR 0003)
+  contracts: { url: string; list: Contracts };   // url: ES module the bus worker imports; list: its default export, imported by the host (ADR 0003)
   components?: Record<string, HostComponent>;
   supervisor?: { strategy: 'one-for-one' | 'never'; maxRestarts: number; withinMs: number; backoff?: Backoff };
   heartbeat?: { everyMs: number; blockedAfterMs: number; killAfterMs: number; readyTimeoutMs: number };
@@ -189,9 +188,10 @@ interface Kernel {
   resume(id: string): Promise<void>;                   // wake a suspended isolate (ADR 0001); no-op unless suspended
   publish<T>(topic: TopicDef<T>, rec: { key?: string; value: T }): Promise<void>;
   subscribe<T>(topic: TopicDef<T>, fn: (r: BusRecord) => void, opts?: { from?: StartPosition }): () => void;
-  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:crash, isolate:failed, bus:crash, route:state_dropped, route:navigate_error, ...
+  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:crash, isolate:failed, bus:crash, bus:failed, bus:seeded, bus:seed_rejected, bus:orphaned_topics, route:state_dropped, route:navigate_error, ...
   isolates(): IsolateSnapshot[];                                      // used by devtools
   syncRoute(): void;                                   // host router changed the URL; republish isoloop.route.v1 if href/state differ (ADR 0002)
+  dropTopic(name: string, o?: { force?: boolean }): Promise<void>;   // delete an orphaned persistent topic; seed_pending / force rules (ADR 0003)
   destroy(): Promise<void>;
 }
 ```
@@ -327,10 +327,11 @@ interface IsolateContext {
 }
 
 interface BusClient {
-  publish<T>(topic: TopicDef<T>, rec: { key?: string; value: T }): Promise<void>;   // rejects on schema/ACL error
-  subscribe<T>(topic: TopicDef<T>, fn: (r: TypedRecord<T>) => void | Promise<void>,
+  publish<In, Out>(topic: TopicDef<In, Out>, rec: { key?: string; value: In }): Promise<void>;   // rejects on schema/ACL error
+  subscribe<In, Out>(topic: TopicDef<In, Out>, fn: (r: TypedRecord<Out>) => void | Promise<void>,
                opts?: { from?: StartPosition; group?: string; autoCommit?: boolean }): () => void;
-  request<Req, Res>(topic: TopicDef<Req>, value: Req, opts?: { timeoutMs?: number }): Promise<Res>;
+  request<In, Out, RIn, ROut>(topic: TopicDef<In, Out, RIn, ROut>, value: In, opts?: { timeoutMs?: number }): Promise<ROut>;   // topics with a reply schema only
+  reply<RIn>(record: TypedRecord<unknown>, value: RIn): Promise<void>;   // validated; invalid / already_replied (ADR 0003)
 }
 ```
 
@@ -347,17 +348,23 @@ No DOM, so it's testable in Node. The bus worker entry (`bus-worker.js`) is a th
 ### 6.1 Topics and records
 
 ```ts
-type TopicDef<T> = {
+type TopicDef<In, Out = In, RIn = never, ROut = RIn> = {
   name: string;                                  // 'cart.items.v1'
-  schema?: StandardSchemaV1<T>;
+  schema: StandardSchemaV1<In, Out>;             // required; unchecked<T>() opts out (ADR 0003)
+  reply?: StandardSchemaV1<RIn, ROut>;           // required for bus.request
+  seed?: { from: TopicDef<any, any>; map: (value: unknown, rec: BusRecord) => In; follow?: boolean };   // M2b, ADR 0003
   retention: { kind: 'last-n'; n: number } | { kind: 'time'; ms: number } | { kind: 'compacted' };
   maxRecordBytes?: number;                       // default 256 KiB, rough estimate by structured size
   durability?: 'memory' | 'persistent';          // default 'memory'; 'persistent' = OPFS (ADR 0007, M2b)
 };
-function topic<T>(name: string, def: Omit<TopicDef<T>, 'name'>): TopicDef<T>;
+function topic<In, Out, RIn, ROut>(name: string, def: Omit<TopicDef<In, Out, RIn, ROut>, 'name'>): TopicDef<In, Out, RIn, ROut>;
+function contracts(...topics: TopicDef<any, any, any, any>[]): Contracts;   // default export of the contracts module; rejects duplicate names
+function unchecked<T>(): StandardSchemaV1<T, T>;
 ```
 
-`TopicDef` objects are what host, isolates and the bus worker share through the contracts module ([ADR 0003](../adr/0003-schema-format-standard-schema.md)). On the wire only the name travels.
+`TopicDef` objects are what host, isolates and the bus worker share through the contracts package ([ADR 0003](../adr/0003-schema-format-standard-schema.md)). On the wire only the name travels. The bus worker builds its topics only from the module at `contracts.url`; at `boot` it compares them with the host's `list` and fails with `contracts_mismatch` if they differ. `contracts_failed`, `contracts_invalid`, `contracts_mismatch` and `reserved_topic` (a contracts module exporting `isoloop.*`) are fatal and not retried: kernel start fails with `bus:failed`. While the module loads, the bus accepts `attach`/`subscribe` and buffers publishes (the bus-restart buffer, `bus_unavailable` past the inbox limit). System topics are defined in `@isoloop/protocol` with hand-written validators.
+
+**Seeding (M2b).** A topic with `seed` starts in a *seeding* state on a device where `seed.from` has data: its publishes are buffered and its subscribers get nothing until every `from` record has been mapped, validated against the new schema and appended (original `ts`/`producer` kept, progress stored atomically with the appends, so exactly once and resumable). Rejected records are skipped and reported (`bus:seed_rejected`), their offsets kept in the seed metadata; `bus:seeded { topic, copied, rejected }` marks the end. `map` must be synchronous (`seed_async` otherwise). `follow: true` keeps forwarding new `from` records while both topics are listed. Persistent topics no longer listed are reported as `bus:orphaned_topics` and kept until `kernel.dropTopic`, which rejects with `seed_pending` while a pending seed needs the topic and needs `{ force: true }` if rejected seed records from it are recorded.
 
 ### 6.2 LogEngine interface
 
@@ -399,8 +406,8 @@ Responsibilities, in order, for a `publish`:
 1. **ACL:** the topic must match `grants.publish` for this isolate, or the result is error `forbidden`. System topics (`isoloop.*`) are always `forbidden` to isolates whatever the grants, and `kernel.publish` rejects them on the main thread; only the kernel's internal path publishes them. Every isolate may subscribe to them without a grant ([ADR 0002](../adr/0002-host-owns-routing.md)).
 2. **Topic exists**, or error `unknown_topic`.
 3. **Size** check, or error `too_large`.
-4. **Schema:** `schema['~standard'].validate(value)`, or error `invalid` with the issues.
-5. `engine.append`, with `producer = isolateId` and `ts = Date.now()`.
+4. **Schema:** `schema['~standard'].validate(value)`, or error `invalid` with the issues as `{ message, path }[]`. A promise is awaited, but appends stay in publish order per topic. In dev builds, a memory topic's output is checked with `structuredClone` (persistent topics are checked by the codec, `not_encodable`).
+5. `engine.append` of the validated **output** (`result.value`), with `producer = isolateId` and `ts = Date.now()`. Records are never validated again on replay or restore.
 6. Reply `result { ok }` if the publish had an `id`.
 7. **Fan out:** push to each live subscription.
 
@@ -410,7 +417,7 @@ Responsibilities, in order, for a `publish`:
 
 **Delivery and backpressure (credits).** Each subscription has `credit`, starting at the inbox limit (default 1,000). The broker pushes `deliver` batches (up to 64 records, coalesced per microtask) while `credit > 0`, and subtracts the number sent. A `commit` restores credit for the committed records. At 0 credit the subscription is *paused*: nothing is queued in memory, only its read cursor is kept. When credit comes back, the broker reads from the log at the cursor. Records that expired while paused are skipped, and the isolate gets a `deliver` with `gap: { from, to }` so it can tell.
 
-**Request/response.** `bus.request(topic, value)` publishes with a reserved `replyTo` (the caller's isolate id) and a correlation id in the record. Responders call `reply(record, value)`, which the broker sends straight to the caller's port as `result { re }`, not through a log. Timeout errors are raised on the caller side.
+**Request/response.** `bus.request(topic, value)` publishes with a reserved `replyTo` (the caller's isolate id) and a correlation id in the record. Responders call `reply(record, value)`, which the broker validates against the topic's `reply` schema and sends straight to the caller's port as `result { re }`, not through a log. Only an isolate the request record was delivered to may reply; the first valid reply wins and later ones reject with `already_replied`. An invalid reply rejects the responder with `invalid` and sends the caller `reply_invalid` at once. `request` on a topic without `reply` rejects with `not_requestable`. Timeout errors are raised on the caller side.
 
 **Metrics** (sampled every 1 s on the control port): records/s per topic, bytes/s, per-subscription lag (`head − cursor`) and credit, rejected publishes by reason.
 

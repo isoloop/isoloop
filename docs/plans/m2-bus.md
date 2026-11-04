@@ -15,8 +15,9 @@ Tasks 1–6 are pure TypeScript in Node and can start right after M0, in paralle
 ## Tasks
 
 ### 1. Topic definitions and contracts
-- **Files:** `packages/bus/src/topic.ts` (`topic()`, `TopicDef`, retention types), `src/standard-schema.ts` (the Standard Schema V1 interface type, vendored, about 40 lines).
-- **Tests (unit):** Zod 4 and Valibot schemas both validate through the interface; type inference of `TopicDef<T>`.
+- **Files:** `packages/bus/src/topic.ts` (`topic()`, `contracts()`, `unchecked()`, `TopicDef<In, Out, RIn, ROut>`, retention types), `src/standard-schema.ts` (the Standard Schema V1 interface type, vendored, about 40 lines), `src/testing.ts` (`testContracts()`, exported as `@isoloop/bus/testing`), `packages/protocol/src/system-topics.ts` (hand-written validators for `isoloop.*`).
+- Schemas are required; `contracts()` rejects duplicate names and `isoloop.*` topics ([ADR 0003](../adr/0003-schema-format-standard-schema.md)).
+- **Tests (unit):** Zod 4 and Valibot schemas both validate through the interface; type inference of `TopicDef` input vs output (a Zod `.default()` field is optional to publish and present to subscribers); `unchecked<T>()` accepts anything; `testContracts()` flags a transform that outputs a class instance.
 
 ### 2. `LogEngine` interface and conformance suite
 - **Files:** `packages/bus/src/engine/types.ts`, `packages/bus/test/engine-conformance.ts` (a function `runEngineConformance(makeEngine)` that every engine must pass).
@@ -31,22 +32,23 @@ Tasks 1–6 are pure TypeScript in Node and can start right after M0, in paralle
 ### 4. Broker core
 - **Files:** `packages/bus/src/broker.ts`. Publish pipeline (ACL, topic, size, schema, append, reply, fan-out), subscriptions with start positions, commits, consumer ids keyed by isolate, `detach` keeping offsets.
 - Transport-agnostic: the broker talks to a `Port`-like interface (`post`, `onMessage`), so tests use in-memory ports.
-- **Tests (unit):** every rejection code; start positions after restart (`committed` falls back to `earliest`); invariant I4; I6 at broker level.
+- The log stores the validated output; async `validate` is awaited with appends kept in publish order per topic; issues mapped to `{ message, path }[]`; dev-only `structuredClone` check for memory topics.
+- **Tests (unit):** every rejection code; a transforming schema stores its output; a slow async schema doesn't reorder records; start positions after restart (`committed` falls back to `earliest`); invariant I4; I6 at broker level.
 
 ### 5. Credits and backpressure
 - Credit accounting, `deliver` batching (64 records, microtask coalescing), pause at 0 credit, resume from cursor, `gap` notice when retention dropped records.
 - **Tests (unit):** a consumer that never commits receives exactly the inbox limit, then nothing; after committing it receives the rest in order; a `last-n: 10` topic with a paused consumer produces a `gap`.
 
 ### 6. Groups and request/response
-- Consumer groups (hash of key, round-robin for keyless); `bus.request` / `reply` with correlation ids and timeouts.
-- **Tests (unit):** two group members split a keyed stream with per-key order kept; a member leaving rebalances; a request times out cleanly; a reply to a dead caller is dropped.
+- Consumer groups (hash of key, round-robin for keyless); `bus.request` / `reply` with correlation ids and timeouts; `reply` schemas validated by the broker; only a recipient of the request may reply, first valid reply wins.
+- **Tests (unit):** two group members split a keyed stream with per-key order kept; a member leaving rebalances; a request times out cleanly; a reply to a dead caller is dropped; an invalid reply rejects the responder with `invalid` and the caller with `reply_invalid`; a second reply gets `already_replied`; a non-recipient's reply is `forbidden`; `request` on a topic without `reply` gets `not_requestable`.
 
 ### 7. Bus worker entry and control port
-- **Files:** `packages/bus/src/worker.ts`: `boot` (imports the contracts URL, creates topics), `attach`/`detach`, `beat`, 1 s `metrics`, fatal error reporting. Built as the `bus-worker.js` bundle.
-- **Tests (browser):** boot with a contracts module, attach two in-memory-wired isolates, publish and deliver.
+- **Files:** `packages/bus/src/worker.ts`: `boot` (imports the contracts URL, reads its `contracts()` default export, compares it with the host's topic configs, creates topics), `attach`/`detach` accepted while contracts load with publishes buffered, `beat`, 1 s `metrics`, fatal error reporting. Built as the `bus-worker.js` bundle.
+- **Tests (browser):** boot with a contracts module, attach two in-memory-wired isolates, publish and deliver; a publish sent before contracts finish loading is validated and delivered in order; a module without a default export fails with `contracts_invalid`, a 404 with `contracts_failed`, a differing retention with `contracts_mismatch`, an `isoloop.*` export with `reserved_topic`.
 
 ### 8. Host bus controller
-- **Files:** `packages/host/src/bus/controller.ts`. Starts the bus worker before isolates, creates a `MessageChannel` per isolate start, sends `attach` / `detach`, and implements `kernel.publish` / `kernel.subscribe` over the control port. Kernel config gains `topics` and `contracts`.
+- **Files:** `packages/host/src/bus/controller.ts`. Starts the bus worker before isolates, creates a `MessageChannel` per isolate start, sends `attach` / `detach`, and implements `kernel.publish` / `kernel.subscribe` over the control port. Kernel config gains `contracts: { url, list }`. Contract errors are fatal and not retried: kernel start fails, `bus:failed { code }`, no isolate spawned.
 - Supervisor: watch the bus heartbeat; on a crash, start a new bus worker and send every running isolate `reattach { busPort }` instead of restarting it ([ADR 0007](../adr/0007-bus-worker-supervision.md)); restart only isolates with `bus: { onReset: 'restart' }`; restart limit; `bus:crash`, `bus:restart`, `bus:failed` events.
 - **Tests (browser):** a forced bus worker crash (test hook) leaves every isolate in `running` (I11), each memory-topic subscription gets exactly one `reset`, and an `onReset: 'restart'` isolate is restarted.
 
@@ -90,7 +92,7 @@ Tasks 1–6 are pure TypeScript in Node and can start right after M0, in paralle
 
 ## Risks
 
-- **Contracts module loading in the bus worker:** a module that imports large libraries (Zod) adds startup time to the bus worker, which is on the critical path for every isolate. Measure it; if needed, the bus worker can boot without schemas and validate once contracts finish loading, buffering publishes meanwhile.
+- **Contracts module loading in the bus worker:** a module that imports large libraries (Zod) adds startup time to the bus worker. Isolates start in parallel (the bus buffers publishes until contracts load, [ADR 0003](../adr/0003-schema-format-standard-schema.md)), but their first publishes wait for it. Measure it in task 13.
 - **Structured-clone cost** of large `deliver` batches: watch it in task 13; transferables for `ArrayBuffer` values are already in the protocol.
 - **Group rebalancing** adds complexity for little v1 demand. If task 6 runs long, ship groups as experimental or move them to M3.
 

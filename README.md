@@ -2,7 +2,7 @@
 
 **A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-Status: **design stage, no code in this repo yet.** The design is written: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) (7 accepted, 1 under review) and [milestone plans](docs/plans/README.md). A single-file proof of concept works and gets ported in M0 (repo foundations), which is next.
+Status: **design stage, no code in this repo yet.** The design is written: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) (all 8 accepted) and [milestone plans](docs/plans/README.md). A single-file proof of concept works and gets ported in M0 (repo foundations), which is next.
 
 ## Why
 
@@ -59,12 +59,19 @@ Isoloop runs in the browser tab, on today's browsers, with no server-side story.
 ## API sketch
 
 ```ts
-import { createKernel, topic } from '@isoloop/host';
+// @acme/contracts: shared by host, isolates and the bus worker
+import { contracts, topic } from '@isoloop/bus';
+export const cartItems = topic('cart.items.v1', { schema, retention: { kind: 'compacted' } });
+export default contracts(cartItems);
+```
 
-const cartItems = topic('cart.items.v1', { schema, retention: { kind: 'compacted' } });
+```ts
+// host
+import { createKernel } from '@isoloop/host';
+import list from '@acme/contracts';
 
 const kernel = createKernel({
-  topics: [cartItems],
+  contracts: { url: '/contracts.js', list },   // the bus worker imports the same module from url
   supervisor: { strategy: 'one-for-one', maxRestarts: 3, withinMs: 60_000 },
 });
 
@@ -144,6 +151,7 @@ Parallel painting of DOM surfaces (canvas isolates painting through `OffscreenCa
 - [System design](docs/design/system-design.md): packages, interfaces, sequences and invariants
 - [Architecture decision records](docs/adr/README.md)
 - [Implementation plans](docs/plans/README.md), one per milestone
+- [Would like](docs/would-like.md): ideas deferred or to explore, not planned
 - Prior art: [Shopify Remote DOM](https://github.com/Shopify/remote-dom), [Neo.mjs](https://github.com/neomjs/neo), [Web Fragments](https://github.com/IgorMinar/reframed), [Aiga](https://aiga.js.org/), [Garfish](https://github.com/web-infra-dev/garfish)
 
 ## License

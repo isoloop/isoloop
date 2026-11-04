@@ -10,7 +10,7 @@ Gets a full task list when M3 closes. Requires [M2b](m2b-durable-log.md) (durabl
 
 1. **Devtools overlay** (`packages/devtools`): mounted on the host, reading `kernel.isolates()`, supervisor events, compositor stats and bus metrics from the control port. Panels: isolates (state, lag, heap, restarts, patch queue), bus (topics, rates, consumer lag and credit, rejected publishes), and a live record log sampled from the bus worker with the option to replay a topic into a scratch view.
 2. **Docs site** (`docs/site`, e.g. VitePress or Starlight): getting started, hosting (CSP/CORS), isolate authoring per adapter, the bus guide (semantics, idempotent handlers), and **"What Isoloop can't hide"** (sync layout, `window`/`document` globals, drag and drop) up front, as the RFC asks. API reference generated from TSDoc.
-3. **CLI** (unscoped `isoloop` package): `isoloop contracts export` → JSON Schema ([ADR 0003](../adr/0003-schema-format-standard-schema.md)); maybe `isoloop new isolate`.
+3. **CLI** (unscoped `isoloop` package): `isoloop contracts export` → JSON Schema draft 2020-12 through the vendored Standard JSON Schema interface (input and output when they differ, plus `reply`; `unchecked` topics flagged; schemas without the interface reported as not exportable) ([ADR 0003](../adr/0003-schema-format-standard-schema.md)); maybe `isoloop new isolate`.
 4. **Release pipeline:** Changesets, npm provenance, `@isoloop/*` scope claimed ([ADR 0004](../adr/0004-npm-name.md)), semver policy for the protocol version vs package versions.
 5. **API review:** freeze public API names; mark experimental parts (groups, request/response) with `@experimental`.
 6. **Launch post** with the M3 dashboard recording and bench numbers.
