@@ -3,20 +3,20 @@
 - **Status:** Draft
 - **Author:** Sabin Pandelovitch
 - **Created:** 2026-10-30
-- **Updated:** 2026-11-03
+- **Updated:** 2026-11-04
 
 ## Summary
 
 Isoloop is an open-source browser runtime that runs every isolate (a UI widget, a micro-frontend, or headless logic such as a state store) in its own Web Worker, so no isolate can freeze, crash or read another. The main thread keeps one job: drawing what visual isolates describe; headless isolates never touch it except for heartbeats. Isolates talk only through a log-based message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-- **Pitch:** run any UI you don't fully control (third-party extensions, AI-generated widgets, heavy dashboard widgets, headless state managers) without letting it break the host.
-- **Who it is for:** heavy dashboards whose widgets share data but shouldn't share an event loop, and platform teams that host other teams' or other companies' UI.
+- **Pitch:** code that shares data shouldn't have to share an event loop. Run independent pieces of front-end code (dashboard widgets, plugins, AI-generated widgets, headless engines such as state stores or sync engines) side by side, sharing data through the bus, without letting any one of them break the host.
+- **Who it is for:** heavy dashboards first, whose widgets share data but shouldn't share an event loop; also platform teams that host other teams' or vendors' code (trusted but unreliable, not hostile), and apps with heavy headless engines. Scope is the browser tab only.
 - **Name:** Isoloop, for an isolated event loop per unit. It was called Federa until 2026-11-03, when the `@federa` npm scope turned out to be taken ([ADR 0004](../adr/0004-npm-name.md)). The unit of isolation is an *isolate*; an isolate that draws UI has a *surface* ([ADR 0008](../adr/0008-isolates-and-surfaces.md)).
 - **Where it stands:** a working proof of concept exists (four isolates, bus, heartbeats, restart supervisor).
 
 ## Problem, goals and non-goals
 
-Today every micro-frontend shares one main thread, one heap and one event loop. One slow or broken isolate makes the whole page janky or blank, and sandboxes built from JS proxies or Shadow DOM isolate globals and styles, not CPU time or crashes.
+Today all the front-end code on a page (micro-frontends, widgets and headless engines alike) shares one main thread, one heap and one event loop. One slow or broken piece makes the whole page janky or blank, and sandboxes built from JS proxies or Shadow DOM isolate globals and styles, not CPU time or crashes.
 
 **Goals**
 

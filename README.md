@@ -6,9 +6,30 @@ Status: **design stage, no code in this repo yet.** The design is written: [RFC 
 
 ## Why
 
-Today every micro-frontend shares one main thread, one heap and one event loop. One slow or broken isolate makes the whole page janky or blank. Existing sandboxes (JS proxies, Shadow DOM) isolate globals and styles, not CPU time or crashes.
+Today all the front-end code on a page shares one main thread, one heap and one event loop: every micro-frontend, every widget, and every headless engine such as a state store, a sync engine or a search index. One slow or broken piece makes the whole page janky or blank. Existing sandboxes (JS proxies, Shadow DOM) isolate globals and styles, not CPU time or crashes. A plain Web Worker isolates CPU time, but it leaves you to wire up how independent pieces share data.
 
-Isoloop is built first for **heavy dashboards**: widgets that share data (filters, entities, lookups) but shouldn't share an event loop. It also fits any UI you don't fully control, such as third-party extensions or AI-generated widgets.
+Isoloop is built on one principle: **code that shares data shouldn't have to share an event loop.** Each isolate gets its own thread, and the only thing isolates share is a log of typed messages.
+
+### Where it fits
+
+Isoloop pays off when several independent pieces of code need the same data, and any one of them might be slow or might crash:
+
+- **Heavy dashboards:** widgets that share filters, entities and lookups, where one expensive chart shouldn't stall the rest.
+- **Plugin and extension hosts:** editors and design tools that run code from other teams or vendors against a shared document model.
+- **AI-generated or user-authored widgets:** code you've reviewed but don't fully trust to be fast or bug-free.
+- **Headless engines in heavy apps:** a sync engine, a search index and a state store working on the same entities, where a large merge or reindex shouldn't block input.
+- **Notebooks and reactive canvases:** cells that consume each other's outputs, where one runaway cell shouldn't take the session down, and a restarted cell rebuilds from the log.
+
+### Where it doesn't
+
+- **A single CPU-heavy task.** Use a plain worker; Isoloop adds nothing if nothing else shares the data.
+- **Code that needs synchronous DOM access,** such as layout measurement or libraries that reach into `document` directly.
+- **Hostile code.** Isolates run same-origin, so they share cookies and storage with the host. For code you don't trust at all, use a cross-origin iframe.
+- **SSR- or SEO-first pages,** where the content has to exist before any script runs.
+
+### Scope and focus
+
+Isoloop runs in the browser tab, on today's browsers, with no server-side story. It is built first for heavy dashboards: they hit every part of the problem at once (shared data, expensive rendering, many independent owners), so the first adapters and the reference app target them.
 
 ## How it works
 
