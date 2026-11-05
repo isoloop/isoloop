@@ -31,7 +31,9 @@ export type CrashReason =
   /** Blocked for `killAfterMs` without a beat; the worker was terminated. */
   | 'unresponsive'
   /** `new Worker` threw. */
-  | 'spawn-failed';
+  | 'spawn-failed'
+  /** `ready.renderFmt` isn't one the host speaks. Fails at once: a restart can't fix it (ADR 0011). */
+  | 'render-fmt-mismatch';
 
 export type SupervisorConfig = {
   /** `never` fails on the first crash. */
@@ -84,6 +86,7 @@ export type SupervisorInput =
   | { k: 'error'; at: number; fatal: boolean; message: string }
   | { k: 'workerError'; at: number; message: string }
   | { k: 'spawnFailed'; at: number; message: string }
+  | { k: 'renderFmtMismatch'; at: number; message: string }
   | { k: 'stop' }
   | { k: 'respawn' }
   | { k: 'hidden' }
@@ -195,6 +198,11 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
         ? same
         : crash(s, input.at, 'spawn-failed', input.message, cfg);
 
+    case 'renderFmtMismatch':
+      return s.state === 'loading'
+        ? crash(s, input.at, 'render-fmt-mismatch', input.message, cfg, true)
+        : same;
+
     case 'stop':
       if (s.state === 'stopped' || s.state === 'failed') return same;
       return {
@@ -241,6 +249,8 @@ function crash(
   reason: CrashReason,
   message: string,
   cfg: SupervisorConfig,
+  /** Skip the restart: the crash would happen again. */
+  final = false,
 ): Step {
   const effects: SupervisorEffect[] = [];
   if (s.state !== 'restarting') effects.push({ k: 'terminate' });
@@ -251,7 +261,7 @@ function crash(
   );
 
   const window = slide(s.window, at, cfg.withinMs);
-  if (cfg.strategy === 'never' || window.length >= cfg.maxRestarts) {
+  if (final || cfg.strategy === 'never' || window.length >= cfg.maxRestarts) {
     effects.push(
       moved('crashed', 'failed'),
       { k: 'showFallback', reason, message },

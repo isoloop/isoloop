@@ -9,6 +9,6 @@ export default defineConfig([
     platform: 'browser',
     dts: false,
     clean: false,
-    deps: { alwaysBundle: ['@isoloop/protocol'] },
+    deps: { alwaysBundle: ['@isoloop/protocol', /^@isoloop\/dom\//] },
   },
 ]);

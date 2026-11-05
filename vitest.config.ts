@@ -31,6 +31,6 @@ export default defineConfig({
   resolve: { conditions: [source, ...defaultClientConditions] },
   ssr: { resolve: { conditions: [source, ...defaultServerConditions] } },
   test: {
-    projects: [node('protocol'), node('bus'), browser('host'), browser('runtime')],
+    projects: [node('protocol'), node('bus'), browser('dom'), browser('host'), browser('runtime')],
   },
 });

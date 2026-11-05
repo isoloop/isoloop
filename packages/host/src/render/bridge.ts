@@ -1,15 +1,19 @@
 import type { SerializedEvent } from '@isoloop/protocol';
 
 /**
- * Host side of a render format (design §4.5), reduced to what M0 needs. The
- * compositor is the only caller of `apply`. M0 bridges also wire their own
- * events; M1 moves that to an EventBridge using `idFor`.
+ * Host side of a render format (design §4.5). The compositor is the only
+ * caller of `apply`. Bridges wire their own delegated events for now; task 8
+ * moves that, with default actions, to an EventBridge using `idFor`.
  */
 export interface HostRenderBridge {
-  /** `patch.fmt` this bridge reads, e.g. `legacy-vdom@1`. */
+  /** `ready.renderFmt` this bridge reads, e.g. `isoloop-dom@1`. */
   readonly fmt: string;
   mount(root: ShadowRoot, send: (event: SerializedEvent) => void): void;
   /** Applies one batch. Returns false and changes nothing if the batch is malformed. */
   apply(batch: unknown): boolean;
+  /** The isolate's id for a host node (EventBridge). `legacy-vdom` has none. */
+  idFor?(node: Node): string | undefined;
+  /** The host element for an isolate's node id (measure, focus). `legacy-vdom` has none. */
+  nodeFor?(id: string): Element | undefined;
   unmount(): void;
 }

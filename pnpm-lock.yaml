@@ -315,8 +315,20 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
 
+  packages/dom:
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(vite@8.3.5(@types/node@26.6.6))
+
   packages/host:
     dependencies:
+      '@isoloop/dom':
+        specifier: workspace:*
+        version: link:../dom
       '@isoloop/protocol':
         specifier: workspace:*
         version: link:../protocol
@@ -333,6 +345,9 @@ importers:
 
   packages/runtime:
     dependencies:
+      '@isoloop/dom':
+        specifier: workspace:*
+        version: link:../dom
       '@isoloop/protocol':
         specifier: workspace:*
         version: link:../protocol

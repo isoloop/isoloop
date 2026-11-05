@@ -33,6 +33,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@isoloop/dom": "workspace:*",
     "@isoloop/protocol": "workspace:*"
   },
   "devDependencies": {

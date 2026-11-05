@@ -197,6 +197,31 @@ describe('supervisor transition table', () => {
       ],
     ],
     [
+      'loading → failed on renderFmtMismatch, with no restart and an empty window (ADR 0011)',
+      at('loading'),
+      { k: 'renderFmtMismatch', at: 5, message: 'speaks x@9' },
+      { state: 'failed', reason: 'render-fmt-mismatch', restarts: 0, window: [] },
+      [
+        { k: 'terminate' },
+        moved('loading', 'crashed'),
+        crashed('render-fmt-mismatch', 'speaks x@9'),
+        moved('crashed', 'failed'),
+        { k: 'showFallback', reason: 'render-fmt-mismatch', message: 'speaks x@9' },
+        {
+          k: 'emit',
+          event: 'isolate:failed',
+          data: { reason: 'render-fmt-mismatch', message: 'speaks x@9' },
+        },
+      ],
+    ],
+    [
+      'renderFmtMismatch outside loading is ignored',
+      at('running'),
+      { k: 'renderFmtMismatch', at: 5, message: 'late' },
+      { state: 'running' },
+      [],
+    ],
+    [
       'document hidden pauses hang judgement: no busy',
       at('running', { lastBeatAt: 0, hidden: true }),
       { k: 'tick', at: 401 },

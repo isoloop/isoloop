@@ -11,7 +11,7 @@ afterEach(() => {
 const fixture = (name: string): string =>
   new URL(`./__fixtures__/${name}.ts`, import.meta.url).href;
 
-function spawn(src: string, protocol = { min: 1, max: 1 }) {
+function spawn(src: string, protocol = { min: 1, max: 1 }, renderFmt = 'legacy-vdom@1') {
   const worker = new Worker(new URL('./bootstrap.ts', import.meta.url), { type: 'module' });
   workers.push(worker);
   const got: Msg[] = [];
@@ -33,7 +33,7 @@ function spawn(src: string, protocol = { min: 1, max: 1 }) {
     p: {
       isolateId: 'T',
       protocol,
-      renderFmt: 'legacy-vdom@1',
+      renderFmt,
       config: null,
       grants: { publish: ['*'], subscribe: ['*'] },
       busPort: port2,
@@ -125,5 +125,41 @@ describe('isolate bootstrap', () => {
     await until(() => got.some((m) => m.t === 'error'));
     expect(got.find((m) => m.t === 'error')).toMatchObject({ p: { fatal: true } });
     expect(got.some((m) => m.t === 'ready')).toBe(false);
+  });
+
+  it('starts a { start(ctx) } module on isoloop-dom@1 and delivers events', async () => {
+    const { got, click } = spawn(fixture('dom-hello'), undefined, 'isoloop-dom@1');
+    await until(() => patches(got).length === 1);
+    expect(got.find((m) => m.t === 'ready')).toMatchObject({
+      p: { adapter: 'vanilla', renderFmt: 'isoloop-dom@1' },
+    });
+    const [batch] = patches(got);
+    expect(batch).toMatchObject([
+      [
+        'insert',
+        0,
+        { k: 'el', tag: 'p', listen: ['click'], children: [{ data: 'hello T' }] },
+        null,
+      ],
+    ]);
+    const insert: unknown = Array.isArray(batch) ? batch[0] : undefined;
+    const node: unknown = Array.isArray(insert) ? insert[2] : undefined;
+    const id: unknown = typeof node === 'object' && node !== null ? Reflect.get(node, 'id') : 0;
+    expect(id).toBeTypeOf('number');
+    click(String(id));
+    await until(() => patches(got).length === 2);
+    // textContent replaces the children, as in the DOM: the old text node goes, a new one comes.
+    expect(patches(got)[1]).toMatchObject([
+      ['remove', expect.any(Number)],
+      ['insert', id, { k: 'text', data: 'clicked' }, null],
+    ]);
+  });
+
+  it('a headless { start(ctx) } module gets no root and no DOM', async () => {
+    const { got } = spawn(fixture('dom-headless'), undefined, 'none');
+    await until(() => got.some((m) => m.t === 'ready'));
+    expect(got.find((m) => m.t === 'ready')).toMatchObject({ p: { renderFmt: 'none' } });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(got.some((m) => m.t === 'error')).toBe(false);
   });
 });

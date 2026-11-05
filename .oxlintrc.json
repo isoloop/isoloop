@@ -47,7 +47,7 @@
           {
             "patterns": [
               {
-                "group": ["@isoloop/*"],
+                "group": ["@isoloop/**"],
                 "message": "protocol depends on nothing (system design §2)."
               }
             ]
@@ -63,7 +63,7 @@
           {
             "patterns": [
               {
-                "group": ["@isoloop/*", "!@isoloop/protocol", "!@isoloop/codec"],
+                "group": ["@isoloop/**", "!@isoloop/protocol", "!@isoloop/codec"],
                 "message": "bus may only import protocol and codec (system design §2)."
               }
             ]
@@ -79,8 +79,8 @@
           {
             "patterns": [
               {
-                "group": ["@isoloop/*", "!@isoloop/protocol"],
-                "message": "host may only import protocol; it loads bus and runtime bundles by URL (system design §2)."
+                "group": ["@isoloop/**", "!@isoloop/protocol", "!@isoloop/dom/host"],
+                "message": "host may only import protocol and @isoloop/dom/host; it loads bus and runtime bundles by URL (system design §2, ADR 0011)."
               }
             ]
           }
@@ -95,8 +95,93 @@
           {
             "patterns": [
               {
-                "group": ["@isoloop/*", "!@isoloop/protocol"],
-                "message": "runtime may only import protocol (system design §2)."
+                "group": ["@isoloop/**", "!@isoloop/protocol", "!@isoloop/dom/worker"],
+                "message": "runtime may only import protocol and @isoloop/dom/worker (system design §2, ADR 0011)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/host/**/*.test.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@isoloop/**",
+                  "!@isoloop/protocol",
+                  "!@isoloop/dom/host",
+                  "!@isoloop/dom/testing"
+                ],
+                "message": "host tests may also import @isoloop/dom/testing (ADR 0011)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/dom/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/**"],
+                "message": "dom imports no other @isoloop package (ADR 0011 point 3)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/dom/src/shared/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/**", "../*"],
+                "message": "src/shared imports nothing outside itself (ADR 0011 point 5)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/dom/src/worker/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/**", "../host/*", "../testing/*"],
+                "message": "src/worker may import src/shared only: no DOM types, no host half (ADR 0011 point 5)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/dom/src/host/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/**", "../worker/*", "../testing/*"],
+                "message": "src/host may import src/shared only (ADR 0011 point 5)."
               }
             ]
           }
