@@ -160,7 +160,7 @@ export type CallResult = { ok: true; value: unknown } | { ok: false; error: { co
 
 The package also exports `isEnvelope`, `assertNever`, the error-code enum, the `Grants` matcher (topic globs like `catalog.*`), and `routeTopic` (`isoloop.route.v1`, value `{ href, pathname, path, search, hash, state }`, [ADR 0002](../adr/0002-host-owns-routing.md)). Routing error codes: `cross_origin`, `routing_disabled`, `navigate_failed`.
 
-Some codes never travel on a port: the host API throws them as a `KernelError`. `createKernel` throws `unsupported_browser`, with every missing feature named, when the browser lacks module workers, `MessageChannel`, adopted stylesheets on a `ShadowRoot`, or OPFS ([ADR 0009](../adr/0009-toolchain.md#rules) rule 7). `spawn` throws `pools_unsupported`, `suspend_unsupported` and `invalid_manifest` (§4.1).
+Some codes never travel on a port: the host API throws them as a `KernelError`. `createKernel` throws `unsupported_browser`, with every missing feature named, when the browser lacks module workers, `MessageChannel`, adopted stylesheets on a `ShadowRoot`, or OPFS ([ADR 0009](../adr/0009-toolchain.md#rules) rule 7). `createKernel` also throws `invalid_config` for a malformed `components` entry. `spawn` throws `pools_unsupported`, `suspend_unsupported` and `invalid_manifest` (§4.1).
 
 ## 4. `@isoloop/host`
 
@@ -173,7 +173,7 @@ createKernel(config: KernelConfig): Kernel
 
 type KernelConfig = {
   contracts: { url: string; list: Contracts };   // url: ES module the bus worker imports; list: its default export, imported by the host (ADR 0003)
-  components?: Record<string, HostComponent>;
+  components?: Record<string, HostComponent>;   // HostComponent = { tag: string; attributes?: string[] }: isolate tag → host custom element (§4.5)
   supervisor?: { strategy: 'one-for-one' | 'never'; maxRestarts: number; withinMs: number; backoff?: Backoff };
   heartbeat?: { everyMs: number; blockedAfterMs: number; killAfterMs: number; readyTimeoutMs: number };
   compositor?: { frameBudgetMs: number };
@@ -285,7 +285,7 @@ interface HostRenderBridge {
 }
 ```
 
-**Component registry.** An allow-list of safe HTML tags (the PoC's list plus `a`, `img`, `table` family, `form` family, `svg` subset), plus host components (`iso-button` → design-system element) registered through `KernelConfig.components`. Unknown tags render as `div`. `script`, `iframe`, `object`, `embed`, `style` and `on*` attributes are never created. `href`/`src` are restricted to `http(s):`, `mailto:` and relative URLs. With routing on, same-origin `<a href>` is rewritten to the absolute URL from the route resolver (`/x` → `basePath + x`) on render and on every patch that changes it ([ADR 0002](../adr/0002-host-owns-routing.md)).
+**Component registry** (`render/registry.ts`). An allow-list of safe HTML tags (the PoC's list plus headings, `br`, `hr`, `a`, `img`, `table` family, `form` family, and an `svg` subset for icons and charts), plus host components (`iso-button` → design-system element) registered through `KernelConfig.components`. Unknown tags render as `div` (`g` inside SVG). Attributes are allow-listed per tag (global, `aria-*` and `data-*` everywhere). `script`, `iframe`, `object`, `embed`, `style`, `foreignObject`, `on*` attributes and `srcdoc` are never created. `href`/`src` are restricted to `http(s):`, `mailto:` and relative URLs, after stripping the whitespace and control characters browsers ignore in a scheme. SVG `<use>` may only reference the same document (`#id`). Form `action`/`formaction` are dropped (submits are always prevented, §4.6). Isolates may set only the `value`, `checked` and `selected` properties. With routing on, same-origin `<a href>` is rewritten to the absolute URL from the route resolver (`/x` → `basePath + x`) on render and on every patch that changes it ([ADR 0002](../adr/0002-host-owns-routing.md)).
 
 ### 4.6 EventBridge and inputs
 
