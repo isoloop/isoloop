@@ -43,8 +43,8 @@ The maintainer's preference is to own the stack and keep dependencies to a minim
 
    Node ids are ours, assigned when a node is created. Records reference nodes and siblings by id, not by index.
 4. **The host side** applies batches through the compositor only. It keeps `id → Node` and `Node → id` (`nodeFor`, `idFor`). Every tag, attribute and URL passes the component registry first (sanitising, I9). Host-owned inputs (design §4.6) decide whether a `prop` record for `value` or `checked` is applied.
-5. **Package layout:** see ADR 0011 (pending).
-6. **Done means the conformance suite passes** (M1 task 4b, `packages/host/test/render-bridge-conformance.ts`) **with no known gaps**, and Preact and React render into the subset in a framework smoke test per adapter (M3).
+5. **Package layout:** `@isoloop/dom`, see [ADR 0011](0011-dom-package.md).
+6. **Done means the conformance suite passes** (M1 task 4b, `@isoloop/dom/testing` per [ADR 0011](0011-dom-package.md)) **with no known gaps**, and Preact and React render into the subset in a framework smoke test per adapter (M3).
 7. **It grows only on evidence.** A member is added when a conformance case, an adapter test or a real isolate needs it, and each addition comes with a test. `legacy-vdom` stays for benchmarks and as a conformance reference.
 
 ### Out of scope

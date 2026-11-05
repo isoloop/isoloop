@@ -71,8 +71,9 @@ flowchart LR
 | `@isoloop/protocol` | everywhere | nothing | anything |
 | `@isoloop/codec` (M2b) | bus worker, Node | nothing | DOM types |
 | `@isoloop/bus` | bus worker, Node | `protocol`, `codec` (M2b) | DOM types, `host`, `runtime` |
-| `@isoloop/host` | main thread | `protocol` | `runtime`, `bus` source (it loads their bundles by URL) |
-| `@isoloop/runtime` | isolate worker | `protocol` | `host`, `bus` |
+| `@isoloop/dom` | isolate worker (`/worker`), main thread (`/host`) | nothing | any `@isoloop/*` package; DOM types in `/worker` |
+| `@isoloop/host` | main thread | `protocol`, `dom/host` | `runtime`, `bus` source (it loads their bundles by URL) |
+| `@isoloop/runtime` | isolate worker | `protocol`, `dom/worker` | `host`, `bus` |
 | `@isoloop/react`, `@isoloop/preact` | isolate worker | `runtime`, the framework (peer dep) | `host` |
 | `@isoloop/devtools` | main thread | `host` | `runtime` |
 
@@ -240,6 +241,7 @@ Transitions (matching the RFC lifecycle diagram):
 | From | Input | To | Effects |
 | --- | --- | --- | --- |
 | loading | `ready` | running | emit `isolate:ready` |
+| loading | `ready` with a `renderFmt` the host doesn't speak | failed | reason `render-fmt-mismatch`, no restart ([ADR 0011](../adr/0011-dom-package.md)); showFallback, emit `isolate:failed` |
 | loading | tick past `readyTimeoutMs` | crashed | terminate |
 | running | tick, no beat for `blockedAfterMs` | blocked | showBusy |
 | blocked | `beat` | running | hideBusy |

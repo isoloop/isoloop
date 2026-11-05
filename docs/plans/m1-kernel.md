@@ -43,14 +43,22 @@
 - **Files:** `packages/host/test/render-bridge-conformance.ts`: `runBridgeConformance(makeBridgePair)`, run in Vitest browser mode.
 - Cases: create / update / move / remove nodes, attributes and text; keyed list reorders keep node identity and focus; sanitising (I9); node-id mapping both ways; listener registration and event round-trip; host-owned input rules; styles.
 - Run it against `legacy-vdom` first (some cases, such as keyed reorders, are expected to fail there and are marked as known gaps), then against every new bridge.
+- Moves to `packages/dom/src/testing` (`@isoloop/dom/testing`) with task 5 ([ADR 0011](../adr/0011-dom-package.md)).
 
 ### 5. RenderBridge: `isoloop-dom@1` (isolate and host)
-- **Files:** TBD by ADR 0011 (package layout, pending). Whatever the layout, there are three parts: the worker-side DOM subset ([ADR 0010](../adr/0010-own-render-bridge.md) point 2) with a per-microtask recorder; the host applier (`HostRenderBridge` with `idFor` / `nodeFor`); and the record types with the fmt constant `isoloop-dom@1`, shared by both.
+- **Files:** a new package `packages/dom` (`@isoloop/dom`, [ADR 0011](../adr/0011-dom-package.md)), with no dependencies:
+  - `src/shared/` (record types, `ISOLOOP_DOM_FMT = 'isoloop-dom@1'`), `src/worker/` (the DOM subset from [ADR 0010](../adr/0010-own-render-bridge.md) point 2, the recorder with an `onBatch` hook, `deliver(nodeId, event)`), `src/host/` (the applier with `idFor` / `nodeFor`, event conversion, a required sanitising policy), `src/testing/` (the conformance suite, moved from `packages/host/test`).
+  - `tsconfig.{shared,worker,host,testing}.json`, one `lib` each; `typecheck` runs all four. tsdown entries `worker`, `host`, `testing`; no root entry.
+  - `package.json` exports `./worker`, `./host`, `./testing`; README marks the package internal.
+  - Wiring: `packages/runtime/src/render/` (microtask schedule, `patch` posting, `ctx.root`) over `@isoloop/dom/worker`; `packages/host/src/render/` (`HostRenderBridge` over `@isoloop/dom/host`, the registry from task 6 as its policy). `legacy-vdom` runs the moved suite.
+  - `.oxlintrc.json`: `runtime` may import `@isoloop/dom/worker` only, `host` `@isoloop/dom/host` (tests also `/testing`), `dom` no `@isoloop/*`, and `protocol`, `bus` never `dom`.
 - **Isolate side:** installs the subset as `document` and the DOM globals only when the isolate has a surface, and exposes `ctx.root`.
+- **Fmt check:** a `ready.renderFmt` other than `isoloop-dom@1` (or `'none'` when headless) crashes the isolate with reason `render-fmt-mismatch` and fails it without a restart.
 - **Moves** are one `move` record. The host applies records through the registry (task 6) and keeps node identity across moves.
 - No dependency. If the task grows past two evenings, split it: the worker-side subset first, then the host applier.
 - **Tests (browser):**
   - the conformance suite (task 4b) passes with **no known gaps**;
+  - an isolate reporting another `renderFmt` fails with `render-fmt-mismatch` and isn't restarted;
   - a 1,000-node list renders;
   - a batch round-trip leaves identical `innerHTML` on both sides;
   - Preact and React render a small app into the subset (a smoke test only; the adapters come in M3).
