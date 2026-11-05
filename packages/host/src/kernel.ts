@@ -1,7 +1,7 @@
 /*
- * The public façade (design §4.1), reduced to what M0 needs to run the proof
- * of concept: spawn, stop, restart, events and snapshots. Wiring only; the
- * decisions live in the supervisor, the DOM writes in the compositor.
+ * The public façade (design §4.1): spawn, stop, restart, events and
+ * snapshots. Wiring only; the decisions live in the supervisor, the DOM writes
+ * in the compositor.
  */
 import {
   isIsolateToHost,
@@ -15,10 +15,14 @@ import { createLegacyBus, type BusDelivery } from './legacy-bus';
 import { load, type LoadedWorker } from './loader';
 import { createLegacyVdomBridge, LEGACY_VDOM } from './render/legacy-vdom';
 import {
+  DEFAULT_BACKOFF,
+  DEFAULT_SUPERVISOR_CONFIG,
   initialSupervision,
   step,
+  type Backoff,
+  type CrashReason,
   type IsolateState,
-  type Supervision,
+  type IsolateSupervision,
   type SupervisorConfig,
   type SupervisorEffect,
   type SupervisorInput,
@@ -26,9 +30,20 @@ import {
 
 export type KernelConfig = {
   workers: { isolateBootstrap: string };
-  heartbeat?: { everyMs?: number; blockedAfterMs?: number };
-  /** Delay before a crashed isolate is restarted. Default 1500 ms, as in the PoC. */
-  restartAfterMs?: number;
+  /** Defaults: one-for-one, 3 restarts in 60 s, backoff 250 ms × 2ⁿ capped at 4 s. */
+  supervisor?: {
+    strategy?: 'one-for-one' | 'never';
+    maxRestarts?: number;
+    withinMs?: number;
+    backoff?: Partial<Backoff>;
+  };
+  /** Defaults: 100 / 400 / 10 000 ms, ready timeout 10 000 ms. */
+  heartbeat?: {
+    everyMs?: number;
+    blockedAfterMs?: number;
+    killAfterMs?: number;
+    readyTimeoutMs?: number;
+  };
   /** Adopted into every surface's shadow root. */
   styles?: readonly CSSStyleSheet[];
 };
@@ -50,6 +65,8 @@ export type IsolateSnapshot = {
   lastBeatAt: number;
   lagMs: number;
   restarts: number;
+  /** The last crash, while restarting or failed. */
+  reason?: CrashReason;
   error?: string;
   surface?: SurfaceStats;
   /** Messages dropped because their `v` or `t` was unknown. */
@@ -58,7 +75,10 @@ export type IsolateSnapshot = {
 
 export type KernelEvents = {
   'isolate:state': { id: string; state: IsolateState; prev: IsolateState };
-  'isolate:crash': { id: string; message: string; restarts: number };
+  'isolate:ready': { id: string };
+  'isolate:crash': { id: string; reason: CrashReason; message: string };
+  /** Past the restart limit, or strategy `never`: the isolate stays down. */
+  'isolate:failed': { id: string; reason: CrashReason; message: string };
   'isolate:error': { id: string; message: string };
   /** A publish on the M0 main-thread bus. */
   'bus:publish': BusDelivery;
@@ -84,7 +104,7 @@ export interface Kernel {
 
 type Slot = {
   manifest: IsolateManifest;
-  sup: Supervision;
+  sup: IsolateSupervision;
   loaded: LoadedWorker | null;
   timer: ReturnType<typeof setTimeout> | undefined;
   dropped: number;
@@ -94,14 +114,23 @@ const DEFAULT_GRANTS: Grants = { publish: [], subscribe: [] };
 
 export function createKernel(config: KernelConfig): Kernel {
   const everyMs = config.heartbeat?.everyMs ?? 100;
+  const def = DEFAULT_SUPERVISOR_CONFIG;
   const cfg: SupervisorConfig = {
-    blockedAfterMs: config.heartbeat?.blockedAfterMs ?? 400,
-    restartAfterMs: config.restartAfterMs ?? 1500,
+    ...def,
+    strategy: config.supervisor?.strategy ?? def.strategy,
+    maxRestarts: config.supervisor?.maxRestarts ?? def.maxRestarts,
+    withinMs: config.supervisor?.withinMs ?? def.withinMs,
+    backoff: { ...DEFAULT_BACKOFF, ...config.supervisor?.backoff },
+    blockedAfterMs: config.heartbeat?.blockedAfterMs ?? def.blockedAfterMs,
+    killAfterMs: config.heartbeat?.killAfterMs ?? def.killAfterMs,
+    readyTimeoutMs: config.heartbeat?.readyTimeoutMs ?? def.readyTimeoutMs,
   };
   const slots = new Map<string, Slot>();
   const listeners: { [E in KernelEvent]: Set<(e: KernelEvents[E]) => void> } = {
     'isolate:state': new Set(),
+    'isolate:ready': new Set(),
     'isolate:crash': new Set(),
+    'isolate:failed': new Set(),
     'isolate:error': new Set(),
     'bus:publish': new Set(),
   };
@@ -130,36 +159,54 @@ export function createKernel(config: KernelConfig): Kernel {
   };
 
   const run = (slot: Slot, effects: SupervisorEffect[]): void => {
+    const id = slot.manifest.id;
     for (const fx of effects) {
       switch (fx.k) {
         case 'terminate':
+          terminate(slot);
+          break;
+        case 'shutdown':
+          // The graceful `shutdown` message arrives with loader hardening (M1 task 3).
           terminate(slot);
           break;
         case 'spawn':
           clearTimeout(slot.timer);
           slot.timer = setTimeout(() => {
             slot.timer = undefined;
-            // A manual restart or stop while waiting wins (PoC: `if (slot.crashed)`).
-            if (slot.sup.state === 'crashed' || slot.sup.state === 'restarting') start(slot);
+            // A stop while waiting wins.
+            if (slot.sup.state === 'restarting') start(slot);
           }, fx.afterMs);
           break;
-        case 'reportError':
-          emit('isolate:error', { id: slot.manifest.id, message: fx.message });
+        case 'showBusy':
+        case 'hideBusy':
+        case 'showFallback':
+        case 'hideFallback':
+          // The isolate shell's overlays arrive with the supervisor wiring (M1 task 2).
+          break;
+        case 'emit':
+          switch (fx.event) {
+            case 'isolate:state':
+              emit(fx.event, { id, ...fx.data });
+              break;
+            case 'isolate:ready':
+              emit(fx.event, { id });
+              break;
+            case 'isolate:crash':
+            case 'isolate:failed':
+              emit(fx.event, { id, ...fx.data });
+              break;
+            case 'isolate:error':
+              emit(fx.event, { id, ...fx.data });
+              break;
+          }
           break;
       }
     }
   };
 
   const feed = (slot: Slot, input: SupervisorInput): void => {
-    const prev = slot.sup;
-    const { s, effects } = step(prev, input, cfg);
+    const { s, effects } = step(slot.sup, input, cfg);
     slot.sup = s;
-    if (s.state === 'crashed' && prev.state !== 'crashed') {
-      emit('isolate:crash', { id: slot.manifest.id, message: s.error ?? '', restarts: s.restarts });
-    }
-    if (s.state !== prev.state) {
-      emit('isolate:state', { id: slot.manifest.id, state: s.state, prev: prev.state });
-    }
     run(slot, effects);
   };
 
@@ -178,7 +225,12 @@ export function createKernel(config: KernelConfig): Kernel {
           else slot.dropped++;
           return;
         case 'error':
-          feed(slot, { k: 'error', fatal: msg.p.fatal, message: msg.p.message });
+          feed(slot, {
+            k: 'error',
+            at: performance.now(),
+            fatal: msg.p.fatal,
+            message: msg.p.message,
+          });
           return;
         case 'call':
           // Host calls arrive in M1.
@@ -217,7 +269,11 @@ export function createKernel(config: KernelConfig): Kernel {
     loaded.worker.addEventListener('error', (e) => {
       e.preventDefault();
       if (slot.loaded === loaded)
-        feed(slot, { k: 'workerError', message: e.message || 'Unknown error' });
+        feed(slot, {
+          k: 'workerError',
+          at: performance.now(),
+          message: e.message || 'Unknown error',
+        });
     });
     slot.loaded = loaded;
     feed(slot, { k: 'spawned', at: performance.now() });
@@ -235,7 +291,7 @@ export function createKernel(config: KernelConfig): Kernel {
   };
 
   const snapshot = (slot: Slot): IsolateSnapshot => {
-    const { state, lastBeatAt, lagMs, restarts, error } = slot.sup;
+    const { state, lastBeatAt, lagMs, restarts, reason, error } = slot.sup;
     const surface = compositor.stats(slot.manifest.id);
     return {
       id: slot.manifest.id,
@@ -244,6 +300,7 @@ export function createKernel(config: KernelConfig): Kernel {
       lagMs,
       restarts,
       dropped: slot.dropped,
+      ...(reason === undefined ? {} : { reason }),
       ...(error === undefined ? {} : { error }),
       ...(surface === undefined ? {} : { surface }),
     };
@@ -285,7 +342,7 @@ export function createKernel(config: KernelConfig): Kernel {
     },
 
     restart(id) {
-      feed(get(id), { k: 'restart' });
+      feed(get(id), { k: 'respawn' });
       return Promise.resolve();
     },
 

@@ -13,18 +13,20 @@ afterEach(async () => {
   document.body.replaceChildren();
 });
 
-function setup(o: { restartAfterMs?: number } = {}) {
+function setup(o: { backoffMs?: number } = {}) {
   const sheet = new CSSStyleSheet();
   sheet.replaceSync('.n { color: rgb(1, 2, 3); }');
   const kernel = createKernel({
     workers: { isolateBootstrap: bootstrap },
-    restartAfterMs: o.restartAfterMs ?? 200,
+    supervisor: { backoff: { initialMs: o.backoffMs ?? 200 } },
     styles: [sheet],
   });
   kernels.push(kernel);
   const events: { [E in keyof KernelEvents]: KernelEvents[E][] } = {
     'isolate:state': [],
+    'isolate:ready': [],
     'isolate:crash': [],
+    'isolate:failed': [],
     'isolate:error': [],
     'bus:publish': [],
   };
@@ -114,16 +116,17 @@ describe('kernel', () => {
     expect(kernel.isolates()).toEqual([]);
   });
 
-  it('restarts a crashed isolate after restartAfterMs and counts it', async () => {
-    const { spawn, events } = setup({ restartAfterMs: 200 });
+  it('restarts a crashed isolate after the backoff and counts it', async () => {
+    const { spawn, events } = setup({ backoffMs: 200 });
     const a = spawn('A');
     await waitFor(() => a.text() === '0');
     a.click('inc');
     await waitFor(() => a.text() === '1');
     a.click('crash');
-    await waitFor(() => a.handle.snapshot().state === 'crashed');
+    await waitFor(() => a.handle.snapshot().state === 'restarting');
+    expect(a.handle.snapshot()).toMatchObject({ reason: 'worker-error', restarts: 1 });
     expect(a.handle.snapshot().error).toContain('fixture crash');
-    expect(events['isolate:crash']).toMatchObject([{ id: 'A', restarts: 1 }]);
+    expect(events['isolate:crash']).toMatchObject([{ id: 'A', reason: 'worker-error' }]);
     await waitFor(() => a.handle.snapshot().state === 'running');
     // Fresh state after the restart, same surface.
     await waitFor(() => a.text() === '0');
@@ -139,7 +142,7 @@ describe('kernel', () => {
     await waitFor(() => a.handle.snapshot().state === 'blocked');
     await waitFor(() => a.handle.snapshot().state === 'running');
     const states = events['isolate:state'].map((e) => e.state);
-    expect(states).toEqual(['running', 'blocked', 'running']);
+    expect(states).toEqual(['loading', 'running', 'blocked', 'running']);
   });
 
   it('a manual restart is not counted', async () => {
