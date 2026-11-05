@@ -1,0 +1,757 @@
+/*
+ * The worker-side DOM subset (ADR 0010 point 2): exactly what Preact and
+ * React call, recorded as isoloop-dom@1 records while it changes. A node is
+ * "known" once the host has been told about it (it's in the tree under the
+ * root); only changes to known nodes become records, and a subtree that joins
+ * the tree is sent whole in one `insert`. Moves inside the tree are one
+ * `move` record, so the host keeps node identity.
+ *
+ * Nothing here touches a global: `createDom()` builds a self-contained
+ * document, and `install()` exposes it as the worker's `document`.
+ */
+import {
+  ROOT_ID,
+  type DomBatch,
+  type DomEvent,
+  type DomRecord,
+  type Namespace,
+  type NodeId,
+  type SerializedNode,
+  type SyncedProp,
+} from '../shared/records';
+
+const HTML_NS = 'http://www.w3.org/1999/xhtml';
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+type ListenerFn = (event: Event) => void;
+type Listener = { fn: ListenerFn | { handleEvent: ListenerFn }; capture: boolean; once: boolean };
+
+/** Strings as the DOM coerces them: numbers and booleans become text, null and undefined empty. */
+const str = (v: unknown): string =>
+  typeof v === 'string'
+    ? v
+    : typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint'
+      ? String(v)
+      : '';
+
+const domError = (name: string, message: string): Error => {
+  const e = new Error(message);
+  e.name = name;
+  return e;
+};
+
+/** Shared state of one document: ids, the recorder, known nodes. */
+type Core = {
+  nextId: number;
+  known: Map<NodeId, WNode>;
+  record(r: DomRecord): void;
+};
+
+/** Listener storage and capture/bubble dispatch through `isoParentTarget()`. */
+export class WEventTarget {
+  /** @internal */ isoListeners: Map<string, Listener[]> = new Map();
+
+  /** @internal */ isoParentTarget(): WEventTarget | null {
+    return null;
+  }
+
+  /** @internal Called when the first listener of `type` is added, or the last removed. */
+  isoListenChanged(_type: string, _on: boolean): void {}
+
+  addEventListener(
+    type: string,
+    fn: ListenerFn | { handleEvent: ListenerFn } | null,
+    options?: boolean | AddEventListenerOptions,
+  ): void {
+    if (!fn) return;
+    const capture = typeof options === 'boolean' ? options : Boolean(options?.capture);
+    const once = typeof options === 'object' && Boolean(options.once);
+    const list = this.isoListeners.get(type) ?? [];
+    if (list.some((l) => l.fn === fn && l.capture === capture)) return;
+    list.push({ fn, capture, once });
+    this.isoListeners.set(type, list);
+    if (list.length === 1) this.isoListenChanged(type, true);
+  }
+
+  removeEventListener(
+    type: string,
+    fn: ListenerFn | { handleEvent: ListenerFn } | null,
+    options?: boolean | EventListenerOptions,
+  ): void {
+    const capture = typeof options === 'boolean' ? options : Boolean(options?.capture);
+    const list = this.isoListeners.get(type);
+    if (!list) return;
+    const i = list.findIndex((l) => l.fn === fn && l.capture === capture);
+    if (i < 0) return;
+    list.splice(i, 1);
+    if (list.length === 0) {
+      this.isoListeners.delete(type);
+      this.isoListenChanged(type, false);
+    }
+  }
+
+  /** Capture from the top, then the target, then bubble (if `bubbles`). */
+  dispatchEvent(event: Event): boolean {
+    const path: WEventTarget[] = [this];
+    for (let t = this.isoParentTarget(); t; t = t.isoParentTarget()) path.push(t);
+    let stopped = false;
+    let stoppedNow = false;
+    const stop = event.stopPropagation.bind(event);
+    const stopNow = event.stopImmediatePropagation.bind(event);
+    Object.defineProperties(event, {
+      target: { value: this, configurable: true },
+      srcElement: { value: this, configurable: true },
+      stopPropagation: {
+        value: () => {
+          stopped = true;
+          stop();
+        },
+        configurable: true,
+      },
+      stopImmediatePropagation: {
+        value: () => {
+          stopped = true;
+          stoppedNow = true;
+          stopNow();
+        },
+        configurable: true,
+      },
+      composedPath: { value: () => path.slice(), configurable: true },
+    });
+    const invoke = (t: WEventTarget, phase: number, capture: boolean | null) => {
+      Object.defineProperties(event, {
+        currentTarget: { value: t, configurable: true },
+        eventPhase: { value: phase, configurable: true },
+      });
+      for (const l of (t.isoListeners.get(event.type) ?? []).slice()) {
+        if (capture !== null && l.capture !== capture) continue;
+        if (l.once) t.removeEventListener(event.type, l.fn, l.capture);
+        if (typeof l.fn === 'function') l.fn.call(t, event);
+        else l.fn.handleEvent(event);
+        if (stoppedNow) return;
+      }
+    };
+    // [target, eventPhase, capture listeners only?]: capture top-down, target, bubble bottom-up.
+    const phases: [WEventTarget, number, boolean | null][] = [];
+    for (let i = path.length - 1; i > 0; i--) {
+      const t = path[i];
+      if (t) phases.push([t, 1, true]);
+    }
+    phases.push([this, 2, null]);
+    if (event.bubbles) for (const t of path.slice(1)) phases.push([t, 3, false]);
+    for (const [t, phase, capture] of phases) {
+      if (stopped) break;
+      invoke(t, phase, capture);
+    }
+    Object.defineProperties(event, {
+      currentTarget: { value: null, configurable: true },
+      eventPhase: { value: 0, configurable: true },
+    });
+    return !event.defaultPrevented;
+  }
+}
+
+export abstract class WNode extends WEventTarget {
+  static readonly ELEMENT_NODE = 1;
+  static readonly TEXT_NODE = 3;
+  static readonly DOCUMENT_NODE = 9;
+  readonly ELEMENT_NODE = 1;
+  readonly TEXT_NODE = 3;
+
+  abstract readonly nodeType: number;
+  abstract readonly nodeName: string;
+  readonly ownerDocument: WDocument;
+  /** @internal */ readonly isoId: NodeId;
+  /** @internal */ isoParent: WElement | null = null;
+  /** @internal */ isoPrev: WNode | null = null;
+  /** @internal */ isoNext: WNode | null = null;
+  /** @internal Whether the host knows this node (it's in the tree under the root). */
+  isoKnown = false;
+
+  constructor(doc: WDocument, id: NodeId) {
+    super();
+    this.ownerDocument = doc;
+    this.isoId = id;
+  }
+
+  /** @internal */ override isoParentTarget(): WEventTarget | null {
+    return this.isoParent;
+  }
+
+  /** @internal */ override isoListenChanged(type: string, on: boolean): void {
+    if (this.isoKnown) this.ownerDocument.isoCore.record(['listen', this.isoId, type, on]);
+  }
+
+  get parentNode(): WElement | null {
+    return this.isoParent;
+  }
+  get parentElement(): WElement | null {
+    return this.isoParent;
+  }
+  get nextSibling(): WNode | null {
+    return this.isoNext;
+  }
+  get previousSibling(): WNode | null {
+    return this.isoPrev;
+  }
+  get firstChild(): WNode | null {
+    return null;
+  }
+  get lastChild(): WNode | null {
+    return null;
+  }
+  get childNodes(): readonly WNode[] {
+    return [];
+  }
+  get isConnected(): boolean {
+    return this.isoKnown;
+  }
+  abstract get textContent(): string;
+  abstract set textContent(v: string | null);
+  abstract get nodeValue(): string | null;
+  abstract set nodeValue(v: string | null);
+
+  hasChildNodes(): boolean {
+    return this.firstChild !== null;
+  }
+
+  contains(other: WNode | null): boolean {
+    for (let n: WNode | null = other; n; n = n.isoParent) if (n === this) return true;
+    return false;
+  }
+
+  remove(): void {
+    this.isoParent?.removeChild(this);
+  }
+}
+
+export class WText extends WNode {
+  readonly nodeType = 3;
+  readonly nodeName = '#text';
+  /** @internal */ isoData: string;
+
+  constructor(doc: WDocument, id: NodeId, data: string) {
+    super(doc, id);
+    this.isoData = data;
+  }
+
+  get data(): string {
+    return this.isoData;
+  }
+  set data(v: unknown) {
+    const data = str(v);
+    if (data === this.isoData) return;
+    this.isoData = data;
+    if (this.isoKnown) this.ownerDocument.isoCore.record(['text', this.isoId, data]);
+  }
+  get length(): number {
+    return this.isoData.length;
+  }
+  get textContent(): string {
+    return this.isoData;
+  }
+  set textContent(v: string | null) {
+    this.data = v ?? '';
+  }
+  get nodeValue(): string | null {
+    return this.isoData;
+  }
+  set nodeValue(v: string | null) {
+    this.data = v ?? '';
+  }
+}
+
+/** What `element.style` offers: declarations by property name, plus the methods frameworks call. */
+export type WStyle = {
+  setProperty(name: string, value: string | null): void;
+  removeProperty(name: string): string;
+  getPropertyValue(name: string): string;
+  cssText: string;
+  [property: string]: unknown;
+};
+
+/** `element.style`: property writes and setProperty, kept as the `style` attribute. */
+const kebab = (name: string): string =>
+  name.startsWith('--') ? name : name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+
+function createStyle(el: WElement): WStyle {
+  const decls = new Map<string, string>();
+  const write = () => {
+    const text = [...decls].map(([k, v]) => `${k}: ${v};`).join(' ');
+    if (text) el.setAttribute('style', text);
+    else el.removeAttribute('style');
+  };
+  const set = (name: string, value: unknown) => {
+    const v = str(value);
+    if (v === '') decls.delete(name);
+    else decls.set(name, v);
+  };
+  const api = {
+    setProperty(name: string, value: string | null) {
+      set(kebab(name), value);
+      write();
+    },
+    removeProperty(name: string) {
+      const old = decls.get(kebab(name)) ?? '';
+      decls.delete(kebab(name));
+      write();
+      return old;
+    },
+    getPropertyValue(name: string) {
+      return decls.get(kebab(name)) ?? '';
+    },
+    get cssText() {
+      return [...decls].map(([k, v]) => `${k}: ${v};`).join(' ');
+    },
+    set cssText(text: string) {
+      decls.clear();
+      for (const part of text.split(';')) {
+        const i = part.indexOf(':');
+        if (i > 0) set(part.slice(0, i).trim(), part.slice(i + 1).trim());
+      }
+      write();
+    },
+  };
+  return new Proxy(api, {
+    get(t, key, receiver) {
+      if (typeof key !== 'string' || key in t) return Reflect.get(t, key, receiver) as unknown;
+      return decls.get(kebab(key === 'cssFloat' ? 'float' : key)) ?? '';
+    },
+    set(t, key, value, receiver) {
+      if (typeof key !== 'string' || key in t) return Reflect.set(t, key, value, receiver);
+      set(kebab(key === 'cssFloat' ? 'float' : key), value);
+      write();
+      return true;
+    },
+  });
+}
+
+export class WElement extends WNode {
+  readonly nodeType = 1;
+  readonly localName: string;
+  readonly namespaceURI: string;
+  /** @internal */ readonly isoNs: Namespace;
+  /** @internal */ isoFirst: WNode | null = null;
+  /** @internal */ isoLast: WNode | null = null;
+  /** @internal */ isoAttrs: Map<string, string> = new Map();
+  /** @internal */ isoProps: Map<SyncedProp, string | boolean> = new Map();
+  /** @internal */ isoChildCache: WNode[] | null = null;
+  /** @internal */ isoStyle: WStyle | null = null;
+
+  constructor(doc: WDocument, id: NodeId, localName: string, ns: Namespace) {
+    super(doc, id);
+    this.localName = localName;
+    this.isoNs = ns;
+    this.namespaceURI = ns === 'svg' ? SVG_NS : HTML_NS;
+  }
+
+  get tagName(): string {
+    return this.isoNs === 'html' ? this.localName.toUpperCase() : this.localName;
+  }
+  get nodeName(): string {
+    return this.tagName;
+  }
+  override get firstChild(): WNode | null {
+    return this.isoFirst;
+  }
+  override get lastChild(): WNode | null {
+    return this.isoLast;
+  }
+  override get childNodes(): readonly WNode[] {
+    if (!this.isoChildCache) {
+      const list: WNode[] = [];
+      for (let n = this.isoFirst; n; n = n.isoNext) list.push(n);
+      this.isoChildCache = list;
+    }
+    return this.isoChildCache;
+  }
+  get children(): readonly WElement[] {
+    return this.childNodes.filter((n): n is WElement => n instanceof WElement);
+  }
+  get firstElementChild(): WElement | null {
+    return this.children[0] ?? null;
+  }
+
+  get textContent(): string {
+    let out = '';
+    for (let n = this.isoFirst; n; n = n.isoNext) out += n.textContent;
+    return out;
+  }
+  set textContent(v: string | null) {
+    this.replaceChildren(...(v ? [this.ownerDocument.createTextNode(v)] : []));
+  }
+  get nodeValue(): string | null {
+    return null;
+  }
+  set nodeValue(_v: string | null) {}
+
+  get attributes(): readonly { name: string; value: string }[] {
+    return [...this.isoAttrs].map(([name, value]) => ({ name, value }));
+  }
+  getAttribute(name: string): string | null {
+    return this.isoAttrs.get(this.isoAttrName(name)) ?? null;
+  }
+  hasAttribute(name: string): boolean {
+    return this.isoAttrs.has(this.isoAttrName(name));
+  }
+  setAttribute(name: string, value: unknown): void {
+    const n = this.isoAttrName(name);
+    const v = str(value);
+    if (this.isoAttrs.get(n) === v) return;
+    this.isoAttrs.set(n, v);
+    if (this.isoKnown) this.ownerDocument.isoCore.record(['attr', this.isoId, n, v]);
+  }
+  removeAttribute(name: string): void {
+    const n = this.isoAttrName(name);
+    if (!this.isoAttrs.delete(n)) return;
+    if (this.isoKnown) this.ownerDocument.isoCore.record(['attr', this.isoId, n, null]);
+  }
+  /** @internal HTML attribute names are case-insensitive; SVG ones aren't. */
+  isoAttrName(name: string): string {
+    return this.isoNs === 'html' ? name.toLowerCase() : name;
+  }
+
+  get style(): WStyle {
+    this.isoStyle ??= createStyle(this);
+    return this.isoStyle;
+  }
+
+  /** @internal */ isoSetProp(name: SyncedProp, value: string | boolean, record: boolean): void {
+    if (this.isoProps.get(name) === value) return;
+    this.isoProps.set(name, value);
+    if (record && this.isoKnown)
+      this.ownerDocument.isoCore.record(['prop', this.isoId, name, value]);
+  }
+
+  appendChild<T extends WNode>(child: T): T {
+    return this.insertBefore(child, null);
+  }
+
+  insertBefore<T extends WNode>(child: T, ref: WNode | null): T {
+    if (!(child instanceof WNode)) throw new TypeError('insertBefore: not a node');
+    if (ref && ref.isoParent !== this) {
+      throw domError('NotFoundError', 'insertBefore: the reference node is not a child');
+    }
+    if (child.contains(this)) {
+      throw domError('HierarchyRequestError', 'insertBefore: would create a cycle');
+    }
+    if (ref === child) ref = child.isoNext;
+    const wasKnown = child.isoKnown;
+    child.isoParent?.isoUnlink(child);
+    this.isoLink(child, ref);
+    const core = this.ownerDocument.isoCore;
+    if (wasKnown && this.isoKnown)
+      core.record(['move', this.isoId, child.isoId, ref?.isoId ?? null]);
+    else if (wasKnown) {
+      core.record(['remove', child.isoId]);
+      forget(child, core);
+    } else if (this.isoKnown) {
+      core.record(['insert', this.isoId, serialize(child), ref?.isoId ?? null]);
+      learn(child, core);
+    }
+    return child;
+  }
+
+  removeChild<T extends WNode>(child: T): T {
+    if (child.isoParent !== this) throw domError('NotFoundError', 'removeChild: not a child');
+    this.isoUnlink(child);
+    if (child.isoKnown) {
+      const core = this.ownerDocument.isoCore;
+      core.record(['remove', child.isoId]);
+      forget(child, core);
+    }
+    return child;
+  }
+
+  replaceChildren(...nodes: (WNode | string)[]): void {
+    while (this.isoLast) this.removeChild(this.isoLast);
+    this.append(...nodes);
+  }
+
+  append(...nodes: (WNode | string)[]): void {
+    for (const n of nodes) {
+      this.appendChild(typeof n === 'string' ? this.ownerDocument.createTextNode(n) : n);
+    }
+  }
+
+  /** @internal */ isoUnlink(child: WNode): void {
+    if (child.isoPrev) child.isoPrev.isoNext = child.isoNext;
+    else this.isoFirst = child.isoNext;
+    if (child.isoNext) child.isoNext.isoPrev = child.isoPrev;
+    else this.isoLast = child.isoPrev;
+    child.isoParent = null;
+    child.isoPrev = null;
+    child.isoNext = null;
+    this.isoChildCache = null;
+  }
+
+  /** @internal */ isoLink(child: WNode, ref: WNode | null): void {
+    child.isoParent = this;
+    child.isoNext = ref;
+    child.isoPrev = ref ? ref.isoPrev : this.isoLast;
+    if (child.isoPrev) child.isoPrev.isoNext = child;
+    else this.isoFirst = child;
+    if (ref) ref.isoPrev = child;
+    else this.isoLast = child;
+    this.isoChildCache = null;
+  }
+}
+
+export class WHTMLElement extends WElement {}
+export class WSVGElement extends WElement {}
+/** Only for `instanceof` checks; never created by the host (the registry drops iframes). */
+export class WHTMLIFrameElement extends WHTMLElement {}
+
+export class WHTMLInputElement extends WHTMLElement {
+  get value(): string {
+    const v = this.isoProps.get('value');
+    return typeof v === 'string' ? v : (this.getAttribute('value') ?? '');
+  }
+  set value(v: unknown) {
+    this.isoSetProp('value', str(v), true);
+  }
+  get checked(): boolean {
+    const v = this.isoProps.get('checked');
+    return typeof v === 'boolean' ? v : this.hasAttribute('checked');
+  }
+  set checked(v: unknown) {
+    this.isoSetProp('checked', Boolean(v), true);
+  }
+  get defaultValue(): string {
+    return this.getAttribute('value') ?? '';
+  }
+  set defaultValue(v: string) {
+    this.setAttribute('value', v);
+  }
+  get defaultChecked(): boolean {
+    return this.hasAttribute('checked');
+  }
+  set defaultChecked(v: boolean) {
+    if (v) this.setAttribute('checked', '');
+    else this.removeAttribute('checked');
+  }
+  get name(): string {
+    return this.getAttribute('name') ?? '';
+  }
+  set name(v: string) {
+    this.setAttribute('name', v);
+  }
+  get type(): string {
+    return this.getAttribute('type') ?? 'text';
+  }
+  set type(v: string) {
+    this.setAttribute('type', v);
+  }
+}
+
+export class WHTMLTextAreaElement extends WHTMLElement {
+  get value(): string {
+    const v = this.isoProps.get('value');
+    return typeof v === 'string' ? v : this.textContent;
+  }
+  set value(v: unknown) {
+    this.isoSetProp('value', str(v), true);
+  }
+  get defaultValue(): string {
+    return this.textContent;
+  }
+  set defaultValue(v: string) {
+    this.textContent = v;
+  }
+  get name(): string {
+    return this.getAttribute('name') ?? '';
+  }
+  set name(v: string) {
+    this.setAttribute('name', v);
+  }
+}
+
+export class WHTMLSelectElement extends WHTMLElement {
+  get value(): string {
+    const v = this.isoProps.get('value');
+    return typeof v === 'string' ? v : '';
+  }
+  set value(v: unknown) {
+    this.isoSetProp('value', str(v), true);
+  }
+  get name(): string {
+    return this.getAttribute('name') ?? '';
+  }
+  set name(v: string) {
+    this.setAttribute('name', v);
+  }
+}
+
+export class WHTMLOptionElement extends WHTMLElement {
+  get selected(): boolean {
+    const v = this.isoProps.get('selected');
+    return typeof v === 'boolean' ? v : this.hasAttribute('selected');
+  }
+  set selected(v: unknown) {
+    this.isoSetProp('selected', Boolean(v), true);
+  }
+}
+
+const HTML_CLASSES: Record<
+  string,
+  new (doc: WDocument, id: NodeId, tag: string, ns: Namespace) => WElement
+> = {
+  input: WHTMLInputElement,
+  textarea: WHTMLTextAreaElement,
+  select: WHTMLSelectElement,
+  option: WHTMLOptionElement,
+  iframe: WHTMLIFrameElement,
+};
+
+export class WDocument extends WEventTarget {
+  readonly nodeType = 9;
+  readonly nodeName = '#document';
+  /** @internal */ readonly isoCore: Core;
+  /** Set by `install()`: the worker global. */
+  defaultView: unknown = null;
+  readonly activeElement = null;
+  /** A detached body, for code that falls back to `document.body`. */
+  readonly body: WHTMLElement;
+
+  constructor(core: Core) {
+    super();
+    this.isoCore = core;
+    this.body = new WHTMLElement(this, -1, 'body', 'html');
+  }
+
+  createElement(tag: string): WElement {
+    const t = tag.toLowerCase();
+    const C = Object.hasOwn(HTML_CLASSES, t) ? HTML_CLASSES[t] : undefined;
+    return new (C ?? WHTMLElement)(this, this.isoCore.nextId++, t, 'html');
+  }
+
+  createElementNS(ns: string | null, tag: string): WElement {
+    if (ns === SVG_NS) return new WSVGElement(this, this.isoCore.nextId++, tag, 'svg');
+    if (ns === HTML_NS || ns === null) return this.createElement(tag);
+    throw domError('NotSupportedError', `createElementNS: namespace ${ns} isn't supported`);
+  }
+
+  createTextNode(data: string): WText {
+    return new WText(this, this.isoCore.nextId++, data);
+  }
+}
+
+/** The subtree as `insert` sends it. */
+function serialize(n: WNode): SerializedNode {
+  if (n instanceof WText) return { k: 'text', id: n.isoId, data: n.isoData };
+  if (!(n instanceof WElement)) throw new TypeError('serialize: unknown node');
+  return {
+    k: 'el',
+    id: n.isoId,
+    tag: n.localName,
+    ns: n.isoNs,
+    attrs: [...n.isoAttrs],
+    props: [...n.isoProps],
+    listen: [...n.isoListeners.keys()],
+    children: n.childNodes.map(serialize),
+  };
+}
+
+function learn(n: WNode, core: Core): void {
+  n.isoKnown = true;
+  core.known.set(n.isoId, n);
+  for (const c of n.childNodes) learn(c, core);
+}
+
+function forget(n: WNode, core: Core): void {
+  n.isoKnown = false;
+  core.known.delete(n.isoId);
+  for (const c of n.childNodes) forget(c, core);
+}
+
+export type WorkerDomOptions = {
+  /** Receives each batch, in order. */
+  onBatch(batch: DomBatch): void;
+  /** Called once per batch with the flush to run; default `queueMicrotask`. */
+  schedule?: (flush: () => void) => void;
+};
+
+export interface WorkerDom {
+  readonly document: WDocument;
+  /** The isolate's render root; the host maps it to the surface. */
+  readonly root: WElement;
+  /** Sends pending records now, if any. */
+  flush(): void;
+  /** Dispatches an event from the host to the node it names (capture and bubble in the worker). */
+  deliver(event: DomEvent): void;
+  /** The id of a node, for tests and host calls. */
+  idOf(node: WNode): NodeId;
+}
+
+export function createDom(opts: WorkerDomOptions): WorkerDom {
+  const schedule = opts.schedule ?? ((fn: () => void) => queueMicrotask(fn));
+  let pending: DomRecord[] = [];
+  let scheduled = false;
+  const flush = (): void => {
+    scheduled = false;
+    if (pending.length === 0) return;
+    const batch = pending;
+    pending = [];
+    opts.onBatch(batch);
+  };
+  const core: Core = {
+    nextId: ROOT_ID + 1,
+    known: new Map(),
+    record(r) {
+      pending.push(r);
+      if (!scheduled) {
+        scheduled = true;
+        schedule(flush);
+      }
+    },
+  };
+  const document = new WDocument(core);
+  const root = new WHTMLElement(document, ROOT_ID, 'iso-root', 'html');
+  root.isoKnown = true;
+  core.known.set(ROOT_ID, root);
+
+  return {
+    document,
+    root,
+    flush,
+    idOf: (node) => node.isoId,
+    deliver(event) {
+      const node = core.known.get(event.target);
+      if (!node) return;
+      // The host already shows what the user typed; sync it without echoing a record.
+      const control =
+        node instanceof WHTMLInputElement ||
+        node instanceof WHTMLTextAreaElement ||
+        node instanceof WHTMLSelectElement;
+      if (control && event.value !== undefined) node.isoSetProp('value', event.value, false);
+      if (node instanceof WHTMLInputElement && event.checked !== undefined)
+        node.isoSetProp('checked', event.checked, false);
+      node.dispatchEvent(toEvent(event));
+    },
+  };
+}
+
+/** A real `Event` with the fields frameworks read from mouse and keyboard events. */
+function toEvent(e: DomEvent): Event {
+  const ev = new Event(e.type, { bubbles: true, cancelable: true });
+  const mods: Record<string, boolean> = {
+    Alt: e.mods.alt,
+    Control: e.mods.ctrl,
+    Meta: e.mods.meta,
+    Shift: e.mods.shift,
+  };
+  // `isTrusted` stays false: it's an unforgeable own property of every Event.
+  Object.defineProperties(ev, {
+    altKey: { value: e.mods.alt },
+    ctrlKey: { value: e.mods.ctrl },
+    metaKey: { value: e.mods.meta },
+    shiftKey: { value: e.mods.shift },
+    getModifierState: { value: (k: string) => mods[k] ?? false },
+    key: { value: e.key },
+    code: { value: e.code },
+    button: { value: e.button ?? 0 },
+    clientX: { value: e.x ?? 0 },
+    clientY: { value: e.y ?? 0 },
+  });
+  return ev;
+}

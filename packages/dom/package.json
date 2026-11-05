@@ -1,0 +1,65 @@
+{
+  "name": "@isoloop/dom",
+  "version": "0.0.0",
+  "description": "Internal: Isoloop's render bridge (isoloop-dom@1). Used by @isoloop/runtime and @isoloop/host; not for app code.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isoloop/isoloop.git",
+    "directory": "packages/dom"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./worker": {
+      "@isoloop/source": "./src/worker/index.ts",
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
+    },
+    "./host": {
+      "@isoloop/source": "./src/host/index.ts",
+      "types": "./dist/host.d.ts",
+      "import": "./dist/host.js"
+    },
+    "./testing": {
+      "@isoloop/source": "./src/testing/index.ts",
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      "./worker": {
+        "types": "./dist/worker.d.ts",
+        "import": "./dist/worker.js"
+      },
+      "./host": {
+        "types": "./dist/host.d.ts",
+        "import": "./dist/host.js"
+      },
+      "./testing": {
+        "types": "./dist/testing.d.ts",
+        "import": "./dist/testing.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.shared.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.host.json && tsc --noEmit -p tsconfig.testing.json"
+  },
+  "peerDependencies": {
+    "vitest": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

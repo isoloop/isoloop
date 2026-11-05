@@ -14,8 +14,9 @@ import { createCompositor, type FallbackRender, type SurfaceStats } from './comp
 import { missingFeatures } from './features';
 import { createLegacyBus, type BusDelivery } from './legacy-bus';
 import { load, type LoadedWorker } from './loader';
+import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from './render/isoloop-dom';
 import { createLegacyVdomBridge, LEGACY_VDOM } from './render/legacy-vdom';
-import { createRegistry, type HostComponent } from './render/registry';
+import { createRegistry, type ComponentRegistry, type HostComponent } from './render/registry';
 import {
   DEFAULT_BACKOFF,
   DEFAULT_SUPERVISOR_CONFIG,
@@ -153,7 +154,12 @@ type Slot = {
   closed: Promise<void>;
   onClosed: () => void;
   dropped: number;
+  /** The render format the isolate reported in `ready`; patches in any other are dropped. */
+  fmt: string | undefined;
 };
+
+/** Render formats a host accepts in `ready`: `legacy-vdom@1` until M1 task 11 removes it. */
+const SURFACE_FMTS: readonly string[] = [ISOLOOP_DOM_FMT, LEGACY_VDOM];
 
 const DEFAULT_GRANTS: Grants = { publish: [], subscribe: [] };
 
@@ -190,9 +196,9 @@ export function createKernel(config: KernelConfig): Kernel {
       'unsupported_browser',
       `This browser lacks what Isoloop needs: ${missing.join(', ')}. See ADR 0009 rule 7 for the minimum versions.`,
     );
-  // Built now so a bad `components` entry fails here; render bridges use it from M1 task 5.
+  let registry: ComponentRegistry;
   try {
-    createRegistry({ components: config.components ?? {} });
+    registry = createRegistry({ components: config.components ?? {} });
   } catch (error) {
     throw new KernelError('invalid_config', error instanceof Error ? error.message : String(error));
   }
@@ -334,14 +340,30 @@ export function createKernel(config: KernelConfig): Kernel {
     const id = slot.manifest.id;
     if (isIsolateToHost(msg)) {
       switch (msg.t) {
-        case 'ready':
+        case 'ready': {
+          const fmt = msg.p.renderFmt;
+          const surface = Boolean(slot.manifest.surface);
+          if (surface ? !SURFACE_FMTS.includes(fmt) : fmt !== 'none') {
+            const speaks = surface ? SURFACE_FMTS.join(' or ') : "'none' (headless)";
+            feed(slot, {
+              k: 'renderFmtMismatch',
+              at: performance.now(),
+              message: `The isolate renders ${JSON.stringify(fmt)}; this host speaks ${speaks}`,
+            });
+            return;
+          }
+          // Surfaces start on isoloop-dom; a legacy isolate swaps its bridge before it renders.
+          if (surface && fmt === LEGACY_VDOM) compositor.reset(id, createLegacyVdomBridge());
+          slot.fmt = fmt;
           feed(slot, { k: 'ready' });
           return;
+        }
         case 'beat':
           feed(slot, { k: 'beat', at: performance.now(), lagMs: msg.p.lagMs });
           return;
         case 'patch':
-          if (msg.p.fmt === LEGACY_VDOM) compositor.enqueue(id, msg.p.batch);
+          if (slot.fmt !== undefined && slot.fmt !== 'none' && msg.p.fmt === slot.fmt)
+            compositor.enqueue(id, msg.p.batch);
           else slot.dropped++;
           return;
         case 'error':
@@ -374,8 +396,9 @@ export function createKernel(config: KernelConfig): Kernel {
 
   const start = (slot: Slot): void => {
     const { manifest } = slot;
+    slot.fmt = undefined;
     if (manifest.surface) {
-      compositor.reset(manifest.id, createLegacyVdomBridge());
+      compositor.reset(manifest.id, createIsoloopDomBridge(registry));
     }
     let loaded: LoadedWorker;
     try {
@@ -385,7 +408,7 @@ export function createKernel(config: KernelConfig): Kernel {
         src: manifest.src,
         config: manifest.config ?? null,
         grants: manifest.grants ?? DEFAULT_GRANTS,
-        renderFmt: manifest.surface ? LEGACY_VDOM : 'none',
+        renderFmt: manifest.surface ? ISOLOOP_DOM_FMT : 'none',
         heartbeatMs: everyMs,
       });
     } catch (err) {
@@ -483,13 +506,19 @@ export function createKernel(config: KernelConfig): Kernel {
         closed: Promise.resolve(),
         onClosed: () => {},
         dropped: 0,
+        fmt: undefined,
       };
       slots.set(manifest.id, slot);
       if (document.hidden) feed(slot, { k: 'hidden' });
       if (manifest.surface) {
-        compositor.attach(manifest.id, manifest.surface, createLegacyVdomBridge(), (event) => {
-          post(slot, { v: 1, t: 'event', p: event });
-        });
+        compositor.attach(
+          manifest.id,
+          manifest.surface,
+          createIsoloopDomBridge(registry),
+          (event) => {
+            post(slot, { v: 1, t: 'event', p: event });
+          },
+        );
       }
       start(slot);
       const id = manifest.id;

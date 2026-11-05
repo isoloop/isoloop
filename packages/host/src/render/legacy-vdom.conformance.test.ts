@@ -1,9 +1,4 @@
-import type { SerializedEvent } from '@isoloop/protocol';
-import {
-  type Handle,
-  type IsolateDriver,
-  runBridgeConformance,
-} from '../../test/render-bridge-conformance';
+import { runBridgeConformance, type Handle, type IsolateDriver } from '@isoloop/dom/testing';
 import { createLegacyVdomBridge } from './legacy-vdom';
 
 type El = Handle & {
@@ -102,7 +97,7 @@ function createLegacyDriver(): IsolateDriver {
       asEl(h).value = value;
       dirty = true;
     },
-    listen(h, type: SerializedEvent['type']) {
+    listen(h, type) {
       asEl(h).listeners.add(type);
       dirty = true;
     },

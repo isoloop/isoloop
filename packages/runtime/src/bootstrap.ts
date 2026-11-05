@@ -2,8 +2,14 @@
 /*
  * Isolate worker entry, built as isolate-bootstrap.js. Waits for `init`,
  * checks the protocol range, starts the heartbeat, then imports the isolate
- * module from `init.src` and calls its default export. On `shutdown` it says
- * `bye` and closes; `onShutdown` handlers arrive with the vanilla API.
+ * module from `init.src` and starts it. Two module shapes:
+ *
+ * - a default export function: an M0 legacy isolate (legacy-vdom@1);
+ * - a default export `{ start(ctx) }`: rendered with isoloop-dom@1 into
+ *   `ctx.root`, the DOM subset installed as `document` when it has a surface.
+ *   The full vanilla API (styles, onShutdown, host calls) is M1 task 11.
+ *
+ * On `shutdown` it says `bye` and closes.
  */
 import {
   PROTOCOL,
@@ -14,6 +20,7 @@ import {
 } from '@isoloop/protocol';
 import { createLegacyIsolate } from './legacy/runtime';
 import { LEGACY_VDOM } from './legacy/vdom';
+import { createRender, ISOLOOP_DOM_FMT, type Render } from './render';
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -45,19 +52,10 @@ async function boot(init: InitPayload): Promise<void> {
     return;
   }
 
-  const runtime = createLegacyIsolate({
-    id: init.isolateId,
-    config: init.config,
-    initial: {},
-    post,
-  });
   self.addEventListener('message', (e: MessageEvent<unknown>) => {
-    if (isHostToIsolate(e.data) && e.data.t === 'shutdown') {
-      post({ v: 1, t: 'bye', p: {} });
-      self.close();
-      return;
-    }
-    runtime.receive(e.data);
+    if (!isShutdown(e)) return;
+    post({ v: 1, t: 'bye', p: {} });
+    self.close();
   });
   startHeartbeat(init.heartbeatMs);
 
@@ -74,13 +72,60 @@ async function boot(init: InitPayload): Promise<void> {
   }
   const main: unknown =
     typeof mod === 'object' && mod !== null && 'default' in mod ? mod.default : undefined;
-  if (typeof main !== 'function') {
-    fatal(`${init.src} has no default export function`);
+  if (typeof main === 'function') {
+    startLegacy(init, main);
     return;
   }
-  post({ v: 1, t: 'ready', p: { runtime: RUNTIME, adapter: 'legacy', renderFmt: LEGACY_VDOM } });
+  if (typeof main === 'object' && main !== null && 'start' in main) {
+    const start: unknown = main.start;
+    if (typeof start === 'function') {
+      await startIsolate(init, (ctx) => Reflect.apply(start, main, [ctx]));
+      return;
+    }
+  }
+  fatal(`${init.src} has no default export: a function, or an object with start(ctx)`);
+}
+
+const isShutdown = (e: MessageEvent<unknown>): boolean =>
+  isHostToIsolate(e.data) && e.data.t === 'shutdown';
+
+function startLegacy(init: InitPayload, main: Function): void {
+  const runtime = createLegacyIsolate({
+    id: init.isolateId,
+    config: init.config,
+    initial: {},
+    post,
+  });
+  self.addEventListener('message', (e: MessageEvent<unknown>) => {
+    if (!isShutdown(e)) runtime.receive(e.data);
+  });
+  const renderFmt = init.renderFmt === 'none' ? 'none' : LEGACY_VDOM;
+  post({ v: 1, t: 'ready', p: { runtime: RUNTIME, adapter: 'legacy', renderFmt } });
   // Called untyped: the module's own LegacyIsolate<State> is checked where it's written.
   Reflect.apply(main, undefined, [runtime.iso]);
+}
+
+/** What `start(ctx)` gets until the vanilla API (task 11) completes it. */
+type StartContext = { id: string; config: unknown; root?: Render['root'] };
+
+async function startIsolate(
+  init: InitPayload,
+  start: (ctx: StartContext) => unknown,
+): Promise<void> {
+  const render = init.renderFmt === 'none' ? null : createRender(post, self);
+  self.addEventListener('message', (e: MessageEvent<unknown>) => {
+    if (render && isHostToIsolate(e.data) && e.data.t === 'event') render.receive(e.data.p);
+  });
+  const renderFmt = render ? ISOLOOP_DOM_FMT : 'none';
+  post({ v: 1, t: 'ready', p: { runtime: '@isoloop/runtime', adapter: 'vanilla', renderFmt } });
+  const ctx: StartContext = render
+    ? { id: init.isolateId, config: init.config, root: render.root }
+    : { id: init.isolateId, config: init.config };
+  try {
+    await start(ctx);
+  } catch (err) {
+    fatal(`start() threw: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 const onInit = (e: MessageEvent<unknown>): void => {

@@ -1,14 +1,34 @@
-import type { SerializedEvent } from '@isoloop/protocol';
+/*
+ * The bridge conformance suite (ADR 0010 point 6, ADR 0011): every render
+ * bridge must pass it. It knows bridges only through the structural types
+ * below, so it imports nothing from other Isoloop packages.
+ */
 import { afterEach, describe, expect, it } from 'vitest';
-import type { HostRenderBridge } from '../src/render/bridge';
+
+/** An event as a host bridge sends it to the isolate, reduced to what the suite reads. */
+export type ConformanceEvent = {
+  type: string;
+  target: string;
+  currentTargets: string[];
+  value?: string;
+  mods: { alt: boolean; ctrl: boolean; meta: boolean; shift: boolean };
+};
+
+/** The host side of a bridge, as the compositor drives it. */
+export interface ConformanceHost {
+  mount(root: ShadowRoot, send: (event: ConformanceEvent) => void): void;
+  /** Applies one batch. Returns false and changes nothing if the batch is malformed. */
+  apply(batch: unknown): boolean;
+  unmount(): void;
+}
 
 /** A node on the isolate side, as the suite sees it. Opaque to the suite. */
 export type Handle = { readonly __handle: true };
 
 /**
  * The isolate side of a bridge, reduced to the DOM operations the suite needs.
- * Each bridge provides its own: the Remote DOM driver calls the polyfill, the
- * legacy-vdom driver keeps a tree and sends it whole.
+ * Each bridge provides its own: the isoloop-dom driver calls the worker-side
+ * DOM subset, the legacy-vdom driver keeps a tree and sends it whole.
  */
 export interface IsolateDriver {
   /** An element with `class="cf-root"` that the suite builds under. Already inserted. */
@@ -23,7 +43,7 @@ export interface IsolateDriver {
   setText(text: Handle, data: string): void;
   /** Sets the `value` property, as a framework does on a controlled input. */
   setValue(el: Handle, value: string): void;
-  listen(el: Handle, type: SerializedEvent['type']): void;
+  listen(el: Handle, type: string): void;
   /** The batches produced since the last flush, in order. */
   flush(): unknown[];
   /** The node id the isolate side uses for `h`, for bridges that expose ids. */
@@ -39,7 +59,7 @@ export interface NodeIds {
 }
 
 export interface BridgePair {
-  host: HostRenderBridge & Partial<NodeIds>;
+  host: ConformanceHost & Partial<NodeIds>;
   isolate: IsolateDriver;
   /** Attributes the bridge writes for its own bookkeeping, left out when trees are compared. */
   internalAttr?: (name: string) => boolean;
@@ -66,8 +86,8 @@ export const CASES = {
 export type CaseName = keyof typeof CASES;
 
 /**
- * The suite every render bridge must pass (ADR 0006 point 5): `legacy-vdom`
- * now, the Remote DOM bridge in task 5, and any bridge after it. Batches go
+ * The suite every render bridge must pass: `legacy-vdom` (with its known
+ * gaps), the isoloop-dom bridge (with none), and any bridge after them. Batches go
  * through `structuredClone`, as they would through `postMessage`.
  */
 export function runBridgeConformance(
@@ -86,7 +106,7 @@ export function runBridgeConformance(
     const shadowHost = document.createElement('div');
     document.body.append(shadowHost);
     const shadow = shadowHost.attachShadow({ mode: 'open' });
-    const sent: SerializedEvent[] = [];
+    const sent: ConformanceEvent[] = [];
     host.mount(shadow, (e) => sent.push(e));
     cleanups.push(() => {
       host.unmount();
