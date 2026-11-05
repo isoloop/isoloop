@@ -13,7 +13,8 @@ updates:
         update-types: [minor, patch]
 
   - package-ecosystem: github-actions
-    directory: /
+    # The local composite actions pin actions too.
+    directories: [/, /.github/actions/*]
     schedule:
       interval: weekly
     cooldown:
