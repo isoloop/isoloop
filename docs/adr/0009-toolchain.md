@@ -52,7 +52,17 @@ Checked on the npm registry, 2026-11-04:
 4. **Dependency rules are enforced** by pnpm's strict `node_modules` (a package can only import what its `package.json` lists), by oxlint `no-restricted-imports` per package, and by `bus` compiling with `lib: ["ES2022", "WebWorker"]`, with no DOM. No TypeScript project references.
 5. **Lint is error-only.** The `correctness`, `suspicious` and `perf` groups are errors, and so are the type-aware TypeScript rules (`no-floating-promises`, `no-misused-promises` and the rest), which matter in a message-passing runtime. `pedantic`, `style` and `restriction` are off unless a rule is added by name. There are no warnings: every rule is either an error or off.
 6. **Format:** oxfmt with `singleQuote: true`, `semi: true`, `printWidth: 100` and `trailingComma: 'all'`, otherwise defaults. This matches the code samples in the design docs.
-7. **Browser baseline: Baseline "widely available"**, meaning features that have been in every major engine for 30 months or more. Packages build with `target: es2022`. For the features we rely on today (module workers, `MessageChannel` transfer, Shadow DOM with `adoptedStyleSheets`, OPFS sync access handles in workers, top-level await), that is roughly Chrome 108, Firefox 114 and Safari 16.4. M1's feature check confirms the exact versions. That check, in `createKernel`, fails clearly on older browsers. CI tests only the latest engines, since Playwright ships nothing else. A PR that starts using a new web API links its Baseline status.
+7. **Browser baseline: Baseline "widely available"**, meaning features that have been in every major engine for 30 months or more. Packages build with `target: es2022`. For the features we rely on today, the minimums are **Chrome 108, Firefox 114 and Safari 16.4**, from MDN browser-compat-data:
+
+   | Feature | Chrome | Firefox | Safari |
+   | --- | --- | --- | --- |
+   | Module workers (`new Worker(url, { type: 'module' })`) | 80 | **114** | 15 |
+   | Constructable stylesheets adopted by a `ShadowRoot` | 73 | 101 | **16.4** |
+   | OPFS sync access handles in workers, with synchronous `getSize`/`truncate`/`flush`/`close` | **108** | 111 | **16.4** |
+   | `es2022` output (class static blocks, top-level await) | 94 | 93 | 16.4 |
+   | `MessageChannel` with transferable ports | old | old | old |
+
+   `createKernel` checks for module workers, `MessageChannel`, adopted stylesheets and OPFS, and throws `unsupported_browser` naming whatever is missing. OPFS sync access handles only exist inside workers, so the main thread checks for OPFS itself; Chrome 102–107 have the handles but with asynchronous methods, which only the bus worker (M2b) can tell apart. CI tests only the latest engines, since Playwright ships nothing else. A PR that starts using a new web API links its Baseline status.
 8. **Versions are pinned exactly** (no `^`) in a pnpm `catalog:` in `pnpm-workspace.yaml`, the single place for tool versions. Dependabot opens one grouped PR a week for npm and GitHub Actions updates, with a 3-day cooldown. Majors (Vite, Vitest, TypeScript, pnpm) come as separate PRs.
 9. **Supply chain.** pnpm's `minimumReleaseAge: 4320` (3 days) rejects versions younger than that. Lifecycle scripts stay blocked, which is pnpm's default, and the few packages that need one are allow-listed by name. Playwright browsers are installed by an explicit `pnpm exec playwright install`. `strictPeerDependencies: true`. GitHub Actions are pinned by commit SHA, with the tag in a comment.
 10. **No corepack.** `packageManager: "pnpm@12.16.1"` pins the version. Contributors install pnpm's standalone binary, and `pnpm self-update` maintains the pin. CI uses `pnpm/action-setup`, which reads the same field.
