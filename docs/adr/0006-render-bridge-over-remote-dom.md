@@ -1,6 +1,6 @@
 # ADR 0006: Remote DOM sits behind an internal RenderBridge
 
-- **Status:** Accepted (gated by the M1 Remote DOM spike)
+- **Status:** Superseded by [ADR 0010](0010-own-render-bridge.md) after the M1 spike (draft PR #23)
 - **Date:** 2026-11-03
 - **Refines:** RFC 0001 "Rendering bridge"
 

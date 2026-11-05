@@ -1,12 +1,12 @@
 # M1: Kernel
 
-**Goal:** the real host kernel: loader, supervisor with one-for-one restarts, heartbeats, and a frame-budgeted compositor on Remote DOM.
+**Goal:** the real host kernel: loader, supervisor with one-for-one restarts, heartbeats, and a frame-budgeted compositor on our own render bridge, `isoloop-dom@1` ([ADR 0010](../adr/0010-own-render-bridge.md)).
 
 **Done when** (RFC 0001): a blocked or crashed isolate never affects the others, proven by Playwright tests.
 
 ## Scope
 
-**In:** design sections [§4](../design/system-design.md#4-isoloophost) and [§5](../design/system-design.md#5-isoloopruntime) except the bus client: Loader, Supervisor state machine, Compositor with budget, `RenderBridge` on Remote DOM ([ADR 0006](../adr/0006-render-bridge-over-remote-dom.md)), component registry, EventBridge, host-owned inputs, host calls (`measure`, `focus`, `scrollIntoView`), Shadow DOM styles, and a vanilla isolate API. `four-loops` moves onto all of it.
+**In:** design sections [§4](../design/system-design.md#4-isoloophost) and [§5](../design/system-design.md#5-isoloopruntime) except the bus client: Loader, Supervisor state machine, Compositor with budget, `RenderBridge` on our own DOM subset ([ADR 0010](../adr/0010-own-render-bridge.md)), component registry, EventBridge, host-owned inputs, host calls (`measure`, `focus`, `scrollIntoView`), Shadow DOM styles, and a vanilla isolate API. `four-loops` moves onto all of it.
 
 **Out:** the log bus (M2; `legacy-bus` stays until then), adapters (M3), `requestCanvas` and `navigate` (M3), devtools (M4).
 
@@ -34,21 +34,26 @@
 - Record the exact minimum Chrome, Firefox and Safari versions in [ADR 0009 rule 7](../adr/0009-toolchain.md#rules) (Baseline widely available, `target: es2022`).
 - **Tests (browser):** each feature stubbed out in turn makes `createKernel` throw `unsupported_browser` naming it; the real browsers pass.
 
-### 4. Remote DOM spike (timebox: one evening)
-- Pin the current `@remote-dom/core` version. In a scratch branch, render a vanilla tree in a worker and mirror it on the host through its connection API.
-- Answer three questions in the PR description ([ADR 0006](../adr/0006-render-bridge-over-remote-dom.md) point 6): (a) are mutation records plain, structured-cloneable data? (b) can remote nodes map to our own ids? (c) can we intercept listener registration?
-- Also **estimate an in-house bridge**: which DOM APIs Preact and React actually call during render (log them through a Proxy on the shim), and a rough line count for our own worker-side DOM subset plus mutation recording. Record it in the PR, so replacing Remote DOM later is a costed option.
-- **Exit:** if (a), (b) or (c) is "no", stop and write a follow-up ADR choosing between patching Remote DOM and building our own bridge (starting from `legacy-vdom` and the estimate).
+### 4. Remote DOM spike (done)
+- Done in draft PR #23 (branch `spike/m1-remote-dom`, never merged). It answered [ADR 0006](../adr/0006-render-bridge-over-remote-dom.md) point 6: (a) records are cloneable, (b) nodes can carry our ids, (c) listener registration can be intercepted. All three were "yes".
+- It also found five gaps (no `style`, unsynced properties, missing `HTML*Element` classes, moves sent as remove plus re-insert, hooks to fill in), a deprecated host receiver, and an in-house estimate of about 1,450 lines against about 7,000 adopted.
+- **Outcome:** [ADR 0010](../adr/0010-own-render-bridge.md) supersedes ADR 0006. We build our own bridge, and Remote DOM isn't used.
 
 ### 4b. Bridge conformance suite
 - **Files:** `packages/host/test/render-bridge-conformance.ts`: `runBridgeConformance(makeBridgePair)`, run in Vitest browser mode.
 - Cases: create / update / move / remove nodes, attributes and text; keyed list reorders keep node identity and focus; sanitising (I9); node-id mapping both ways; listener registration and event round-trip; host-owned input rules; styles.
 - Run it against `legacy-vdom` first (some cases, such as keyed reorders, are expected to fail there and are marked as known gaps), then against every new bridge.
 
-### 5. RenderBridge (isolate and host)
-- **Files:** `packages/runtime/src/render/remote-dom.ts`, `packages/host/src/render/remote-dom.ts`, the shared fmt constant `remote-dom@1`.
-- The isolate side installs the polyfill, exposes `ctx.root`, and batches mutations per microtask into one `patch`. The host side implements `HostRenderBridge`.
-- **Tests (browser):** passes the conformance suite (task 4b) with no known gaps; a 1,000-node list; a batch round-trip leaves identical `innerHTML` on both sides.
+### 5. RenderBridge: `isoloop-dom@1` (isolate and host)
+- **Files:** TBD by ADR 0011 (package layout, pending). Whatever the layout, there are three parts: the worker-side DOM subset ([ADR 0010](../adr/0010-own-render-bridge.md) point 2) with a per-microtask recorder; the host applier (`HostRenderBridge` with `idFor` / `nodeFor`); and the record types with the fmt constant `isoloop-dom@1`, shared by both.
+- **Isolate side:** installs the subset as `document` and the DOM globals only when the isolate has a surface, and exposes `ctx.root`.
+- **Moves** are one `move` record. The host applies records through the registry (task 6) and keeps node identity across moves.
+- No dependency. If the task grows past two evenings, split it: the worker-side subset first, then the host applier.
+- **Tests (browser):**
+  - the conformance suite (task 4b) passes with **no known gaps**;
+  - a 1,000-node list renders;
+  - a batch round-trip leaves identical `innerHTML` on both sides;
+  - Preact and React render a small app into the subset (a smoke test only; the adapters come in M3).
 
 ### 6. Component registry and sanitising
 - **Files:** `packages/host/src/render/registry.ts`.
@@ -90,7 +95,7 @@
 
 ## Risks
 
-- **Remote DOM fit** (task 4 is the gate). Fallback: keep `legacy-vdom` and extend it with keyed diffing, as ADR 0006 allows.
+- **Own bridge scope** (task 5). The subset is sized to what Preact 11 and React 19 call today. A framework release that calls something new fails the smoke test, and we add the member with a test ([ADR 0010](../adr/0010-own-render-bridge.md) point 7).
 - **Input latency** is the RFC's biggest risk. Task 8's tests and task 13's numbers are the evidence; publish them even if they're unflattering.
 - **Firefox/WebKit heartbeat timing:** background tabs throttle timers; task 2 pauses hang judgement while hidden and resets clocks on return (I14).
 
