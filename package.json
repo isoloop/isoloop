@@ -15,6 +15,7 @@
     "test:node": "vitest run --project protocol --project bus",
     "test:browser": "vitest run --project host --project runtime",
     "e2e": "playwright test",
+    "bench": "vitest run --config bench/vitest.config.ts",
     "test:install-browsers": "playwright install chromium firefox webkit",
     "build": "pnpm -r build",
     "dev": "pnpm --filter four-loops dev",

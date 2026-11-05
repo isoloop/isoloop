@@ -26,7 +26,11 @@ export interface LogEngine {
   /** Stores a consumer's committed offset. Kept even when the records it names are dropped. */
   commit(topic: string, consumer: string, offset: number): void;
   committed(topic: string, consumer: string): number | undefined;
-  /** Retention pass: drops expired (`time`) and superseded (`compacted`) records. */
+  /**
+   * Retention pass: drops superseded (`compacted`) and expired (`time`)
+   * records. Expiry runs in offset order and stops at the first record young
+   * enough, so a record with an older `ts` behind it is kept until it reaches the tail.
+   */
   compact(topic: string): void;
 }
 

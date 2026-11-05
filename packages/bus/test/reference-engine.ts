@@ -63,8 +63,10 @@ export class ReferenceEngine implements LogEngine {
     const t = this.#topic(topic);
     const r = t.cfg.retention;
     if (r.kind === 'time') {
+      // Records expire in offset order: the first one young enough stops the pass.
       const cutoff = this.#now() - r.ms;
-      t.records = t.records.filter((x) => x.ts >= cutoff);
+      const keep = t.records.findIndex((x) => x.ts >= cutoff);
+      t.records = keep === -1 ? [] : t.records.slice(keep);
     } else if (r.kind === 'compacted') {
       const latest = new Map<string, number>();
       for (const x of t.records) if (x.key !== undefined) latest.set(x.key, x.offset);
