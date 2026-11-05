@@ -18,6 +18,11 @@
       "@isoloop/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./testing": {
+      "@isoloop/source": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
     }
   },
   "publishConfig": {
@@ -25,17 +30,23 @@
       ".": {
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"
+      },
+      "./testing": {
+        "types": "./dist/testing.d.ts",
+        "import": "./dist/testing.js"
       }
     }
   },
   "scripts": {
-    "build": "tsdown --platform neutral --dts",
+    "build": "tsdown",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@isoloop/protocol": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "valibot": "catalog:",
+    "zod": "catalog:"
   }
 }
