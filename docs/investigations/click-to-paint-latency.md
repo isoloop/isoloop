@@ -64,7 +64,7 @@ A message from the worker can't be painted until a frame after it arrives. In Ch
 ## Recommendations
 
 1. **Fix the bench (done, #39).** Both sides now end at the frame that paints the change. Chromium overhead p50 / p95 went from 30.7 / 30.9 to 16.3 / 16.5 ms.
-2. **Recalibrate the budget (design §9): done.** An 8 ms overhead can't be met in Chromium with message passing. The budget is now at most one frame on Chromium and at most 8 ms on Firefox and WebKit, report-only for now ([design §9](../design/system-design.md#9-performance-budgets)).
+2. **Recalibrate the budget (design §9): done.** An 8 ms overhead can't be met in Chromium with message passing. The budget is now at most one frame in every engine (Firefox pays a frame too, see the follow-up below), report-only for now ([design §9](../design/system-design.md#9-performance-budgets)).
 3. **Run the bench in Firefox and WebKit too, report-only: done.** The bench runs in all three engines, in an `aligned` and a `random` variant; see *Follow-up* below for the numbers and what the random variant showed.
 4. **Getting the frame back means not waiting for the message.**
    - **Idea:** the worker writes its batch into a `SharedArrayBuffer`, and the compositor reads it in the very next rAF, with no task to defer. That would win back about 16.7 ms per click in Chromium.
@@ -96,6 +96,6 @@ Headless, local, 100 clicks per side, p50 / p95 in ms. Firefox and WebKit coarse
 What this adds:
 
 - **The random variant doesn't randomise where clicks land.** Each click waits for a frame plus a random 0–16 ms, yet `pointerdown` still arrives 2–3 ms after a frame (phase p95 3 ms on Chromium, 1.6 ms on Firefox). The engines deliver Playwright's input aligned to their frames, whatever the delay before it. So the frame wait seen here is how these browsers schedule synthetic input, not a quirk of when Playwright sends it. Only real input (recommendation 5) can show the phase real users see. The bench keeps the variant and reports the phase, so a change in input scheduling shows up.
-- **Firefox is over its 8 ms budget by about one frame.** It doesn't defer the patch, but it runs a frame right after input (the main-thread counter paints in 1–2 ms), so a change that arrives from a worker a moment later waits for the next one. The overhead is a frame there too, for a different reason.
+- **Firefox pays one frame too, so the budget is now one frame in every engine.** It doesn't defer the patch, but it runs a frame right after input (the main-thread counter paints in 1–2 ms), so a change that arrives from a worker a moment later waits for the next one. The overhead is a frame there too, for a different reason.
 - **WebKit pays no overhead:** it doesn't render a frame straight after input, so the main thread waits a full frame as well, and the worker's patch arrives in time for it.
 

@@ -16,9 +16,9 @@
  * rAF callback is that frame. Ending both at the frame keeps the comparison
  * fair: a main-thread change isn't on screen until the next frame either
  * (docs/investigations/click-to-paint-latency.md). Report only, no threshold
- * yet. Budget (design §9): p95 overhead ≤ 1 frame on Chromium, whose
+ * yet. Budget (design §9): p95 overhead ≤ 1 frame in every engine. Chromium's
  * `DeferRendererTasksAfterInput` holds the worker's patch past the next frame,
- * and ≤ 8 ms on Firefox and WebKit. Firefox and WebKit coarsen timers to whole
+ * and Firefox renders a frame right after input, before the patch arrives. Firefox and WebKit coarsen timers to whole
  * milliseconds, so their numbers are whole ms.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -224,11 +224,9 @@ for (const variant of VARIANTS) {
       clickGap: { isolate: stats(iso.clickGaps), main: stats(mt.clickGaps) },
       /** ms since the last frame when pointerdown arrived: shows where clicks land. */
       phase: stats([...iso.phases, ...mt.phases]),
-      /** Design §9: one frame on Chromium, 8 ms on Firefox and WebKit. Report only. */
-      budget: chromium
-        ? { p95Overhead: '1 frame', p95OverheadMs: round(FRAME_MS), enforced: false }
-        : { p95Overhead: '8 ms', p95OverheadMs: 8, enforced: false },
-      withinBudget: overhead.p95 <= (chromium ? FRAME_MS : 8),
+      /** Design §9: one frame in every engine. Report only. */
+      budget: { p95Overhead: '1 frame', p95OverheadMs: round(FRAME_MS), enforced: false },
+      withinBudget: overhead.p95 <= FRAME_MS,
     };
     console.log(
       `click-to-paint ${browser}/${variant}: isolate p50 ${isolate.p50} / p95 ${isolate.p95} ms, ` +

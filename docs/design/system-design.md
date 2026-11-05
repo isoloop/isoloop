@@ -595,14 +595,15 @@ Starting targets, to be calibrated in M1/M2 benches and then enforced in CI with
 
 | Metric | Target | Bench |
 | --- | --- | --- |
-| Click-to-paint overhead vs. the same UI single-threaded | p95 ≤ 1 frame on Chromium; p95 ≤ 8 ms on Firefox and WebKit | `bench/click-to-paint` (all three engines, report-only) |
+| Click-to-paint overhead vs. the same UI single-threaded | p95 ≤ 1 frame in every engine | `bench/click-to-paint` (all three engines, report-only) |
 | Compositor DOM work per frame | ≤ 8 ms (default budget) | compositor stats |
 | Heartbeat-detected blocking | ≤ 500 ms to show busy | E2E |
 
-The click-to-paint budget is in frames on Chromium because its `DeferRendererTasksAfterInput` holds the worker's `patch` past the next frame after real input, so any render through `postMessage` paints one frame later there ([investigation](../investigations/click-to-paint-latency.md)).
 | Idle isolate memory, vanilla / Preact / React | ≤ 3 / 5 / 12 MB (measure first) | `bench/memory-per-isolate` |
 | Bus throughput, TS engine, 10 subscribers, 200-byte records | ≥ 50k records/s delivered | `bench/throughput` |
 | Restart to first paint (no replay) | ≤ 300 ms after backoff | E2E timing |
+
+The click-to-paint budget is one frame because a render through `postMessage` can arrive just after the frame a main-thread change would make. Chromium's `DeferRendererTasksAfterInput` holds the worker's `patch` past the next frame after real input; Firefox renders a frame right after input, before the patch arrives. WebKit shows no overhead today. Winning that frame back is the `SharedArrayBuffer` render-channel evaluation in M5 ([investigation](../investigations/click-to-paint-latency.md)).
 
 ## 10. Testing strategy
 

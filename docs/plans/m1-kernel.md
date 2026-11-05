@@ -98,7 +98,7 @@
 - Headless: a headless fixture isolate (no `surface`) reaches `running`, is supervised the same way (block → kill → restart), never produces DOM writes, and gets `no_surface` from `measure` ([ADR 0008](../adr/0008-isolates-and-surfaces.md)).
 
 ### 13. Click-to-paint bench (first cut)
-- **Files:** `bench/click-to-paint/`. A Playwright script with 100 clicks on a counter, timing `pointerdown` → the frame that paints the change, compared with the same counter rendered directly in the main thread. Runs in Chromium, Firefox and WebKit, in an `aligned` and a `random` click variant, report-only against the design §9 budget (1 frame on Chromium, 8 ms elsewhere; see the [click-to-paint investigation](../investigations/click-to-paint-latency.md)).
+- **Files:** `bench/click-to-paint/`. A Playwright script with 100 clicks on a counter, timing `pointerdown` → the frame that paints the change, compared with the same counter rendered directly in the main thread. Runs in Chromium, Firefox and WebKit, in an `aligned` and a `random` click variant, report-only against the design §9 budget (1 frame in every engine; see the [click-to-paint investigation](../investigations/click-to-paint-latency.md)).
 - Run it in CI as a report only (no threshold yet). This calibrates the [budget](../design/system-design.md#9-performance-budgets).
 
 ## Risks
