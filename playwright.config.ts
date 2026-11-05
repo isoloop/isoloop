@@ -12,6 +12,9 @@ export default defineConfig({
   testDir: 'e2e',
   forbidOnly: ci,
   retries: ci ? 1 : 0,
+  // One test at a time on CI: the isolation suite measures frame rates and
+  // timing, which parallel tests on a small runner would distort.
+  ...(ci ? { workers: 1 } : {}),
   reporter: ci ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://localhost:${port}/`,

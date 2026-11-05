@@ -24,7 +24,12 @@ type HarnessKernel = {
     event: 'bus:publish',
     fn: (e: { from: string; topic: string; value: unknown }) => void,
   ): () => void;
-  isolates(): { id: string; state: string; restarts: number }[];
+  isolates(): {
+    id: string;
+    state: string;
+    restarts: number;
+    surface?: { queued: number; applied: number };
+  }[];
   destroy(): Promise<void>;
 };
 declare global {
