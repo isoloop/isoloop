@@ -15,6 +15,7 @@ import { missingFeatures } from './features';
 import { createLegacyBus, type BusDelivery } from './legacy-bus';
 import { load, type LoadedWorker } from './loader';
 import { createLegacyVdomBridge, LEGACY_VDOM } from './render/legacy-vdom';
+import { createRegistry, type HostComponent } from './render/registry';
 import {
   DEFAULT_BACKOFF,
   DEFAULT_SUPERVISOR_CONFIG,
@@ -53,6 +54,12 @@ export type KernelConfig = {
   styles?: readonly CSSStyleSheet[];
   /** DOM work per frame; default 8 ms. The first batch of a frame always applies (I8). */
   compositor?: { frameBudgetMs: number };
+  /**
+   * Host elements isolates may render by name (design §4.5), e.g.
+   * `{ 'iso-button': { tag: 'ds-button', attributes: ['variant'] } }`.
+   * Malformed entries make `createKernel` throw `invalid_config`.
+   */
+  components?: Readonly<Record<string, HostComponent>>;
 };
 
 export type IsolateManifest = {
@@ -76,7 +83,8 @@ export type KernelErrorCode =
   | 'unsupported_browser'
   | 'pools_unsupported'
   | 'suspend_unsupported'
-  | 'invalid_manifest';
+  | 'invalid_manifest'
+  | 'invalid_config';
 
 /** An error the kernel API throws, with a code to branch on. */
 export class KernelError extends Error {
@@ -182,6 +190,12 @@ export function createKernel(config: KernelConfig): Kernel {
       'unsupported_browser',
       `This browser lacks what Isoloop needs: ${missing.join(', ')}. See ADR 0009 rule 7 for the minimum versions.`,
     );
+  // Built now so a bad `components` entry fails here; render bridges use it from M1 task 5.
+  try {
+    createRegistry({ components: config.components ?? {} });
+  } catch (error) {
+    throw new KernelError('invalid_config', error instanceof Error ? error.message : String(error));
+  }
   const everyMs = config.heartbeat?.everyMs ?? 100;
   const def = DEFAULT_SUPERVISOR_CONFIG;
   const cfg: SupervisorConfig = {
