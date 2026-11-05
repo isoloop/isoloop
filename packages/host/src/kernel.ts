@@ -13,6 +13,8 @@ import {
   type BusRecord,
   type CallResult,
   type ContractsList,
+  type IdleReport,
+  type Retention,
   type StartPosition,
   type TopicRef,
   type TypedRecord,
@@ -96,6 +98,8 @@ export type KernelConfig = {
    * `history.pushState` / `replaceState`.
    */
   onNavigate?: OnNavigate;
+  /** Suspension: at most this many suspended isolates start at once (default 4, ADR 0001). */
+  suspend?: { maxConcurrentWakes?: number };
   /** Dev checks: the bus checks every schema output with `structuredClone` (ADR 0003, decision 11). Default false. */
   dev?: boolean;
 };
@@ -112,7 +116,12 @@ export type IsolateManifest = {
   fallback?: FallbackRender;
   /** Named worker pool (ADR 0001). Typed now, rejected with `pools_unsupported` until M2c. */
   pool?: string;
-  /** Opt-in suspension (ADR 0001). Anything but `'never'` is rejected with `suspend_unsupported` until M2. */
+  /**
+   * Opt-in suspension (ADR 0001), default `'never'`. `'when-idle'` waits
+   * 60 s. Idle means: no visible surface (headless counts as never visible),
+   * nothing delivered for `afterMs`, no `ctx.keepAwake()` hold, and no host
+   * call or publish waiting for an answer.
+   */
   suspend?: 'never' | 'when-idle' | { whenIdle: { afterMs: number } };
   /**
    * After a bus restart, memory topics start empty and each subscription gets
@@ -125,7 +134,6 @@ export type IsolateManifest = {
 export type KernelErrorCode =
   | 'unsupported_browser'
   | 'pools_unsupported'
-  | 'suspend_unsupported'
   | 'invalid_manifest'
   | 'invalid_config'
   /** The bus couldn't load its contracts, so nothing can start (ADR 0003, decision 7). */
@@ -154,6 +162,8 @@ export type IsolateSnapshot = {
   surface?: SurfaceStats;
   /** Messages dropped because their `v` or `t` was unknown. */
   dropped: number;
+  /** Open `ctx.keepAwake()` holds, from the last beat (devtools). */
+  holds?: { ageMs: number; stack?: string }[];
 };
 
 export type KernelEvents = {
@@ -197,6 +207,8 @@ export interface Kernel {
   spawn(manifest: IsolateManifest): IsolateHandle;
   stop(id: string): Promise<void>;
   restart(id: string): Promise<void>;
+  /** Wakes a suspended isolate (ADR 0001); a no-op otherwise. */
+  resume(id: string): Promise<void>;
   /**
    * Publishes from the host. Rejects with a `BusError`: `forbidden` for
    * `isoloop.*` topics, or the broker's code (`invalid`, `bus_unavailable`, …).
@@ -238,7 +250,38 @@ type Slot = {
   dropped: number;
   /** The render format the isolate reported in `ready`; patches in any other are dropped. */
   fmt: string | undefined;
+  /** From the last beat: what suspension needs to know. */
+  idle: IdleReport | undefined;
+  /** The surface is on screen (IntersectionObserver), ignoring the tab's visibility. */
+  intersecting: boolean;
+  /** `performance.now()` when the surface last stopped being visible. */
+  hiddenSince: number;
+  /** Started by the wake queue and not yet out of `loading`. */
+  waking: boolean;
+  queuedWake: boolean;
+  warnedHold: boolean;
+  warnedTopics: Set<string>;
 };
+
+/** `afterMs` for a suspendable manifest, or `undefined` for `'never'`. */
+function suspendAfter(m: IsolateManifest): number | undefined {
+  const s = m.suspend;
+  if (s === undefined || s === 'never') return undefined;
+  if (s === 'when-idle') return 60_000;
+  return s.whenIdle.afterMs;
+}
+
+/** On-screen order: top to bottom, then left to right; headless last. */
+export function wakeOrder(
+  items: readonly { id: string; rect: { top: number; left: number } | undefined }[],
+): string[] {
+  const ranked = items.map((x, i) => ({ ...x, i }));
+  ranked.sort((a, b) => {
+    if (!a.rect || !b.rect) return a.rect ? -1 : b.rect ? 1 : a.i - b.i;
+    return a.rect.top - b.rect.top || a.rect.left - b.rect.left || a.i - b.i;
+  });
+  return ranked.map((x) => x.id);
+}
 
 /** Render formats a host accepts in `ready` for an isolate with a surface (ADR 0011: exact match). */
 const SURFACE_FMTS: readonly string[] = [ISOLOOP_DOM_FMT];
@@ -287,15 +330,10 @@ function validate(m: IsolateManifest): void {
     );
   }
   const s = m.suspend;
-  if (s !== undefined && s !== 'never') {
-    const ok =
-      s === 'when-idle' ||
-      (typeof s === 'object' && s !== null && typeof s.whenIdle?.afterMs === 'number');
-    if (!ok) throw new KernelError('invalid_manifest', `"${m.id}": unknown \`suspend\` value`);
-    throw new KernelError(
-      'suspend_unsupported',
-      `"${m.id}" asks for suspension, which arrives in M2 (ADR 0001)`,
-    );
+  if (s !== undefined && s !== 'never' && s !== 'when-idle') {
+    const ms: unknown = typeof s === 'object' && s !== null ? s.whenIdle?.afterMs : undefined;
+    if (typeof ms !== 'number' || !(ms > 0))
+      throw new KernelError('invalid_manifest', `"${m.id}": unknown \`suspend\` value`);
   }
 }
 /** How often the supervisor judges heartbeats and timeouts (plan m1-kernel, task 2). */
@@ -376,13 +414,16 @@ export function createKernel(config: KernelConfig): Kernel {
     if (!slot.loaded) return;
     slot.loaded.worker.terminate();
     slot.loaded = null;
-    controller?.detach(slot.manifest.id);
+    // A suspended headless isolate is woken by records on its topics (ADR 0001).
+    controller?.detach(slot.manifest.id, {
+      wake: slot.sup.state === 'suspended' && !slot.manifest.surface,
+    });
     slot.onClosed();
   };
 
-  const shutdown = (slot: Slot, graceMs: number): void => {
+  const shutdown = (slot: Slot, graceMs: number, reason: 'stop' | 'suspend' = 'stop'): void => {
     if (!slot.loaded) return;
-    post(slot, { v: 1, t: 'shutdown', p: { reason: 'stop', graceMs } });
+    post(slot, { v: 1, t: 'shutdown', p: { reason, graceMs } });
     slot.graceTimer = setTimeout(() => {
       terminate(slot);
     }, graceMs);
@@ -403,6 +444,17 @@ export function createKernel(config: KernelConfig): Kernel {
           break;
         case 'shutdown':
           shutdown(slot, fx.graceMs);
+          break;
+        case 'suspend':
+          compositor.freeze(id);
+          shutdown(slot, fx.graceMs, 'suspend');
+          break;
+        case 'wake':
+          if (!slot.queuedWake) {
+            slot.queuedWake = true;
+            wakeQueue.push(slot);
+          }
+          pumpWakes();
           break;
         case 'spawn':
           clearTimeout(slot.timer);
@@ -567,6 +619,17 @@ export function createKernel(config: KernelConfig): Kernel {
           return;
         }
         case 'beat':
+          slot.idle = msg.p.idle;
+          if (
+            config.dev &&
+            !slot.warnedHold &&
+            msg.p.idle?.holds.some((h) => h.ageMs > 10 * 60_000)
+          ) {
+            slot.warnedHold = true;
+            console.warn(
+              `[isoloop] "${id}" has held keepAwake() for over 10 minutes; it can't be suspended (ADR 0001).`,
+            );
+          }
           feed(slot, { k: 'beat', at: performance.now(), lagMs: msg.p.lagMs });
           return;
         case 'patch':
@@ -587,16 +650,17 @@ export function createKernel(config: KernelConfig): Kernel {
           else hostCall(slot, msg.id, msg.p.method, msg.p.args);
           return;
         case 'bye':
-          if (slot.sup.state === 'stopped') terminate(slot);
+          if (slot.sup.state === 'stopped' || slot.sup.state === 'suspended') terminate(slot);
           return;
       }
     }
     slot.dropped++;
   };
 
-  const start = (slot: Slot): void => {
+  const start = (slot: Slot, o: { wake?: boolean } = {}): void => {
     const { manifest } = slot;
     slot.fmt = undefined;
+    slot.idle = undefined;
     if (manifest.surface) {
       compositor.reset(manifest.id, bridgeFor(manifest.id));
     }
@@ -615,9 +679,14 @@ export function createKernel(config: KernelConfig): Kernel {
         renderFmt: manifest.surface ? ISOLOOP_DOM_FMT : 'none',
         heartbeatMs: everyMs,
         busPort,
+        ...(o.wake ? { wake: true } : {}),
       });
     } catch (err) {
       controller?.detach(manifest.id);
+      // Free memory before the retry: suspend every idle suspendable isolate (ADR 0001).
+      const at = performance.now();
+      for (const other of slots.values())
+        if (other !== slot && isIdle(other, at)) feed(other, { k: 'suspend' });
       const message = err instanceof Error ? err.message : String(err);
       feed(slot, { k: 'spawnFailed', at: performance.now(), message });
       return;
@@ -678,10 +747,15 @@ export function createKernel(config: KernelConfig): Kernel {
               emit('bus:ready', { first });
               // The new bus starts with an empty route topic (ADR 0002, ADR 0007).
               if (!first) void router?.sync(true);
+              // It also forgot what suspended isolates were waiting for: wake the headless ones.
+              if (!first)
+                for (const slot of slots.values())
+                  if (!slot.manifest.surface) feed(slot, { k: 'wake' });
             },
             crash: (reason, message) => emit('bus:crash', { reason, message }),
             restart: (restarts) => emit('bus:restart', { restarts }),
             metrics: (m) => {
+              warnLossyTopics(m.subscriptions);
               routeWatched = m.subscriptions.some(
                 (x) =>
                   x.topic === routeTopic.name && !x.consumer.startsWith(HOST_CONNECTION_PREFIX),
@@ -696,6 +770,11 @@ export function createKernel(config: KernelConfig): Kernel {
               const at = performance.now();
               for (const slot of slots.values())
                 feed(slot, { k: 'busFailed', at, message: `bus: ${f.code}: ${f.message}` });
+            },
+            wake: (id) => {
+              const slot = slots.get(id);
+              // Visual isolates wake only when seen (ADR 0001).
+              if (slot && !slot.manifest.surface) feed(slot, { k: 'wake' });
             },
             reattach: (id) => {
               const slot = slots.get(id);
@@ -753,10 +832,97 @@ export function createKernel(config: KernelConfig): Kernel {
     });
   }
 
+  // Suspension (ADR 0001): idleness, visibility and the wake queue.
+  const maxWakes = config.suspend?.maxConcurrentWakes ?? 4;
+  const wakeQueue: Slot[] = [];
+  const retentionOf = new Map<string, Retention>(
+    (config.contracts?.list.topics ?? []).map((t) => [t.name, t.retention]),
+  );
+
+  const visible = (slot: Slot): boolean =>
+    Boolean(slot.manifest.surface) && slot.intersecting && !document.hidden;
+
+  function isIdle(slot: Slot, at: number): boolean {
+    const afterMs = suspendAfter(slot.manifest);
+    const idle = slot.idle;
+    if (afterMs === undefined || slot.sup.state !== 'running' || !idle) return false;
+    if (idle.holds.length > 0 || idle.inFlight > 0 || idle.sinceDeliveryMs < afterMs) return false;
+    if (slot.manifest.surface && (visible(slot) || at - slot.hiddenSince < afterMs)) return false;
+    return true;
+  }
+
+  /** Starts queued wakes, visible surfaces first in on-screen order, at most `maxWakes` at once. */
+  function pumpWakes(): void {
+    let running = 0;
+    for (const slot of slots.values()) {
+      if (slot.waking && slot.sup.state !== 'loading') slot.waking = false;
+      if (slot.waking) running++;
+    }
+    if (running >= maxWakes || wakeQueue.length === 0) return;
+    const pending = wakeQueue.filter(
+      (s) => s.sup.state === 'suspended' && slots.get(s.manifest.id) === s,
+    );
+    const order = wakeOrder(
+      pending.map((s) => {
+        const host = s.manifest.surface ? compositor.host(s.manifest.id) : undefined;
+        const r = host && visible(s) ? host.getBoundingClientRect() : undefined;
+        return { id: s.manifest.id, rect: r ? { top: r.top, left: r.left } : undefined };
+      }),
+    );
+    wakeQueue.length = 0;
+    for (const id of order) {
+      const slot = slots.get(id);
+      if (!slot) continue;
+      if (running >= maxWakes) {
+        wakeQueue.push(slot);
+        continue;
+      }
+      slot.queuedWake = false;
+      slot.waking = true;
+      running++;
+      start(slot, { wake: true });
+    }
+  }
+
+  /** Registration warning: a suspendable isolate reading a topic that can drop records while it sleeps. */
+  function warnLossyTopics(subs: readonly { consumer: string; topic: string }[]): void {
+    for (const { consumer, topic } of subs) {
+      const slot = slots.get(consumer);
+      if (!slot || suspendAfter(slot.manifest) === undefined || slot.warnedTopics.has(topic))
+        continue;
+      const r = retentionOf.get(topic);
+      if (r?.kind !== 'last-n' && r?.kind !== 'time') continue;
+      slot.warnedTopics.add(topic);
+      console.warn(
+        `[isoloop] "${consumer}" can be suspended and reads ${topic} (${r.kind} retention): records it misses while suspended may be dropped, which arrives as a gap (ADR 0001).`,
+      );
+    }
+  }
+
+  const observer =
+    typeof IntersectionObserver === 'undefined'
+      ? undefined
+      : new IntersectionObserver((entries) => {
+          const at = performance.now();
+          for (const e of entries) {
+            const id = e.target instanceof HTMLElement ? e.target.dataset['isolateId'] : undefined;
+            const slot = id === undefined ? undefined : slots.get(id);
+            if (!slot) continue;
+            const was = visible(slot);
+            slot.intersecting = e.isIntersecting;
+            if (was && !visible(slot)) slot.hiddenSince = at;
+            if (visible(slot)) feed(slot, { k: 'wake' });
+          }
+        });
+
   const tick = setInterval(() => {
     const at = performance.now();
     controller?.feed({ k: 'tick', at });
-    for (const slot of slots.values()) feed(slot, { k: 'tick', at });
+    for (const slot of slots.values()) {
+      feed(slot, { k: 'tick', at });
+      if (isIdle(slot, at)) feed(slot, { k: 'suspend' });
+    }
+    if (wakeQueue.length > 0) pumpWakes();
   }, TICK_MS);
 
   // Hidden and frozen tabs (ADR 0001): a hidden page's timers are throttled
@@ -765,8 +931,11 @@ export function createKernel(config: KernelConfig): Kernel {
   const visibility = (): void => {
     const at = performance.now();
     controller?.feed(document.hidden ? { k: 'hidden' } : { k: 'visible', at });
-    for (const slot of slots.values())
+    for (const slot of slots.values()) {
+      if (document.hidden && slot.intersecting) slot.hiddenSince = at;
       feed(slot, document.hidden ? { k: 'hidden' } : { k: 'visible', at });
+      if (visible(slot)) feed(slot, { k: 'wake' });
+    }
   };
   const resumed = (): void => {
     const at = performance.now();
@@ -795,6 +964,7 @@ export function createKernel(config: KernelConfig): Kernel {
       ...(reason === undefined ? {} : { reason }),
       ...(error === undefined ? {} : { error }),
       ...(surface === undefined ? {} : { surface }),
+      ...(slot.idle && slot.idle.holds.length > 0 ? { holds: slot.idle.holds } : {}),
     };
   };
 
@@ -817,6 +987,13 @@ export function createKernel(config: KernelConfig): Kernel {
         onClosed: () => {},
         dropped: 0,
         fmt: undefined,
+        idle: undefined,
+        intersecting: true,
+        hiddenSince: performance.now(),
+        waking: false,
+        queuedWake: false,
+        warnedHold: false,
+        warnedTopics: new Set(),
       };
       slots.set(manifest.id, slot);
       if (document.hidden) feed(slot, { k: 'hidden' });
@@ -824,6 +1001,8 @@ export function createKernel(config: KernelConfig): Kernel {
         compositor.attach(manifest.id, manifest.surface, bridgeFor(manifest.id), (event) => {
           post(slot, { v: 1, t: 'event', p: event });
         });
+        const host = compositor.host(manifest.id);
+        if (host && suspendAfter(manifest) !== undefined) observer?.observe(host);
       }
       start(slot);
       const id = manifest.id;
@@ -838,6 +1017,9 @@ export function createKernel(config: KernelConfig): Kernel {
     stop(id) {
       const slot = get(id);
       clearTimeout(slot.timer);
+      const host = compositor.host(id);
+      if (host) observer?.unobserve(host);
+      if (slot.sup.state === 'suspended') controller?.forget(id);
       feed(slot, { k: 'stop' });
       // A failed isolate has no worker; nothing else to wait for.
       if (slot.sup.state !== 'stopped') terminate(slot);
@@ -848,6 +1030,11 @@ export function createKernel(config: KernelConfig): Kernel {
 
     restart(id) {
       feed(get(id), { k: 'respawn' });
+      return Promise.resolve();
+    },
+
+    resume(id) {
+      feed(get(id), { k: 'wake' });
       return Promise.resolve();
     },
 
@@ -896,6 +1083,7 @@ export function createKernel(config: KernelConfig): Kernel {
 
     async destroy() {
       clearInterval(tick);
+      observer?.disconnect();
       document.removeEventListener('visibilitychange', visibility);
       document.removeEventListener('resume', resumed);
       await Promise.all([...slots.keys()].map((id) => kernel.stop(id)));

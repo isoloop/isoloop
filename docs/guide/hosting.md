@@ -41,7 +41,7 @@ Without them the import fails and the isolate crashes with reason `error` and a 
 ## Placement rules
 
 - **One worker per isolate** ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). `manifest.pool` is typed but rejected with `pools_unsupported` until worker pools land (M2c).
-- **No suspension yet.** `manifest.suspend` accepts only `'never'` until M2; anything else is rejected with `suspend_unsupported`.
+- **Suspension is opt-in.** `manifest.suspend: 'when-idle'` (60 s) or `{ whenIdle: { afterMs } }` lets an idle isolate's worker be shut down and woken later (ADR 0001); the default `'never'` keeps it running, in a hidden tab too.
 - **Worker budget.** Passing `workers.budget` live workers (32 by default) logs one warning and emits `workers:budget`. It never blocks a spawn. Each worker has its own heap, so the right number depends on the device.
 - **Spawn failures.** If `new Worker` throws (say, the browser is out of memory), the isolate crashes with reason `spawn-failed`, then gets the normal backoff and restart limit.
 

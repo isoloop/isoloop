@@ -27,6 +27,21 @@ export type InitPayload = {
   heartbeatMs: number;
   /** Isolate module URL, imported by the bootstrap. */
   src: string;
+  /**
+   * Set when the isolate wakes from suspension (ADR 0001): its `latest`
+   * subscriptions start from `committed` instead, so it replays what it missed.
+   */
+  wake?: boolean;
+};
+
+/** What a beat says about whether the isolate could be suspended (ADR 0001). */
+export type IdleReport = {
+  /** Time since the bus last delivered a record to this isolate. */
+  sinceDeliveryMs: number;
+  /** Host calls, publishes and requests waiting for an answer. */
+  inFlight: number;
+  /** Open `ctx.keepAwake()` holds: age and where they were taken. */
+  holds: { ageMs: number; stack?: string }[];
 };
 
 /** Isolate port: host → isolate. */
@@ -45,7 +60,7 @@ export type IsolateToHost =
   /** `styles`: stylesheets the isolate added since its last patch, applied before `batch` (design §4.8). */
   | Envelope<'patch', { fmt: string; batch: unknown; styles?: string[] }>
   | Envelope<'call', { method: HostMethod; args: unknown[] }>
-  | Envelope<'beat', { lagMs: number; heapBytes?: number }>
+  | Envelope<'beat', { lagMs: number; heapBytes?: number; idle?: IdleReport }>
   | Envelope<'error', ErrorPayload>
   /** Last message after `shutdown`: handlers ran, the host may terminate now (design §7.6). */
   | Envelope<'bye', Record<string, never>>;

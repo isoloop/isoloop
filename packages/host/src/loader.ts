@@ -17,6 +17,8 @@ export type LoadOptions = {
   heartbeatMs: number;
   /** The isolate's end of its bus connection; transferred in `init`. */
   busPort: MessagePort;
+  /** Waking from suspension: `latest` subscriptions resume from `committed` (ADR 0001). */
+  wake?: boolean;
 };
 
 export function load(o: LoadOptions): LoadedWorker {
@@ -33,6 +35,7 @@ export function load(o: LoadOptions): LoadedWorker {
       busPort: o.busPort,
       heartbeatMs: o.heartbeatMs,
       src: new URL(o.src, document.baseURI).href,
+      ...(o.wake ? { wake: true } : {}),
     },
   };
   worker.postMessage(init, [o.busPort]);

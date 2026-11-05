@@ -57,6 +57,8 @@ export function createHostCalls(opts: HostCallsOptions): {
   api: HostApi;
   /** Settles the call a `result` answers. Unknown ids are ignored. */
   receive(re: string, result: CallResult): void;
+  /** Calls waiting for an answer. */
+  pending(): number;
 } {
   const timeoutMs = opts.timeoutMs ?? 5000;
   const pending = new Map<
@@ -113,6 +115,7 @@ export function createHostCalls(opts: HostCallsOptions): {
         await call('scrollIntoView', node, o === undefined ? [] : [o]);
       },
     },
+    pending: () => pending.size,
     receive(re, result) {
       const p = pending.get(re);
       if (!p) return;

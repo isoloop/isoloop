@@ -213,7 +213,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         return;
       }
       case 'detach':
-        b.detach(msg.p.isolateId, msg.p.keepOffsets);
+        b.detach(msg.p.isolateId, msg.p.keepOffsets, { wake: msg.p.wake ?? false });
         return;
       case 'publish': {
         const { id } = msg;
@@ -304,7 +304,12 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
     try {
       list = await loadContracts(p.contractsUrl, p.topics, importModule);
       const engine = new TsEngine();
-      b = new Broker({ contracts: list, engine, dev: p.dev ?? false });
+      b = new Broker({
+        contracts: list,
+        engine,
+        dev: p.dev ?? false,
+        onWake: (isolateId, topic) => post({ v: 1, t: 'wake', p: { isolateId, topic } }),
+      });
     } catch (e) {
       fatal(
         e instanceof BootError

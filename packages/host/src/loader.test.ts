@@ -50,15 +50,16 @@ describe('placement rules (ADR 0001)', () => {
     expect(k.isolates()).toEqual([]);
   });
 
-  it('rejects suspension other than never with suspend_unsupported', () => {
+  it('accepts every suspend setting, and rejects a malformed one with invalid_manifest', () => {
     const k = kernel();
-    expect(codeOf(() => k.spawn({ id: 'A', src: counter, suspend: 'when-idle' }))).toBe(
-      'suspend_unsupported',
-    );
+    expect(codeOf(() => k.spawn({ id: 'A', src: counter, suspend: 'when-idle' }))).toBeUndefined();
     expect(
       codeOf(() => k.spawn({ id: 'B', src: counter, suspend: { whenIdle: { afterMs: 5 } } })),
-    ).toBe('suspend_unsupported');
+    ).toBeUndefined();
     expect(codeOf(() => k.spawn({ id: 'C', src: counter, suspend: 'never' }))).toBeUndefined();
+    expect(
+      codeOf(() => k.spawn({ id: 'D', src: counter, suspend: { whenIdle: { afterMs: -1 } } })),
+    ).toBe('invalid_manifest');
   });
 
   it('rejects malformed manifests with invalid_manifest', () => {

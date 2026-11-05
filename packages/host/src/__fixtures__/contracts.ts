@@ -44,7 +44,14 @@ export const report: Topic<Report> = {
   retention: { kind: 'last-n', n: 1000 },
 };
 
-const topics = [count, notes, report];
+/** A short log: five records while suspended lose two (ADR 0001 gap). */
+export const small: Topic<number> = {
+  name: 'small.v1',
+  schema: schema((v): v is number => typeof v === 'number'),
+  retention: { kind: 'last-n', n: 3 },
+};
+
+const topics = [count, notes, report, small];
 
 const list: {
   '~isoloop': 'contracts';

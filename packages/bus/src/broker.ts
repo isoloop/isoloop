@@ -60,6 +60,11 @@ export type BrokerOptions = {
    * subscribing to any other topic gets `reset` first (ADR 0007).
    */
   durable?: (topic: string) => boolean;
+  /**
+   * A record arrived on a topic a suspended isolate subscribed to (ADR 0001).
+   * The bus worker sends `wake` on the control port. Called once per sleep.
+   */
+  onWake?: (isolateId: string, topic: string) => void;
 };
 
 /** Who is publishing: an isolate (grants apply), the host (`kernel.publish`), or the kernel itself (system topics). */
@@ -207,6 +212,9 @@ export class Broker {
   /** Consumers whose offsets were dropped by `detach { keepOffsets: false }`, per topic. */
   readonly #forgotten = new Set<string>();
   readonly #rejected: Partial<Record<ErrorCode, number>> = {};
+  /** Suspended isolates by topic: who to wake when a record arrives there. */
+  readonly #sleepers = new Map<string, Set<string>>();
+  readonly #onWake: (isolateId: string, topic: string) => void;
   #dropped = 0;
 
   constructor(opts: BrokerOptions) {
@@ -217,6 +225,7 @@ export class Broker {
     this.#inboxLimit = opts.inboxLimit ?? 1000;
     this.#timers = opts.timers ?? { set: (fn, ms) => void setTimeout(fn, ms) };
     this.#durable = opts.durable ?? (() => false);
+    this.#onWake = opts.onWake ?? (() => {});
     for (const def of [...(opts.systemTopics ?? SYSTEM_TOPICS), ...opts.contracts.topics]) {
       this.#engine.createTopic(topicConfig(def));
       this.#topics.set(def.name, {
@@ -226,6 +235,26 @@ export class Broker {
         records: 0,
         bytes: 0,
       });
+    }
+  }
+
+  #sleep(topic: string, isolateId: string): void {
+    let set = this.#sleepers.get(topic);
+    if (!set) this.#sleepers.set(topic, (set = new Set()));
+    set.add(isolateId);
+  }
+
+  #unsleep(isolateId: string): void {
+    for (const set of this.#sleepers.values()) set.delete(isolateId);
+  }
+
+  /** Wakes every isolate sleeping on `topic`, once. */
+  #wake(topic: string): void {
+    const set = this.#sleepers.get(topic);
+    if (!set || set.size === 0) return;
+    for (const id of set) {
+      this.#unsleep(id);
+      this.#onWake(id, topic);
     }
   }
 
@@ -308,11 +337,18 @@ export class Broker {
    * which rebalance. With `keepOffsets` its commits stay, so a restart with
    * `from: 'committed'` resumes (I6). Replies to its pending requests are dropped.
    */
-  detach(isolateId: string, keepOffsets: boolean): void {
+  detach(isolateId: string, keepOffsets: boolean, opts: { wake?: boolean } = {}): void {
+    if (!opts.wake) this.#unsleep(isolateId);
     const conn = this.#conns.get(isolateId);
     if (!conn) return;
     this.#conns.delete(isolateId);
-    for (const sub of conn.subs.values()) this.#leave(sub);
+    for (const sub of conn.subs.values()) {
+      // A suspended isolate is woken by records on its own subscriptions, and
+      // on a group's only when nobody else is left to take them (ADR 0001).
+      const g = sub.group;
+      if (opts.wake && (!g || g.members.length === 1)) this.#sleep(sub.topic, isolateId);
+      this.#leave(sub);
+    }
     conn.subs.clear();
     if (!keepOffsets) {
       for (const name of this.#topics.keys()) this.#forgotten.add(`${name}\u0000${isolateId}`);
@@ -500,6 +536,7 @@ export class Broker {
     if (p.req) this.#openRequest(name, offset, p.req);
     p.settle({ ok: true, value: { offset } });
     this.#fanOut(name);
+    this.#wake(name);
   }
 
   /** Turns a schema result into the value to store, or the error to send. */

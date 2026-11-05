@@ -508,3 +508,55 @@ describe('isoloop.route.v1 (ADR 0002)', () => {
     expect(a.values('isoloop.route.v1')).toEqual([value]);
   });
 });
+
+const wakeSetup = () => {
+  const woken: [string, string][] = [];
+  const broker = new Broker({
+    contracts: contracts(notes, items),
+    engine: new TsEngine(),
+    onWake: (id, t) => woken.push([id, t]),
+  });
+  return { broker, woken };
+};
+
+describe('wake for suspended isolates (ADR 0001)', () => {
+  it('wakes once on the first record for a subscribed topic, not for others', async () => {
+    const { broker, woken } = wakeSetup();
+    const h = connect(broker, 'H', all);
+    await h.call('subscribe', { topic: 'notes.v1', from: 'latest' });
+    broker.detach('H', true, { wake: true });
+    const p = connect(broker, 'P', all);
+    await p.call('publish', { topic: 'cart.items.v1', value: { sku: 'x' } });
+    expect(woken).toEqual([]);
+    await p.call('publish', { topic: 'notes.v1', value: 'a' });
+    await p.call('publish', { topic: 'notes.v1', value: 'b' });
+    expect(woken).toEqual([['H', 'notes.v1']]);
+  });
+
+  it('a plain detach or a new attach forgets the sleeper', async () => {
+    const { broker, woken } = wakeSetup();
+    const h = connect(broker, 'H', all);
+    await h.call('subscribe', { topic: 'notes.v1', from: 'latest' });
+    broker.detach('H', true, { wake: true });
+    broker.detach('H', true);
+    const p = connect(broker, 'P', all);
+    await p.call('publish', { topic: 'notes.v1', value: 'a' });
+    expect(woken).toEqual([]);
+  });
+
+  it('in a group, only the last member to leave sleeps on the topic', async () => {
+    const { broker, woken } = wakeSetup();
+    const x = connect(broker, 'X', all);
+    const y = connect(broker, 'Y', all);
+    await x.call('subscribe', { topic: 'notes.v1', from: 'latest', group: 'g' });
+    await y.call('subscribe', { topic: 'notes.v1', from: 'latest', group: 'g' });
+    broker.detach('X', true, { wake: true });
+    const p = connect(broker, 'P', all);
+    await p.call('publish', { topic: 'notes.v1', value: 'a' });
+    expect(woken).toEqual([]);
+    expect(y.values('notes.v1')).toEqual(['a']);
+    broker.detach('Y', true, { wake: true });
+    await p.call('publish', { topic: 'notes.v1', value: 'b' });
+    expect(woken).toEqual([['Y', 'notes.v1']]);
+  });
+});

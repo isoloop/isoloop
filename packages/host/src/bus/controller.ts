@@ -51,6 +51,8 @@ export type BusControllerEvents = {
    * message, or restarts the isolate.
    */
   reattach(isolateId: string): void;
+  /** A record arrived for a suspended isolate's subscription (ADR 0001). */
+  wake(isolateId: string, topic: string): void;
 };
 
 export type BusControllerOptions = {
@@ -75,8 +77,13 @@ export type HostSubscription = {
 export interface BusController {
   /** Wires a new bus connection for an isolate and returns the isolate's end. */
   connect(isolateId: string, grants: Grants, o?: { reattach?: boolean }): MessagePort;
-  /** Ends an isolate's connection; its committed offsets stay (ADR 0005). */
-  detach(isolateId: string): void;
+  /**
+   * Ends an isolate's connection; its committed offsets stay (ADR 0005).
+   * With `wake`, the bus watches its subscriptions for a suspended isolate.
+   */
+  detach(isolateId: string, o?: { wake?: boolean }): void;
+  /** Forgets a suspended isolate the bus may still be watching for (stopped while asleep). */
+  forget(isolateId: string): void;
   publish(topic: string, key: string | undefined, value: unknown): Promise<CallResult>;
   subscribe(sub: HostSubscription): () => void;
   /** Supervisor clock and page visibility, fed by the kernel. */
@@ -197,7 +204,8 @@ export function createBusController(o: BusControllerOptions): BusController {
         return;
       }
       case 'wake':
-        return; // suspension: M2 task 12b
+        o.events.wake(msg.p.isolateId, msg.p.topic);
+        return;
       case 'error':
         if (msg.p.fatal && msg.p.code !== undefined) {
           // A contracts error: deterministic, so no restart (ADR 0003, decision 7).
@@ -280,6 +288,8 @@ export function createBusController(o: BusControllerOptions): BusController {
             failForGood({ reason: fx.data.reason, message: fx.data.message });
           break;
         case 'shutdown':
+        case 'suspend':
+        case 'wake':
         case 'showBusy':
         case 'hideBusy':
         case 'showFallback':
@@ -341,11 +351,19 @@ export function createBusController(o: BusControllerOptions): BusController {
   return {
     connect,
 
-    detach(isolateId) {
+    detach(isolateId, opts = {}) {
       if (!conns.delete(isolateId)) return;
       const i = queue.findIndex((q) => q.msg.t === 'attach' && q.msg.p.isolateId === isolateId);
-      if (i >= 0) queue.splice(i, 1);
-      else if (worker) send({ v: 1, t: 'detach', p: { isolateId, keepOffsets: true } });
+      const p = { isolateId, keepOffsets: true, ...(opts.wake ? { wake: true } : {}) };
+      if (i >= 0) {
+        queue.splice(i, 1);
+        if (opts.wake) send({ v: 1, t: 'detach', p });
+      } else if (worker) send({ v: 1, t: 'detach', p });
+    },
+
+    forget(isolateId) {
+      if (worker && !conns.has(isolateId))
+        send({ v: 1, t: 'detach', p: { isolateId, keepOffsets: true } });
     },
 
     publish(topic, key, value) {

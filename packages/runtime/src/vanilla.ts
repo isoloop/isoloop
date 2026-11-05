@@ -6,12 +6,14 @@
  */
 import {
   isHostToIsolate,
+  type IdleReport,
   type InitPayload,
   type IsolateToHost,
   type ShutdownReason,
 } from '@isoloop/protocol';
 import { createBusClient, type BusClient } from './bus-client';
 import { createHostCalls, type HostApi } from './host-calls';
+import { createKeepAwake } from './keep-awake';
 import { createRender } from './render';
 
 /**
@@ -42,7 +44,10 @@ export type IsolateContext<Root = IsolateRoot> = {
   styles(css: string | readonly string[]): void;
   /** Runs on stop, within the host's grace period, before the worker goes. */
   onShutdown(fn: (reason: ShutdownReason) => void | Promise<void>): void;
-  /** Holds the isolate against suspension (ADR 0001). A no-op until M2 builds suspension. */
+  /**
+   * Holds the isolate against suspension (ADR 0001); call the result to
+   * release. Only matters for isolates spawned with `suspend`.
+   */
   keepAwake(): () => void;
 };
 
@@ -66,6 +71,8 @@ export type VanillaRuntime = {
   receive(msg: unknown): void;
   /** Runs the `onShutdown` handlers; resolves when all have settled. */
   shutdown(reason: ShutdownReason): Promise<void>;
+  /** For the beat: whether the isolate could be suspended now. */
+  idle(): IdleReport;
 };
 
 /** Builds the context for `start(ctx)`. `scope` is the worker global the DOM subset installs on. */
@@ -78,7 +85,9 @@ export function createVanillaIsolate(init: InitPayload, post: Post, scope: objec
     surface: render !== null,
     navigate: init.grants.navigate === true,
   });
+  const awake = createKeepAwake();
   const bus = createBusClient(init.busPort, {
+    ...(init.wake ? { wake: true } : {}),
     onError: (err) => {
       const p =
         err instanceof Error && err.stack !== undefined
@@ -99,7 +108,7 @@ export function createVanillaIsolate(init: InitPayload, post: Post, scope: objec
     onShutdown: (fn) => {
       onShutdown.push(fn);
     },
-    keepAwake: () => () => {},
+    keepAwake: () => awake.hold(),
   };
 
   return {
@@ -111,6 +120,14 @@ export function createVanillaIsolate(init: InitPayload, post: Post, scope: objec
         else if (msg.t === 'reattach') bus.reattach(msg.p.busPort);
         else if (msg.t === 'result' && msg.re !== undefined) calls.receive(msg.re, msg.p);
       }
+    },
+    idle() {
+      const b = bus.idle();
+      return {
+        sinceDeliveryMs: b.sinceDeliveryMs,
+        inFlight: b.inFlight + calls.pending(),
+        holds: awake.report(performance.now()),
+      };
     },
     async shutdown(reason) {
       await Promise.allSettled(onShutdown.map(async (fn) => fn(reason)));

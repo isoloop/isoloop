@@ -6,8 +6,12 @@
  * end to end with plain numbers.
  *
  * `crashed` is passed through, never rested in: a crash goes straight on to
- * `restarting` (waiting out the backoff) or `failed`. Suspension (ADR 0001)
- * arrives in M2.
+ * `restarting` (waiting out the backoff) or `failed`.
+ *
+ * `suspended` (ADR 0001) is opt-in and entered only from `running` when the
+ * kernel judges the isolate idle; `wake` asks the kernel's wake queue for a
+ * spawn, and `spawned` moves it to `loading`. It never touches the restart
+ * window.
  */
 import { assertNever } from '@isoloop/protocol';
 import { backoffMs, DEFAULT_BACKOFF, slide, type Backoff } from './timers';
@@ -19,7 +23,9 @@ export type IsolateState =
   | 'stopped'
   | 'crashed'
   | 'restarting'
-  | 'failed';
+  | 'failed'
+  /** Opt-in: idle, so its worker was shut down; wakes on visibility, a record or `resume` (ADR 0001). */
+  | 'suspended';
 
 export type CrashReason =
   /** A fatal `error` message from the isolate. */
@@ -93,6 +99,10 @@ export type SupervisorInput =
   | { k: 'busFailed'; at: number; message: string }
   | { k: 'stop' }
   | { k: 'respawn' }
+  /** The kernel judged a running isolate idle (ADR 0001). */
+  | { k: 'suspend' }
+  /** Visible again, a record for a headless isolate, or `kernel.resume`. */
+  | { k: 'wake' }
   | { k: 'hidden' }
   /** Document visible again, or the Page Lifecycle `resume` event. */
   | { k: 'visible'; at: number };
@@ -112,6 +122,10 @@ export type SupervisorEffect =
   | { k: 'shutdown'; graceMs: number }
   | { k: 'showBusy' }
   | { k: 'hideBusy' }
+  /** Freeze the surface, `shutdown { reason: 'suspend' }`, detach keeping offsets, terminate. */
+  | { k: 'suspend'; graceMs: number }
+  /** Put the isolate in the wake queue; the kernel spawns it and feeds `spawned`. */
+  | { k: 'wake' }
   | { k: 'showFallback'; reason: CrashReason; message: string }
   | { k: 'hideFallback' }
   | ({ k: 'emit' } & SupervisorEvent);
@@ -146,7 +160,7 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
   const same: Step = { s, effects: [] };
   switch (input.k) {
     case 'spawned':
-      if (s.state !== 'restarting') return same;
+      if (s.state !== 'restarting' && s.state !== 'suspended') return same;
       return {
         s: {
           ...withoutCrash(s),
@@ -232,6 +246,16 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
       if (s.state !== 'restarting') effects.push(moved(s.state, 'restarting'));
       return { s: { ...withoutCrash(s), state: 'restarting', window: [] }, effects };
     }
+
+    case 'suspend':
+      if (s.state !== 'running') return same;
+      return {
+        s: { ...s, state: 'suspended' },
+        effects: [{ k: 'suspend', graceMs: cfg.stopGraceMs }, moved('running', 'suspended')],
+      };
+
+    case 'wake':
+      return s.state === 'suspended' ? { s, effects: [{ k: 'wake' }] } : same;
 
     case 'hidden':
       return { s: { ...s, hidden: true }, effects: [] };
