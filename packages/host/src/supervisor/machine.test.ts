@@ -240,6 +240,48 @@ describe('supervisor transition table', () => {
       [],
     ],
     [
+      'running → suspended on suspend: shutdown with grace (ADR 0001)',
+      at('running'),
+      { k: 'suspend' },
+      { state: 'suspended' },
+      [{ k: 'suspend', graceMs: 1000 }, moved('running', 'suspended')],
+    ],
+    [
+      'suspend outside running is ignored',
+      at('blocked'),
+      { k: 'suspend' },
+      { state: 'blocked' },
+      [],
+    ],
+    [
+      'suspended asks the wake queue on wake, and stays suspended until spawned',
+      at('suspended'),
+      { k: 'wake' },
+      { state: 'suspended' },
+      [{ k: 'wake' }],
+    ],
+    [
+      'suspended → loading on spawned, restart window untouched',
+      at('suspended', { restarts: 2, window: [5, 6] }),
+      { k: 'spawned', at: 10 },
+      { state: 'loading', restarts: 2, window: [5, 6], spawnedAt: 10 },
+      [moved('suspended', 'loading')],
+    ],
+    [
+      'wake on a running isolate is ignored',
+      at('running'),
+      { k: 'wake' },
+      { state: 'running' },
+      [],
+    ],
+    [
+      'a suspended isolate is never judged blocked',
+      at('suspended', { lastBeatAt: 0 }),
+      { k: 'tick', at: 99_999 },
+      { state: 'suspended' },
+      [],
+    ],
+    [
       'renderFmtMismatch outside loading is ignored',
       at('running'),
       { k: 'renderFmtMismatch', at: 5, message: 'late' },
@@ -398,5 +440,20 @@ describe('restart policy (fake clock)', () => {
     const { s } = run(at('loading'), [...loop, ...loop, ...loop, ...loop]);
     expect(s.state).toBe('failed');
     expect(s.error).toBe('start threw');
+  });
+});
+
+describe('wake order (ADR 0001)', () => {
+  it('visible surfaces first, top to bottom then left to right; headless last, in queue order', async () => {
+    const { wakeOrder } = await import('../kernel');
+    expect(
+      wakeOrder([
+        { id: 'h1', rect: undefined },
+        { id: 'b', rect: { top: 100, left: 0 } },
+        { id: 'a2', rect: { top: 0, left: 50 } },
+        { id: 'h2', rect: undefined },
+        { id: 'a1', rect: { top: 0, left: 10 } },
+      ]),
+    ).toEqual(['a1', 'a2', 'b', 'h1', 'h2']);
   });
 });

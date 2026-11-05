@@ -100,6 +100,14 @@ export interface Compositor {
   reset(id: string, bridge: HostRenderBridge): void;
   /** Removes the surface (stop). */
   detach(id: string): void;
+  /**
+   * Suspension (ADR 0001): replaces the live tree with an inert copy of its
+   * last frame and unmounts the bridge. The copy stays until the first batch
+   * after the next `reset` applies.
+   */
+  freeze(id: string): void;
+  /** The `<iso-surface>` element, for visibility tracking. */
+  host(id: string): HTMLElement | undefined;
   /** Shows or hides the busy overlay. */
   busy(id: string, on: boolean): void;
   /** Shows the fallback, rendered by `render`, or hides it with `null`. */
@@ -125,6 +133,8 @@ type Surface = {
   lastFrameMs: number;
   /** The isolate's own stylesheets, after the shell and the kernel's. */
   sheets: CSSStyleSheet[];
+  /** The frozen last frame of a suspended isolate. */
+  snapshot: HTMLElement | undefined;
 };
 
 export function createCompositor(opts: CompositorOptions = {}): Compositor {
@@ -169,8 +179,11 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
         s.queue.shift();
         const t0 = now();
         if (next.k === 'batch' && next.styles?.length) adopt(s, next.styles);
-        if (next.k === 'batch' && s.bridge.apply(next.batch)) s.applied++;
-        else s.rejected++;
+        if (next.k === 'batch' && s.bridge.apply(next.batch)) {
+          s.applied++;
+          s.snapshot?.remove();
+          s.snapshot = undefined;
+        } else s.rejected++;
         spent.set(s, (spent.get(s) ?? 0) + now() - t0);
         appliedAny = true;
         progress = true;
@@ -228,7 +241,30 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
         dropped: 0,
         lastFrameMs: 0,
         sheets: [],
+        snapshot: undefined,
       });
+    },
+
+    freeze(id) {
+      const s = surfaces.get(id);
+      if (!s) return;
+      s.snapshot?.remove();
+      const snap = document.createElement('div');
+      snap.className = 'iso-snapshot';
+      snap.style.display = 'contents';
+      snap.inert = true;
+      for (const n of s.shadow.childNodes) {
+        if (n !== s.busy && n !== s.fallback) snap.append(n.cloneNode(true));
+      }
+      s.dropped += s.queue.filter((q) => q.k === 'batch').length;
+      s.queue.length = 0;
+      s.bridge.unmount();
+      s.shadow.append(snap);
+      s.snapshot = snap;
+    },
+
+    host(id) {
+      return surfaces.get(id)?.host;
     },
 
     enqueue(id, batch, sheetTexts) {

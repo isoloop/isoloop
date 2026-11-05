@@ -34,6 +34,11 @@ export type SubscribeOptions = {
    * from it; records from the new bus follow.
    */
   onReset?: () => void;
+  /**
+   * Records in `[from, to]` were dropped by retention before they reached
+   * this subscription (design §6.3), e.g. while the isolate was suspended.
+   */
+  onGap?: (gap: { from: number; to: number }) => void;
 };
 
 export interface BusClient {
@@ -62,6 +67,12 @@ export type BusClientOptions = {
   inboxLimit?: number;
   /** A handler threw: reported to the host as a non-fatal error. */
   onError?: (err: unknown) => void;
+  /**
+   * Woken from suspension (ADR 0001): `latest` subscriptions start from
+   * `committed`, so the isolate replays what it missed while asleep.
+   */
+  wake?: boolean;
+  now?: () => number;
 };
 
 const check = (r: CallResult): void => {
@@ -89,12 +100,16 @@ type Sub = {
 
 export type BusClientHandle = {
   client: BusClient;
+  /** For the idle report: time since the last delivery, and calls waiting for an answer. */
+  idle(): { sinceDeliveryMs: number; inFlight: number };
   /** Swaps to a new bus port after a bus restart. */
   reattach(port: MessagePort): void;
 };
 
 export function createBusClient(first: MessagePort, o: BusClientOptions = {}): BusClientHandle {
   const limit = o.inboxLimit ?? 1000;
+  const now = o.now ?? (() => performance.now());
+  let lastDelivery = now();
   let port = first;
   let nextId = 0;
   const pending = new Map<string, Pending>();
@@ -149,6 +164,7 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
       topic: sub.topic,
       from: sub.opts.from ?? 'latest',
     };
+    if (o.wake && p.from === 'latest') p.from = 'committed';
     if (sub.opts.group !== undefined) p.group = sub.opts.group;
     void call({ v: 1, t: 'subscribe', p }).then((r) => {
       if (!r.ok) o.onError?.(new BusError(r.error));
@@ -167,6 +183,15 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
       case 'deliver': {
         const sub = subs.get(msg.p.topic);
         if (!sub) return;
+        lastDelivery = now();
+        const { gap } = msg.p;
+        if (gap) {
+          try {
+            sub.opts.onGap?.(gap);
+          } catch (err) {
+            o.onError?.(err);
+          }
+        }
         sub.queue.push(...msg.p.records);
         void drain(sub);
         return;
@@ -268,6 +293,7 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
 
   return {
     client,
+    idle: () => ({ sinceDeliveryMs: now() - lastDelivery, inFlight: pending.size }),
     reattach(next) {
       const old = port;
       port = next;

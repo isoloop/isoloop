@@ -11,6 +11,7 @@
 import {
   PROTOCOL,
   isHostToIsolate,
+  type IdleReport,
   type InitPayload,
   type IsolateToHost,
   type ShutdownReason,
@@ -26,11 +27,15 @@ const fatal = (message: string, code?: 'protocol_mismatch'): void => {
   post({ v: 1, t: 'error', p: code ? { message, fatal: true, code } : { message, fatal: true } });
 };
 
+/** Set once the isolate has started: what the beat reports for suspension (ADR 0001). */
+let idleReport: (() => IdleReport) | null = null;
+
 function startHeartbeat(everyMs: number): void {
   let last = performance.now();
   setInterval(() => {
     const now = performance.now();
-    post({ v: 1, t: 'beat', p: { lagMs: Math.max(0, now - last - everyMs) } });
+    const lagMs = Math.max(0, now - last - everyMs);
+    post({ v: 1, t: 'beat', p: idleReport ? { lagMs, idle: idleReport() } : { lagMs } });
     last = now;
   }, everyMs);
 }
@@ -91,6 +96,7 @@ async function startIsolate(init: InitPayload, start: (ctx: unknown) => unknown)
     runtime.receive(e.data);
   });
   shutdownHook = (reason) => runtime.shutdown(reason);
+  idleReport = () => runtime.idle();
   post({
     v: 1,
     t: 'ready',

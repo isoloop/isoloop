@@ -47,7 +47,12 @@ export type HostToBus =
    * so each memory topic it subscribes to answers with `reset` first (ADR 0007).
    */
   | Envelope<'attach', { isolateId: string; grants: Grants; port: MessagePort; reattach?: boolean }>
-  | Envelope<'detach', { isolateId: string; keepOffsets: boolean }>
+  /**
+   * `wake`: the isolate is suspended (ADR 0001). The bus remembers its
+   * subscriptions and sends `wake` on the control port when a record arrives
+   * on one of them (for a group, only when it was the last member).
+   */
+  | Envelope<'detach', { isolateId: string; keepOffsets: boolean; wake?: boolean }>
   /** `kernel.publish`. With `id` set, the bus replies with `result`. */
   | Envelope<'publish', { topic: string; key?: string; value: unknown }>;
 
