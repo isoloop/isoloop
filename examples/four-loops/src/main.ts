@@ -17,7 +17,12 @@ const $ = (id: string): HTMLElement => {
 const sheet = new CSSStyleSheet();
 sheet.replaceSync(surfaceCss);
 
-const kernel = createKernel({ workers: { isolateBootstrap: bootstrap }, styles: [sheet] });
+// A long first backoff keeps the crash overlay on screen long enough to read, as in the PoC.
+const kernel = createKernel({
+  workers: { isolateBootstrap: bootstrap },
+  supervisor: { backoff: { initialMs: 1500 } },
+  styles: [sheet],
+});
 
 const isolates = [
   { id: 'A', name: 'A · Counter', src: counter },

@@ -8,7 +8,7 @@ export {
   type KernelEvent,
   type KernelEvents,
 } from './kernel';
-export type { IsolateState } from './supervisor';
+export type { Backoff, CrashReason, IsolateState } from './supervisor';
 export type { SurfaceStats } from './compositor';
 export type { BusDelivery } from './legacy-bus';
 export type { HostRenderBridge } from './render/bridge';

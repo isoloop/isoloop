@@ -44,7 +44,8 @@ export function createPane(root: HTMLElement, id: string, name: string, kernel: 
     paint(s) {
       if (!s) return;
       restarts.textContent = s.restarts ? `restarts: ${s.restarts}` : '';
-      const crashed = s.state === 'crashed';
+      // Between a crash and the respawn, the supervisor is `restarting` with the error kept.
+      const crashed = s.state === 'crashed' || (s.state === 'restarting' && s.error !== undefined);
       pane.classList.toggle('is-crashed', crashed);
       if (crashed) {
         status.className = 'status crashed';
@@ -59,6 +60,9 @@ export function createPane(root: HTMLElement, id: string, name: string, kernel: 
       } else if (s.state === 'running') {
         status.className = 'status';
         status.textContent = `loop ok · lag ${Math.round(s.lagMs)}ms`;
+      } else if (s.state === 'failed') {
+        status.className = 'status crashed';
+        status.textContent = 'failed';
       } else {
         status.className = 'status';
         status.textContent = 'starting';
