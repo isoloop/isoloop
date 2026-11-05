@@ -15,6 +15,14 @@ async function open(page: Page, query = ''): Promise<void> {
   await Promise.all(
     ALL.map((id) => expect(status(page, id)).toContainText('loop ok', { timeout: 10_000 })),
   );
+  // Every first render has been painted: nothing left in any compositor queue.
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.kernel.isolates().every((s) => (s.surface?.queued ?? 0) === 0 && s.surface),
+      ),
+    )
+    .toBe(true);
   // Every state change from here on, per isolate.
   await page.evaluate(() => {
     const log: { id: string; state: string }[] = [];
