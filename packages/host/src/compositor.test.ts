@@ -204,6 +204,38 @@ describe('compositor host calls (after)', () => {
   });
 });
 
+describe('compositor styles', () => {
+  it('adopts a patch’s stylesheets just before its batch, and a restart drops them', () => {
+    const { frames, compositor, attach } = setup();
+    const target = document.createElement('div');
+    document.body.append(target);
+    targets.push(target);
+    let sheetsAtApply = -1;
+    const shadowOf = () => target.querySelector('iso-surface')?.shadowRoot;
+    compositor.attach(
+      'S',
+      target,
+      {
+        fmt: 'fake@1',
+        mount() {},
+        apply() {
+          sheetsAtApply = shadowOf()?.adoptedStyleSheets.length ?? -1;
+          return true;
+        },
+        unmount() {},
+      },
+      () => {},
+    );
+    attach('other');
+    compositor.enqueue('S', 1, ['p { color: red }', 'b { color: blue }']);
+    expect(shadowOf()?.adoptedStyleSheets).toHaveLength(1); // the shell only
+    frames.tick();
+    expect(sheetsAtApply).toBe(3);
+    compositor.reset('S', fakeBridge('S', [], frames.clock));
+    expect(shadowOf()?.adoptedStyleSheets).toHaveLength(1);
+  });
+});
+
 describe('compositor stop and restart', () => {
   it('stopping an isolate drops its queue', () => {
     const { frames, log, compositor, attach } = setup();

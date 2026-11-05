@@ -89,7 +89,8 @@ export interface Compositor {
     bridge: HostRenderBridge,
     send: (e: SerializedEvent) => void,
   ): void;
-  enqueue(id: string, batch: unknown): void;
+  /** Queues a batch; `styles` are adopted into the shadow root just before it applies (design §4.8). */
+  enqueue(id: string, batch: unknown, styles?: readonly string[]): void;
   /**
    * Runs `fn` in a frame, once every batch queued before it has applied
    * (host calls, design §4.7). Dropped with the queue on restart or stop.
@@ -107,7 +108,7 @@ export interface Compositor {
 }
 
 type Queued =
-  | { k: 'batch'; batch: unknown }
+  | { k: 'batch'; batch: unknown; styles?: readonly string[] }
   | { k: 'call'; fn: (surface: { host: HTMLElement; bridge: HostRenderBridge }) => void };
 
 type Surface = {
@@ -122,6 +123,8 @@ type Surface = {
   rejected: number;
   dropped: number;
   lastFrameMs: number;
+  /** The isolate's own stylesheets, after the shell and the kernel's. */
+  sheets: CSSStyleSheet[];
 };
 
 export function createCompositor(opts: CompositorOptions = {}): Compositor {
@@ -165,6 +168,7 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
         }
         s.queue.shift();
         const t0 = now();
+        if (next.k === 'batch' && next.styles?.length) adopt(s, next.styles);
         if (next.k === 'batch' && s.bridge.apply(next.batch)) s.applied++;
         else s.rejected++;
         spent.set(s, (spent.get(s) ?? 0) + now() - t0);
@@ -177,6 +181,16 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
 
   const finish = (spent: Map<Surface, number>): void => {
     for (const [s, ms] of spent) s.lastFrameMs = ms;
+  };
+
+  /** Isolate CSS lives in the shadow root only, so it can't leak out; host tokens inherit in as custom properties. */
+  const adopt = (s: Surface, texts: readonly string[]): void => {
+    for (const text of texts) {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(text);
+      s.sheets.push(sheet);
+    }
+    s.shadow.adoptedStyleSheets = [shell(), ...styles, ...s.sheets];
   };
 
   const schedule = (): void => {
@@ -213,13 +227,16 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
         rejected: 0,
         dropped: 0,
         lastFrameMs: 0,
+        sheets: [],
       });
     },
 
-    enqueue(id, batch) {
+    enqueue(id, batch, sheetTexts) {
       const s = surfaces.get(id);
       if (!s) return;
-      s.queue.push({ k: 'batch', batch });
+      s.queue.push(
+        sheetTexts?.length ? { k: 'batch', batch, styles: sheetTexts } : { k: 'batch', batch },
+      );
       schedule();
     },
 
@@ -235,6 +252,8 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
       if (!s) return;
       s.dropped += s.queue.filter((q) => q.k === 'batch').length;
       s.queue.length = 0;
+      s.sheets = [];
+      s.shadow.adoptedStyleSheets = [shell(), ...styles];
       s.bridge.unmount();
       s.bridge = bridge;
       bridge.mount(s.shadow, s.send);

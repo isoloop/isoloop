@@ -9,6 +9,7 @@ import {
   install,
   ISOLOOP_DOM_FMT,
   WNode,
+  type DomBatch,
   type WElement,
   type WorkerDom,
 } from '@isoloop/dom/worker';
@@ -26,6 +27,8 @@ export type Render = {
   receive(event: SerializedEvent): void;
   /** The id the host knows a node by, as host calls send it; `undefined` for anything else. */
   idOf(node: unknown): string | undefined;
+  /** Adds stylesheets to the surface; they travel with the next patch (design §4.8). */
+  styles(css: string | readonly string[]): void;
 };
 
 /**
@@ -33,14 +36,39 @@ export type Render = {
  * as that global's `document` and DOM classes, which frameworks need.
  */
 export function createRender(post: (msg: IsolateToHost) => void, scope?: object): Render {
+  let pendingStyles: string[] = [];
+  let stylesScheduled = false;
+  const postPatch = (batch: DomBatch): void => {
+    const styles = pendingStyles;
+    pendingStyles = [];
+    post({
+      v: 1,
+      t: 'patch',
+      p:
+        styles.length > 0
+          ? { fmt: ISOLOOP_DOM_FMT, batch, styles }
+          : { fmt: ISOLOOP_DOM_FMT, batch },
+    });
+  };
   const dom = createDom({
-    onBatch: (batch) => post({ v: 1, t: 'patch', p: { fmt: ISOLOOP_DOM_FMT, batch } }),
+    onBatch: postPatch,
     schedule: (flush) => queueMicrotask(flush),
   });
   if (scope) install(dom, scope);
   return {
     root: dom.root,
     dom,
+    styles(css) {
+      pendingStyles.push(...(typeof css === 'string' ? [css] : css));
+      if (stylesScheduled) return;
+      stylesScheduled = true;
+      queueMicrotask(() => {
+        stylesScheduled = false;
+        dom.flush();
+        // Styles with no DOM change still need a patch to travel in.
+        if (pendingStyles.length > 0) postPatch([]);
+      });
+    },
     idOf: (node) =>
       node instanceof WNode && node.isConnected ? String(dom.idOf(node)) : undefined,
     receive(e) {

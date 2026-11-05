@@ -42,7 +42,8 @@ export type HostToIsolate =
 export type IsolateToHost =
   /** The isolate's half of the handshake: what it actually runs. */
   | Envelope<'ready', { runtime: string; adapter: string; renderFmt: string }>
-  | Envelope<'patch', { fmt: string; batch: unknown }>
+  /** `styles`: stylesheets the isolate added since its last patch, applied before `batch` (design §4.8). */
+  | Envelope<'patch', { fmt: string; batch: unknown; styles?: string[] }>
   | Envelope<'call', { method: HostMethod; args: unknown[] }>
   | Envelope<'beat', { lagMs: number; heapBytes?: number }>
   | Envelope<'error', ErrorPayload>

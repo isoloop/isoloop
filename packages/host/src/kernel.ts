@@ -167,6 +167,13 @@ const SURFACE_FMTS: readonly string[] = [ISOLOOP_DOM_FMT, LEGACY_VDOM];
 
 const DEFAULT_GRANTS: Grants = { publish: [], subscribe: [] };
 
+/** Stylesheet texts from a patch; anything else is ignored. Capped so one patch can't flood the root. */
+function stylesOf(x: unknown): string[] | undefined {
+  if (!Array.isArray(x)) return undefined;
+  const texts = x.filter((t): t is string => typeof t === 'string').slice(0, 64);
+  return texts.length > 0 ? texts : undefined;
+}
+
 /** `scrollIntoView` options from an isolate, keeping only what the DOM accepts. */
 function scrollOptions(x: unknown): ScrollIntoViewOptions {
   const out: ScrollIntoViewOptions = {};
@@ -444,7 +451,7 @@ export function createKernel(config: KernelConfig): Kernel {
           return;
         case 'patch':
           if (slot.fmt !== undefined && slot.fmt !== 'none' && msg.p.fmt === slot.fmt)
-            compositor.enqueue(id, msg.p.batch);
+            compositor.enqueue(id, msg.p.batch, stylesOf(msg.p.styles));
           else slot.dropped++;
           return;
         case 'error':

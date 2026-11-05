@@ -311,7 +311,7 @@ interface HostRenderBridge {
 
 ### 4.8 Styles
 
-An isolate sends stylesheet text in a patch-side side channel (`styles: string[]`). The compositor turns each into a `CSSStyleSheet` and assigns it to `shadowRoot.adoptedStyleSheets`. Host design tokens pass through CSS custom properties, which inherit through the shadow boundary.
+An isolate calls `ctx.styles(css)`, and the stylesheet text travels with its next patch in a side channel (`patch.styles: string[]`, the sheets added since the last patch; a styles-only change sends an empty batch). The compositor turns each into a `CSSStyleSheet` just before that batch applies and adopts it after the shell's and the kernel's sheets (`KernelConfig.styles`). A restart drops the isolate's sheets. Host design tokens pass through CSS custom properties, which inherit through the shadow boundary. Headless isolates' `styles()` is a no-op.
 
 ## 5. `@isoloop/runtime`
 
