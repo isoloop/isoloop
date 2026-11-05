@@ -1,14 +1,36 @@
 /*
  * Owns every surface and is the only code that writes to them (design §4.4).
- * M0: one rAF per frame that applies every queued batch, with no frame budget
- * yet. Each surface is an <iso-surface> shadow host with the kernel's
+ * One rAF per frame applies queued batches round-robin across isolates,
+ * starting at a rotating index, while the frame budget lasts. The first batch
+ * of a frame always applies, so a frame does at most budget + one batch of
+ * work (I8). Batches are never split; leftovers roll to the next frame. Each surface is an <iso-surface> shadow host with the kernel's
  * stylesheets adopted, and a shell the isolate can't touch: a busy overlay
  * and a fallback slot, kept across restarts.
  */
 import type { SerializedEvent } from '@isoloop/protocol';
 import type { HostRenderBridge } from './render/bridge';
 
-export type SurfaceStats = { queued: number; applied: number; rejected: number };
+export type SurfaceStats = {
+  /** Batches waiting for a frame. */
+  queued: number;
+  applied: number;
+  /** Batches the bridge refused as malformed. */
+  rejected: number;
+  /** Batches dropped unapplied by a restart. */
+  dropped: number;
+  /** Milliseconds spent applying this isolate's batches in the last frame it had work. */
+  lastFrameMs: number;
+};
+
+export type CompositorOptions = {
+  /** Adopted into every surface's shadow root. */
+  styles?: readonly CSSStyleSheet[];
+  /** DOM work per frame, in ms. Default 8 (design §9). */
+  frameBudgetMs?: number;
+  /** For tests: a fake clock and frame scheduler. */
+  now?: () => number;
+  requestFrame?: (fn: () => void) => void;
+};
 
 /** What a failed isolate's fallback shows (design §4.3). */
 export type FallbackInfo = {
@@ -89,24 +111,61 @@ type Surface = {
   queue: unknown[];
   applied: number;
   rejected: number;
+  dropped: number;
+  lastFrameMs: number;
 };
 
-export function createCompositor(styles: readonly CSSStyleSheet[] = []): Compositor {
+export function createCompositor(opts: CompositorOptions = {}): Compositor {
+  const {
+    styles = [],
+    frameBudgetMs = 8,
+    now = () => performance.now(),
+    requestFrame = (fn) => {
+      requestAnimationFrame(fn);
+    },
+  } = opts;
   const surfaces = new Map<string, Surface>();
-  let raf = 0;
+  let scheduled = false;
+  let rotate = 0;
 
   const frame = (): void => {
-    raf = 0;
-    for (const s of surfaces.values()) {
-      for (const batch of s.queue.splice(0)) {
-        if (s.bridge.apply(batch)) s.applied++;
+    scheduled = false;
+    const order = [...surfaces.values()];
+    if (order.length === 0) return;
+    const start = rotate++ % order.length;
+    const frameStart = now();
+    const spent = new Map<Surface, number>();
+    let appliedAny = false;
+    // Round-robin, one batch per isolate per round, so a chatty isolate can't
+    // use up the budget before the others get a turn.
+    for (let progress = true; progress;) {
+      progress = false;
+      for (let i = 0; i < order.length; i++) {
+        const s = order[(start + i) % order.length];
+        if (!s || s.queue.length === 0) continue;
+        if (appliedAny && now() - frameStart >= frameBudgetMs) {
+          schedule();
+          return finish(spent);
+        }
+        const t0 = now();
+        if (s.bridge.apply(s.queue.shift())) s.applied++;
         else s.rejected++;
+        spent.set(s, (spent.get(s) ?? 0) + now() - t0);
+        appliedAny = true;
+        progress = true;
       }
     }
+    finish(spent);
+  };
+
+  const finish = (spent: Map<Surface, number>): void => {
+    for (const [s, ms] of spent) s.lastFrameMs = ms;
   };
 
   const schedule = (): void => {
-    if (!raf) raf = requestAnimationFrame(frame);
+    if (scheduled) return;
+    scheduled = true;
+    requestFrame(frame);
   };
 
   return {
@@ -135,6 +194,8 @@ export function createCompositor(styles: readonly CSSStyleSheet[] = []): Composi
         queue: [],
         applied: 0,
         rejected: 0,
+        dropped: 0,
+        lastFrameMs: 0,
       });
     },
 
@@ -148,6 +209,7 @@ export function createCompositor(styles: readonly CSSStyleSheet[] = []): Composi
     reset(id, bridge) {
       const s = surfaces.get(id);
       if (!s) return;
+      s.dropped += s.queue.length;
       s.queue.length = 0;
       s.bridge.unmount();
       s.bridge = bridge;
@@ -177,7 +239,15 @@ export function createCompositor(styles: readonly CSSStyleSheet[] = []): Composi
 
     stats(id) {
       const s = surfaces.get(id);
-      return s && { queued: s.queue.length, applied: s.applied, rejected: s.rejected };
+      return (
+        s && {
+          queued: s.queue.length,
+          applied: s.applied,
+          rejected: s.rejected,
+          dropped: s.dropped,
+          lastFrameMs: s.lastFrameMs,
+        }
+      );
     },
   };
 }

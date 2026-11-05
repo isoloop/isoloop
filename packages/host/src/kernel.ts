@@ -51,6 +51,8 @@ export type KernelConfig = {
   };
   /** Adopted into every surface's shadow root. */
   styles?: readonly CSSStyleSheet[];
+  /** DOM work per frame; default 8 ms. The first batch of a frame always applies (I8). */
+  compositor?: { frameBudgetMs: number };
 };
 
 export type IsolateManifest = {
@@ -204,7 +206,10 @@ export function createKernel(config: KernelConfig): Kernel {
   };
   const budget = config.workers.budget ?? 32;
   let warnedBudget = false;
-  const compositor = createCompositor(config.styles);
+  const compositor = createCompositor({
+    ...(config.styles ? { styles: config.styles } : {}),
+    ...(config.compositor ? { frameBudgetMs: config.compositor.frameBudgetMs } : {}),
+  });
 
   const emit = <E extends KernelEvent>(event: E, data: KernelEvents[E]): void => {
     for (const fn of listeners[event]) fn(data);
