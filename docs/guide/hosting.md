@@ -8,16 +8,41 @@ What the page that runs Isoloop, and the servers that serve isolates, need to se
 2. The bootstrap `import()`s the isolate module at `manifest.src`. That URL can be on another origin, such as a CDN.
 3. The isolate replies `ready` within `heartbeat.readyTimeoutMs` (10 s by default), or it crashes with reason `ready-timeout`.
 
+## The bus worker and the contracts module
+
+The bus runs in its own worker, which the kernel starts before any isolate ([ADR 0005](../adr/0005-bus-topology-message-channels.md)). It needs two URLs, given together:
+
+- **`workers.bus`:** the bus worker bundle, `bus-worker.js` from `@isoloop/bus/worker`. Like the bootstrap, it's a module worker, so the host app serves it from its own origin.
+- **`contracts.url`:** the contracts module ([ADR 0003](../adr/0003-schema-format-standard-schema.md)). The bus worker `import()`s it to get the topic schemas. The host imports the same module for `contracts.list`. It can be on another origin, with the same CORS headers as an isolate module.
+
+Give both or neither. One without the other makes `createKernel` throw `invalid_config`. With neither there is no bus: isolates still run, but `kernel.publish` rejects with `bus_unavailable`.
+
+In [four-loops](../../examples/four-loops/src/main.ts) with Vite, both bundles come in as `?worker&url`, and the contracts module comes in through the example's `?isolate` plugin, so it's emitted as its own chunk:
+
+```ts
+import busWorker from '@isoloop/bus/worker?worker&url';
+import bootstrap from '@isoloop/runtime/bootstrap?worker&url';
+import list from './contracts';
+import contractsUrl from './contracts?isolate';
+
+const kernel = createKernel({
+  contracts: { url: contractsUrl, list },
+  workers: { isolateBootstrap: bootstrap, bus: busWorker },
+});
+```
+
+If the contracts module fails to load or is invalid (`contracts_failed`, `contracts_invalid`, `contracts_mismatch`, `reserved_topic`), it isn't retried. The kernel emits `bus:failed { code }`, every isolate fails with reason `bus-failed`, and later `spawn` calls throw `bus_failed`.
+
 ## Content Security Policy
 
 | Directive | Needs | Why |
 | --- | --- | --- |
-| `worker-src` | `'self'` | The bootstrap is a same-origin module worker. No `blob:` is needed. |
-| `script-src` | `'self'` plus every origin that serves isolates | The bootstrap `import()`s isolate modules. |
+| `worker-src` | `'self'` | The bootstrap and the bus worker are same-origin module workers. No `blob:` is needed. |
+| `script-src` | `'self'` plus every origin that serves isolates or the contracts module | The bootstrap `import()`s isolate modules; the bus worker `import()`s the contracts. |
 | `connect-src` | The same origins as `script-src`, plus any API the isolates call | `fetch` from inside a worker. |
 | `style-src` | `'self'` | Stylesheets are adopted as `CSSStyleSheet` objects, so `'unsafe-inline'` isn't needed. |
 
-A worker isn't governed by the page's policy. It gets the policy sent with its own script, so the bootstrap's response must carry these directives too. Sending one policy on every response from the host app covers both.
+A worker isn't governed by the page's policy. It gets the policy sent with its own script, so the responses for the bootstrap and the bus worker must carry these directives too. Sending one policy on every response from the host app covers all of them.
 
 For example, with isolates on `https://cdn.example.com`:
 

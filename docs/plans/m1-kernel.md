@@ -1,5 +1,7 @@
 # M1: Kernel
 
+**Status:** done. Write-up: [Crashing an isolate on purpose](../posts/m1-crashing-an-isolate.md).
+
 **Goal:** the real host kernel: loader, supervisor with one-for-one restarts, heartbeats, and a frame-budgeted compositor on our own render bridge, `isoloop-dom@1` ([ADR 0010](../adr/0010-own-render-bridge.md)).
 
 **Done when** (RFC 0001): a blocked or crashed isolate never affects the others, proven by Playwright tests.
@@ -8,7 +10,7 @@
 
 **In:** design sections [§4](../design/system-design.md#4-isoloophost) and [§5](../design/system-design.md#5-isoloopruntime) except the bus client: Loader, Supervisor state machine, Compositor with budget, `RenderBridge` on our own DOM subset ([ADR 0010](../adr/0010-own-render-bridge.md)), component registry, EventBridge, host-owned inputs, host calls (`measure`, `focus`, `scrollIntoView`), Shadow DOM styles, and a vanilla isolate API. `four-loops` moves onto all of it.
 
-**Out:** the log bus (M2; `legacy-bus` stays until then), adapters (M3), `requestCanvas` and `navigate` (M3), devtools (M4).
+**Out:** the log bus (M2; `legacy-bus` stays until then), adapters (M3), `requestCanvas` (M3), `navigate` (landed in M2 task 10, [#46](https://github.com/isoloop/isoloop/pull/46)), devtools (M4).
 
 ## Tasks
 
