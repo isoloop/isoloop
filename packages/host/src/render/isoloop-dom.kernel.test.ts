@@ -70,6 +70,29 @@ describe('isoloop-dom in the kernel', () => {
     await waitFor(() => shadow()?.activeElement === shadow()?.querySelector('input'));
   });
 
+  it('styles: isolate CSS stays in its surface, host design tokens reach in', async () => {
+    const page = document.createElement('p');
+    page.textContent = 'host p';
+    document.body.append(page);
+    document.body.style.setProperty('--brand', 'rgb(0, 0, 255)');
+    try {
+      const { shadow } = spawn(bootstrap, fixture('dom-styles'));
+      await waitFor(() => shadow()?.querySelector('.tok') !== null);
+      const inner = shadow()?.querySelector('p');
+      const tok = shadow()?.querySelector('.tok');
+      if (!inner || !tok) throw new Error('not rendered');
+      await waitFor(() => getComputedStyle(inner).color === 'rgb(255, 0, 0)');
+      expect(getComputedStyle(tok).color).toBe('rgb(0, 0, 255)');
+      // Neither the type selector nor `*` reaches the host page.
+      expect(getComputedStyle(page).color).not.toBe('rgb(255, 0, 0)');
+      expect(getComputedStyle(page).fontWeight).not.toBe('900');
+      // The surface's shell (busy overlay, fallback) keeps its own sheet first.
+      expect(shadow()?.adoptedStyleSheets.length).toBe(3);
+    } finally {
+      document.body.style.removeProperty('--brand');
+    }
+  });
+
   it('an isolate reporting another renderFmt fails with render-fmt-mismatch and is not restarted', async () => {
     const { handle, log } = spawn(worker('../__fixtures__/bogus-fmt-bootstrap.ts'), 'unused');
     await waitFor(() => handle.snapshot().state === 'failed');

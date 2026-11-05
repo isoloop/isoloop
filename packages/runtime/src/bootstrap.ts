@@ -107,7 +107,14 @@ function startLegacy(init: InitPayload, main: Function): void {
 }
 
 /** What `start(ctx)` gets until the vanilla API (task 11) completes it. */
-type StartContext = { id: string; config: unknown; root?: Render['root']; host: HostApi };
+type StartContext = {
+  id: string;
+  config: unknown;
+  root?: Render['root'];
+  host: HostApi;
+  /** Stylesheets for the surface; a no-op when headless. */
+  styles(css: string | readonly string[]): void;
+};
 
 async function startIsolate(
   init: InitPayload,
@@ -128,9 +135,13 @@ async function startIsolate(
   });
   const renderFmt = render ? ISOLOOP_DOM_FMT : 'none';
   post({ v: 1, t: 'ready', p: { runtime: '@isoloop/runtime', adapter: 'vanilla', renderFmt } });
-  const ctx: StartContext = render
-    ? { id: init.isolateId, config: init.config, root: render.root, host: calls.api }
-    : { id: init.isolateId, config: init.config, host: calls.api };
+  const base = {
+    id: init.isolateId,
+    config: init.config,
+    host: calls.api,
+    styles: (css: string | readonly string[]) => render?.styles(css),
+  };
+  const ctx: StartContext = render ? { ...base, root: render.root } : base;
   try {
     await start(ctx);
   } catch (err) {
