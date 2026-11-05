@@ -23,7 +23,7 @@ Placement belongs to the host manifest alone. An isolate module cannot ask for a
 Staging:
 
 - **v1 (M1):** only the own-worker placement runs. `manifest.pool` is part of the types and is validated, but `spawn` rejects it with `pools_unsupported`, so the API shape is fixed and adding pools later breaks nothing.
-- **After M2:** pools are built ([M2c plan](../plans/m2c-worker-pools.md)), headless isolates only at first: the Remote DOM shim installs one global `document` per worker, so visual isolates with `pool` stay rejected until a surface can be scoped per isolate. M2c opens with a benchmark gate: if pooling 20 small headless isolates saves less than about 30 % memory and doesn't start them faster, pools are dropped and this ADR records the result.
+- **After M2:** pools are built ([M2c plan](../plans/m2c-worker-pools.md)), headless isolates only at first: the `isoloop-dom` subset ([ADR 0010](0010-own-render-bridge.md)) installs one global `document` per worker, so visual isolates with `pool` stay rejected until a surface can be scoped per isolate. M2c opens with a benchmark gate: if pooling 20 small headless isolates saves less than about 30 % memory and doesn't start them faster, pools are dropped and this ADR records the result.
 
 Nothing in the public API exposes worker identity:
 

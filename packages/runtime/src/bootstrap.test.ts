@@ -11,7 +11,7 @@ afterEach(() => {
 const fixture = (name: string): string =>
   new URL(`./__fixtures__/${name}.ts`, import.meta.url).href;
 
-function spawn(src: string, protocol = { min: 1, max: 1 }, renderFmt = 'legacy-vdom@1') {
+function spawn(src: string, protocol = { min: 1, max: 1 }, renderFmt = 'isoloop-dom@1') {
   const worker = new Worker(new URL('./bootstrap.ts', import.meta.url), { type: 'module' });
   workers.push(worker);
   const got: Msg[] = [];
@@ -70,9 +70,17 @@ const until = (ok: () => boolean, timeout = 2000): Promise<void> =>
 
 const patches = (got: Msg[]) => got.flatMap((m) => (m.t === 'patch' ? [m.p.batch] : []));
 
+/** The node id of the first node the first patch inserts. */
+const firstId = (got: Msg[]): string => {
+  const batch = patches(got)[0];
+  const insert: unknown = Array.isArray(batch) ? batch[0] : undefined;
+  const node: unknown = Array.isArray(insert) ? insert[2] : undefined;
+  return String(typeof node === 'object' && node !== null ? Reflect.get(node, 'id') : '');
+};
+
 describe('isolate bootstrap', () => {
   it('posts ready, then patch, then beat within 250 ms', async () => {
-    const { got, at } = spawn(fixture('counter'));
+    const { got, at } = spawn(fixture('dom-hello'));
     await until(() => at.has('ready') && at.has('patch') && at.has('beat'), 2000);
     const types = got.map((m) => m.t);
     expect(types.indexOf('ready')).toBeLessThan(types.indexOf('patch'));
@@ -81,42 +89,29 @@ describe('isolate bootstrap', () => {
     expect(got.find((m) => m.t === 'ready')).toEqual({
       v: 1,
       t: 'ready',
-      p: { runtime: '@isoloop/runtime legacy', adapter: 'legacy', renderFmt: 'legacy-vdom@1' },
+      p: { runtime: '@isoloop/runtime', adapter: 'vanilla', renderFmt: 'isoloop-dom@1' },
     });
-    expect(patches(got)[0]).toEqual({ t: 'div', p: { class: 'n' }, c: ['0'] });
-  });
-
-  it('runs a handler on an event and posts the new tree', async () => {
-    const { got, click } = spawn(fixture('counter'));
-    await until(() => patches(got).length === 1);
-    click('inc');
-    click('inc');
-    await until(() => patches(got).some((b) => JSON.stringify(b).includes('"2"')));
-  });
-
-  it('subscribes, publishes, and receives x-deliver', async () => {
-    const { got, send, click } = spawn(fixture('counter'));
-    await until(() => got.some((m) => m.t === 'x-sub'));
-    expect(got.find((m) => m.t === 'x-sub')?.p).toEqual({ topic: 'note' });
-    click('pub');
-    await until(() => got.some((m) => m.t === 'x-pub'));
-    expect(got.find((m) => m.t === 'x-pub')?.p).toEqual({ topic: 'count', value: 0 });
-    send({ v: 1, t: 'x-deliver', p: { topic: 'note', value: 'hi', from: 'D' } });
-    await until(() => patches(got).some((b) => JSON.stringify(b).includes('D: \\"hi\\"')));
   });
 
   it('surfaces a throwing handler as a worker error', async () => {
-    const { errors, click, got } = spawn(fixture('counter'));
-    await until(() => got.some((m) => m.t === 'ready'));
-    click('crash');
+    const { errors, click, got } = spawn(fixture('dom-crash'));
+    await until(() => patches(got).length === 1);
+    click(firstId(got));
     await until(() => errors.length > 0);
     expect(errors[0]).toContain('fixture crash');
   });
 
   it('posts a fatal protocol_mismatch for an unsupported range', async () => {
-    const { got } = spawn(fixture('counter'), { min: 2, max: 3 });
+    const { got } = spawn(fixture('dom-hello'), { min: 2, max: 3 });
     await until(() => got.length > 0);
     expect(got[0]).toMatchObject({ t: 'error', p: { fatal: true, code: 'protocol_mismatch' } });
+    expect(got.some((m) => m.t === 'ready')).toBe(false);
+  });
+
+  it('posts a fatal error for a default export that is a plain function', async () => {
+    const { got } = spawn(fixture('fn-default'));
+    await until(() => got.some((m) => m.t === 'error'));
+    expect(got.find((m) => m.t === 'error')).toMatchObject({ p: { fatal: true } });
     expect(got.some((m) => m.t === 'ready')).toBe(false);
   });
 

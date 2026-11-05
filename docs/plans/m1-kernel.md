@@ -42,7 +42,7 @@
 ### 4b. Bridge conformance suite
 - **Files:** `packages/host/test/render-bridge-conformance.ts`: `runBridgeConformance(makeBridgePair)`, run in Vitest browser mode.
 - Cases: create / update / move / remove nodes, attributes and text; keyed list reorders keep node identity and focus; sanitising (I9); node-id mapping both ways; listener registration and event round-trip; host-owned input rules; styles.
-- Run it against `legacy-vdom` first (some cases, such as keyed reorders, are expected to fail there and are marked as known gaps), then against every new bridge.
+- Run it against `legacy-vdom` first (some cases, such as keyed reorders, are expected to fail there and are marked as known gaps), then against every new bridge. (`legacy-vdom` was deleted after M1.)
 - Moves to `packages/dom/src/testing` (`@isoloop/dom/testing`) with task 5 ([ADR 0011](../adr/0011-dom-package.md)).
 
 ### 5. RenderBridge: `isoloop-dom@1` (isolate and host)
@@ -50,7 +50,7 @@
   - `src/shared/` (record types, `ISOLOOP_DOM_FMT = 'isoloop-dom@1'`), `src/worker/` (the DOM subset from [ADR 0010](../adr/0010-own-render-bridge.md) point 2, the recorder with an `onBatch` hook, `deliver(nodeId, event)`), `src/host/` (the applier with `idFor` / `nodeFor`, event conversion, a required sanitising policy), `src/testing/` (the conformance suite, moved from `packages/host/test`).
   - `tsconfig.{shared,worker,host,testing}.json`, one `lib` each; `typecheck` runs all four. tsdown entries `worker`, `host`, `testing`; no root entry.
   - `package.json` exports `./worker`, `./host`, `./testing`; README marks the package internal.
-  - Wiring: `packages/runtime/src/render/` (microtask schedule, `patch` posting, `ctx.root`) over `@isoloop/dom/worker`; `packages/host/src/render/` (`HostRenderBridge` over `@isoloop/dom/host`, the registry from task 6 as its policy). `legacy-vdom` runs the moved suite.
+  - Wiring: `packages/runtime/src/render/` (microtask schedule, `patch` posting, `ctx.root`) over `@isoloop/dom/worker`; `packages/host/src/render/` (`HostRenderBridge` over `@isoloop/dom/host`, the registry from task 6 as its policy). `legacy-vdom` ran the moved suite until it was deleted after M1.
   - `.oxlintrc.json`: `runtime` may import `@isoloop/dom/worker` only, `host` `@isoloop/dom/host` (tests also `/testing`), `dom` no `@isoloop/*`, and `protocol`, `bus` never `dom`.
 - **Isolate side:** installs the subset as `document` and the DOM globals only when the isolate has a surface, and exposes `ctx.root`.
 - **Fmt check:** a `ready.renderFmt` other than `isoloop-dom@1` (or `'none'` when headless) crashes the isolate with reason `render-fmt-mismatch` and fails it without a restart.
@@ -61,7 +61,7 @@
   - an isolate reporting another `renderFmt` fails with `render-fmt-mismatch` and isn't restarted;
   - a 1,000-node list renders;
   - a batch round-trip leaves identical `innerHTML` on both sides;
-  - Preact and React render a small app into the subset (a smoke test only; the adapters come in M3).
+  - ~~Preact and React render a small app into the subset~~: moved to the M3 adapters, which bring the frameworks in as devDependencies ([should-do](../should-do.md)).
 
 ### 6. Component registry and sanitising
 - **Files:** `packages/host/src/render/registry.ts`.
@@ -86,7 +86,7 @@
 
 ### 11. Vanilla isolate API and four-loops migration
 - `packages/runtime/src/vanilla.ts`: `export default { start(ctx) }` with plain DOM calls on `ctx.root`.
-- Rewrite the four isolates on it and delete the `legacy-vdom` paths from the example (they stay in packages only for benchmarks).
+- Rewrite the four isolates on it and delete the `legacy-vdom` paths from the example. The packages' `legacy-vdom` code and the M0 `h`/`view`/`setState` isolate API were removed after M1.
 - Change the PoC's crash behaviour to the real supervisor (backoff, limit, Failed state) and update the e2e expectations to match.
 
 ### 12. Isolation test suite (the done-criterion)

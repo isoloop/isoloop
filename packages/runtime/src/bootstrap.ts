@@ -2,12 +2,9 @@
 /*
  * Isolate worker entry, built as isolate-bootstrap.js. Waits for `init`,
  * checks the protocol range, starts the heartbeat, then imports the isolate
- * module from `init.src` and starts it. Two module shapes:
- *
- * - a default export function: an M0 legacy isolate (legacy-vdom@1);
- * - a default export `{ start(ctx) }`: rendered with isoloop-dom@1 into
- *   `ctx.root`, the DOM subset installed as `document` when it has a surface.
- *   The full vanilla API (styles, onShutdown, host calls) is M1 task 11.
+ * module from `init.src` and starts it. The module's default export is
+ * `{ start(ctx) }`: rendered with isoloop-dom@1 into `ctx.root`, the DOM
+ * subset installed as `document` when it has a surface.
  *
  * On `shutdown` it says `bye` and closes.
  */
@@ -19,12 +16,8 @@ import {
   type LegacyIsolateToHost,
   type ShutdownReason,
 } from '@isoloop/protocol';
-import { createLegacyIsolate } from './legacy/runtime';
-import { LEGACY_VDOM } from './legacy/vdom';
 
 declare const self: DedicatedWorkerGlobalScope;
-
-const RUNTIME = '@isoloop/runtime legacy';
 
 const post = (msg: IsolateToHost | LegacyIsolateToHost): void => {
   self.postMessage(msg);
@@ -78,10 +71,6 @@ async function boot(init: InitPayload): Promise<void> {
   }
   const main: unknown =
     typeof mod === 'object' && mod !== null && 'default' in mod ? mod.default : undefined;
-  if (typeof main === 'function') {
-    startLegacy(init, main);
-    return;
-  }
   if (typeof main === 'object' && main !== null && 'start' in main) {
     const start: unknown = main.start;
     if (typeof start === 'function') {
@@ -89,30 +78,11 @@ async function boot(init: InitPayload): Promise<void> {
       return;
     }
   }
-  fatal(`${init.src} has no default export: a function, or an object with start(ctx)`);
+  fatal(`${init.src} has no default export with start(ctx)`);
 }
 
 /** Set by a `{ start(ctx) }` isolate: runs its onShutdown handlers. */
 let shutdownHook: ((reason: ShutdownReason) => Promise<void>) | null = null;
-
-const isShutdown = (e: MessageEvent<unknown>): boolean =>
-  isHostToIsolate(e.data) && e.data.t === 'shutdown';
-
-function startLegacy(init: InitPayload, main: Function): void {
-  const runtime = createLegacyIsolate({
-    id: init.isolateId,
-    config: init.config,
-    initial: {},
-    post,
-  });
-  self.addEventListener('message', (e: MessageEvent<unknown>) => {
-    if (!isShutdown(e)) runtime.receive(e.data);
-  });
-  const renderFmt = init.renderFmt === 'none' ? 'none' : LEGACY_VDOM;
-  post({ v: 1, t: 'ready', p: { runtime: RUNTIME, adapter: 'legacy', renderFmt } });
-  // Called untyped: the module's own LegacyIsolate<State> is checked where it's written.
-  Reflect.apply(main, undefined, [runtime.iso]);
-}
 
 async function startIsolate(init: InitPayload, start: (ctx: unknown) => unknown): Promise<void> {
   // Loaded on demand, so a worker's first beat doesn't wait for the DOM subset.

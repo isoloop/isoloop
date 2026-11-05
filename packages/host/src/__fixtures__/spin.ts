@@ -1,11 +1,17 @@
 // Test isolate: renders, gets going, then loops forever, so its heartbeat stops for good.
-type Iso = { view(fn: () => unknown): void; h(tag: string, props: null, ...c: string[]): unknown };
+type Ctx = { root?: Element };
 
-export default function main(iso: Iso): void {
-  iso.view(() => iso.h('span', null, 'spinning soon'));
-  setTimeout(() => {
-    for (;;) {
-      // Never yields.
+export default {
+  start(ctx: Ctx): void {
+    if (ctx.root) {
+      const span = document.createElement('span');
+      span.textContent = 'spinning soon';
+      ctx.root.append(span);
     }
-  }, 300);
-}
+    setTimeout(() => {
+      for (;;) {
+        // Never yields.
+      }
+    }, 300);
+  },
+};

@@ -86,9 +86,8 @@ describe('supervision', () => {
     const a = spawn('A', fixture('throws'));
     await waitFor(() => a.handle.snapshot().state === 'failed');
     expect(log['isolate:crash']).toHaveLength(3);
-    expect(log['isolate:failed']).toMatchObject([
-      { id: 'A', reason: 'error', message: 'start threw' },
-    ]);
+    expect(log['isolate:failed']).toMatchObject([{ id: 'A', reason: 'error' }]);
+    expect(log['isolate:failed'][0]?.message).toContain('start threw');
     const fallback = a.shell('iso-fallback');
     expect(fallback?.hidden).toBe(false);
     expect(fallback?.textContent).toContain('start threw');

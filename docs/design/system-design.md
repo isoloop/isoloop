@@ -142,7 +142,7 @@ export type BusToHost =
 export type InitPayload = {
   isolateId: string;
   protocol: { min: number; max: number };
-  renderFmt: string;              // 'isoloop-dom@1', 'legacy-vdom@1', or 'none' (headless)
+  renderFmt: string;              // 'isoloop-dom@1', or 'none' (headless)
   config: unknown;                // manifest.config, passed through
   grants: Grants;
   busPort: MessagePort;           // transferred
@@ -279,7 +279,7 @@ Applies `isoloop-dom@1` batches from an isolate's worker-side DOM subset ([ADR 0
 
 ```ts
 interface HostRenderBridge {
-  readonly fmt: string;                                    // 'isoloop-dom@1' | 'legacy-vdom@1'
+  readonly fmt: string;                                    // 'isoloop-dom@1'
   mount(root: ShadowRoot, registry: ComponentRegistry): void;
   apply(batch: unknown): void;                             // called only by the Compositor
   idFor(node: Node): string | undefined;                   // for the EventBridge
@@ -296,7 +296,7 @@ interface HostRenderBridge {
 - An event fires only if the isolate registered a listener for `(nodeId, type)` on the target or an ancestor. Those registrations travel in patches.
 - Serialized event: `{ type, target: nodeId, currentTargets: nodeId[], value?, checked?, key?, code?, mods, x?, y?, button? }`.
 - **Default actions:** `submit` and with routing on, plain primary-button clicks on same-origin `<a>` (hash-only included) are always prevented on the host and go to `onNavigate` with `from` set to the isolate; they need no `navigate` grant. Clicks with a modifier key, a non-primary button, `target` other than `_self`, or `download` keep the browser's behaviour ([ADR 0002](../adr/0002-host-owns-routing.md)). Other defaults run normally. An isolate can't call `preventDefault` synchronously, so the docs list this limit.
-- **Host-owned inputs:** `input`, `textarea` and `select` keep their own value and caret on the host. The isolate gets `input` events with the value. A `value` from the isolate is applied only if it differs from the live value and the element isn't focused, or the isolate sets `force`. That avoids caret jumps and the per-keystroke round trip.
+- **Host-owned inputs:** `input`, `textarea` and `select` keep their own value and caret on the host. The isolate gets `input` events with the value. A `value` from the isolate is applied only if it differs from the live value and the element isn't focused. A `force` option for focused inputs is planned for M3, after the adapters ([should-do](../should-do.md)). That avoids caret jumps and the per-keystroke round trip.
 
 ### 4.7 Host calls
 
