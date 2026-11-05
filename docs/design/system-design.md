@@ -267,7 +267,8 @@ Owns every surface in the DOM and is the **only** code that writes to it.
 - When an isolate with a `surface` spawns, it creates `<iso-surface data-isolate-id>` in that target. That element is the shadow host; the shadow root holds the isolate's adopted stylesheets, a busy overlay and a fallback slot. Headless isolates get no surface and never reach the compositor.
 - Each isolate has a FIFO of `PatchBatch`es. `patch` messages enqueue and schedule one `requestAnimationFrame`.
 - **Per frame:** start at a rotating isolate index (round-robin fairness), apply whole batches while `performance.now() - frameStart < frameBudgetMs`, and always apply at least one batch per frame so progress is guaranteed. Batches left over roll to the next frame. Batches are never split, since a batch is one atomic UI state.
-- Exposes `stats()` per isolate (queue depth, ms applied per frame, batches dropped on stop) for devtools and metrics.
+- Within a frame, isolates take turns **one batch at a time**, so a chatty isolate can't spend the whole budget before the others get a turn.
+- Exposes `stats()` per isolate for devtools and metrics: `queued`, `applied`, `rejected` (malformed batches), `dropped` (discarded by a restart; a stop removes the surface and its queue) and `lastFrameMs` (ms applied in the last frame it had work). Tests inject the clock and the frame scheduler.
 - On restart it clears the isolate's queue and its shadow content, then keeps the shell (busy/fallback UI) in place.
 
 ### 4.5 RenderBridge (host side)
