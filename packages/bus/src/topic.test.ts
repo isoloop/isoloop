@@ -137,6 +137,10 @@ describe('contracts()', () => {
       { name: 'x.v1', schema: unchecked(), retention: { kind: 'last-n', n: 0 } },
     ],
     ['time without ms', { name: 'x.v1', schema: unchecked(), retention: { kind: 'time', ms: -1 } }],
+    [
+      'an unknown durability',
+      { name: 'x.v1', schema: unchecked(), retention: last10, durability: 'disk' },
+    ],
   ])('rejects a topic with %s', (_, bad) => {
     // Untyped on purpose: contracts modules are plain JS to the bus worker.
     expect(catchErr(() => Reflect.apply(contracts, undefined, [bad]))).toMatchObject({
@@ -155,6 +159,13 @@ describe('contracts()', () => {
       requestable: true,
     });
     expect(structuredClone(cfg)).toEqual(cfg);
+  });
+
+  it('carries durability, and accepts persistent topics before M2b', () => {
+    const p = topic('p.v1', { schema: unchecked(), retention: last10, durability: 'persistent' });
+    expect(contracts(p).get('p.v1')).toBe(p);
+    expect(topicConfig(p)).toMatchObject({ durability: 'persistent' });
+    expect(topicConfig(a)).not.toHaveProperty('durability');
   });
 });
 

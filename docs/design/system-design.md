@@ -387,6 +387,7 @@ The TS engine stores each topic as a chunked array plus, for compacted topics, a
 
 ```ts
 interface LogStorage {
+  readonly kind: 'memory' | 'opfs';                               // reported in the bus `ready` message
   open(): Promise<StoredState>;                                   // segments + offsets found on disk
   appendBatch(topic: string, encoded: Uint8Array[]): void;        // buffered; group commit every 5 ms / 256 records
   flush(): Promise<void>;                                         // resolves when the batch is durable → publish acked

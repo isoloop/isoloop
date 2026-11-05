@@ -45,6 +45,7 @@
     "@isoloop/protocol": "workspace:*"
   },
   "devDependencies": {
+    "fast-check": "catalog:",
     "typescript": "catalog:",
     "valibot": "catalog:",
     "zod": "catalog:"

@@ -22,6 +22,11 @@ export type TopicDef<In, Out = In, RIn = never, ROut = RIn> = {
   readonly retention: Retention;
   /** Rough structured size limit per record. Default 256 KiB. */
   readonly maxRecordBytes?: number;
+  /**
+   * Default `memory`. `persistent` keeps the topic in OPFS (ADR 0007, M2b);
+   * until then it is accepted and behaves as `memory`, with a console warning.
+   */
+  readonly durability?: 'memory' | 'persistent';
 };
 
 export type AnyTopicDef = TopicDef<any, any, any, any>;
@@ -113,6 +118,9 @@ function problemOf(t: AnyTopicDef): string | undefined {
   if (t.maxRecordBytes !== undefined && !positiveInt(t.maxRecordBytes)) {
     return 'needs a positive integer `maxRecordBytes`';
   }
+  if (t.durability !== undefined && t.durability !== 'memory' && t.durability !== 'persistent') {
+    return "has a durability other than 'memory' or 'persistent'";
+  }
   return undefined;
 }
 
@@ -169,5 +177,6 @@ export function topicConfig(t: AnyTopicDef): TopicConfig {
     requestable: t.reply !== undefined,
   };
   if (t.maxRecordBytes !== undefined) cfg.maxRecordBytes = t.maxRecordBytes;
+  if (t.durability !== undefined) cfg.durability = t.durability;
   return cfg;
 }

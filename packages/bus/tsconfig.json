@@ -3,5 +3,7 @@
   "compilerOptions": {
     "lib": ["ES2022", "WebWorker"]
   },
-  "include": ["src"]
+  // test/ holds suites and helpers other test files run (e.g. the engine
+  // conformance suite); the test files that run them live next to the source.
+  "include": ["src", "test"]
 }
