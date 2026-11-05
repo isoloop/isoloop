@@ -1,56 +1,60 @@
-import type { LegacyIsolate } from '@isoloop/runtime';
-
-type State = { result: string; lastCount: number | null };
+import { defineIsolate } from '@isoloop/runtime';
+import { el } from './dom';
 
 // C · Heavy work
-export default function main(iso: LegacyIsolate<State>): void {
-  const { h } = iso;
-  iso.setState({ result: 'nothing yet', lastCount: null });
-  iso.on('block', () => {
-    const t = performance.now();
-    while (performance.now() - t < 3000) {
-      // Blocks this isolate's event loop, and only this one.
-    }
-    iso.setState({ result: 'blocked for 3000 ms' });
-  });
-  iso.on('primes', () => {
-    const t = performance.now();
-    const N = 30_000_000;
-    const sieve = new Uint8Array(N + 1);
-    let count = 0;
-    for (let i = 2; i <= N; i++) {
-      if (!sieve[i]) {
-        count++;
-        for (let j = i * i; j <= N; j += i) sieve[j] = 1;
+export default defineIsolate<HTMLElement>({
+  start(ctx) {
+    const { root } = ctx;
+    if (!root) return;
+    const result = el('p', { class: 'mono' }, 'nothing yet');
+    const last = el('p', { class: 'muted' });
+    const showLast = (n: number | null) => {
+      last.textContent = `Last count from A: ${n ?? '-'}. Messages sent while blocked queue up and arrive after.`;
+    };
+    showLast(null);
+
+    const block = el('button', { class: 'primary' }, 'Block this loop 3s');
+    block.addEventListener('click', () => {
+      const t = performance.now();
+      while (performance.now() - t < 3000) {
+        // Blocks this isolate's event loop, and only this one.
       }
-    }
-    const ms = Math.round(performance.now() - t);
-    iso.setState({ result: `${count.toLocaleString()} primes below 30M in ${ms} ms` });
-    iso.bus.publish('primes', { count, ms });
-  });
-  iso.on('crash', () => {
-    throw new Error('Federate C threw on purpose');
-  });
-  iso.bus.subscribe('count', (n) => {
-    iso.setState({ lastCount: typeof n === 'number' ? n : null });
-  });
-  iso.view((s) =>
-    h(
-      'div',
-      { class: 'stack' },
-      h(
+      result.textContent = 'blocked for 3000 ms';
+    });
+
+    const primes = el('button', {}, 'Count primes');
+    primes.addEventListener('click', () => {
+      const t = performance.now();
+      const N = 30_000_000;
+      const sieve = new Uint8Array(N + 1);
+      let count = 0;
+      for (let i = 2; i <= N; i++) {
+        if (!sieve[i]) {
+          count++;
+          for (let j = i * i; j <= N; j += i) sieve[j] = 1;
+        }
+      }
+      const ms = Math.round(performance.now() - t);
+      result.textContent = `${count.toLocaleString()} primes below 30M in ${ms} ms`;
+      ctx.bus.publish('primes', { count, ms });
+    });
+
+    const crash = el('button', {}, 'Crash');
+    crash.addEventListener('click', () => {
+      throw new Error('Isolate C threw on purpose');
+    });
+
+    ctx.bus.subscribe('count', (n) => {
+      showLast(typeof n === 'number' ? n : null);
+    });
+    root.append(
+      el(
         'div',
-        { class: 'row' },
-        h('button', { class: 'primary', onclick: 'block' }, 'Block this loop 3s'),
-        h('button', { onclick: 'primes' }, 'Count primes'),
-        h('button', { onclick: 'crash' }, 'Crash'),
+        { class: 'stack' },
+        el('div', { class: 'row' }, block, primes, crash),
+        result,
+        last,
       ),
-      h('p', { class: 'mono' }, s.result),
-      h(
-        'p',
-        { class: 'muted' },
-        `Last count from A: ${s.lastCount ?? '-'}. Messages sent while blocked queue up and arrive after.`,
-      ),
-    ),
-  );
-}
+    );
+  },
+});

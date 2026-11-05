@@ -17,10 +17,10 @@ const $ = (id: string): HTMLElement => {
 const sheet = new CSSStyleSheet();
 sheet.replaceSync(surfaceCss);
 
-// A long first backoff keeps the crash overlay on screen long enough to read, as in the PoC.
+// The real supervisor's defaults: backoff 250 ms × 2ⁿ, and the fourth crash
+// within 60 s fails the isolate, which then shows the kernel's fallback.
 const kernel = createKernel({
   workers: { isolateBootstrap: bootstrap },
-  supervisor: { backoff: { initialMs: 1500 } },
   styles: [sheet],
 });
 

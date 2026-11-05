@@ -162,4 +162,17 @@ describe('isolate bootstrap', () => {
     await new Promise((r) => setTimeout(r, 100));
     expect(got.some((m) => m.t === 'error')).toBe(false);
   });
+
+  it('runs onShutdown handlers before bye, and speaks the M1 bus', async () => {
+    const { got, send } = spawn(fixture('dom-shutdown'), undefined, 'isoloop-dom@1');
+    await until(() => got.some((m) => m.t === 'x-sub'));
+    expect(got.find((m) => m.t === 'x-pub')).toMatchObject({ p: { topic: 'hello', value: 'T' } });
+    send({ v: 1, t: 'x-deliver', p: { topic: 'note', value: 'hi', from: 'D' } });
+    await until(() => JSON.stringify(patches(got)).includes('D: hi'));
+    send({ v: 1, t: 'shutdown', p: { reason: 'stop', graceMs: 1000 } });
+    await until(() => got.some((m) => m.t === 'bye'));
+    const types = got.map((m) => m.t);
+    expect(JSON.stringify(patches(got).at(-1))).toContain('bye: stop');
+    expect(types.lastIndexOf('patch')).toBeLessThan(types.indexOf('bye'));
+  });
 });

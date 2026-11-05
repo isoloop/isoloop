@@ -347,7 +347,9 @@ interface BusClient {
 
 `subscribe` with `autoCommit` (default `true`) commits the record's offset after the handler's promise resolves. That gives at-least-once delivery, so handlers must be idempotent (stated in the docs).
 
-`defineIsolate(fn)` in each adapter wraps a framework component into an `IsolateDefinition`. Vanilla and headless isolates export `{ start(ctx) {} }` directly.
+`defineIsolate(fn)` in each adapter wraps a framework component into an `IsolateDefinition`. Vanilla and headless isolates export `{ start(ctx) {} }` directly; `@isoloop/runtime` exports `defineIsolate<Root>(def)` to type it (`defineIsolate<HTMLElement>` gives `ctx.root` the DOM's types in DOM-typed code). `onShutdown` handlers run when the host sends `shutdown`, and `bye` follows once they settle or the grace runs out (§7.6).
+
+Until M2's bus worker, `ctx.bus` is M0's main-thread bus over the isolate port (`publish(topic, value)`, `subscribe(topic, fn)`); M2 task 9 replaces it with the `BusClient` above, and `keepAwake()` is a no-op until suspension lands in M2.
 
 **Headless isolates** ([ADR 0008](../adr/0008-isolates-and-surfaces.md)) get the same bootstrap, heartbeat, error handling and `BusClient`, but no polyfill and no `root`. `styles()` is a no-op, and the DOM host calls reject with `no_surface`. A typical headless isolate is a store: it subscribes to command topics, keeps state, and publishes snapshots to a compacted topic that visual isolates read with `from: 'earliest'`.
 
