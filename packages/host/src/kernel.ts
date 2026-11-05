@@ -10,7 +10,7 @@ import {
   type HostToIsolate,
   type LegacyHostToIsolate,
 } from '@isoloop/protocol';
-import { createCompositor, type SurfaceStats } from './compositor';
+import { createCompositor, type FallbackRender, type SurfaceStats } from './compositor';
 import { createLegacyBus, type BusDelivery } from './legacy-bus';
 import { load, type LoadedWorker } from './loader';
 import { createLegacyVdomBridge, LEGACY_VDOM } from './render/legacy-vdom';
@@ -56,6 +56,8 @@ export type IsolateManifest = {
   surface?: Element;
   config?: unknown;
   grants?: Grants;
+  /** Renders the fallback shown once the isolate has `failed`. Defaults to a message and a Retry button. */
+  fallback?: FallbackRender;
 };
 
 export type IsolateSnapshot = {
@@ -111,6 +113,8 @@ type Slot = {
 };
 
 const DEFAULT_GRANTS: Grants = { publish: [], subscribe: [] };
+/** How often the supervisor judges heartbeats and timeouts (plan m1-kernel, task 2). */
+const TICK_MS = 50;
 
 export function createKernel(config: KernelConfig): Kernel {
   const everyMs = config.heartbeat?.everyMs ?? 100;
@@ -179,9 +183,24 @@ export function createKernel(config: KernelConfig): Kernel {
           break;
         case 'showBusy':
         case 'hideBusy':
+          compositor.busy(id, fx.k === 'showBusy');
+          break;
         case 'showFallback':
+          compositor.fallback(
+            id,
+            {
+              id,
+              reason: fx.reason,
+              message: fx.message,
+              respawn: () => {
+                if (slots.get(id) === slot) feed(slot, { k: 'respawn' });
+              },
+            },
+            slot.manifest.fallback,
+          );
+          break;
         case 'hideFallback':
-          // The isolate shell's overlays arrive with the supervisor wiring (M1 task 2).
+          compositor.fallback(id, null);
           break;
         case 'emit':
           switch (fx.event) {
@@ -275,6 +294,14 @@ export function createKernel(config: KernelConfig): Kernel {
           message: e.message || 'Unknown error',
         });
     });
+    loaded.worker.addEventListener('messageerror', () => {
+      if (slot.loaded === loaded)
+        feed(slot, {
+          k: 'workerError',
+          at: performance.now(),
+          message: 'A message from the isolate could not be deserialised',
+        });
+    });
     slot.loaded = loaded;
     feed(slot, { k: 'spawned', at: performance.now() });
   };
@@ -282,7 +309,22 @@ export function createKernel(config: KernelConfig): Kernel {
   const tick = setInterval(() => {
     const at = performance.now();
     for (const slot of slots.values()) feed(slot, { k: 'tick', at });
-  }, everyMs);
+  }, TICK_MS);
+
+  // Hidden and frozen tabs (ADR 0001): a hidden page's timers are throttled
+  // and a frozen one runs nothing, so silence there says nothing about an
+  // isolate. Judge nothing while hidden; restart every clock on the way back.
+  const visibility = (): void => {
+    const at = performance.now();
+    for (const slot of slots.values())
+      feed(slot, document.hidden ? { k: 'hidden' } : { k: 'visible', at });
+  };
+  const resumed = (): void => {
+    const at = performance.now();
+    for (const slot of slots.values()) feed(slot, { k: 'visible', at });
+  };
+  document.addEventListener('visibilitychange', visibility);
+  document.addEventListener('resume', resumed);
 
   const get = (id: string): Slot => {
     const slot = slots.get(id);
@@ -317,6 +359,7 @@ export function createKernel(config: KernelConfig): Kernel {
         dropped: 0,
       };
       slots.set(manifest.id, slot);
+      if (document.hidden) feed(slot, { k: 'hidden' });
       if (manifest.surface) {
         compositor.attach(manifest.id, manifest.surface, createLegacyVdomBridge(), (event) => {
           post(slot, { v: 1, t: 'event', p: event });
@@ -360,6 +403,8 @@ export function createKernel(config: KernelConfig): Kernel {
 
     async destroy() {
       clearInterval(tick);
+      document.removeEventListener('visibilitychange', visibility);
+      document.removeEventListener('resume', resumed);
       await Promise.all([...slots.keys()].map((id) => kernel.stop(id)));
     },
   };
