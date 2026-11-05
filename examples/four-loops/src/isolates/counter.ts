@@ -13,9 +13,9 @@ export default defineIsolate<HTMLElement>({
     inc.addEventListener('click', () => {
       n++;
       big.textContent = String(n);
-      ctx.bus.publish('count', n);
+      ctx.legacyBus.publish('count', n);
     });
-    ctx.bus.subscribe('note', (value, from) => {
+    ctx.legacyBus.subscribe('note', (value, from) => {
       note.textContent = `${from} says: ${text(value)}`;
     });
     root.append(

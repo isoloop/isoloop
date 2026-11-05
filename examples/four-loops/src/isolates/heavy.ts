@@ -36,7 +36,7 @@ export default defineIsolate<HTMLElement>({
       }
       const ms = Math.round(performance.now() - t);
       result.textContent = `${count.toLocaleString()} primes below 30M in ${ms} ms`;
-      ctx.bus.publish('primes', { count, ms });
+      ctx.legacyBus.publish('primes', { count, ms });
     });
 
     const hang = el('button', {}, 'Hang');
@@ -52,7 +52,7 @@ export default defineIsolate<HTMLElement>({
       throw new Error('Isolate C threw on purpose');
     });
 
-    ctx.bus.subscribe('count', (n) => {
+    ctx.legacyBus.subscribe('count', (n) => {
       showLast(typeof n === 'number' ? n : null);
     });
     root.append(

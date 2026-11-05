@@ -4,6 +4,7 @@
  * in the compositor.
  */
 import {
+  BusError,
   isIsolateToHost,
   isLegacyIsolateToHost,
   isSystemTopic,
@@ -22,7 +23,6 @@ import {
   type LegacyHostToIsolate,
 } from '@isoloop/protocol';
 import { createBusController, HOST_CONNECTION_PREFIX, type BusController } from './bus/controller';
-import { BusError } from './bus/errors';
 import { createCompositor, type FallbackRender, type SurfaceStats } from './compositor';
 import { missingFeatures } from './features';
 import { createLegacyBus, type BusDelivery } from './legacy-bus';

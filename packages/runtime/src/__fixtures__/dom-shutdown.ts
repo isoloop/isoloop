@@ -10,10 +10,10 @@ const isolate: IsolateDefinition = defineIsolate({
       await new Promise((r) => setTimeout(r, 50));
       root.textContent = `bye: ${reason}`;
     });
-    ctx.bus.subscribe('note', (value, from) => {
+    ctx.legacyBus.subscribe('note', (value, from) => {
       root.textContent = `${from}: ${String(value)}`;
     });
-    ctx.bus.publish('hello', ctx.id);
+    ctx.legacyBus.publish('hello', ctx.id);
   },
 });
 

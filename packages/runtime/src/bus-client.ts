@@ -1,0 +1,292 @@
+/*
+ * The isolate's bus client (design §5, §6.3, ADR 0007). Talks to the bus
+ * worker over the port from `init`, never through the main thread (ADR 0005).
+ *
+ * - `publish` resolves on the broker's `result`, or rejects with a `BusError`.
+ * - `subscribe` runs handlers one record at a time, in order. With
+ *   `autoCommit` (default) it commits once a handler settles, so delivery is
+ *   at least once. A handler that throws stops the subscription's commits:
+ *   the record and those after it are redelivered on the next start.
+ * - On `reattach` (a bus restart) it swaps the port, sends every subscription
+ *   again and re-sends every publish the old bus never answered, in order.
+ */
+import {
+  BusError,
+  isBusToIsolate,
+  type BusRecord,
+  type BusToIsolate,
+  type CallResult,
+  type IsolateToBus,
+  type StartPosition,
+  type TopicRef,
+  type TypedRecord,
+} from '@isoloop/protocol';
+
+export type SubscribeOptions = {
+  /** Default `latest`. */
+  from?: StartPosition;
+  /** Share the topic with other subscribers of the same group: each record goes to one of them. */
+  group?: string;
+  /** Default true: commit each record once its handler settles. */
+  autoCommit?: boolean;
+  /**
+   * A bus restart lost this memory topic (ADR 0007). Clear what was built
+   * from it; records from the new bus follow.
+   */
+  onReset?: () => void;
+};
+
+export interface BusClient {
+  /** Resolves once the broker appended the record; rejects with a `BusError`. */
+  publish<In>(topic: TopicRef<In, any, any, any>, rec: { key?: string; value: In }): Promise<void>;
+  /** Returns the unsubscribe function. */
+  subscribe<Out>(
+    topic: TopicRef<any, Out, any, any>,
+    fn: (r: TypedRecord<Out>) => void | Promise<void>,
+    opts?: SubscribeOptions,
+  ): () => void;
+  /** Topics with a `reply` schema only. Rejects with `timeout` after `timeoutMs` (default 30 s). */
+  request<In, ROut>(
+    topic: TopicRef<In, any, any, ROut>,
+    value: In,
+    opts?: { key?: string; timeoutMs?: number },
+  ): Promise<ROut>;
+  /** Answers a request record delivered to this isolate; the broker checks `value` against the topic's `reply` schema. */
+  reply(record: TypedRecord<unknown>, value: unknown): Promise<void>;
+  /** Commits a record by hand, for `autoCommit: false`. */
+  commit(record: TypedRecord<unknown>): void;
+}
+
+export type BusClientOptions = {
+  /** Unanswered publishes and requests before new ones reject with `bus_unavailable`. Default 1,000. */
+  inboxLimit?: number;
+  /** A handler threw: reported to the host as a non-fatal error. */
+  onError?: (err: unknown) => void;
+};
+
+const check = (r: CallResult): void => {
+  if (!r.ok) throw new BusError(r.error);
+};
+
+/** Default request timeout, the broker's too. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+type Pending = {
+  msg: IsolateToBus & { id: string };
+  settle: (r: CallResult) => void;
+};
+
+type Sub = {
+  topic: string;
+  fn: (r: BusRecord) => void | Promise<void>;
+  opts: SubscribeOptions;
+  /** Records waiting for their handler, in order. */
+  queue: BusRecord[];
+  running: boolean;
+  /** A handler threw: no more commits until the isolate restarts. */
+  stuck: boolean;
+};
+
+export type BusClientHandle = {
+  client: BusClient;
+  /** Swaps to a new bus port after a bus restart. */
+  reattach(port: MessagePort): void;
+};
+
+export function createBusClient(first: MessagePort, o: BusClientOptions = {}): BusClientHandle {
+  const limit = o.inboxLimit ?? 1000;
+  let port = first;
+  let nextId = 0;
+  const pending = new Map<string, Pending>();
+  const subs = new Map<string, Sub>();
+  /** Which topic a delivered record came from, for `reply` and `commit`. */
+  const topicOf = new WeakMap<object, string>();
+
+  const send = (msg: IsolateToBus): void => {
+    port.postMessage(msg);
+  };
+
+  const call = (msg: IsolateToBus): Promise<CallResult> => {
+    if (pending.size >= limit) {
+      return Promise.resolve({
+        ok: false,
+        error: { code: 'bus_unavailable', message: 'Too many bus calls waiting for an answer' },
+      });
+    }
+    const id = `b${++nextId}`;
+    return new Promise((settle) => {
+      const withId = { ...msg, id };
+      pending.set(id, { msg: withId, settle });
+      send(withId);
+    });
+  };
+
+  const commit = (topic: string, offset: number): void => {
+    send({ v: 1, t: 'commit', p: { topic, offset } });
+  };
+
+  const drain = async (sub: Sub): Promise<void> => {
+    if (sub.running) return;
+    sub.running = true;
+    while (sub.queue.length > 0 && subs.get(sub.topic) === sub) {
+      const r = sub.queue.shift();
+      if (!r) break;
+      topicOf.set(r, sub.topic);
+      try {
+        // oxlint-disable-next-line no-await-in-loop -- one record at a time, in order, by design
+        await sub.fn(r);
+      } catch (err) {
+        sub.stuck = true;
+        o.onError?.(err);
+      }
+      if (sub.opts.autoCommit !== false && !sub.stuck) commit(sub.topic, r.offset);
+    }
+    sub.running = false;
+  };
+
+  const sendSubscribe = (sub: Sub): void => {
+    const p: Extract<IsolateToBus, { t: 'subscribe' }>['p'] = {
+      topic: sub.topic,
+      from: sub.opts.from ?? 'latest',
+    };
+    if (sub.opts.group !== undefined) p.group = sub.opts.group;
+    void call({ v: 1, t: 'subscribe', p }).then((r) => {
+      if (!r.ok) o.onError?.(new BusError(r.error));
+    });
+  };
+
+  const receive = (msg: BusToIsolate): void => {
+    switch (msg.t) {
+      case 'result': {
+        const p = msg.re === undefined ? undefined : pending.get(msg.re);
+        if (!p || msg.re === undefined) return;
+        pending.delete(msg.re);
+        p.settle(msg.p);
+        return;
+      }
+      case 'deliver': {
+        const sub = subs.get(msg.p.topic);
+        if (!sub) return;
+        sub.queue.push(...msg.p.records);
+        void drain(sub);
+        return;
+      }
+      case 'reset': {
+        const sub = subs.get(msg.p.topic);
+        if (!sub) return;
+        sub.queue.length = 0;
+        try {
+          sub.opts.onReset?.();
+        } catch (err) {
+          o.onError?.(err);
+        }
+        return;
+      }
+      default: {
+        const never: never = msg;
+        return never;
+      }
+    }
+  };
+
+  const listen = (p: MessagePort): void => {
+    p.addEventListener('message', (e: MessageEvent<unknown>) => {
+      if (port === p && isBusToIsolate(e.data)) receive(e.data);
+    });
+    p.start();
+  };
+  listen(first);
+
+  const client: BusClient = {
+    async publish(topic, rec) {
+      const p: Extract<IsolateToBus, { t: 'publish' }>['p'] = {
+        topic: topic.name,
+        value: rec.value,
+      };
+      if (rec.key !== undefined) p.key = rec.key;
+      check(await call({ v: 1, t: 'publish', p }));
+    },
+
+    subscribe(topic, fn, opts = {}) {
+      subs.get(topic.name)?.queue.splice(0);
+      const sub: Sub = {
+        topic: topic.name,
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the broker validated every record against the topic's schema
+        fn: fn as (r: BusRecord) => void | Promise<void>,
+        opts,
+        queue: [],
+        running: false,
+        stuck: false,
+      };
+      subs.set(topic.name, sub);
+      sendSubscribe(sub);
+      return () => {
+        if (subs.get(topic.name) !== sub) return;
+        subs.delete(topic.name);
+        send({ v: 1, t: 'unsubscribe', p: { topic: topic.name } });
+      };
+    },
+
+    async request(topic, value, opts = {}) {
+      const timeoutMs = opts.timeoutMs ?? REQUEST_TIMEOUT_MS;
+      const p: Extract<IsolateToBus, { t: 'request' }>['p'] = {
+        topic: topic.name,
+        value,
+        timeoutMs,
+      };
+      if (opts.key !== undefined) p.key = opts.key;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<CallResult>((resolve) => {
+        timer = setTimeout(() => {
+          resolve({
+            ok: false,
+            error: { code: 'timeout', message: `No reply on ${topic.name} within ${timeoutMs} ms` },
+          });
+        }, timeoutMs);
+      });
+      const r = await Promise.race([call({ v: 1, t: 'request', p }), timeout]);
+      clearTimeout(timer);
+      check(r);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the broker validated the reply against the topic's reply schema
+      return (r as { value: unknown }).value as never;
+    },
+
+    async reply(record, value) {
+      const topic = topicOf.get(record);
+      if (topic === undefined)
+        throw new Error('reply: this record was not delivered to this isolate');
+      check(await call({ v: 1, t: 'reply', p: { topic, offset: record.offset, value } }));
+    },
+
+    commit(record) {
+      const topic = topicOf.get(record);
+      if (topic === undefined)
+        throw new Error('commit: this record was not delivered to this isolate');
+      commit(topic, record.offset);
+    },
+  };
+
+  return {
+    client,
+    reattach(next) {
+      const old = port;
+      port = next;
+      old.close();
+      listen(next);
+      const unanswered = [...pending.values()];
+      for (const p of unanswered) {
+        if (p.msg.t !== 'subscribe') continue;
+        // Superseded by the subscribe sent below.
+        pending.delete(p.msg.id);
+        p.settle({ ok: true, value: null });
+      }
+      // Subscriptions first, then everything the old bus never answered, in
+      // the order it was sent. Its memory log is gone, so nothing duplicates.
+      for (const sub of subs.values()) {
+        sub.queue.length = 0;
+        sendSubscribe(sub);
+      }
+      for (const p of unanswered) if (p.msg.t !== 'subscribe') send(p.msg);
+    },
+  };
+}

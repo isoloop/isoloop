@@ -16,10 +16,10 @@ export default defineIsolate<HTMLElement>({
       lines.length = Math.min(lines.length, 5);
       log.replaceChildren(...lines.map((l) => el('li', {}, l)));
     };
-    ctx.bus.subscribe('count', (n, from) => {
+    ctx.legacyBus.subscribe('count', (n, from) => {
       push(`${from} count = ${text(n)}`);
     });
-    ctx.bus.subscribe('primes', (p, from) => {
+    ctx.legacyBus.subscribe('primes', (p, from) => {
       if (isPrimes(p)) push(`${from} primes = ${p.count} (${p.ms} ms)`);
     });
 
@@ -28,7 +28,7 @@ export default defineIsolate<HTMLElement>({
     const send = async () => {
       const draft = input.value;
       if (!draft.trim()) return;
-      ctx.bus.publish('note', draft);
+      ctx.legacyBus.publish('note', draft);
       push(`me → note: ${draft}`);
       // The host owns a focused input's value (design §4.6), so focus moves off
       // the input before it's cleared. Until an isolate can force a value,

@@ -2,7 +2,7 @@
 // Typed structurally: host may not import @isoloop/runtime.
 type Ctx = {
   root?: Element;
-  bus: {
+  legacyBus: {
     publish(topic: string, value: unknown): void;
     subscribe(topic: string, fn: (value: unknown, from: string) => void): void;
   };
@@ -33,7 +33,7 @@ export default {
       count,
       button('inc', () => {
         show(n + 1);
-        ctx.bus.publish('count', n);
+        ctx.legacyBus.publish('count', n);
       }),
       button('crash', () => {
         throw new Error('fixture crash');
@@ -46,9 +46,9 @@ export default {
       }),
     );
     root.append(wrap);
-    ctx.bus.subscribe('count', (value, from) => {
+    ctx.legacyBus.subscribe('count', (value, from) => {
       show(typeof value === 'number' ? value * 100 : -1);
-      ctx.bus.publish('seen', from);
+      ctx.legacyBus.publish('seen', from);
     });
   },
 };

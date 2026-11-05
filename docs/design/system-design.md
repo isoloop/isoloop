@@ -343,7 +343,7 @@ interface BusClient {
   subscribe<In, Out>(topic: TopicDef<In, Out>, fn: (r: TypedRecord<Out>) => void | Promise<void>,
                opts?: { from?: StartPosition; group?: string; autoCommit?: boolean }): () => void;
   request<In, Out, RIn, ROut>(topic: TopicDef<In, Out, RIn, ROut>, value: In, opts?: { timeoutMs?: number }): Promise<ROut>;   // topics with a reply schema only
-  reply<RIn>(record: TypedRecord<unknown>, value: RIn): Promise<void>;   // validated; invalid / already_replied (ADR 0003)
+  reply(record: TypedRecord<unknown>, value: unknown): Promise<void>;   // validated against the reply schema; invalid / already_replied (ADR 0003)
 }
 ```
 
@@ -351,7 +351,7 @@ interface BusClient {
 
 `defineIsolate(fn)` in each adapter wraps a framework component into an `IsolateDefinition`. Vanilla and headless isolates export `{ start(ctx) {} }` directly; `@isoloop/runtime` exports `defineIsolate<Root>(def)` to type it (`defineIsolate<HTMLElement>` gives `ctx.root` the DOM's types in DOM-typed code). `onShutdown` handlers run when the host sends `shutdown`, and `bye` follows once they settle or the grace runs out (§7.6).
 
-Until M2's bus worker, `ctx.bus` is M0's main-thread bus over the isolate port (`publish(topic, value)`, `subscribe(topic, fn)`); M2 task 9 replaces it with the `BusClient` above, and `keepAwake()` is a no-op until suspension lands in M2.
+`ctx.bus` is the `BusClient` above (M2 task 9), plus `commit(record)` for `autoCommit: false` and an `onReset` option for memory topics lost in a bus restart. Handlers run one record at a time, in order. A handler that throws is reported as a non-fatal `error` and stops that subscription's commits, so the record and those after it come back on the next start. On `reattach` the client sends every subscription again, then every publish and request the old bus never answered, in order; past the inbox limit (1,000 unanswered) calls reject with `bus_unavailable`. M0's main-thread bus stays as `ctx.legacyBus` until four-loops moves to topics (M2 task 11). `keepAwake()` is a no-op until suspension (M2 task 12b).
 
 **Headless isolates** ([ADR 0008](../adr/0008-isolates-and-surfaces.md)) get the same bootstrap, heartbeat, error handling and `BusClient`, but no polyfill and no `root`. `styles()` is a no-op, and the DOM host calls reject with `no_surface`. A typical headless isolate is a store: it subscribes to command topics, keeps state, and publishes snapshots to a compacted topic that visual isolates read with `from: 'earliest'`.
 
