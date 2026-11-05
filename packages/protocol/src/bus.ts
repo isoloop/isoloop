@@ -10,6 +10,11 @@ export type BusRecord = {
   ts: number;
   /** Isolate id of the publisher. */
   producer: string;
+  /**
+   * Set on a `bus.request` record: the caller's isolate id and its request id.
+   * A recipient answers with `reply { topic, offset }` (design §6.3).
+   */
+  req?: { from: string; id: string };
 };
 
 /** Where a new subscription starts reading. */
@@ -21,7 +26,15 @@ export type IsolateToBus =
   | Envelope<'publish', { topic: string; key?: string; value: unknown }>
   | Envelope<'subscribe', { topic: string; from: StartPosition; group?: string }>
   | Envelope<'unsubscribe', { topic: string }>
-  | Envelope<'commit', { topic: string; offset: number }>;
+  | Envelope<'commit', { topic: string; offset: number }>
+  /**
+   * `bus.request`: appended like a publish, with `req` set on the record. `id`
+   * is required; the reply (or `reply_invalid`) comes back as `result { re: id }`.
+   * The broker forgets the request after `timeoutMs`; the caller raises the timeout.
+   */
+  | Envelope<'request', { topic: string; key?: string; value: unknown; timeoutMs: number }>
+  /** Answers the request record at `offset`. With `id` set, the responder gets `result`. */
+  | Envelope<'reply', { topic: string; offset: number; value: unknown }>;
 
 /** Bus port: bus worker → isolate. */
 export type BusToIsolate =
@@ -36,6 +49,8 @@ export const ISOLATE_TO_BUS: MessageTypes<IsolateToBus> = {
   subscribe: true,
   unsubscribe: true,
   commit: true,
+  request: true,
+  reply: true,
 };
 
 export const BUS_TO_ISOLATE: MessageTypes<BusToIsolate> = {
