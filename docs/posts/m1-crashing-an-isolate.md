@@ -33,8 +33,17 @@ M1's promise was one sentence: **a blocked or crashed isolate never affects the 
 
 The budget is an overhead of **≤ 8 ms at p95**, and we're at about 31 ms. Roughly 13 ms is the round trip to the worker and back, which should be closer to 1 ms. The rest is waiting for the next frame. Both are the first things to look at; the bench runs in CI on every PR so the effect of each fix shows up.
 
+> **Update, 2026-11-05:** the [click-to-paint investigation](../investigations/click-to-paint-latency.md) corrected these numbers the same day.
+>
+> - **The round trip takes 0.2 ms.** The 13 ms is Chromium's `DeferRendererTasksAfterInput`, which holds the worker's reply until the next frame after a real click.
+> - **The main-thread figure was biased.** The bench stopped that timer before the frame. Measured to the frame that paints the change, the main thread takes about 14.5 ms in Chromium, so the real overhead is **one frame, about 16.5 ms** (#39).
+> - **The bench now runs in all three engines,** 100 clicks per side (#41). The overhead is about one frame in Chromium and Firefox, for different reasons, and zero in WebKit.
+> - **The budget is now at most one frame at p95 in every engine** ([design §9](../design/system-design.md#9-performance-budgets), #42). Winning the frame back means not waiting for a message; M5 evaluates a `SharedArrayBuffer` render channel for that.
+
 **The WebKit exception:** on the 4-core CI runner, headless WebKit drops from 56 to 40–48 fps while C spins a core. The suite records that number for WebKit instead of asserting it, until we understand why.
 
 ## Next
 
 M2 replaces M0's main-thread bus with the log bus in its own worker (topics, schemas, offsets, replay), so isolates talk to each other without the main thread at all.
+
+*(Done since: M2 landed in #43–#50.)*
