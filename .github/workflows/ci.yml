@@ -1,5 +1,6 @@
-# ADR 0009, rule 12: Ubuntu only, three jobs. `browser` and `e2e` start after
-# `check` passes. Actions are pinned by commit SHA (rule 9), tags in comments.
+# ADR 0009, rule 12: Ubuntu only. Four jobs: `browser`, `e2e` (one per engine)
+# and `bench` start after `check` passes. Actions are pinned by commit SHA
+# (rule 9), tags in comments.
 name: CI
 
 on:

@@ -1,5 +1,7 @@
 # M2: Bus
 
+**Status:** done (tasks 1–13, [#13](https://github.com/isoloop/isoloop/pull/13)–[#53](https://github.com/isoloop/isoloop/pull/53)). Where the build differs from a task, the task has an *As built* note.
+
 **Goal:** the log-based bus in its own worker: topics with schemas, retention, offsets, replay and backpressure, behind the `LogEngine` interface with the TS engine.
 
 **Done when** (RFC 0001): a restarted isolate rebuilds its state from the log in a test.
@@ -49,6 +51,7 @@ Tasks 1–6 are pure TypeScript in Node and can start right after M0, in paralle
 
 ### 8. Host bus controller
 - **Files:** `packages/host/src/bus/controller.ts`. Starts the bus worker before isolates, creates a `MessageChannel` per isolate start, sends `attach` / `detach`, and implements `kernel.publish` / `kernel.subscribe` over the control port. Kernel config gains `contracts: { url, list }`. Contract errors are fatal and not retried: kernel start fails, `bus:failed { code }`, no isolate spawned.
+- *As built:* `contracts` and `workers.bus` are optional but go together; one without the other makes `createKernel` throw `invalid_config`. With neither there is no bus worker, isolates get an unconnected port and `kernel.publish` rejects with `bus_unavailable`. `createKernel` stays synchronous, so a contracts failure can't fail kernel start: `bus:failed { code }` is emitted, every isolate fails with reason `bus-failed`, and later `spawn` calls throw `bus_failed` (ADR 0003 amendment pending). Host `kernel.publish` calls the crashed bus never answered reject with `bus_unavailable`; the isolate `BusClient` re-sends its own (ADR 0007 amendment pending).
 - Supervisor: watch the bus heartbeat; on a crash, start a new bus worker and send every running isolate `reattach { busPort }` instead of restarting it ([ADR 0007](../adr/0007-bus-worker-supervision.md)); restart only isolates with `bus: { onReset: 'restart' }`; restart limit; `bus:crash`, `bus:restart`, `bus:failed` events.
 - **Tests (browser):** a forced bus worker crash (test hook) leaves every isolate in `running` (I11), each memory-topic subscription gets exactly one `reset`, and an `onReset: 'restart'` isolate is restarted.
 
@@ -70,11 +73,12 @@ Tasks 1–6 are pure TypeScript in Node and can start right after M0, in paralle
 - Define `count.v1`, `note.v1` and `primes.v1` topics with Zod schemas in `examples/four-loops/src/contracts.ts`; each isolate declares its grants.
 - Delete the `x-pub`/`x-sub` envelopes and `legacy-bus.ts`.
 - Add a test hook (`window.__isoloop`) that counts main-thread messages per type, for invariant I7.
+- *As built:* the hook is the internal `kernel.debug` (`messages()` for I7, plus `crashBus()` for the bus-crash tests), which four-loops exposes as `window.__isoloop`. Four-loops also gained a headless store isolate S (`store.v1`, compacted) and a Crash button on D.
 
 ### 12. Replay test (the done-criterion)
 - **File:** `e2e/replay.spec.ts`.
 - D (Messages) subscribes to `count.v1` and `note.v1` and keeps a log. *As built:* D reads with `from: 'earliest'`, because with auto-commit a restart from `committed` gets only the records after its last commit, so it couldn't rebuild the log; I6 (committed resume) is covered by the BusClient and broker tests. Click A five times, send two notes, crash D. After restart D shows the same log without new events, and the bus metrics show D replayed from its committed offsets.
-- Also: a headless store isolate that publishes snapshots to a compacted topic is crashed, and a visual isolate reading it with `from: 'earliest'` keeps showing the latest state throughout; the restarted store rebuilds its state from its command topics; I7 holds (no `deliver` seen on the main thread).
+- Also: a headless store isolate that publishes snapshots to a compacted topic is crashed, and a visual isolate reading it with `from: 'earliest'` keeps showing the latest state throughout; the restarted store rebuilds its state from its command topics; I7 holds (no `deliver` seen on the main thread). *As built:* the store is restarted with `kernel.restart('S')` rather than crashed, because a record that crashes it would crash it again on replay.
 
 ### 12b. Opt-in suspension
 - Implements [ADR 0001 § Suspension](../adr/0001-one-worker-per-isolate.md#suspension-opt-in). Lifts the M1 `suspend_unsupported` guard: `manifest.suspend: 'never' | 'when-idle' | { whenIdle: { afterMs } }`, default `'never'`, `'when-idle'` = 60 s.
@@ -85,17 +89,19 @@ Tasks 1–6 are pure TypeScript in Node and can start right after M0, in paralle
 - **Spawn failures:** before retrying a `spawn-failed` isolate, suspend every idle suspendable isolate.
 - **Warnings at registration:** a suspendable isolate subscribing to a `last-n` or `time` topic.
 - **Files:** `packages/host/src/supervisor/` (state, transitions, wake queue), `packages/host/src/bus/controller.ts` (`wake`), `packages/bus/src/broker.ts` (wake for detached-with-offsets subscribers, group leave/rejoin), `packages/runtime/src/keep-awake.ts`.
+- *As built:* on wake only `latest` subscriptions become `committed`; `earliest` and `committed` ones are kept. A bus restart wakes every suspended headless isolate, because the new bus has lost what each was waiting for (ADR 0001 amendment pending). The `last-n`/`time` warning comes from bus metrics, so up to about 1 s after the subscribe. The 10-minute `keepAwake` warning needs `KernelConfig.dev`. Isolate ids starting `isoloop:` are rejected (`invalid_manifest`): the kernel uses that prefix for its own bus connections.
 - **Tests:** unit rows for `running → suspended → loading` and the wake queue order; browser: a `'when-idle'` headless isolate suspends after the idle time and wakes on a publish to its topic, with the missed records replayed in order (I13); a held `keepAwake` prevents suspension, releasing it allows it; a hidden visual isolate is not woken by records but replays them when shown; a `last-n: 3` topic with 5 publishes while suspended delivers a `gap`; 10 suspended visual isolates shown together start at most 4 at a time; an isolate with `suspend: 'never'` is never suspended; a suspended group member leaves and rejoins its group.
 
 ### 13. Throughput bench
 - `bench/throughput`: 10 isolate workers subscribed and one publisher, 200-byte records; report records/s and p95 delivery latency. Report only, used to set the [budget](../design/system-design.md#9-performance-budgets) and as the M5 baseline.
+- *As built* ([#50](https://github.com/isoloop/isoloop/pull/50)): 45.5k records/s delivered on CI (36.7k locally), below the 50k budget, p95 latency 125 ms, mostly queueing behind 500 unanswered publishes. Each publish arrives as its own task, so per-microtask batching only ever batches one record. The budget is left as is; batching across tasks is the [M5b spike](m5b-delivery-batching.md). The bench's contracts have no Zod, so the contracts-load question below wasn't answered.
 
 ## Risks
 
-- **Contracts module loading in the bus worker:** a module that imports large libraries (Zod) adds startup time to the bus worker. Isolates start in parallel (the bus buffers publishes until contracts load, [ADR 0003](../adr/0003-schema-format-standard-schema.md)), but their first publishes wait for it. Measure it in task 13.
+- **Contracts module loading in the bus worker:** a module that imports large libraries (Zod) adds startup time to the bus worker. Isolates start in parallel (the bus buffers publishes until contracts load, [ADR 0003](../adr/0003-schema-format-standard-schema.md)), but their first publishes wait for it. Task 13 didn't measure it with Zod; the [M5b spike](m5b-delivery-batching.md) does.
 - **Structured-clone cost** of large `deliver` batches: watch it in task 13; transferables for `ArrayBuffer` values are already in the protocol.
 - **Group rebalancing** adds complexity for little v1 demand. If task 6 runs long, ship groups as experimental or move them to M3.
 
 ## Demo / write-up
 
-Four-loops with the bus log visible: crash D and watch it replay its history; publish an invalid record from the console and watch the broker reject it. Post: "A Kafka-shaped bus in a Web Worker."
+Four-loops with the bus log visible: crash D and watch it replay its history; publish an invalid record from the console and watch the broker reject it. Post: "A Kafka-shaped bus in a Web Worker" (not written yet).

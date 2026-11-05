@@ -37,10 +37,25 @@ Tools are only called through these root scripts, never as binaries ([ADR 0009](
 | `pnpm typecheck` | TypeScript 7, `tsc --noEmit` in every package and for the root config and e2e files. |
 | `pnpm test` | Vitest: `protocol` and `bus` in Node; `dom`, `host`, `runtime` and the bus worker (`*.browser.test.ts`) in Chromium. `test:node` and `test:browser` run each half. |
 | `pnpm e2e` | Playwright against the built demo in all three engines. `pnpm e2e --project=webkit` runs one. |
+| `pnpm bench` | Node micro-benches (`bench/**/*.bench.ts`, e.g. the log engine), kept out of `pnpm test`. |
+| `pnpm bench:click-to-paint` / `pnpm bench:throughput` | Playwright benches in the browser: click-to-paint latency in all three engines, and bus throughput in Chromium. Report only; results go to `bench-results/`. |
+| `pnpm test:install-browsers` | Installs Chromium, Firefox and WebKit for Playwright. |
 | `pnpm build` | tsdown for the packages, Vite for the demo. |
 | `pnpm dev` | The four-loops demo with Vite's dev server. |
 
 There are no git hooks. CI is the only gate.
+
+## CI
+
+`.github/workflows/ci.yml` runs on every PR and on `main`:
+
+- **`check`:** format check, lint, typecheck, `test:node` and build.
+- **After `check` passes, in parallel:**
+  - **`browser`:** `test:browser` in Chromium.
+  - **`e2e`:** `pnpm e2e` once per engine (Chromium, Firefox, WebKit).
+  - **`bench`:** both Playwright benches. Report only, with no threshold; the numbers are in the job log and the `bench-results` artifact.
+
+The jobs that need browsers install them through `.github/actions/install-browsers`. It retries a stalled install (each attempt has a 5-minute limit) and caches the browser binaries per Playwright version. Each of those jobs has a 30-minute limit. If a job still hangs, cancel the run and re-run the failed jobs.
 
 ## Editors
 
@@ -63,7 +78,7 @@ Other editors need three things:
 
 - **Branches** are `<type>/<slug>`: `feature/`, `fix/`, `chore/` or `docs/`. Milestone tasks lead with the milestone, e.g. `feature/m1-supervisor`.
 - **Every change reaches `main` through a PR**, docs included, squash-merged on GitHub once CI is green (`gh pr merge --squash`). A ruleset on `main` enforces it. The PR title becomes the commit title, so it carries the matching conventional prefix: `feat:`, `fix:`, `chore:` or `docs:`.
-- **Changesets** record user-facing changes from M1 on.
+- **Changesets** record user-facing changes from M1 on: add a file to `.changeset/` by hand. The Changesets tooling and release pipeline arrive with M4 ([plan](docs/plans/m4-devtools-release.md)).
 - **Decisions** made along the way become [ADRs](docs/adr/README.md); ideas for later go in [`docs/would-like.md`](docs/would-like.md).
 
 The full conventions are in the [plans index](docs/plans/README.md#conventions).

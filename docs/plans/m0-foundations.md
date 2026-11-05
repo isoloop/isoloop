@@ -1,5 +1,7 @@
 # M0: Foundations
 
+**Status:** done.
+
 **Goal:** a working monorepo with CI, the wire-protocol types, and the proof of concept ported to TypeScript and running from the repo.
 
 **Done when** (RFC 0001): the four-loops demo runs from the repo and CI is green.
@@ -18,7 +20,7 @@ The proof of concept is a single HTML file ([artifact "Four loops"](https://clau
 | --- | --- |
 | `fed-runtime` script (`h`, `view`, `setState`, `on`, `bus`, heartbeat) | `packages/runtime/src/legacy/runtime.ts` |
 | `build` / `setProps` / `patch` diff on the host | `packages/host/src/render/legacy-vdom.ts` (implements `HostRenderBridge`) |
-| `FederatedContainer` (mount, start, stop, crash, restart, route, rAF render, paintStatus) | split into `host/src/kernel.ts`, `loader.ts`, `supervisor.ts`, `compositor.ts`, `legacy-bus.ts` |
+| `FederatedContainer` (mount, start, stop, crash, restart, route, rAF render, paintStatus) | split into `host/src/kernel.ts`, `loader.ts`, `supervisor.ts`, `compositor.ts`, `legacy-bus.ts` (removed in M2 task 11, [#47](https://github.com/isoloop/isoloop/pull/47)) |
 | Federates A–D | `examples/four-loops/src/isolates/{counter,ticker,heavy,messages}.ts` |
 | Header (fps chip, block-main button, bus log) | `examples/four-loops/src/chrome.ts` |
 
@@ -57,7 +59,7 @@ Keep the PoC's behaviour exactly, including its quirks (the pub/sub doesn't echo
 - **Tests (browser):** a worker built from the bootstrap and a fixture isolate posts `ready`, then `patch`, then `beat` within 250 ms.
 
 ### 6. Host, legacy flavour
-- `kernel.ts` (`createKernel`, `spawn`, `stop`, `on`), `loader.ts` (module worker from the bootstrap URL, `init`), `compositor.ts` (one rAF per frame, no budget yet), `render/legacy-vdom.ts` (the PoC diff behind `HostRenderBridge`), `legacy-bus.ts` (PoC fan-out), `supervisor.ts` (PoC rules: blocked after 400 ms of silence, restart 1.5 s after crash, no limit).
+- `kernel.ts` (`createKernel`, `spawn`, `stop`, `on`), `loader.ts` (module worker from the bootstrap URL, `init`), `compositor.ts` (one rAF per frame, no budget yet), `render/legacy-vdom.ts` (the PoC diff behind `HostRenderBridge`), `legacy-bus.ts` (PoC fan-out, removed in M2 task 11), `supervisor.ts` (PoC rules: blocked after 400 ms of silence, restart 1.5 s after crash, no limit).
 - Shadow DOM per surface from day one, with styles adopted from the example's CSS.
 - **Tests (browser):** spawn a fixture isolate with a surface, a click reaches the isolate, the patch is applied, stop removes the surface.
 
