@@ -5,4 +5,6 @@ export {
   type IsolateRoot,
   type LegacyBus,
 } from './vanilla';
+export type { BusClient, SubscribeOptions } from './bus-client';
+export { BusError } from '@isoloop/protocol';
 export { HostCallError, type HostApi, type ScrollIntoViewOptionsLike } from './host-calls';
