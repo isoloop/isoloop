@@ -35,7 +35,7 @@ Tools are only called through these root scripts, never as binaries ([ADR 0009](
 | `pnpm format` / `pnpm format:check` | oxfmt. Markdown isn't formatted. |
 | `pnpm lint` | oxlint, type-aware. Every rule is an error or off. |
 | `pnpm typecheck` | TypeScript 7, `tsc --noEmit` in every package and for the root config and e2e files. |
-| `pnpm test` | Vitest: `protocol` and `bus` in Node, `host` and `runtime` in Chromium. `test:node` and `test:browser` run each half. |
+| `pnpm test` | Vitest: `protocol` and `bus` in Node; `dom`, `host`, `runtime` and the bus worker (`*.browser.test.ts`) in Chromium. `test:node` and `test:browser` run each half. |
 | `pnpm e2e` | Playwright against the built demo in all three engines. `pnpm e2e --project=webkit` runs one. |
 | `pnpm build` | tsdown for the packages, Vite for the demo. |
 | `pnpm dev` | The four-loops demo with Vite's dev server. |

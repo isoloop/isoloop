@@ -23,6 +23,10 @@
       "@isoloop/source": "./src/testing.ts",
       "types": "./dist/testing.d.ts",
       "import": "./dist/testing.js"
+    },
+    "./worker": {
+      "@isoloop/source": "./src/worker.ts",
+      "import": "./dist/bus-worker.js"
     }
   },
   "publishConfig": {
@@ -34,6 +38,9 @@
       "./testing": {
         "types": "./dist/testing.d.ts",
         "import": "./dist/testing.js"
+      },
+      "./worker": {
+        "import": "./dist/bus-worker.js"
       }
     }
   },

@@ -1,9 +1,14 @@
 import { defineConfig } from 'tsdown';
 
-// Two entries: the package API and `@isoloop/bus/testing`. The bus worker
-// bundle (`bus-worker.js`) arrives with M2 task 7.
-export default defineConfig({
-  entry: ['src/index.ts', 'src/testing.ts'],
-  platform: 'neutral',
-  dts: true,
-});
+export default defineConfig([
+  // The package API and `@isoloop/bus/testing`.
+  { entry: ['src/index.ts', 'src/testing.ts'], platform: 'neutral', dts: true },
+  // The bus worker entry, loaded by URL: one self-contained file, bus-worker.js.
+  {
+    entry: { 'bus-worker': 'src/worker.ts' },
+    platform: 'browser',
+    dts: false,
+    clean: false,
+    deps: { alwaysBundle: ['@isoloop/protocol'] },
+  },
+]);

@@ -13,7 +13,7 @@
     "typecheck": "pnpm -r typecheck && tsc --noEmit",
     "test": "vitest run",
     "test:node": "vitest run --project protocol --project bus",
-    "test:browser": "vitest run --project dom --project host --project runtime",
+    "test:browser": "vitest run --project bus-browser --project dom --project host --project runtime",
     "e2e": "playwright test",
     "bench": "vitest run --config bench/vitest.config.ts",
     "bench:click-to-paint": "playwright test --config bench/click-to-paint/playwright.config.ts",

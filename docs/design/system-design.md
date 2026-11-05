@@ -128,7 +128,7 @@ export type BusToIsolate =
 
 // Control port: host ↔ bus worker
 export type HostToBus =
-  | Envelope<'boot', { contractsUrl: string; topics: TopicConfig[] }>   // topics = cloneable part of contracts.list, for the boot check (ADR 0003)
+  | Envelope<'boot', { contractsUrl: string; topics: TopicConfig[]; heartbeatMs?: number; dev?: boolean }>   // topics = cloneable part of contracts.list, for the boot check (ADR 0003); dev = structuredClone check
   | Envelope<'attach', { isolateId: string; grants: Grants; port: MessagePort }>
   | Envelope<'detach', { isolateId: string; keepOffsets: boolean }>
   | Envelope<'publish', { topic: string; key?: string; value: unknown }>;
@@ -137,7 +137,8 @@ export type BusToHost =
   | Envelope<'beat', { lagMs: number }>
   | Envelope<'wake', { isolateId: string; topic: string }>   // record for a suspended isolate (ADR 0001)
   | Envelope<'metrics', BusMetrics>
-  | Envelope<'error', { message: string; stack?: string; fatal: boolean }>;
+  | Envelope<'result', CallResult>                          // answers a host publish sent with an id
+  | Envelope<'error', { message: string; stack?: string; fatal: boolean; code?: ErrorCode }>;   // fatal + contracts code: kernel start fails, no retry
 
 export type InitPayload = {
   isolateId: string;

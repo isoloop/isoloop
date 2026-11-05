@@ -62,13 +62,31 @@ export type Publisher =
   | { kind: 'host' }
   | { kind: 'kernel' };
 
-type Topic = { def: AnyTopicDef; maxBytes: number; queue: Pending[] };
+type Topic = {
+  def: AnyTopicDef;
+  maxBytes: number;
+  queue: Pending[];
+  /** Records appended since the broker started, and their estimated bytes. */
+  records: number;
+  bytes: number;
+};
+
+/** Cumulative counters for metrics (design §6.3); the bus worker turns them into rates. */
+export type BrokerStats = {
+  topics: { topic: string; records: number; bytes: number }[];
+  /** `lag` is `head − cursor`: records not yet delivered. */
+  subscriptions: { consumer: string; topic: string; lag: number; credit: number }[];
+  /** Rejected publishes and requests, by error code. */
+  rejected: Partial<Record<ErrorCode, number>>;
+};
 
 type Validated = StandardSchemaV1.Result<unknown> | { thrown: unknown };
 
 /** A publish waiting for its (possibly async) validation, in publish order per topic. */
 type Pending = {
   producer: string;
+  /** Estimated size of the published value. */
+  bytes: number;
   key: string | undefined;
   req: { from: Connection; id: string; timeoutMs: number } | undefined;
   done: boolean;
@@ -179,6 +197,7 @@ export class Broker {
   readonly #requests = new Map<string, Request>();
   /** Consumers whose offsets were dropped by `detach { keepOffsets: false }`, per topic. */
   readonly #forgotten = new Set<string>();
+  readonly #rejected: Partial<Record<ErrorCode, number>> = {};
   #dropped = 0;
 
   constructor(opts: BrokerOptions) {
@@ -194,6 +213,8 @@ export class Broker {
         def,
         maxBytes: def.maxRecordBytes ?? DEFAULT_MAX_RECORD_BYTES,
         queue: [],
+        records: 0,
+        bytes: 0,
       });
     }
   }
@@ -201,6 +222,50 @@ export class Broker {
   /** Messages dropped as malformed or unknown (design §3: dropped and counted). */
   get dropped(): number {
     return this.#dropped;
+  }
+
+  /** Counters for the 1 s metrics sample. */
+  stats(): BrokerStats {
+    const subscriptions: BrokerStats['subscriptions'] = [];
+    const groups = new Set<Group>();
+    for (const conn of this.#conns.values()) {
+      for (const sub of conn.subs.values()) {
+        const head = this.#engine.head(sub.topic);
+        const g = sub.group;
+        if (g) {
+          if (groups.has(g)) continue;
+          groups.add(g);
+          const credit = g.members.reduce((n, m) => n + m.credit, 0);
+          subscriptions.push({
+            consumer: g.consumer,
+            topic: g.topic,
+            lag: head - g.cursor,
+            credit,
+          });
+          continue;
+        }
+        subscriptions.push({
+          consumer: conn.isolateId,
+          topic: sub.topic,
+          lag: head - sub.cursor,
+          credit: sub.credit,
+        });
+      }
+    }
+    return {
+      topics: [...this.#topics].map(([topic, t]) => ({
+        topic,
+        records: t.records,
+        bytes: t.bytes,
+      })),
+      subscriptions,
+      rejected: { ...this.#rejected },
+    };
+  }
+
+  /** Retention pass over every topic (`time` and `compacted`); the bus worker runs it every second. */
+  compact(): void {
+    for (const name of this.#topics.keys()) this.#engine.compact(name);
   }
 
   /** Connects an isolate. A second attach for the same id replaces the first. */
@@ -325,8 +390,12 @@ export class Broker {
     key: string | undefined,
     value: unknown,
     req: Pending['req'],
-    settle: (r: CallResult) => void,
+    done: (r: CallResult) => void,
   ): void {
+    const settle = (r: CallResult): void => {
+      if (!r.ok) this.#rejected[r.error.code] = (this.#rejected[r.error.code] ?? 0) + 1;
+      done(r);
+    };
     const system = isSystemTopic(name);
     if (from.kind === 'kernel' ? !system : system) {
       settle(fail('forbidden', `${from.kind} may not publish to ${name}`));
@@ -348,12 +417,14 @@ export class Broker {
       settle(fail('not_requestable', `${name} has no reply schema`));
       return;
     }
-    if (estimateSize(value, topic.maxBytes) > topic.maxBytes) {
+    const bytes = estimateSize(value, topic.maxBytes);
+    if (bytes > topic.maxBytes) {
       settle(fail('too_large', `record is over ${topic.maxBytes} bytes`));
       return;
     }
 
     const pending: Pending = {
+      bytes,
       producer:
         from.kind === 'isolate'
           ? from.isolateId
@@ -399,6 +470,8 @@ export class Broker {
     if (p.key !== undefined) rec = { ...rec, key: p.key };
     if (p.req) rec = { ...rec, req: { from: p.req.from.isolateId, id: p.req.id } };
     const offset = this.#engine.append(name, rec);
+    topic.records++;
+    topic.bytes += p.bytes;
     if (p.req) this.#openRequest(name, offset, p.req);
     p.settle({ ok: true, value: { offset } });
     this.#fanOut(name);
