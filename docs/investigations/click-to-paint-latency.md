@@ -64,17 +64,38 @@ A message from the worker can't be painted until a frame after it arrives. In Ch
 ## Recommendations
 
 1. **Fix the bench (done, #39).** Both sides now end at the frame that paints the change. Chromium overhead p50 / p95 went from 30.7 / 30.9 to 16.3 / 16.5 ms.
-2. **Recalibrate the budget (design §9).** An 8 ms overhead can't be met in Chromium with message passing. Proposal: measure the overhead in frames, with a budget of at most one frame on Chromium and at most 8 ms on Firefox and WebKit, enforced with a tolerance once the bench runs in all three.
-3. **Run the bench in Firefox and WebKit too, report-only** (a small change to `bench/click-to-paint/playwright.config.ts`). Also add a random-phase variant, so the numbers reflect real input timing and not Playwright's frame-aligned clicks.
+2. **Recalibrate the budget (design §9): done.** An 8 ms overhead can't be met in Chromium with message passing. The budget is now at most one frame on Chromium and at most 8 ms on Firefox and WebKit, report-only for now ([design §9](../design/system-design.md#9-performance-budgets)).
+3. **Run the bench in Firefox and WebKit too, report-only: done.** The bench runs in all three engines, in an `aligned` and a `random` variant; see *Follow-up* below for the numbers and what the random variant showed.
 4. **Getting the frame back means not waiting for the message.**
    - **Idea:** the worker writes its batch into a `SharedArrayBuffer`, and the compositor reads it in the very next rAF, with no task to defer. That would win back about 16.7 ms per click in Chromium.
    - **Cost:** it needs cross-origin isolation (COOP/COEP), a shared-memory render channel next to `isoloop-dom@1`, and an ADR.
    - **Where it fits:** M5, the shared-memory engine, already makes the same trade for the bus. It should benchmark a render channel alongside it rather than build one now.
-5. **Check it with real input.** These numbers come from Playwright's synthetic input in headless browsers. One run in headed Chrome with real mouse clicks would confirm that the deferral, and the extra frame, affect real users the same way. A recording with DevTools' Performance panel is enough.
+   - **Tracked:** [M5 plan](../plans/m5-shared-memory-engine.md), item 7.
+5. **Check it with real input.** These numbers come from Playwright's synthetic input in headless browsers. One run in headed Chrome with real mouse clicks would confirm that the deferral, and the extra frame, affect real users the same way. A recording with DevTools' Performance panel is enough. **Open:** this needs a person at a browser.
 6. **Not worth chasing:** the round trip itself (0.2 ms), structured clone, and microtask batching. None costs more than 0.3 ms.
 
 ## Reproducing
 
-- **The bench:** `pnpm bench:click-to-paint` (Chromium, 200 clicks, report-only).
+- **The bench:** `pnpm bench:click-to-paint` (Chromium, Firefox and WebKit; `aligned` and `random` variants; 100 clicks per side; report-only). Results land in `bench-results/click-to-paint-<browser>-<variant>.json`.
 - **The deferral:** add `launchOptions: { args: ['--disable-features=DeferRendererTasksAfterInput'] }` to the bench's Chromium project. The isolate's p50 drops from about 31 ms to about 14 ms.
 - **The segment breakdown:** put back probes at the points listed under Method. They weren't kept, because they touch four files in two packages for a one-off measurement.
+
+## Follow-up: all three engines
+
+Headless, local, 100 clicks per side, p50 / p95 in ms. Firefox and WebKit coarsen timers to whole milliseconds.
+
+| Engine | Variant | Isolate | Main thread | Overhead |
+| --- | --- | --- | --- | --- |
+| Chromium | aligned | 31.0 / 31.4 | 14.5 / 14.8 | 16.5 / 16.6 |
+| Chromium | random | 31.2 / 31.4 | 14.5 / 14.8 | 16.7 / 16.6 |
+| Firefox | aligned | 16 / 18 | 1 / 2 | 15 / 16 |
+| Firefox | random | 16 / 17 | 1 / 2 | 15 / 15 |
+| WebKit | aligned | 14 / 14 | 14 / 14 | 0 / 0 |
+| WebKit | random | 14 / 14 | 14 / 14 | 0 / 0 |
+
+What this adds:
+
+- **The random variant doesn't randomise where clicks land.** Each click waits for a frame plus a random 0–16 ms, yet `pointerdown` still arrives 2–3 ms after a frame (phase p95 3 ms on Chromium, 1.6 ms on Firefox). The engines deliver Playwright's input aligned to their frames, whatever the delay before it. So the frame wait seen here is how these browsers schedule synthetic input, not a quirk of when Playwright sends it. Only real input (recommendation 5) can show the phase real users see. The bench keeps the variant and reports the phase, so a change in input scheduling shows up.
+- **Firefox is over its 8 ms budget by about one frame.** It doesn't defer the patch, but it runs a frame right after input (the main-thread counter paints in 1–2 ms), so a change that arrives from a worker a moment later waits for the next one. The overhead is a frame there too, for a different reason.
+- **WebKit pays no overhead:** it doesn't render a frame straight after input, so the main thread waits a full frame as well, and the worker's patch arrives in time for it.
+
