@@ -46,7 +46,7 @@
 - Moves to `packages/dom/src/testing` (`@isoloop/dom/testing`) with task 5 ([ADR 0011](../adr/0011-dom-package.md)).
 
 ### 5. RenderBridge: `isoloop-dom@1` (isolate and host)
-- **Files:** a new package `packages/dom` (`@isoloop/dom`, [ADR 0011](../adr/0011-dom-package.md)), with no dependencies:
+- **Files:** a new package `packages/dom` (`@isoloop/dom`, [ADR 0011](../adr/0011-dom-package.md)), with no runtime dependencies (`/testing` has an optional peer on Vitest):
   - `src/shared/` (record types, `ISOLOOP_DOM_FMT = 'isoloop-dom@1'`), `src/worker/` (the DOM subset from [ADR 0010](../adr/0010-own-render-bridge.md) point 2, the recorder with an `onBatch` hook, `deliver(nodeId, event)`), `src/host/` (the applier with `idFor` / `nodeFor`, event conversion, a required sanitising policy), `src/testing/` (the conformance suite, moved from `packages/host/test`).
   - `tsconfig.{shared,worker,host,testing}.json`, one `lib` each; `typecheck` runs all four. tsdown entries `worker`, `host`, `testing`; no root entry.
   - `package.json` exports `./worker`, `./host`, `./testing`; README marks the package internal.

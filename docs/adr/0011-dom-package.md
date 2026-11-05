@@ -30,7 +30,7 @@ Other forces:
    - `host` may import `@isoloop/dom/host` only (and `@isoloop/dom/testing` from its tests).
    - `protocol`, `bus` and `codec` never import `dom`.
    - `dom` imports no other `@isoloop/*` package.
-3. **No dependencies at all.** Not even `protocol`. Node ids are plain numbers that `dom` defines. `runtime` and `host` relate them to protocol types if they need to.
+3. **No runtime dependencies; `/testing` has an optional peer on Vitest.** Not even `protocol`. Node ids are plain numbers that `dom` defines. `runtime` and `host` relate them to protocol types if they need to.
 4. **`dom` owns the format.** The record types and the fmt constant `ISOLOOP_DOM_FMT = 'isoloop-dom@1'` live in `src/shared` and are exported from both `/worker` and `/host`. `protocol` keeps `patch.batch: unknown` and never learns the record shape.
 5. **Four source folders, each type-checked on its own:**
 
