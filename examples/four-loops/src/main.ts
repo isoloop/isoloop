@@ -7,6 +7,7 @@ import contractsUrl from './contracts?isolate';
 import counter from './isolates/counter?isolate';
 import heavy from './isolates/heavy?isolate';
 import messages from './isolates/messages?isolate';
+import storeIsolate from './isolates/store?isolate';
 import ticker from './isolates/ticker?isolate';
 import './page.css';
 import surfaceCss from './surface.css?inline';
@@ -63,7 +64,7 @@ const isolates = [
     id: 'D',
     name: 'D · Messages',
     src: messages,
-    grants: { publish: ['note.v1'], subscribe: ['count.v1', 'primes.v1'] },
+    grants: { publish: ['note.v1'], subscribe: ['count.v1', 'note.v1', 'primes.v1', 'store.v1'] },
   },
 ];
 
@@ -72,6 +73,13 @@ const panes = isolates.map(({ id, name, src, grants }) => {
   const pane = createPane(root, id, name, kernel);
   kernel.spawn({ id, src, surface: pane.body, grants });
   return pane;
+});
+
+// S has no surface: a headless store that folds count.v1 and note.v1 into store.v1.
+kernel.spawn({
+  id: 'S',
+  src: storeIsolate,
+  grants: { publish: ['store.v1'], subscribe: ['count.v1', 'note.v1', 'store.v1'] },
 });
 
 setInterval(() => {

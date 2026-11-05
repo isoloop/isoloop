@@ -22,4 +22,10 @@ export const primes = topic('primes.v1', {
   retention: { kind: 'last-n', n: 20 },
 });
 
-export default contracts(count, note, primes);
+/** S's folded state: the latest count and how many notes were sent. One record per key. */
+export const store = topic('store.v1', {
+  schema: z.object({ count: z.number().int(), notes: z.number().int() }),
+  retention: { kind: 'compacted' },
+});
+
+export default contracts(count, note, primes, store);

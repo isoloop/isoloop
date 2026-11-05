@@ -73,7 +73,7 @@ Tasks 1–6 are pure TypeScript in Node and can start right after M0, in paralle
 
 ### 12. Replay test (the done-criterion)
 - **File:** `e2e/replay.spec.ts`.
-- D (Messages) subscribes to `count.v1` and `note.v1` with `from: 'committed'` and keeps a log. Click A five times, send two notes, crash D. After restart D shows the same log without new events, and the bus metrics show D replayed from its committed offsets.
+- D (Messages) subscribes to `count.v1` and `note.v1` and keeps a log. *As built:* D reads with `from: 'earliest'`, because with auto-commit a restart from `committed` gets only the records after its last commit, so it couldn't rebuild the log; I6 (committed resume) is covered by the BusClient and broker tests. Click A five times, send two notes, crash D. After restart D shows the same log without new events, and the bus metrics show D replayed from its committed offsets.
 - Also: a headless store isolate that publishes snapshots to a compacted topic is crashed, and a visual isolate reading it with `from: 'earliest'` keeps showing the latest state throughout; the restarted store rebuilds its state from its command topics; I7 holds (no `deliver` seen on the main thread).
 
 ### 12b. Opt-in suspension

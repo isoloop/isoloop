@@ -38,6 +38,7 @@ type HarnessKernel = {
     restarts: number;
     surface?: { queued: number; applied: number };
   }[];
+  restart(id: string): Promise<void>;
   syncRoute(): void;
   debug: { crashBus(): void; messages(): Record<string, number> };
   destroy(): Promise<void>;
