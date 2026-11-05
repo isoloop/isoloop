@@ -158,6 +158,8 @@ export type CallResult = { ok: true; value: unknown } | { ok: false; error: { co
 
 The package also exports `isEnvelope`, `assertNever`, the error-code enum, the `Grants` matcher (topic globs like `catalog.*`), and `routeTopic` (`isoloop.route.v1`, value `{ href, pathname, path, search, hash, state }`, [ADR 0002](../adr/0002-host-owns-routing.md)). Routing error codes: `cross_origin`, `routing_disabled`, `navigate_failed`.
 
+Some codes never travel on a port: the host API throws them as a `KernelError`. `createKernel` throws `unsupported_browser`, with every missing feature named, when the browser lacks module workers, `MessageChannel`, adopted stylesheets on a `ShadowRoot`, or OPFS ([ADR 0009](../adr/0009-toolchain.md#rules) rule 7). `spawn` throws `pools_unsupported`, `suspend_unsupported` and `invalid_manifest` (§4.1).
+
 ## 4. `@isoloop/host`
 
 ### 4.1 Kernel

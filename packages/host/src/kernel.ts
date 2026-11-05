@@ -11,6 +11,7 @@ import {
   type LegacyHostToIsolate,
 } from '@isoloop/protocol';
 import { createCompositor, type FallbackRender, type SurfaceStats } from './compositor';
+import { missingFeatures } from './features';
 import { createLegacyBus, type BusDelivery } from './legacy-bus';
 import { load, type LoadedWorker } from './loader';
 import { createLegacyVdomBridge, LEGACY_VDOM } from './render/legacy-vdom';
@@ -69,7 +70,11 @@ export type IsolateManifest = {
 };
 
 /** Codes `createKernel` and `spawn` throw with (design §4.1). */
-export type KernelErrorCode = 'pools_unsupported' | 'suspend_unsupported' | 'invalid_manifest';
+export type KernelErrorCode =
+  | 'unsupported_browser'
+  | 'pools_unsupported'
+  | 'suspend_unsupported'
+  | 'invalid_manifest';
 
 /** An error the kernel API throws, with a code to branch on. */
 export class KernelError extends Error {
@@ -169,6 +174,12 @@ function validate(m: IsolateManifest): void {
 const TICK_MS = 50;
 
 export function createKernel(config: KernelConfig): Kernel {
+  const missing = missingFeatures();
+  if (missing.length > 0)
+    throw new KernelError(
+      'unsupported_browser',
+      `This browser lacks what Isoloop needs: ${missing.join(', ')}. See ADR 0009 rule 7 for the minimum versions.`,
+    );
   const everyMs = config.heartbeat?.everyMs ?? 100;
   const def = DEFAULT_SUPERVISOR_CONFIG;
   const cfg: SupervisorConfig = {
