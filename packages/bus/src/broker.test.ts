@@ -478,3 +478,33 @@ describe('reattach after a bus restart (ADR 0007)', () => {
     expect(d.inbox.some((m) => m.t === 'reset')).toBe(false);
   });
 });
+
+describe('isoloop.route.v1 (ADR 0002)', () => {
+  it('is built in: a `*` publish grant still gets forbidden; the kernel publishes; anyone subscribes', async () => {
+    const broker = new Broker({ contracts: contracts(notes), engine: new TsEngine() });
+    const a = connect(broker, 'A', { publish: ['*'], subscribe: [] });
+    const value = {
+      href: 'http://x/',
+      pathname: '/',
+      path: '/',
+      search: '',
+      hash: '',
+      state: null,
+    };
+    expect(await a.call('publish', { topic: 'isoloop.route.v1', value })).toMatchObject({
+      ok: false,
+      error: { code: 'forbidden' },
+    });
+    expect(
+      await a.call('subscribe', { topic: 'isoloop.route.v1', from: 'earliest' }),
+    ).toMatchObject({ ok: true });
+    expect(
+      await broker.publish({ kind: 'kernel' }, 'isoloop.route.v1', 'current', value),
+    ).toMatchObject({ ok: true });
+    expect(
+      await broker.publish({ kind: 'kernel' }, 'isoloop.route.v1', 'current', { href: 1 }),
+    ).toMatchObject({ ok: false, error: { code: 'invalid' } });
+    await flush();
+    expect(a.values('isoloop.route.v1')).toEqual([value]);
+  });
+});

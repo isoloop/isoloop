@@ -266,6 +266,9 @@ importers:
 
   e2e/harness:
     dependencies:
+      '@isoloop/bus':
+        specifier: workspace:*
+        version: link:../../packages/bus
       '@isoloop/host':
         specifier: workspace:*
         version: link:../../packages/host

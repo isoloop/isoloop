@@ -79,9 +79,3 @@ export const checks: {
   },
   any: () => [],
 };
-
-/**
- * Every system topic, built into the bus. `isoloop.route.v1` arrives with
- * routing (M2 task 10, ADR 0002).
- */
-export const SYSTEM_TOPICS: readonly SystemTopicDef<any>[] = [];

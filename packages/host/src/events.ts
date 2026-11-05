@@ -6,8 +6,9 @@
  *
  * - `submit` is always prevented on the host: an isolate can't call
  *   preventDefault in time, and a submit would navigate the whole page.
- * - Links keep the browser's behaviour until routing (ADR 0002, M2 task 10)
- *   takes over same-origin clicks.
+ * - With routing on, `onClick` sees every click first; the kernel takes plain
+ *   primary-button clicks on same-origin links to `onNavigate` (ADR 0002).
+ *   Everything else keeps the browser's behaviour.
  *
  * Pointer moves are forwarded only to registered listeners and coalesced to
  * one per animation frame.
@@ -33,6 +34,8 @@ export type EventBridgeOptions = {
   /** The serialized event for a DOM event, or `null` if no isolate listener wants it. */
   toEvent: (e: Event, type: EventType) => SerializedEvent | null;
   send: (e: SerializedEvent) => void;
+  /** Every click on the surface, before it is forwarded (link interception, ADR 0002). */
+  onClick?: (e: MouseEvent) => void;
   /** For tests: the frame scheduler for coalesced pointer moves. */
   requestFrame?: (fn: () => void) => void;
 };
@@ -55,6 +58,7 @@ export function listenEvents(
       type,
       (e) => {
         if (type === 'submit') e.preventDefault();
+        if (type === 'click' && e instanceof MouseEvent) opts.onClick?.(e);
         const event = toEvent(e, type);
         if (event) send(event);
       },

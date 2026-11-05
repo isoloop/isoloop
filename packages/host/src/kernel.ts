@@ -8,6 +8,8 @@ import {
   isIsolateToHost,
   isLegacyIsolateToHost,
   isSystemTopic,
+  ROUTE_KEY,
+  routeTopic,
   type BusMetrics,
   type BusRecord,
   type CallResult,
@@ -28,6 +30,7 @@ import { missingFeatures } from './features';
 import { createLegacyBus, type BusDelivery } from './legacy-bus';
 import { load, type LoadedWorker } from './loader';
 import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from './render/isoloop-dom';
+import { createRouter, type OnNavigate, type Router } from './router';
 import { createRegistry, type ComponentRegistry, type HostComponent } from './render/registry';
 import {
   DEFAULT_BACKOFF,
@@ -81,6 +84,20 @@ export type KernelConfig = {
    * Malformed entries make `createKernel` throw `invalid_config`.
    */
   components?: Readonly<Record<string, HostComponent>>;
+  /**
+   * Default true. With false the kernel adds no listeners, never publishes
+   * `isoloop.route.v1`, leaves link clicks alone, and `navigate` rejects with
+   * `routing_disabled` (ADR 0002).
+   */
+  routing?: boolean;
+  /** Default `/`. Must match the host router's `basename`; `/x` hrefs resolve against it. */
+  basePath?: string;
+  /**
+   * Decides a navigation from an isolate or a link click. Return `true` once
+   * accepted (not when finished), `false` to refuse. Default:
+   * `history.pushState` / `replaceState`.
+   */
+  onNavigate?: OnNavigate;
   /** Dev checks: the bus checks every schema output with `structuredClone` (ADR 0003, decision 11). Default false. */
   dev?: boolean;
 };
@@ -165,6 +182,10 @@ export type KernelEvents = {
   'bus:failed': { code?: ErrorCode; reason?: CrashReason; message: string };
   /** Sampled every second (design §6.3). */
   'bus:metrics': BusMetrics;
+  /** `history.state` was too large for the route topic; it was published as `null` (ADR 0002). */
+  'route:state_dropped': { bytes: number };
+  /** `onNavigate` threw; the navigate call rejected with `navigate_failed`. */
+  'route:navigate_error': { from: string; href: string; error: string };
 };
 
 export type KernelEvent = keyof KernelEvents;
@@ -193,6 +214,12 @@ export interface Kernel {
   ): () => void;
   on<E extends KernelEvent>(event: E, fn: (e: KernelEvents[E]) => void): () => void;
   isolates(): IsolateSnapshot[];
+  /**
+   * The host's router changed the URL: republish `isoloop.route.v1` if
+   * `href` or `state` differ (ADR 0002). Wire it once, e.g.
+   * `router.subscribe(() => kernel.syncRoute())`. A no-op with routing off.
+   */
+  syncRoute(): void;
   destroy(): Promise<void>;
   /** @internal Test hooks; not part of the API. */
   readonly debug: { crashBus(): void };
@@ -318,6 +345,8 @@ export function createKernel(config: KernelConfig): Kernel {
     'bus:restart': new Set(),
     'bus:failed': new Set(),
     'bus:metrics': new Set(),
+    'route:state_dropped': new Set(),
+    'route:navigate_error': new Set(),
   };
   const budget = config.workers.budget ?? 32;
   let warnedBudget = false;
@@ -479,9 +508,36 @@ export function createKernel(config: KernelConfig): Kernel {
         });
         return;
       }
-      case 'navigate':
-        fail('routing_disabled', 'navigate: routing arrives in M2 (ADR 0002)');
+      case 'navigate': {
+        // Checked in the runtime too; the kernel is the one that counts (ADR 0002).
+        if (slot.manifest.grants?.navigate !== true) {
+          fail('forbidden', 'navigate: this isolate has no navigate grant (ADR 0002)');
+          return;
+        }
+        if (!router) {
+          fail('routing_disabled', 'navigate: routing is off (KernelConfig.routing)');
+          return;
+        }
+        const [href, opts] = args;
+        if (typeof href !== 'string') {
+          fail('invalid', 'navigate: href must be a string');
+          return;
+        }
+        const o = typeof opts === 'object' && opts !== null ? opts : {};
+        const replace: unknown = Reflect.get(o, 'replace');
+        const state: unknown = Reflect.get(o, 'state');
+        void router
+          .navigate(href, {
+            replace: replace === true,
+            from: slot.manifest.id,
+            ...(state === undefined ? {} : { state }),
+          })
+          .then((r) => {
+            if (r.ok) reply({ ok: true, value: r.value });
+            else fail(r.code, r.message);
+          });
         return;
+      }
       case 'requestCanvas':
         fail('unsupported', 'requestCanvas arrives in M3');
         return;
@@ -550,7 +606,7 @@ export function createKernel(config: KernelConfig): Kernel {
     const { manifest } = slot;
     slot.fmt = undefined;
     if (manifest.surface) {
-      compositor.reset(manifest.id, createIsoloopDomBridge(registry));
+      compositor.reset(manifest.id, bridgeFor(manifest.id));
     }
     const grants = manifest.grants ?? DEFAULT_GRANTS;
     const busPort = controller
@@ -624,10 +680,20 @@ export function createKernel(config: KernelConfig): Kernel {
           supervisor: cfg,
           dev: config.dev ?? false,
           events: {
-            ready: (first) => emit('bus:ready', { first }),
+            ready: (first) => {
+              emit('bus:ready', { first });
+              // The new bus starts with an empty route topic (ADR 0002, ADR 0007).
+              if (!first) void router?.sync(true);
+            },
             crash: (reason, message) => emit('bus:crash', { reason, message }),
             restart: (restarts) => emit('bus:restart', { restarts }),
-            metrics: (m) => emit('bus:metrics', m),
+            metrics: (m) => {
+              routeWatched = m.subscriptions.some(
+                (x) =>
+                  x.topic === routeTopic.name && !x.consumer.startsWith(HOST_CONNECTION_PREFIX),
+              );
+              emit('bus:metrics', m);
+            },
             failed: (f) => {
               emit('bus:failed', f);
               if (!('code' in f)) return;
@@ -655,6 +721,43 @@ export function createKernel(config: KernelConfig): Kernel {
           },
         })
       : undefined;
+
+  /** From the last metrics: an isolate subscribes to the route topic (for the basePath warning). */
+  let routeWatched = false;
+  const router: Router | undefined =
+    config.routing === false
+      ? undefined
+      : createRouter({
+          ...(config.basePath === undefined ? {} : { basePath: config.basePath }),
+          ...(config.onNavigate ? { onNavigate: config.onNavigate } : {}),
+          publish: (value) =>
+            controller
+              ? controller.publish(routeTopic.name, ROUTE_KEY, value)
+              : Promise.resolve({
+                  ok: false,
+                  error: { code: 'bus_unavailable', message: 'No bus worker' },
+                }),
+          busDown: () =>
+            !controller ||
+            controller.state === 'restarting' ||
+            controller.state === 'crashed' ||
+            controller.state === 'failed',
+          stateDropped: (bytes) => emit('route:state_dropped', { bytes }),
+          navigateError: (e) => emit('route:navigate_error', e),
+          ...(config.dev ? { dev: { subscribed: () => routeWatched } } : {}),
+        });
+  if (router && controller) void router.sync();
+
+  /** A render bridge for one isolate: links go through the router when routing is on. */
+  function bridgeFor(id: string): ReturnType<typeof createIsoloopDomBridge> {
+    if (!router) return createIsoloopDomBridge(registry);
+    return createIsoloopDomBridge(registry, {
+      rewriteHref: (href) => router.rewrite(href),
+      onLink: (a, e) => {
+        router.linkClick(a, e, id);
+      },
+    });
+  }
 
   const tick = setInterval(() => {
     const at = performance.now();
@@ -724,14 +827,9 @@ export function createKernel(config: KernelConfig): Kernel {
       slots.set(manifest.id, slot);
       if (document.hidden) feed(slot, { k: 'hidden' });
       if (manifest.surface) {
-        compositor.attach(
-          manifest.id,
-          manifest.surface,
-          createIsoloopDomBridge(registry),
-          (event) => {
-            post(slot, { v: 1, t: 'event', p: event });
-          },
-        );
+        compositor.attach(manifest.id, manifest.surface, bridgeFor(manifest.id), (event) => {
+          post(slot, { v: 1, t: 'event', p: event });
+        });
       }
       start(slot);
       const id = manifest.id;
@@ -797,11 +895,16 @@ export function createKernel(config: KernelConfig): Kernel {
       return [...slots.values()].map(snapshot);
     },
 
+    syncRoute() {
+      void router?.sync();
+    },
+
     async destroy() {
       clearInterval(tick);
       document.removeEventListener('visibilitychange', visibility);
       document.removeEventListener('resume', resumed);
       await Promise.all([...slots.keys()].map((id) => kernel.stop(id)));
+      router?.destroy();
       controller?.destroy();
     },
   };

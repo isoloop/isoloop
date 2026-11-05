@@ -217,7 +217,12 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         return;
       case 'publish': {
         const { id } = msg;
-        void b.publish({ kind: 'host' }, msg.p.topic, msg.p.key, msg.p.value).then((r) => {
+        // Only the main thread holds the control port. `kernel.publish` refuses
+        // isoloop.* there, so a system-topic publish here is the kernel's own.
+        const from = isSystemTopic(msg.p.topic)
+          ? ({ kind: 'kernel' } as const)
+          : ({ kind: 'host' } as const);
+        void b.publish(from, msg.p.topic, msg.p.key, msg.p.value).then((r) => {
           if (id !== undefined) post({ v: 1, t: 'result', re: id, p: r });
         });
         return;

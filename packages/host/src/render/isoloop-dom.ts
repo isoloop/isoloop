@@ -62,17 +62,43 @@ function hostOwned(el: Element, name: string, value: string | boolean): boolean 
   return true;
 }
 
-export function policyFrom(registry: ComponentRegistry): SanitisePolicy {
+export type BridgeOptions = {
+  /** Rewrites a link's sanitised `href` (ADR 0002: same-origin hrefs become absolute). */
+  rewriteHref?: (href: string) => string;
+  /** The `<a>` a plain click landed on, if any, and the click. */
+  onLink?: (a: HTMLAnchorElement, e: MouseEvent) => void;
+};
+
+export function policyFrom(registry: ComponentRegistry, o: BridgeOptions = {}): SanitisePolicy {
+  const rewrite = o.rewriteHref;
   return {
     element: (tag, ns) => registry.element(tag, ns),
-    attribute: (tag, ns, name, value) => registry.attribute(tag, ns, name, value),
+    attribute: (tag, ns, name, value) => {
+      const v = registry.attribute(tag, ns, name, value);
+      return v !== null && rewrite && ns === 'html' && tag === 'a' && name.toLowerCase() === 'href'
+        ? rewrite(v)
+        : v;
+    },
     property: (el, name, value) =>
       registry.property(el.localName, name) && hostOwned(el, name, value),
   };
 }
 
-export function createIsoloopDomBridge(registry: ComponentRegistry): HostRenderBridge {
-  const policy = policyFrom(registry);
+/** The anchor in the shadow tree a click landed on, if any. */
+function anchorOf(e: MouseEvent, shadow: ShadowRoot): HTMLAnchorElement | undefined {
+  for (const n of e.composedPath()) {
+    if (n === shadow) return undefined;
+    if (n instanceof HTMLAnchorElement) return n;
+  }
+  return undefined;
+}
+
+export function createIsoloopDomBridge(
+  registry: ComponentRegistry,
+  o: BridgeOptions = {},
+): HostRenderBridge {
+  const policy = policyFrom(registry, o);
+  const { onLink } = o;
   let applier: ReturnType<typeof createApplier> | null = null;
   let container: HTMLElement | null = null;
   let abort: AbortController | null = null;
@@ -95,6 +121,14 @@ export function createIsoloopDomBridge(registry: ComponentRegistry): HostRenderB
             return rec ? serialize(rec, type) : null;
           },
           send,
+          ...(onLink
+            ? {
+                onClick: (e: MouseEvent) => {
+                  const anchor = anchorOf(e, shadow);
+                  if (anchor) onLink(anchor, e);
+                },
+              }
+            : {}),
         },
         abort.signal,
       );

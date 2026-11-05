@@ -13,6 +13,7 @@ export {
 export type { Backoff, CrashReason, IsolateState } from './supervisor';
 export type { FallbackInfo, FallbackRender, SurfaceStats } from './compositor';
 export type { BusDelivery } from './legacy-bus';
+export type { NavigateRequest, OnNavigate } from './router';
 export { BusError } from '@isoloop/protocol';
 export type { HostRenderBridge } from './render/bridge';
 export type { HostComponent } from './render/registry';

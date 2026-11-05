@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@isoloop/bus": "workspace:*",
     "@isoloop/host": "workspace:*",
     "@isoloop/runtime": "workspace:*"
   },
