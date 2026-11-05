@@ -16,6 +16,8 @@ Can start after M2, since it depends only on the `LogEngine` interface and the t
 6. **Publish results** in the docs and a post, including the case where the TS engine wins.
 7. **Evaluate a `SharedArrayBuffer` render channel** against `postMessage` patches (it could win back about one frame per click on Chromium; needs cross-origin isolation, as the engine does). See the [click-to-paint investigation](../investigations/click-to-paint-latency.md). An ADR only if the numbers justify it.
 
+Delivery batching across tasks (the TS engine's M2 shortfall against the 50k records/s budget) is a separate spike after this milestone: [M5b](m5b-delivery-batching.md).
+
 ## Open risks
 
 - The binary value codec may cost more than the copies it saves; measure early with a TS-only SAB prototype before writing Rust.
