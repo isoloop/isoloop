@@ -50,7 +50,7 @@ export function createPane(root: HTMLElement, id: string, name: string, kernel: 
       if (crashed) {
         status.className = 'status crashed';
         status.textContent = 'crashed';
-        overlay.textContent = `${s.error ?? 'Unknown error'} — supervisor restarting…`;
+        overlay.textContent = `${s.error ?? 'Unknown error'} — restarting (backoff)…`;
         return;
       }
       if (s.state === 'blocked') {

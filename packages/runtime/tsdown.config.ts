@@ -10,5 +10,7 @@ export default defineConfig([
     dts: false,
     clean: false,
     deps: { alwaysBundle: ['@isoloop/protocol', /^@isoloop\/dom\//] },
+    // The on-demand import of the vanilla runtime stays in the same file.
+    outputOptions: { inlineDynamicImports: true },
   },
 ]);

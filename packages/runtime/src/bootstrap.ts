@@ -17,11 +17,10 @@ import {
   type InitPayload,
   type IsolateToHost,
   type LegacyIsolateToHost,
+  type ShutdownReason,
 } from '@isoloop/protocol';
 import { createLegacyIsolate } from './legacy/runtime';
 import { LEGACY_VDOM } from './legacy/vdom';
-import { createHostCalls, type HostApi } from './host-calls';
-import { createRender, ISOLOOP_DOM_FMT, type Render } from './render';
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -53,10 +52,16 @@ async function boot(init: InitPayload): Promise<void> {
     return;
   }
 
+  // `bye` once the isolate's onShutdown handlers settle, or when the grace runs out.
   self.addEventListener('message', (e: MessageEvent<unknown>) => {
-    if (!isShutdown(e)) return;
-    post({ v: 1, t: 'bye', p: {} });
-    self.close();
+    const msg = e.data;
+    if (!isHostToIsolate(msg) || msg.t !== 'shutdown') return;
+    const done = shutdownHook?.(msg.p.reason) ?? Promise.resolve();
+    const grace = new Promise((r) => setTimeout(r, Math.max(0, msg.p.graceMs - 50)));
+    void Promise.race([done, grace]).finally(() => {
+      post({ v: 1, t: 'bye', p: {} });
+      self.close();
+    });
   });
   startHeartbeat(init.heartbeatMs);
 
@@ -87,6 +92,9 @@ async function boot(init: InitPayload): Promise<void> {
   fatal(`${init.src} has no default export: a function, or an object with start(ctx)`);
 }
 
+/** Set by a `{ start(ctx) }` isolate: runs its onShutdown handlers. */
+let shutdownHook: ((reason: ShutdownReason) => Promise<void>) | null = null;
+
 const isShutdown = (e: MessageEvent<unknown>): boolean =>
   isHostToIsolate(e.data) && e.data.t === 'shutdown';
 
@@ -106,44 +114,21 @@ function startLegacy(init: InitPayload, main: Function): void {
   Reflect.apply(main, undefined, [runtime.iso]);
 }
 
-/** What `start(ctx)` gets until the vanilla API (task 11) completes it. */
-type StartContext = {
-  id: string;
-  config: unknown;
-  root?: Render['root'];
-  host: HostApi;
-  /** Stylesheets for the surface; a no-op when headless. */
-  styles(css: string | readonly string[]): void;
-};
-
-async function startIsolate(
-  init: InitPayload,
-  start: (ctx: StartContext) => unknown,
-): Promise<void> {
-  const render = init.renderFmt === 'none' ? null : createRender(post, self);
-  const calls = createHostCalls({
-    post,
-    beforeCall: () => render?.dom.flush(),
-    idOf: (node) => (render ? render.idOf(node) : undefined),
-    surface: render !== null,
-  });
+async function startIsolate(init: InitPayload, start: (ctx: unknown) => unknown): Promise<void> {
+  // Loaded on demand, so a worker's first beat doesn't wait for the DOM subset.
+  const { createVanillaIsolate } = await import('./vanilla');
+  const runtime = createVanillaIsolate(init, post, self);
   self.addEventListener('message', (e: MessageEvent<unknown>) => {
-    const msg = e.data;
-    if (!isHostToIsolate(msg)) return;
-    if (msg.t === 'event') render?.receive(msg.p);
-    else if (msg.t === 'result' && msg.re !== undefined) calls.receive(msg.re, msg.p);
+    runtime.receive(e.data);
   });
-  const renderFmt = render ? ISOLOOP_DOM_FMT : 'none';
-  post({ v: 1, t: 'ready', p: { runtime: '@isoloop/runtime', adapter: 'vanilla', renderFmt } });
-  const base = {
-    id: init.isolateId,
-    config: init.config,
-    host: calls.api,
-    styles: (css: string | readonly string[]) => render?.styles(css),
-  };
-  const ctx: StartContext = render ? { ...base, root: render.root } : base;
+  shutdownHook = (reason) => runtime.shutdown(reason);
+  post({
+    v: 1,
+    t: 'ready',
+    p: { runtime: '@isoloop/runtime', adapter: 'vanilla', renderFmt: runtime.renderFmt },
+  });
   try {
-    await start(ctx);
+    await start(runtime.ctx);
   } catch (err) {
     fatal(`start() threw: ${err instanceof Error ? err.message : String(err)}`);
   }

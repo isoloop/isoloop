@@ -1,27 +1,32 @@
-import type { LegacyIsolate } from '@isoloop/runtime';
-import { text } from './text';
-
-type State = { n: number; note: string | null };
+import { defineIsolate } from '@isoloop/runtime';
+import { el, text } from './dom';
 
 // A · Counter
-export default function main(iso: LegacyIsolate<State>): void {
-  const { h } = iso;
-  iso.setState({ n: 0, note: null });
-  iso.on('inc', () => {
-    iso.setState((s) => ({ n: s.n + 1 }));
-    iso.bus.publish('count', iso.state.n);
-  });
-  iso.bus.subscribe('note', (note, from) => {
-    iso.setState({ note: `${from} says: ${text(note)}` });
-  });
-  iso.view((s) =>
-    h(
-      'div',
-      { class: 'stack' },
-      h('div', { class: 'big' }, s.n),
-      h('button', { class: 'primary', onclick: 'inc' }, 'Increment'),
-      h('p', { class: 'muted' }, 'Publishes "count" on the bus.'),
-      s.note && h('p', { class: 'muted mono' }, s.note),
-    ),
-  );
-}
+export default defineIsolate<HTMLElement>({
+  start(ctx) {
+    const { root } = ctx;
+    if (!root) return;
+    let n = 0;
+    const big = el('div', { class: 'big' }, '0');
+    const note = el('p', { class: 'muted mono' });
+    const inc = el('button', { class: 'primary' }, 'Increment');
+    inc.addEventListener('click', () => {
+      n++;
+      big.textContent = String(n);
+      ctx.bus.publish('count', n);
+    });
+    ctx.bus.subscribe('note', (value, from) => {
+      note.textContent = `${from} says: ${text(value)}`;
+    });
+    root.append(
+      el(
+        'div',
+        { class: 'stack' },
+        big,
+        inc,
+        el('p', { class: 'muted' }, 'Publishes "count" on the bus.'),
+        note,
+      ),
+    );
+  },
+});

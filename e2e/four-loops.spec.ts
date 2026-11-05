@@ -43,19 +43,25 @@ test('(b) blocking C leaves B ticking and A responsive', async ({ page }) => {
   await expect(pane(page, 'C')).toContainText('Last count from A: 1.');
 });
 
-test('(c) a crash in C shows the overlay, then C restarts once', async ({ page }) => {
-  await pane(page, 'C').getByRole('button', { name: 'Crash' }).click();
-  const overlay = pane(page, 'C').locator('.crash-overlay');
-  await expect(overlay).toBeVisible({ timeout: 2_000 });
-  await expect(overlay).toContainText('Federate C threw on purpose');
-  await expect(overlay).toContainText('supervisor restarting');
-  await expect(status(page, 'C')).toHaveText('crashed');
-
+const crashC = async (page: Page) => {
   await expect(status(page, 'C')).toContainText('loop ok', { timeout: 5_000 });
-  await expect(overlay).toBeHidden();
-  await expect(pane(page, 'C').locator('.restarts')).toHaveText('restarts: 1');
-  // The others never noticed.
-  await Promise.all(['A', 'B', 'D'].map((id) => expect(status(page, id)).toContainText('loop ok')));
+  await pane(page, 'C').getByRole('button', { name: 'Crash' }).click();
+};
+
+test('(c) a crash in C restarts it after the backoff; the others never notice', async ({
+  page,
+}) => {
+  await crashC(page);
+  await expect(pane(page, 'C').locator('.restarts')).toHaveText('restarts: 1', { timeout: 3_000 });
+  await expect(status(page, 'C')).toContainText('loop ok', { timeout: 5_000 });
+  await expect(pane(page, 'C').locator('.crash-overlay')).toBeHidden();
+  await expect(pane(page, 'C')).toContainText('nothing yet');
+  await Promise.all(
+    ['A', 'B', 'D'].flatMap((id) => [
+      expect(status(page, id)).toContainText('loop ok'),
+      expect(pane(page, id).locator('.restarts')).toHaveText(''),
+    ]),
+  );
 });
 
 test('(d) a note typed in D appears in A', async ({ page }) => {
@@ -65,4 +71,29 @@ test('(d) a note typed in D appears in A', async ({ page }) => {
   await expect(pane(page, 'A')).toContainText('D says: hello from D');
   await expect(pane(page, 'D').locator('.log li').first()).toHaveText('me → note: hello from D');
   await expect(input).toHaveValue('');
+});
+
+test('(e) the fourth crash within 60 s fails C and shows the fallback; Retry brings it back', async ({
+  page,
+}) => {
+  for (let i = 1; i <= 3; i++) {
+    // Sequential on purpose: each crash waits for the restart before the next.
+    // oxlint-disable-next-line no-await-in-loop
+    await crashC(page);
+    // oxlint-disable-next-line no-await-in-loop
+    await expect(pane(page, 'C').locator('.restarts')).toHaveText(`restarts: ${i}`, {
+      timeout: 5_000,
+    });
+  }
+  await crashC(page);
+  await expect(status(page, 'C')).toHaveText('failed', { timeout: 3_000 });
+  const fallback = pane(page, 'C').locator('.iso-fallback');
+  await expect(fallback).toBeVisible();
+  await expect(fallback).toContainText('"C" stopped working');
+  await expect(fallback).toContainText('Isolate C threw on purpose');
+  await Promise.all(['A', 'B', 'D'].map((id) => expect(status(page, id)).toContainText('loop ok')));
+
+  await fallback.getByRole('button', { name: 'Retry' }).click();
+  await expect(status(page, 'C')).toContainText('loop ok', { timeout: 5_000 });
+  await expect(fallback).toBeHidden();
 });

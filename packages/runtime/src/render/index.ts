@@ -20,6 +20,8 @@ export { ISOLOOP_DOM_FMT };
 const nodeId = (s: string): number | undefined => (/^\d+$/.test(s) ? Number(s) : undefined);
 
 export type Render = {
+  /** The render format this runtime speaks. */
+  readonly fmt: string;
   /** The isolate's render target: what `ctx.root` is. */
   readonly root: WElement;
   readonly dom: WorkerDom;
@@ -56,6 +58,7 @@ export function createRender(post: (msg: IsolateToHost) => void, scope?: object)
   });
   if (scope) install(dom, scope);
   return {
+    fmt: ISOLOOP_DOM_FMT,
     root: dom.root,
     dom,
     styles(css) {
