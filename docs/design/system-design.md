@@ -109,7 +109,8 @@ export type IsolateToHost =
   | Envelope<'patch', { fmt: string; batch: unknown }>
   | Envelope<'call', { method: HostMethod; args: unknown[] }>
   | Envelope<'beat', { lagMs: number; heapBytes?: number }>
-  | Envelope<'error', { message: string; stack?: string; fatal: boolean }>;
+  | Envelope<'error', { message: string; stack?: string; fatal: boolean }>
+  | Envelope<'bye', {}>;                                         // last message after shutdown: handlers done, terminate now (§7.6)
 
 // Bus port: isolate ↔ bus worker
 export type IsolateToBus =
@@ -188,7 +189,7 @@ interface Kernel {
   resume(id: string): Promise<void>;                   // wake a suspended isolate (ADR 0001); no-op unless suspended
   publish<T>(topic: TopicDef<T>, rec: { key?: string; value: T }): Promise<void>;
   subscribe<T>(topic: TopicDef<T>, fn: (r: BusRecord) => void, opts?: { from?: StartPosition }): () => void;
-  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:crash, isolate:failed, bus:crash, bus:failed, bus:seeded, bus:seed_rejected, bus:orphaned_topics, route:state_dropped, route:navigate_error, ...
+  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:crash, bus:failed, bus:seeded, bus:seed_rejected, bus:orphaned_topics, route:state_dropped, route:navigate_error, ...
   isolates(): IsolateSnapshot[];                                      // used by devtools
   syncRoute(): void;                                   // host router changed the URL; republish isoloop.route.v1 if href/state differ (ADR 0002)
   dropTopic(name: string, o?: { force?: boolean }): Promise<void>;   // delete an orphaned persistent topic; seed_pending / force rules (ADR 0003)
@@ -197,6 +198,8 @@ interface Kernel {
 ```
 
 Defaults: heartbeat `100 / 400 / 10_000` ms, ready timeout `10_000` ms, frame budget `8` ms, supervisor `one-for-one`, 3 restarts in 60 s, backoff `250 ms × 2ⁿ` capped at 4 s.
+
+`spawn` throws a `KernelError` with a `code`: `pools_unsupported`, `suspend_unsupported` (until M2c and M2), or `invalid_manifest`. Hosting requirements (CSP, CORS) are in [the hosting guide](../guide/hosting.md).
 
 ### 4.2 Loader
 
@@ -527,7 +530,7 @@ sequenceDiagram
 
 ### 7.6 Shutdown
 
-`kernel.stop(id)` → `shutdown { reason: 'stop', graceMs: 1000 }`. The isolate runs its `onShutdown` handlers, then commits offsets. The kernel calls `terminate()` after the grace period or on the isolate's last message, sends `detach`, and the compositor removes the surface. The isolate ends in state `stopped`.
+`kernel.stop(id)` → `shutdown { reason: 'stop', graceMs: 1000 }`. The isolate runs its `onShutdown` handlers, then commits offsets. The kernel calls `terminate()` after the grace period or on the isolate's last message (`bye`), sends `detach`, and the compositor removes the surface. The isolate ends in state `stopped`.
 
 ### 7.7 Bus worker crash
 

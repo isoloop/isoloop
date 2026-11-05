@@ -29,7 +29,11 @@ import {
 } from './supervisor';
 
 export type KernelConfig = {
-  workers: { isolateBootstrap: string };
+  workers: {
+    isolateBootstrap: string;
+    /** Soft worker count: passing it warns once (`workers:budget`) and never blocks a spawn. Default 32 (ADR 0001). */
+    budget?: number;
+  };
   /** Defaults: one-for-one, 3 restarts in 60 s, backoff 250 ms × 2ⁿ capped at 4 s. */
   supervisor?: {
     strategy?: 'one-for-one' | 'never';
@@ -58,7 +62,24 @@ export type IsolateManifest = {
   grants?: Grants;
   /** Renders the fallback shown once the isolate has `failed`. Defaults to a message and a Retry button. */
   fallback?: FallbackRender;
+  /** Named worker pool (ADR 0001). Typed now, rejected with `pools_unsupported` until M2c. */
+  pool?: string;
+  /** Opt-in suspension (ADR 0001). Anything but `'never'` is rejected with `suspend_unsupported` until M2. */
+  suspend?: 'never' | 'when-idle' | { whenIdle: { afterMs: number } };
 };
+
+/** Codes `createKernel` and `spawn` throw with (design §4.1). */
+export type KernelErrorCode = 'pools_unsupported' | 'suspend_unsupported' | 'invalid_manifest';
+
+/** An error the kernel API throws, with a code to branch on. */
+export class KernelError extends Error {
+  readonly code: KernelErrorCode;
+  constructor(code: KernelErrorCode, message: string) {
+    super(message);
+    this.name = 'KernelError';
+    this.code = code;
+  }
+}
 
 export type IsolateSnapshot = {
   id: string;
@@ -82,6 +103,8 @@ export type KernelEvents = {
   /** Past the restart limit, or strategy `never`: the isolate stays down. */
   'isolate:failed': { id: string; reason: CrashReason; message: string };
   'isolate:error': { id: string; message: string };
+  /** More live workers than `workers.budget`. Emitted once per kernel. */
+  'workers:budget': { live: number; budget: number };
   /** A publish on the M0 main-thread bus. */
   'bus:publish': BusDelivery;
 };
@@ -109,10 +132,39 @@ type Slot = {
   sup: IsolateSupervision;
   loaded: LoadedWorker | null;
   timer: ReturnType<typeof setTimeout> | undefined;
+  /** Terminates a worker that outlives its shutdown grace. */
+  graceTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Settled once the worker is gone. */
+  closed: Promise<void>;
+  onClosed: () => void;
   dropped: number;
 };
 
 const DEFAULT_GRANTS: Grants = { publish: [], subscribe: [] };
+
+function validate(m: IsolateManifest): void {
+  if (typeof m.id !== 'string' || m.id === '' || typeof m.src !== 'string' || m.src === '')
+    throw new KernelError('invalid_manifest', 'A manifest needs a non-empty `id` and `src`');
+  if (m.pool !== undefined) {
+    if (typeof m.pool !== 'string' || m.pool === '')
+      throw new KernelError('invalid_manifest', `"${m.id}": \`pool\` must be a non-empty string`);
+    throw new KernelError(
+      'pools_unsupported',
+      `"${m.id}" asks for pool "${m.pool}", but worker pools arrive in M2c (ADR 0001)`,
+    );
+  }
+  const s = m.suspend;
+  if (s !== undefined && s !== 'never') {
+    const ok =
+      s === 'when-idle' ||
+      (typeof s === 'object' && s !== null && typeof s.whenIdle?.afterMs === 'number');
+    if (!ok) throw new KernelError('invalid_manifest', `"${m.id}": unknown \`suspend\` value`);
+    throw new KernelError(
+      'suspend_unsupported',
+      `"${m.id}" asks for suspension, which arrives in M2 (ADR 0001)`,
+    );
+  }
+}
 /** How often the supervisor judges heartbeats and timeouts (plan m1-kernel, task 2). */
 const TICK_MS = 50;
 
@@ -136,8 +188,11 @@ export function createKernel(config: KernelConfig): Kernel {
     'isolate:crash': new Set(),
     'isolate:failed': new Set(),
     'isolate:error': new Set(),
+    'workers:budget': new Set(),
     'bus:publish': new Set(),
   };
+  const budget = config.workers.budget ?? 32;
+  let warnedBudget = false;
   const compositor = createCompositor(config.styles);
 
   const emit = <E extends KernelEvent>(event: E, data: KernelEvents[E]): void => {
@@ -155,11 +210,28 @@ export function createKernel(config: KernelConfig): Kernel {
   });
 
   const terminate = (slot: Slot): void => {
+    clearTimeout(slot.graceTimer);
+    slot.graceTimer = undefined;
     if (!slot.loaded) return;
     slot.loaded.worker.terminate();
     slot.loaded.busPort.close();
     slot.loaded = null;
     bus.remove(slot.manifest.id);
+    slot.onClosed();
+  };
+
+  const shutdown = (slot: Slot, graceMs: number): void => {
+    if (!slot.loaded) return;
+    post(slot, { v: 1, t: 'shutdown', p: { reason: 'stop', graceMs } });
+    slot.graceTimer = setTimeout(() => {
+      terminate(slot);
+    }, graceMs);
+  };
+
+  const live = (): number => {
+    let n = 0;
+    for (const slot of slots.values()) if (slot.loaded) n++;
+    return n;
   };
 
   const run = (slot: Slot, effects: SupervisorEffect[]): void => {
@@ -170,8 +242,7 @@ export function createKernel(config: KernelConfig): Kernel {
           terminate(slot);
           break;
         case 'shutdown':
-          // The graceful `shutdown` message arrives with loader hardening (M1 task 3).
-          terminate(slot);
+          shutdown(slot, fx.graceMs);
           break;
         case 'spawn':
           clearTimeout(slot.timer);
@@ -255,6 +326,9 @@ export function createKernel(config: KernelConfig): Kernel {
           // Host calls arrive in M1.
           slot.dropped++;
           return;
+        case 'bye':
+          if (slot.sup.state === 'stopped') terminate(slot);
+          return;
       }
     }
     if (isLegacyIsolateToHost(msg)) {
@@ -273,15 +347,22 @@ export function createKernel(config: KernelConfig): Kernel {
     if (manifest.surface) {
       compositor.reset(manifest.id, createLegacyVdomBridge());
     }
-    const loaded = load({
-      bootstrapUrl: config.workers.isolateBootstrap,
-      id: manifest.id,
-      src: manifest.src,
-      config: manifest.config ?? null,
-      grants: manifest.grants ?? DEFAULT_GRANTS,
-      renderFmt: manifest.surface ? LEGACY_VDOM : 'none',
-      heartbeatMs: everyMs,
-    });
+    let loaded: LoadedWorker;
+    try {
+      loaded = load({
+        bootstrapUrl: config.workers.isolateBootstrap,
+        id: manifest.id,
+        src: manifest.src,
+        config: manifest.config ?? null,
+        grants: manifest.grants ?? DEFAULT_GRANTS,
+        renderFmt: manifest.surface ? LEGACY_VDOM : 'none',
+        heartbeatMs: everyMs,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      feed(slot, { k: 'spawnFailed', at: performance.now(), message });
+      return;
+    }
     loaded.worker.addEventListener('message', (e: MessageEvent<unknown>) => {
       if (slot.loaded === loaded) onMessage(slot, e.data);
     });
@@ -303,7 +384,18 @@ export function createKernel(config: KernelConfig): Kernel {
         });
     });
     slot.loaded = loaded;
+    slot.closed = new Promise((resolve) => {
+      slot.onClosed = resolve;
+    });
     feed(slot, { k: 'spawned', at: performance.now() });
+    const n = live();
+    if (n > budget && !warnedBudget) {
+      warnedBudget = true;
+      console.warn(
+        `Isoloop: ${n} isolate workers are running, more than the budget of ${budget}. Each worker has its own heap; see ADR 0001.`,
+      );
+      emit('workers:budget', { live: n, budget });
+    }
   };
 
   const tick = setInterval(() => {
@@ -350,12 +442,16 @@ export function createKernel(config: KernelConfig): Kernel {
 
   const kernel: Kernel = {
     spawn(manifest) {
+      validate(manifest);
       if (slots.has(manifest.id)) throw new Error(`Isolate "${manifest.id}" already exists`);
       const slot: Slot = {
         manifest,
         sup: initialSupervision(performance.now()),
         loaded: null,
         timer: undefined,
+        graceTimer: undefined,
+        closed: Promise.resolve(),
+        onClosed: () => {},
         dropped: 0,
       };
       slots.set(manifest.id, slot);
@@ -379,9 +475,11 @@ export function createKernel(config: KernelConfig): Kernel {
       const slot = get(id);
       clearTimeout(slot.timer);
       feed(slot, { k: 'stop' });
+      // A failed isolate has no worker; nothing else to wait for.
+      if (slot.sup.state !== 'stopped') terminate(slot);
       compositor.detach(id);
       slots.delete(id);
-      return Promise.resolve();
+      return slot.loaded ? slot.closed : Promise.resolve();
     },
 
     restart(id) {
