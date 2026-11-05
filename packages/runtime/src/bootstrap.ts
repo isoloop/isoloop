@@ -20,6 +20,7 @@ import {
 } from '@isoloop/protocol';
 import { createLegacyIsolate } from './legacy/runtime';
 import { LEGACY_VDOM } from './legacy/vdom';
+import { createHostCalls, type HostApi } from './host-calls';
 import { createRender, ISOLOOP_DOM_FMT, type Render } from './render';
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -106,21 +107,30 @@ function startLegacy(init: InitPayload, main: Function): void {
 }
 
 /** What `start(ctx)` gets until the vanilla API (task 11) completes it. */
-type StartContext = { id: string; config: unknown; root?: Render['root'] };
+type StartContext = { id: string; config: unknown; root?: Render['root']; host: HostApi };
 
 async function startIsolate(
   init: InitPayload,
   start: (ctx: StartContext) => unknown,
 ): Promise<void> {
   const render = init.renderFmt === 'none' ? null : createRender(post, self);
+  const calls = createHostCalls({
+    post,
+    beforeCall: () => render?.dom.flush(),
+    idOf: (node) => (render ? render.idOf(node) : undefined),
+    surface: render !== null,
+  });
   self.addEventListener('message', (e: MessageEvent<unknown>) => {
-    if (render && isHostToIsolate(e.data) && e.data.t === 'event') render.receive(e.data.p);
+    const msg = e.data;
+    if (!isHostToIsolate(msg)) return;
+    if (msg.t === 'event') render?.receive(msg.p);
+    else if (msg.t === 'result' && msg.re !== undefined) calls.receive(msg.re, msg.p);
   });
   const renderFmt = render ? ISOLOOP_DOM_FMT : 'none';
   post({ v: 1, t: 'ready', p: { runtime: '@isoloop/runtime', adapter: 'vanilla', renderFmt } });
   const ctx: StartContext = render
-    ? { id: init.isolateId, config: init.config, root: render.root }
-    : { id: init.isolateId, config: init.config };
+    ? { id: init.isolateId, config: init.config, root: render.root, host: calls.api }
+    : { id: init.isolateId, config: init.config, host: calls.api };
   try {
     await start(ctx);
   } catch (err) {

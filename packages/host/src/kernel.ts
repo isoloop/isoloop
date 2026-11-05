@@ -6,7 +6,11 @@
 import {
   isIsolateToHost,
   isLegacyIsolateToHost,
+  type CallResult,
+  type ErrorCode,
   type Grants,
+  type HostMethod,
+  type Rect,
   type HostToIsolate,
   type LegacyHostToIsolate,
 } from '@isoloop/protocol';
@@ -162,6 +166,24 @@ type Slot = {
 const SURFACE_FMTS: readonly string[] = [ISOLOOP_DOM_FMT, LEGACY_VDOM];
 
 const DEFAULT_GRANTS: Grants = { publish: [], subscribe: [] };
+
+/** `scrollIntoView` options from an isolate, keeping only what the DOM accepts. */
+function scrollOptions(x: unknown): ScrollIntoViewOptions {
+  const out: ScrollIntoViewOptions = {};
+  if (typeof x !== 'object' || x === null) return out;
+  const pick = <T extends string>(k: string, ok: readonly T[]): T | undefined => {
+    const v: unknown = Reflect.get(x, k);
+    return ok.find((o) => o === v);
+  };
+  const positions = ['start', 'center', 'end', 'nearest'] as const;
+  const behavior = pick('behavior', ['auto', 'instant', 'smooth'] as const);
+  const block = pick('block', positions);
+  const inline = pick('inline', positions);
+  if (behavior) out.behavior = behavior;
+  if (block) out.block = block;
+  if (inline) out.inline = inline;
+  return out;
+}
 
 function validate(m: IsolateManifest): void {
   if (typeof m.id !== 'string' || m.id === '' || typeof m.src !== 'string' || m.src === '')
@@ -336,6 +358,65 @@ export function createKernel(config: KernelConfig): Kernel {
     run(slot, effects);
   };
 
+  /**
+   * Host calls (design §4.7). DOM calls run after every patch the isolate
+   * sent before them, in the compositor's frame, so `measure` sees the
+   * layout those patches produce.
+   */
+  const hostCall = (slot: Slot, re: string, method: HostMethod, args: unknown[]): void => {
+    const reply = (p: CallResult): void => {
+      if (slot.loaded) post(slot, { v: 1, t: 'result', re, p });
+    };
+    const fail = (code: ErrorCode, message: string): void => {
+      reply({ ok: false, error: { code, message } });
+    };
+    switch (method) {
+      case 'measure':
+      case 'focus':
+      case 'scrollIntoView': {
+        if (!slot.manifest.surface) {
+          fail('no_surface', `${method}: a headless isolate has no surface (ADR 0008)`);
+          return;
+        }
+        const [nodeId, opts] = args;
+        compositor.after(slot.manifest.id, ({ host, bridge }) => {
+          const el = typeof nodeId === 'string' ? bridge.nodeFor?.(nodeId) : undefined;
+          if (!el) {
+            fail('not_found', `${method}: no rendered node ${JSON.stringify(nodeId)}`);
+            return;
+          }
+          if (method === 'measure') {
+            const r = el.getBoundingClientRect();
+            const base = host.getBoundingClientRect();
+            const rect: Rect = {
+              x: r.x - base.x,
+              y: r.y - base.y,
+              width: r.width,
+              height: r.height,
+            };
+            reply({ ok: true, value: rect });
+            return;
+          }
+          if (method === 'focus') {
+            if (el instanceof HTMLElement || el instanceof SVGElement) el.focus();
+          } else {
+            el.scrollIntoView(scrollOptions(opts));
+          }
+          reply({ ok: true, value: null });
+        });
+        return;
+      }
+      case 'navigate':
+        fail('routing_disabled', 'navigate: routing arrives in M2 (ADR 0002)');
+        return;
+      case 'requestCanvas':
+        fail('unsupported', 'requestCanvas arrives in M3');
+        return;
+      default:
+        fail('unsupported', `Unknown host method ${JSON.stringify(method)}`);
+    }
+  };
+
   const onMessage = (slot: Slot, msg: unknown): void => {
     const id = slot.manifest.id;
     if (isIsolateToHost(msg)) {
@@ -375,8 +456,8 @@ export function createKernel(config: KernelConfig): Kernel {
           });
           return;
         case 'call':
-          // Host calls arrive in M1.
-          slot.dropped++;
+          if (msg.id === undefined) slot.dropped++;
+          else hostCall(slot, msg.id, msg.p.method, msg.p.args);
           return;
         case 'bye':
           if (slot.sup.state === 'stopped') terminate(slot);

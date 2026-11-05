@@ -164,6 +164,46 @@ describe('compositor fairness', () => {
   });
 });
 
+describe('compositor host calls (after)', () => {
+  it('runs a call after the batches queued before it, and before later ones', () => {
+    const { frames, log, compositor, attach } = setup(100);
+    attach('A');
+    const order: string[] = [];
+    compositor.enqueue('A', 1);
+    compositor.after('A', () => order.push(`call after ${log.map((a) => a.batch).join(',')}`));
+    compositor.enqueue('A', 2);
+    frames.tick();
+    expect(order).toEqual(['call after 1']);
+    expect(log.map((a) => a.batch)).toEqual([1, 2]);
+  });
+
+  it('runs a call on an empty queue in the next frame, and does not count it as a batch', () => {
+    const { frames, compositor, attach } = setup();
+    attach('A');
+    let ran = false;
+    compositor.after('A', ({ host }) => {
+      ran = host.localName === 'iso-surface';
+    });
+    expect(ran).toBe(false);
+    expect(compositor.stats('A')?.queued).toBe(0);
+    frames.tick();
+    expect(ran).toBe(true);
+    expect(compositor.stats('A')?.applied).toBe(0);
+  });
+
+  it('a restart drops pending calls with the queue', () => {
+    const { frames, log, compositor, attach } = setup();
+    attach('A');
+    let ran = false;
+    compositor.after('A', () => {
+      ran = true;
+    });
+    compositor.reset('A', fakeBridge('A', log, frames.clock));
+    frames.tick();
+    expect(ran).toBe(false);
+  });
+});
+
 describe('compositor stop and restart', () => {
   it('stopping an isolate drops its queue', () => {
     const { frames, log, compositor, attach } = setup();

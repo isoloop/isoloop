@@ -90,6 +90,11 @@ export interface Compositor {
     send: (e: SerializedEvent) => void,
   ): void;
   enqueue(id: string, batch: unknown): void;
+  /**
+   * Runs `fn` in a frame, once every batch queued before it has applied
+   * (host calls, design §4.7). Dropped with the queue on restart or stop.
+   */
+  after(id: string, fn: (surface: { host: HTMLElement; bridge: HostRenderBridge }) => void): void;
   /** Drops the queue and the surface's content, keeps the surface (restart). */
   reset(id: string, bridge: HostRenderBridge): void;
   /** Removes the surface (stop). */
@@ -101,6 +106,10 @@ export interface Compositor {
   stats(id: string): SurfaceStats | undefined;
 }
 
+type Queued =
+  | { k: 'batch'; batch: unknown }
+  | { k: 'call'; fn: (surface: { host: HTMLElement; bridge: HostRenderBridge }) => void };
+
 type Surface = {
   host: HTMLElement;
   shadow: ShadowRoot;
@@ -108,7 +117,7 @@ type Surface = {
   fallback: HTMLElement;
   bridge: HostRenderBridge;
   send: (e: SerializedEvent) => void;
-  queue: unknown[];
+  queue: Queued[];
   applied: number;
   rejected: number;
   dropped: number;
@@ -142,13 +151,21 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
       progress = false;
       for (let i = 0; i < order.length; i++) {
         const s = order[(start + i) % order.length];
-        if (!s || s.queue.length === 0) continue;
+        if (!s) continue;
+        // Calls waiting at the head run as soon as their isolate's turn comes.
+        for (let q = s.queue[0]; q?.k === 'call'; q = s.queue[0]) {
+          s.queue.shift();
+          q.fn({ host: s.host, bridge: s.bridge });
+        }
+        const next = s.queue[0];
+        if (!next) continue;
         if (appliedAny && now() - frameStart >= frameBudgetMs) {
           schedule();
           return finish(spent);
         }
+        s.queue.shift();
         const t0 = now();
-        if (s.bridge.apply(s.queue.shift())) s.applied++;
+        if (next.k === 'batch' && s.bridge.apply(next.batch)) s.applied++;
         else s.rejected++;
         spent.set(s, (spent.get(s) ?? 0) + now() - t0);
         appliedAny = true;
@@ -202,14 +219,21 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
     enqueue(id, batch) {
       const s = surfaces.get(id);
       if (!s) return;
-      s.queue.push(batch);
+      s.queue.push({ k: 'batch', batch });
+      schedule();
+    },
+
+    after(id, fn) {
+      const s = surfaces.get(id);
+      if (!s) return;
+      s.queue.push({ k: 'call', fn });
       schedule();
     },
 
     reset(id, bridge) {
       const s = surfaces.get(id);
       if (!s) return;
-      s.dropped += s.queue.length;
+      s.dropped += s.queue.filter((q) => q.k === 'batch').length;
       s.queue.length = 0;
       s.bridge.unmount();
       s.bridge = bridge;
@@ -241,7 +265,7 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
       const s = surfaces.get(id);
       return (
         s && {
-          queued: s.queue.length,
+          queued: s.queue.filter((q) => q.k === 'batch').length,
           applied: s.applied,
           rejected: s.rejected,
           dropped: s.dropped,
