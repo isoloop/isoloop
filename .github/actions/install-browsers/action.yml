@@ -1,0 +1,30 @@
+# Installs Playwright browsers and their system packages for CI.
+# System packages (apt) are installed on every run, with a time limit and
+# retries (see retry.sh); browser binaries are cached per Playwright version.
+name: Install Playwright browsers
+description: Playwright browsers and their system dependencies, with retries and a cache
+inputs:
+  browsers:
+    description: Space-separated browser names, e.g. "chromium firefox webkit"
+    required: true
+runs:
+  using: composite
+  steps:
+    - id: version
+      shell: bash
+      run: echo "playwright=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+    - id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.version.outputs.playwright }}-${{ inputs.browsers }}
+    - name: System dependencies
+      shell: bash
+      # dpkg --configure -a finishes a package install that a timed-out attempt interrupted.
+      run: |
+        "$GITHUB_ACTION_PATH/retry.sh" bash -c 'sudo dpkg --configure -a && pnpm exec playwright install-deps "$@"' _ ${{ inputs.browsers }}
+    - name: Browsers
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        "$GITHUB_ACTION_PATH/retry.sh" pnpm exec playwright install ${{ inputs.browsers }}
