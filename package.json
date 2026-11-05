@@ -16,6 +16,7 @@
     "test:browser": "vitest run --project dom --project host --project runtime",
     "e2e": "playwright test",
     "bench": "vitest run --config bench/vitest.config.ts",
+    "bench:click-to-paint": "playwright test --config bench/click-to-paint/playwright.config.ts",
     "test:install-browsers": "playwright install chromium firefox webkit",
     "build": "pnpm -r build",
     "dev": "pnpm --filter four-loops dev",

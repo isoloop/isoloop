@@ -4,5 +4,7 @@
     "lib": ["ES2022"],
     "types": ["node"]
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts"],
+  // A Playwright script, checked by the root tsconfig with the E2E tests.
+  "exclude": ["click-to-paint"]
 }
