@@ -12,6 +12,7 @@ One plan per milestone of [RFC 0001](../rfcs/0001-threaded-runtime.md#mvp-roadma
 | M3 Adapters + dashboard | [m3-adapters-dashboard.md](m3-adapters-dashboard.md) | Outline | Dashboard live on a public URL; recorded comparison in the README |
 | M4 Devtools + 0.1 | [m4-devtools-release.md](m4-devtools-release.md) | Outline | `0.1.0` on npm with a launch post |
 | M5 Shared-memory engine | [m5-shared-memory-engine.md](m5-shared-memory-engine.md) | Outline | Benchmark results published, whichever engine wins |
+| M5b Delivery batching (spike) | [m5b-delivery-batching.md](m5b-delivery-batching.md) | Outline | Findings written up; ADR amending §6.3 or a recalibrated §9 budget accepted |
 
 Outlines get full task lists when the milestone before them closes, so they reflect what was learned.
 
@@ -20,7 +21,7 @@ flowchart LR
   M0 --> M1 --> M2 --> M3 --> M4
   M2 --> M2b --> M4
   M2 --> M2c
-  M2 --> M5
+  M2 --> M5 --> M5b
   M3 -. "dashboard metrics reused" .-> M4
 ```
 
