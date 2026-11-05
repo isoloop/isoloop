@@ -186,6 +186,43 @@ describe('suspension', () => {
     expect(state('N')).toBe('running');
   });
 
+  // Plan m2-bus task 10: a host pushState + syncRoute reaches subscribed
+  // isolates and wakes no unsubscribed suspended isolate. S, suspended and
+  // subscribed to the route, is the control: it must wake, so U staying
+  // asleep means something.
+  it('a host pushState and syncRoute wake a suspended route subscriber, and no other suspended isolate', async () => {
+    const start = location.href;
+    try {
+      const { kernel, latest, states, state } = setup();
+      const route = { topic: 'isoloop.route.v1' };
+      const R = document.createElement('section');
+      document.body.append(R);
+      kernel.spawn({ id: 'R', src, surface: R, grants: ALL, suspend: 'never', config: route });
+      kernel.spawn({ id: 'S', src, grants: ALL, suspend: IDLE, config: route });
+      kernel.spawn({ id: 'U', src, grants: ALL, suspend: IDLE, config: { topic: 'notes.v1' } });
+      await until(() => state('S') === 'suspended' && state('U') === 'suspended');
+      const sleptS = latest('S')?.instance;
+      const uSince = states.length;
+
+      history.pushState({ from: 'host' }, '', '/orders/7');
+      kernel.syncRoute();
+
+      const reached = (id: string) =>
+        latest(id)?.values.some(
+          (v) => typeof v === 'object' && v !== null && Reflect.get(v, 'pathname') === '/orders/7',
+        );
+      await until(() => reached('R'));
+      await until(() => reached('S'));
+      expect(latest('S')?.instance).not.toBe(sleptS);
+      // Give a stray wake time to show up before checking U.
+      await new Promise((r) => setTimeout(r, 400));
+      expect(state('U')).toBe('suspended');
+      expect(states.slice(uSince).filter((e) => e.id === 'U')).toEqual([]);
+    } finally {
+      history.replaceState(null, '', start);
+    }
+  });
+
   it('a suspended group member leaves its group and rejoins on resume', async () => {
     const { kernel, latest, state } = setup();
     kernel.spawn({ id: 'X', src, grants: ALL, suspend: IDLE, config: groupConfig('X') });
