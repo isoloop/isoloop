@@ -3,11 +3,13 @@ packages:
   - examples/*
   - bench
   - e2e/harness
+  - spikes/*
 
 # Every tool version lives here, pinned exactly (ADR 0009, rule 8).
 # Packages reference them with "catalog:".
 catalog:
   '@playwright/test': 1.64.1
+  '@remote-dom/core': 1.12.1
   '@types/node': 26.6.6
   '@vitest/browser-playwright': 5.0.5
   fast-check: 4.10.2

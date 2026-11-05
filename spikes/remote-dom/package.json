@@ -1,0 +1,16 @@
+{
+  "name": "@isoloop/spike-remote-dom",
+  "private": true,
+  "type": "module",
+  "description": "M1 task 4 scratch spike. Lives on spike/m1-remote-dom only; never merged.",
+  "scripts": {
+    "spike": "vitest run --config vitest.config.js"
+  },
+  "dependencies": {
+    "@remote-dom/core": "catalog:"
+  },
+  "devDependencies": {
+    "@vitest/browser-playwright": "catalog:",
+    "vitest": "catalog:"
+  }
+}
