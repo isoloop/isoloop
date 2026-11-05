@@ -6,7 +6,14 @@
 import {
   isIsolateToHost,
   isLegacyIsolateToHost,
+  isSystemTopic,
+  type BusMetrics,
+  type BusRecord,
   type CallResult,
+  type ContractsList,
+  type StartPosition,
+  type TopicRef,
+  type TypedRecord,
   type ErrorCode,
   type Grants,
   type HostMethod,
@@ -14,6 +21,8 @@ import {
   type HostToIsolate,
   type LegacyHostToIsolate,
 } from '@isoloop/protocol';
+import { createBusController, HOST_CONNECTION_PREFIX, type BusController } from './bus/controller';
+import { BusError } from './bus/errors';
 import { createCompositor, type FallbackRender, type SurfaceStats } from './compositor';
 import { missingFeatures } from './features';
 import { createLegacyBus, type BusDelivery } from './legacy-bus';
@@ -35,8 +44,16 @@ import {
 } from './supervisor';
 
 export type KernelConfig = {
+  /**
+   * The topics (ADR 0003): `url` is the ES module the bus worker imports,
+   * `list` its default export, imported by the host. Needs `workers.bus`.
+   * Without it there is no bus worker; M2 task 11 makes it required.
+   */
+  contracts?: { url: string; list: ContractsList };
   workers: {
     isolateBootstrap: string;
+    /** `bus-worker.js` URL. */
+    bus?: string;
     /** Soft worker count: passing it warns once (`workers:budget`) and never blocks a spawn. Default 32 (ADR 0001). */
     budget?: number;
   };
@@ -64,6 +81,8 @@ export type KernelConfig = {
    * Malformed entries make `createKernel` throw `invalid_config`.
    */
   components?: Readonly<Record<string, HostComponent>>;
+  /** Dev checks: the bus checks every schema output with `structuredClone` (ADR 0003, decision 11). Default false. */
+  dev?: boolean;
 };
 
 export type IsolateManifest = {
@@ -80,6 +99,11 @@ export type IsolateManifest = {
   pool?: string;
   /** Opt-in suspension (ADR 0001). Anything but `'never'` is rejected with `suspend_unsupported` until M2. */
   suspend?: 'never' | 'when-idle' | { whenIdle: { afterMs: number } };
+  /**
+   * After a bus restart, memory topics start empty and each subscription gets
+   * `reset` (ADR 0007). `onReset: 'restart'` restarts the isolate instead.
+   */
+  bus?: { onReset?: 'reset' | 'restart' };
 };
 
 /** Codes `createKernel` and `spawn` throw with (design §4.1). */
@@ -88,7 +112,9 @@ export type KernelErrorCode =
   | 'pools_unsupported'
   | 'suspend_unsupported'
   | 'invalid_manifest'
-  | 'invalid_config';
+  | 'invalid_config'
+  /** The bus couldn't load its contracts, so nothing can start (ADR 0003, decision 7). */
+  | 'bus_failed';
 
 /** An error the kernel API throws, with a code to branch on. */
 export class KernelError extends Error {
@@ -126,6 +152,19 @@ export type KernelEvents = {
   'workers:budget': { live: number; budget: number };
   /** A publish on the M0 main-thread bus. */
   'bus:publish': BusDelivery;
+  /** The bus worker loaded its contracts. `first` is false after a restart. */
+  'bus:ready': { first: boolean };
+  'bus:crash': { reason: CrashReason; message: string };
+  /** A new bus worker is starting; running isolates get a new bus port (ADR 0007). */
+  'bus:restart': { restarts: number };
+  /**
+   * The bus is down for good. With `code`, its contracts couldn't be used and
+   * no isolate runs (ADR 0003); with `reason`, it crashed past the restart
+   * limit and isolates keep running with every publish rejected (ADR 0007).
+   */
+  'bus:failed': { code?: ErrorCode; reason?: CrashReason; message: string };
+  /** Sampled every second (design §6.3). */
+  'bus:metrics': BusMetrics;
 };
 
 export type KernelEvent = keyof KernelEvents;
@@ -141,9 +180,22 @@ export interface Kernel {
   spawn(manifest: IsolateManifest): IsolateHandle;
   stop(id: string): Promise<void>;
   restart(id: string): Promise<void>;
+  /**
+   * Publishes from the host. Rejects with a `BusError`: `forbidden` for
+   * `isoloop.*` topics, or the broker's code (`invalid`, `bus_unavailable`, …).
+   */
+  publish<In>(topic: TopicRef<In, any, any, any>, rec: { key?: string; value: In }): Promise<void>;
+  /** Subscribes from the host, from `latest` by default. Records cross the main thread only here. */
+  subscribe<Out>(
+    topic: TopicRef<any, Out, any, any>,
+    fn: (r: TypedRecord<Out>) => void,
+    opts?: { from?: StartPosition },
+  ): () => void;
   on<E extends KernelEvent>(event: E, fn: (e: KernelEvents[E]) => void): () => void;
   isolates(): IsolateSnapshot[];
   destroy(): Promise<void>;
+  /** @internal Test hooks; not part of the API. */
+  readonly debug: { crashBus(): void };
 }
 
 type Slot = {
@@ -194,6 +246,11 @@ function scrollOptions(x: unknown): ScrollIntoViewOptions {
 function validate(m: IsolateManifest): void {
   if (typeof m.id !== 'string' || m.id === '' || typeof m.src !== 'string' || m.src === '')
     throw new KernelError('invalid_manifest', 'A manifest needs a non-empty `id` and `src`');
+  if (m.id.startsWith(HOST_CONNECTION_PREFIX))
+    throw new KernelError(
+      'invalid_manifest',
+      `"${m.id}": ids starting with ${HOST_CONNECTION_PREFIX} belong to the kernel`,
+    );
   if (m.pool !== undefined) {
     if (typeof m.pool !== 'string' || m.pool === '')
       throw new KernelError('invalid_manifest', `"${m.id}": \`pool\` must be a non-empty string`);
@@ -230,6 +287,11 @@ export function createKernel(config: KernelConfig): Kernel {
   } catch (error) {
     throw new KernelError('invalid_config', error instanceof Error ? error.message : String(error));
   }
+  if ((config.contracts === undefined) !== (config.workers.bus === undefined))
+    throw new KernelError(
+      'invalid_config',
+      '`contracts` and `workers.bus` go together: the bus worker needs both',
+    );
   const everyMs = config.heartbeat?.everyMs ?? 100;
   const def = DEFAULT_SUPERVISOR_CONFIG;
   const cfg: SupervisorConfig = {
@@ -251,6 +313,11 @@ export function createKernel(config: KernelConfig): Kernel {
     'isolate:error': new Set(),
     'workers:budget': new Set(),
     'bus:publish': new Set(),
+    'bus:ready': new Set(),
+    'bus:crash': new Set(),
+    'bus:restart': new Set(),
+    'bus:failed': new Set(),
+    'bus:metrics': new Set(),
   };
   const budget = config.workers.budget ?? 32;
   let warnedBudget = false;
@@ -278,8 +345,8 @@ export function createKernel(config: KernelConfig): Kernel {
     slot.graceTimer = undefined;
     if (!slot.loaded) return;
     slot.loaded.worker.terminate();
-    slot.loaded.busPort.close();
     slot.loaded = null;
+    controller?.detach(slot.manifest.id);
     bus.remove(slot.manifest.id);
     slot.onClosed();
   };
@@ -485,6 +552,10 @@ export function createKernel(config: KernelConfig): Kernel {
     if (manifest.surface) {
       compositor.reset(manifest.id, createIsoloopDomBridge(registry));
     }
+    const grants = manifest.grants ?? DEFAULT_GRANTS;
+    const busPort = controller
+      ? controller.connect(manifest.id, grants)
+      : new MessageChannel().port2; // no bus worker: an unconnected port
     let loaded: LoadedWorker;
     try {
       loaded = load({
@@ -492,11 +563,13 @@ export function createKernel(config: KernelConfig): Kernel {
         id: manifest.id,
         src: manifest.src,
         config: manifest.config ?? null,
-        grants: manifest.grants ?? DEFAULT_GRANTS,
+        grants,
         renderFmt: manifest.surface ? ISOLOOP_DOM_FMT : 'none',
         heartbeatMs: everyMs,
+        busPort,
       });
     } catch (err) {
+      controller?.detach(manifest.id);
       const message = err instanceof Error ? err.message : String(err);
       feed(slot, { k: 'spawnFailed', at: performance.now(), message });
       return;
@@ -536,8 +609,56 @@ export function createKernel(config: KernelConfig): Kernel {
     }
   };
 
+  /**
+   * The bus worker (ADR 0005, ADR 0007), started before any isolate. After a
+   * bus restart each running isolate gets a new port (`reattach`) and keeps
+   * running, unless its manifest asks to be restarted.
+   */
+  let contractsFailed = false;
+  const controller: BusController | undefined =
+    config.contracts && config.workers.bus
+      ? createBusController({
+          workerUrl: config.workers.bus,
+          contracts: config.contracts,
+          heartbeatMs: everyMs,
+          supervisor: cfg,
+          dev: config.dev ?? false,
+          events: {
+            ready: (first) => emit('bus:ready', { first }),
+            crash: (reason, message) => emit('bus:crash', { reason, message }),
+            restart: (restarts) => emit('bus:restart', { restarts }),
+            metrics: (m) => emit('bus:metrics', m),
+            failed: (f) => {
+              emit('bus:failed', f);
+              if (!('code' in f)) return;
+              // Nothing can run without contracts: fail every isolate, accept no new ones.
+              contractsFailed = true;
+              const at = performance.now();
+              for (const slot of slots.values())
+                feed(slot, { k: 'busFailed', at, message: `bus: ${f.code}: ${f.message}` });
+            },
+            reattach: (id) => {
+              const slot = slots.get(id);
+              if (!slot?.loaded || !controller) return;
+              if (slot.manifest.bus?.onReset === 'restart' && controller.state !== 'failed') {
+                feed(slot, { k: 'respawn' });
+                return;
+              }
+              const port = controller.connect(id, slot.manifest.grants ?? DEFAULT_GRANTS, {
+                reattach: true,
+              });
+              slot.loaded.worker.postMessage(
+                { v: 1, t: 'reattach', p: { busPort: port } } satisfies HostToIsolate,
+                [port],
+              );
+            },
+          },
+        })
+      : undefined;
+
   const tick = setInterval(() => {
     const at = performance.now();
+    controller?.feed({ k: 'tick', at });
     for (const slot of slots.values()) feed(slot, { k: 'tick', at });
   }, TICK_MS);
 
@@ -546,11 +667,13 @@ export function createKernel(config: KernelConfig): Kernel {
   // isolate. Judge nothing while hidden; restart every clock on the way back.
   const visibility = (): void => {
     const at = performance.now();
+    controller?.feed(document.hidden ? { k: 'hidden' } : { k: 'visible', at });
     for (const slot of slots.values())
       feed(slot, document.hidden ? { k: 'hidden' } : { k: 'visible', at });
   };
   const resumed = (): void => {
     const at = performance.now();
+    controller?.feed({ k: 'visible', at });
     for (const slot of slots.values()) feed(slot, { k: 'visible', at });
   };
   document.addEventListener('visibilitychange', visibility);
@@ -581,6 +704,11 @@ export function createKernel(config: KernelConfig): Kernel {
   const kernel: Kernel = {
     spawn(manifest) {
       validate(manifest);
+      if (contractsFailed)
+        throw new KernelError(
+          'bus_failed',
+          `"${manifest.id}": the bus failed to load its contracts`,
+        );
       if (slots.has(manifest.id)) throw new Error(`Isolate "${manifest.id}" already exists`);
       const slot: Slot = {
         manifest,
@@ -631,6 +759,32 @@ export function createKernel(config: KernelConfig): Kernel {
       return Promise.resolve();
     },
 
+    async publish(topic, rec) {
+      if (isSystemTopic(topic.name))
+        throw new BusError({ code: 'forbidden', message: `${topic.name} belongs to the kernel` });
+      if (!controller)
+        throw new BusError({
+          code: 'bus_unavailable',
+          message: 'No bus worker: KernelConfig.contracts is not set',
+        });
+      const r = await controller.publish(topic.name, rec.key, rec.value);
+      if (!r.ok) throw new BusError(r.error);
+    },
+
+    subscribe(topic, fn, opts) {
+      if (!controller) throw new Error('No bus worker: KernelConfig.contracts is not set');
+      return controller.subscribe({
+        topic: topic.name,
+        from: opts?.from ?? 'latest',
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the broker validated the value against the topic's schema
+        fn: (r: BusRecord) => fn(r as TypedRecord<never>),
+      });
+    },
+
+    debug: {
+      crashBus: () => controller?.crash(),
+    },
+
     on(event, fn) {
       const set = listeners[event];
       set.add(fn);
@@ -648,6 +802,7 @@ export function createKernel(config: KernelConfig): Kernel {
       document.removeEventListener('visibilitychange', visibility);
       document.removeEventListener('resume', resumed);
       await Promise.all([...slots.keys()].map((id) => kernel.stop(id)));
+      controller?.destroy();
     },
   };
   return kernel;

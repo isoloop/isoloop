@@ -42,7 +42,11 @@ export type HostToBus =
       'boot',
       { contractsUrl: string; topics: TopicConfig[]; heartbeatMs?: number; dev?: boolean }
     >
-  | Envelope<'attach', { isolateId: string; grants: Grants; port: MessagePort }>
+  /**
+   * `reattach`: the isolate was connected to a bus that has since restarted,
+   * so each memory topic it subscribes to answers with `reset` first (ADR 0007).
+   */
+  | Envelope<'attach', { isolateId: string; grants: Grants; port: MessagePort; reattach?: boolean }>
   | Envelope<'detach', { isolateId: string; keepOffsets: boolean }>
   /** `kernel.publish`. With `id` set, the bus replies with `result`. */
   | Envelope<'publish', { topic: string; key?: string; value: unknown }>;

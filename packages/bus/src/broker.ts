@@ -54,6 +54,12 @@ export type BrokerOptions = {
   systemTopics?: readonly AnyTopicDef[];
   /** Default `setTimeout`. Used to forget requests after their timeout. */
   timers?: Timers;
+  /**
+   * True for topics whose log survived a bus restart. Default: none, since
+   * every topic is in memory until OPFS storage (M2b). A reattached isolate
+   * subscribing to any other topic gets `reset` first (ADR 0007).
+   */
+  durable?: (topic: string) => boolean;
 };
 
 /** Who is publishing: an isolate (grants apply), the host (`kernel.publish`), or the kernel itself (system topics). */
@@ -143,6 +149,8 @@ type Connection = {
   grants: Grants;
   port: BusPort;
   subs: Map<string, Subscription>;
+  /** Set when attached after a bus restart: memory topics not yet reset on this connection. */
+  reset: Set<string> | undefined;
 };
 
 const fail = (code: ErrorCode, message: string, extra?: Partial<CallError>): CallResult => ({
@@ -191,6 +199,7 @@ export class Broker {
   readonly #batch: number;
   readonly #inboxLimit: number;
   readonly #timers: Timers;
+  readonly #durable: (topic: string) => boolean;
   readonly #topics = new Map<string, Topic>();
   readonly #conns = new Map<string, Connection>();
   readonly #groups = new Map<string, Group>();
@@ -207,6 +216,7 @@ export class Broker {
     this.#batch = opts.batchSize ?? 64;
     this.#inboxLimit = opts.inboxLimit ?? 1000;
     this.#timers = opts.timers ?? { set: (fn, ms) => void setTimeout(fn, ms) };
+    this.#durable = opts.durable ?? (() => false);
     for (const def of [...(opts.systemTopics ?? SYSTEM_TOPICS), ...opts.contracts.topics]) {
       this.#engine.createTopic(topicConfig(def));
       this.#topics.set(def.name, {
@@ -268,10 +278,25 @@ export class Broker {
     for (const name of this.#topics.keys()) this.#engine.compact(name);
   }
 
-  /** Connects an isolate. A second attach for the same id replaces the first. */
-  attach(isolateId: string, grants: Grants, port: BusPort): void {
+  /**
+   * Connects an isolate. A second attach for the same id replaces the first.
+   * With `reattach`, the isolate was connected to a bus that restarted: its
+   * first subscribe to each memory topic is answered with `reset` (ADR 0007).
+   */
+  attach(
+    isolateId: string,
+    grants: Grants,
+    port: BusPort,
+    opts: { reattach?: boolean } = {},
+  ): void {
     this.detach(isolateId, true);
-    const conn: Connection = { isolateId, grants, port, subs: new Map() };
+    const conn: Connection = {
+      isolateId,
+      grants,
+      port,
+      subs: new Map(),
+      reset: opts.reattach ? new Set() : undefined,
+    };
     this.#conns.set(isolateId, conn);
     port.onMessage((msg) => {
       if (this.#conns.get(isolateId) === conn) this.#receive(conn, msg);
@@ -584,6 +609,11 @@ export class Broker {
       return fail('forbidden', `no subscribe grant for ${name}`);
     }
     if (!this.#topics.has(name)) return fail('unknown_topic', `unknown topic ${name}`);
+    if (conn.reset && !conn.reset.has(name) && !this.#durable(name)) {
+      // Exactly one reset per memory topic per reattached connection (I11).
+      conn.reset.add(name);
+      conn.port.post({ v: 1, t: 'reset', p: { topic: name, reason: 'bus_restart' } });
+    }
     const old = conn.subs.get(name);
     if (old) this.#leave(old);
     const sub: Subscription = {

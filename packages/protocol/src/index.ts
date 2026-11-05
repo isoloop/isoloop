@@ -7,3 +7,4 @@ export * from './bus';
 export * from './control';
 export * from './legacy';
 export * from './system-topics';
+export * from './topics';

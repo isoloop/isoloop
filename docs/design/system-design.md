@@ -183,6 +183,7 @@ type KernelConfig = {
   routing?: boolean;                        // default true; false = no route topic, no link interception, navigate rejects routing_disabled (ADR 0002)
   basePath?: string;                        // default '/'; must match the host router's basename
   onNavigate?: (req: NavigateRequest) => boolean | Promise<boolean>;   // default: history.pushState/replaceState; true = accepted, not finished
+  dev?: boolean;                            // default false; the bus checks schema outputs with structuredClone (ADR 0003)
 };
 
 type NavigateRequest = { href: string; replace: boolean; state?: unknown; from: string };   // href absolute, same-origin; from = isolate id
@@ -195,7 +196,7 @@ interface Kernel {
   resume(id: string): Promise<void>;                   // wake a suspended isolate (ADR 0001); no-op unless suspended
   publish<T>(topic: TopicDef<T>, rec: { key?: string; value: T }): Promise<void>;
   subscribe<T>(topic: TopicDef<T>, fn: (r: BusRecord) => void, opts?: { from?: StartPosition }): () => void;
-  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:crash, bus:failed, bus:seeded, bus:seed_rejected, bus:orphaned_topics, route:state_dropped, route:navigate_error, ...
+  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:ready, bus:crash, bus:restart, bus:failed, bus:metrics, bus:seeded, bus:seed_rejected, bus:orphaned_topics, route:state_dropped, route:navigate_error, ...
   isolates(): IsolateSnapshot[];                                      // used by devtools
   syncRoute(): void;                                   // host router changed the URL; republish isoloop.route.v1 if href/state differ (ADR 0002)
   dropTopic(name: string, o?: { force?: boolean }): Promise<void>;   // delete an orphaned persistent topic; seed_pending / force rules (ADR 0003)
@@ -205,7 +206,7 @@ interface Kernel {
 
 Defaults: heartbeat `100 / 400 / 10_000` ms, ready timeout `10_000` ms, frame budget `8` ms, supervisor `one-for-one`, 3 restarts in 60 s, backoff `250 ms × 2ⁿ` capped at 4 s.
 
-`spawn` throws a `KernelError` with a `code`: `pools_unsupported`, `suspend_unsupported` (until M2c and M2), or `invalid_manifest`. Hosting requirements (CSP, CORS) are in [the hosting guide](../guide/hosting.md).
+`spawn` throws a `KernelError` with a `code`: `pools_unsupported`, `suspend_unsupported` (until M2c and M2), `invalid_manifest` (also for ids starting with `isoloop:`, which name the kernel's own bus connections), or `bus_failed` once the bus couldn't load its contracts. A contracts failure also fails every running isolate (reason `bus-failed`): nothing can run without contracts. `kernel.publish` rejects with a `BusError` carrying the broker's code. The manifest's `bus: { onReset: 'restart' }` opts an isolate into a restart instead of `reset` after a bus restart ([ADR 0007](../adr/0007-bus-worker-supervision.md)). Hosting requirements (CSP, CORS) are in [the hosting guide](../guide/hosting.md).
 
 ### 4.2 Loader
 

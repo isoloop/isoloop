@@ -209,7 +209,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
       case 'attach': {
         const port = ports.get(msg.p.isolateId) ?? held(msg.p.port);
         ports.delete(msg.p.isolateId);
-        b.attach(msg.p.isolateId, msg.p.grants, port);
+        b.attach(msg.p.isolateId, msg.p.grants, port, { reattach: msg.p.reattach ?? false });
         return;
       }
       case 'detach':

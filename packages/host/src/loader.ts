@@ -1,11 +1,11 @@
 /*
  * Turns a manifest into a running worker (design §4.2): a module worker from
- * the bootstrap URL, then `init`. In M0 the bus port is an unused channel end,
- * since bus traffic still goes through the main thread.
+ * the bootstrap URL, then `init` with the bus port transferred. The bus
+ * controller made that port and attached its other end to the bus worker.
  */
 import { PROTOCOL, type Grants, type HostToIsolate } from '@isoloop/protocol';
 
-export type LoadedWorker = { worker: Worker; busPort: MessagePort };
+export type LoadedWorker = { worker: Worker };
 
 export type LoadOptions = {
   bootstrapUrl: string;
@@ -15,11 +15,12 @@ export type LoadOptions = {
   grants: Grants;
   renderFmt: string;
   heartbeatMs: number;
+  /** The isolate's end of its bus connection; transferred in `init`. */
+  busPort: MessagePort;
 };
 
 export function load(o: LoadOptions): LoadedWorker {
   const worker = new Worker(o.bootstrapUrl, { type: 'module', name: o.id });
-  const { port1, port2 } = new MessageChannel();
   const init: HostToIsolate = {
     v: 1,
     t: 'init',
@@ -29,11 +30,11 @@ export function load(o: LoadOptions): LoadedWorker {
       renderFmt: o.renderFmt,
       config: o.config,
       grants: o.grants,
-      busPort: port2,
+      busPort: o.busPort,
       heartbeatMs: o.heartbeatMs,
       src: new URL(o.src, document.baseURI).href,
     },
   };
-  worker.postMessage(init, [port2]);
-  return { worker, busPort: port1 };
+  worker.postMessage(init, [o.busPort]);
+  return { worker };
 }

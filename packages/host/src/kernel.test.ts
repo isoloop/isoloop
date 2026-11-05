@@ -22,13 +22,12 @@ function setup(o: { backoffMs?: number } = {}) {
     styles: [sheet],
   });
   kernels.push(kernel);
-  const events: { [E in keyof KernelEvents]: KernelEvents[E][] } = {
+  const events: {
+    [E in 'isolate:state' | 'isolate:crash' | 'isolate:error' | 'bus:publish']: KernelEvents[E][];
+  } = {
     'isolate:state': [],
-    'isolate:ready': [],
     'isolate:crash': [],
-    'isolate:failed': [],
     'isolate:error': [],
-    'workers:budget': [],
     'bus:publish': [],
   };
   kernel.on('isolate:state', (e) => {
