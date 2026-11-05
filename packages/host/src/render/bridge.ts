@@ -11,9 +11,9 @@ export interface HostRenderBridge {
   mount(root: ShadowRoot, send: (event: SerializedEvent) => void): void;
   /** Applies one batch. Returns false and changes nothing if the batch is malformed. */
   apply(batch: unknown): boolean;
-  /** The isolate's id for a host node (EventBridge). `legacy-vdom` has none. */
+  /** The isolate's id for a host node (EventBridge). Optional for test bridges. */
   idFor?(node: Node): string | undefined;
-  /** The host element for an isolate's node id (measure, focus). `legacy-vdom` has none. */
+  /** The host element for an isolate's node id (measure, focus). Optional for test bridges. */
   nodeFor?(id: string): Element | undefined;
   unmount(): void;
 }

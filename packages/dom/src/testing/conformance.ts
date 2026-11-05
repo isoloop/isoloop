@@ -27,8 +27,8 @@ export type Handle = { readonly __handle: true };
 
 /**
  * The isolate side of a bridge, reduced to the DOM operations the suite needs.
- * Each bridge provides its own: the isoloop-dom driver calls the worker-side
- * DOM subset, the legacy-vdom driver keeps a tree and sends it whole.
+ * Each bridge provides its own; the isoloop-dom driver calls the worker-side
+ * DOM subset.
  */
 export interface IsolateDriver {
   /** An element with `class="cf-root"` that the suite builds under. Already inserted. */
@@ -86,9 +86,9 @@ export const CASES = {
 export type CaseName = keyof typeof CASES;
 
 /**
- * The suite every render bridge must pass: `legacy-vdom` (with its known
- * gaps), the isoloop-dom bridge (with none), and any bridge after them. Batches go
- * through `structuredClone`, as they would through `postMessage`.
+ * The suite every render bridge must pass, with no known gaps for the
+ * isoloop-dom bridge. Known gaps can be marked per bridge. Batches go through
+ * `structuredClone`, as they would through `postMessage`.
  */
 export function runBridgeConformance(
   name: string,

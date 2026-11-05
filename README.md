@@ -168,6 +168,7 @@ Parallel painting of DOM surfaces (canvas isolates painting through `OffscreenCa
 - [Implementation plans](docs/plans/README.md), one per milestone
 - [Contributing](CONTRIBUTING.md): setup, scripts, editors and conventions
 - [Would like](docs/would-like.md): ideas deferred or to explore, not planned
+- [Should do](docs/should-do.md): committed work waiting on a package or milestone
 - Prior art: [Shopify Remote DOM](https://github.com/Shopify/remote-dom), [Neo.mjs](https://github.com/neomjs/neo), [Web Fragments](https://github.com/IgorMinar/reframed), [Aiga](https://aiga.js.org/), [Garfish](https://github.com/web-infra-dev/garfish)
 
 ## License

@@ -8,11 +8,11 @@ Gets a full task list when M2 closes.
 
 ## Main work items
 
-1. **Preact adapter** (`packages/preact`): `defineIsolate`, `useTopic(topic, { from })`, `usePublish`, `useRequest`, `useHost` (measure, focus, navigate), `useRoute()` (subscribes to `routeTopic` only when used, [ADR 0002](../adr/0002-host-owns-routing.md)). Rendering into `ctx.root`, the `isoloop-dom` subset ([ADR 0010](../adr/0010-own-render-bridge.md)). First, because Preact is small and the M1 smoke test already renders it.
-2. **React adapter** (`packages/react`): the same hooks; React DOM renders into the `isoloop-dom` subset (M1 smoke test); verify concurrent features and `useSyncExternalStore` for topics.
+1. **Preact adapter** (`packages/preact`): `defineIsolate`, `useTopic(topic, { from })`, `usePublish`, `useRequest`, `useHost` (measure, focus, navigate), `useRoute()` (subscribes to `routeTopic` only when used, [ADR 0002](../adr/0002-host-owns-routing.md)). Rendering into `ctx.root`, the `isoloop-dom` subset ([ADR 0010](../adr/0010-own-render-bridge.md)). First, because Preact is small. Starts with the Preact smoke test moved from M1 task 5 ([should-do](../should-do.md)).
+2. **React adapter** (`packages/react`): the same hooks; React DOM renders into the `isoloop-dom` subset (the React smoke test moved from M1 task 5); verify concurrent features and `useSyncExternalStore` for topics.
 3. **Adapter conformance tests:** one fixture app per adapter, run through the same E2E suite (render, events, inputs, replay).
 4. **Canvas isolates:** `requestCanvas` host call; a small chart helper on `OffscreenCanvas` in the worker; resize events.
-5. **`examples/dashboard`**, a markets dashboard that needs no backend:
+5. **The markets dashboard**, in a new `isoloop/examples` repository on prerelease publishes ([should-do](../should-do.md)), so its dependencies stay out of the main repo. It installs from npm once `0.1.0` ships (M4). It needs no backend:
    - **Feed isolates** (headless), one per exchange, on public market-data WebSockets that need no key (e.g. Coinbase, Kraken, Bitstamp, OKX). Each maps its exchange's messages to shared `trades.v1` / `book.v1` schemas, and keeps `prices.v1` (compacted per symbol) current. One exchange's burst, parse error or hung socket affects only its own isolate.
    - **Sources** behind the same topics: `live` (the WebSockets) and `replay` (recorded ticks played back at N× speed). The replay source is what benchmarks, E2E tests and the recorded comparison use, because live markets aren't reproducible.
    - **Aggregator isolate:** cross-market VWAP, spreads and volume per symbol into `aggregates.v1`.

@@ -19,7 +19,6 @@ import { missingFeatures } from './features';
 import { createLegacyBus, type BusDelivery } from './legacy-bus';
 import { load, type LoadedWorker } from './loader';
 import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from './render/isoloop-dom';
-import { createLegacyVdomBridge, LEGACY_VDOM } from './render/legacy-vdom';
 import { createRegistry, type ComponentRegistry, type HostComponent } from './render/registry';
 import {
   DEFAULT_BACKOFF,
@@ -162,8 +161,8 @@ type Slot = {
   fmt: string | undefined;
 };
 
-/** Render formats a host accepts in `ready`: `legacy-vdom@1` until M1 task 11 removes it. */
-const SURFACE_FMTS: readonly string[] = [ISOLOOP_DOM_FMT, LEGACY_VDOM];
+/** Render formats a host accepts in `ready` for an isolate with a surface (ADR 0011: exact match). */
+const SURFACE_FMTS: readonly string[] = [ISOLOOP_DOM_FMT];
 
 const DEFAULT_GRANTS: Grants = { publish: [], subscribe: [] };
 
@@ -440,8 +439,6 @@ export function createKernel(config: KernelConfig): Kernel {
             });
             return;
           }
-          // Surfaces start on isoloop-dom; a legacy isolate swaps its bridge before it renders.
-          if (surface && fmt === LEGACY_VDOM) compositor.reset(id, createLegacyVdomBridge());
           slot.fmt = fmt;
           feed(slot, { k: 'ready' });
           return;

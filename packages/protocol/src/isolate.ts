@@ -17,7 +17,7 @@ export type InitPayload = {
   isolateId: string;
   /** Protocol versions the host accepts. */
   protocol: { min: number; max: number };
-  /** `isoloop-dom@1`, `legacy-vdom@1`, or `none` (headless). */
+  /** `isoloop-dom@1`, or `none` (headless). */
   renderFmt: string;
   /** `manifest.config`, passed through. */
   config: unknown;
