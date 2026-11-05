@@ -40,6 +40,11 @@ export type BrokerOptions = {
   dev?: boolean;
   /** Records delivered per `deliver` message. Default 64. */
   batchSize?: number;
+  /**
+   * Credit per subscription: records delivered and not yet committed before
+   * delivery pauses (design §6.3). Default 1,000.
+   */
+  inboxLimit?: number;
   /** Built-in `isoloop.*` topics. Default `SYSTEM_TOPICS` from `@isoloop/protocol`. */
   systemTopics?: readonly AnyTopicDef[];
 };
@@ -66,8 +71,14 @@ type Subscription = {
   topic: string;
   /** Whose offsets: the isolate id. */
   consumer: string;
-  /** Next offset to deliver. */
+  /** Next offset to read from the log. While paused this is all that is kept. */
   cursor: number;
+  /** Records that may still be delivered before the next commit. */
+  credit: number;
+  /** Offsets delivered and not yet committed, ascending. */
+  unacked: number[];
+  /** A pump is queued for the next microtask. */
+  scheduled: boolean;
 };
 
 type Connection = {
@@ -103,6 +114,7 @@ export class Broker {
   readonly #now: () => number;
   readonly #dev: boolean;
   readonly #batch: number;
+  readonly #inboxLimit: number;
   readonly #topics = new Map<string, Topic>();
   readonly #conns = new Map<string, Connection>();
   /** Consumers whose offsets were dropped by `detach { keepOffsets: false }`, per topic. */
@@ -114,6 +126,7 @@ export class Broker {
     this.#now = opts.now ?? Date.now;
     this.#dev = opts.dev ?? false;
     this.#batch = opts.batchSize ?? 64;
+    this.#inboxLimit = opts.inboxLimit ?? 1000;
     for (const def of [...(opts.systemTopics ?? SYSTEM_TOPICS), ...opts.contracts.topics]) {
       this.#engine.createTopic(topicConfig(def));
       this.#topics.set(def.name, {
@@ -328,9 +341,12 @@ export class Broker {
       topic: name,
       consumer,
       cursor: this.#start(name, consumer, from),
+      credit: this.#inboxLimit,
+      unacked: [],
+      scheduled: false,
     };
     conn.subs.set(name, sub);
-    this.#pump(conn, sub);
+    this.#schedule(conn, sub);
     return { ok: true, value: { from: sub.cursor } };
   }
 
@@ -359,28 +375,78 @@ export class Broker {
       return fail('invalid', `offset ${offset} is not in ${name} yet`);
     this.#forgotten.delete(`${name}\u0000${sub.consumer}`);
     this.#engine.commit(name, sub.consumer, offset);
+    // A commit restores credit for the delivered records it covers.
+    let freed = 0;
+    while (sub.unacked.length > 0 && (sub.unacked[0] ?? Infinity) <= offset) {
+      sub.unacked.shift();
+      freed++;
+    }
+    sub.credit += freed;
+    if (freed > 0) this.#schedule(conn, sub);
     return { ok: true, value: null };
   }
 
   #fanOut(name: string): void {
     for (const conn of this.#conns.values()) {
       const sub = conn.subs.get(name);
-      if (sub) this.#pump(conn, sub);
+      if (sub) this.#schedule(conn, sub);
     }
   }
 
-  /** Delivers everything from the subscription's cursor to the head, in batches. */
+  /**
+   * Queues one pump per subscription per microtask, so records published in
+   * the same task go out together.
+   */
+  #schedule(conn: Connection, sub: Subscription): void {
+    if (sub.scheduled) return;
+    sub.scheduled = true;
+    queueMicrotask(() => {
+      sub.scheduled = false;
+      // The subscription may have been replaced, dropped or detached meanwhile.
+      if (this.#conns.get(conn.isolateId) === conn && conn.subs.get(sub.topic) === sub) {
+        this.#pump(conn, sub);
+      }
+    });
+  }
+
+  /**
+   * Delivers from the cursor while there is credit, in batches. At 0 credit
+   * the subscription is paused: nothing is queued, only the cursor is kept,
+   * and a commit resumes it from the log. Records that expired meanwhile are
+   * reported as `gap` (compaction is not a gap: superseded records are meant
+   * to go).
+   */
   #pump(conn: Connection, sub: Subscription): void {
+    if (sub.credit <= 0) return;
+    let gap: { from: number; to: number } | undefined;
+    const tail = this.#engine.tail(sub.topic);
+    if (sub.cursor < tail) {
+      const retention = this.#topics.get(sub.topic)?.def.retention.kind;
+      if (retention !== 'compacted') gap = { from: sub.cursor, to: tail - 1 };
+      sub.cursor = tail;
+    }
     const head = this.#engine.head(sub.topic);
-    while (sub.cursor < head) {
-      const records: BusRecord[] = this.#engine.read(sub.topic, sub.cursor, this.#batch);
+    while (sub.credit > 0 && sub.cursor < head) {
+      const records: BusRecord[] = this.#engine.read(
+        sub.topic,
+        sub.cursor,
+        Math.min(this.#batch, sub.credit),
+      );
       const last = records.at(-1);
       if (!last) {
         sub.cursor = head;
-        return;
+        break;
       }
       sub.cursor = last.offset + 1;
-      conn.port.post({ v: 1, t: 'deliver', p: { topic: sub.topic, records } });
+      sub.credit -= records.length;
+      for (const r of records) sub.unacked.push(r.offset);
+      conn.port.post({
+        v: 1,
+        t: 'deliver',
+        p: gap ? { topic: sub.topic, records, gap } : { topic: sub.topic, records },
+      });
+      gap = undefined;
     }
+    if (gap) conn.port.post({ v: 1, t: 'deliver', p: { topic: sub.topic, records: [], gap } });
   }
 }

@@ -10,7 +10,7 @@ export type FakeIsolate = {
   closed: boolean;
   /** Sends a message as the isolate would. */
   send(msg: IsolateToBus | Record<string, unknown>): void;
-  /** Sends with an id and resolves with the broker's `result`. */
+  /** Sends with an id and resolves with the broker's `result`, once deliveries it caused are in. */
   call(t: IsolateToBus['t'], p: Record<string, unknown>): Promise<CallResult>;
   /** Records delivered on a topic, in order. */
   records(topic: string): BusRecord[];
@@ -49,7 +49,9 @@ export function fakeIsolate(id: string): FakeIsolate {
       const callId = `c${++ids}`;
       const done = new Promise<CallResult>((resolve) => waiting.set(callId, resolve));
       iso.send({ v: 1, t, id: callId, p });
-      return done;
+      const r = await done;
+      await flush(); // deliveries go out in a microtask after the result
+      return r;
     },
     records(topic) {
       return iso.inbox.flatMap((m) =>

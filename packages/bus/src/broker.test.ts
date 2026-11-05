@@ -56,6 +56,7 @@ describe('publish pipeline', () => {
       value: { offset: 1 },
     });
     a.send({ v: 1, t: 'subscribe', p: { topic: 'notes.v1', from: 'earliest' } });
+    await flush();
     expect(a.records('notes.v1')).toEqual([
       { offset: 0, value: 'x', ts: 1_000, producer: 'A' },
       { offset: 1, key: 'k', value: 'y', ts: 1_000, producer: 'A' },
@@ -227,6 +228,7 @@ const fill = async (broker: Broker, n: number) => {
     // oxlint-disable-next-line no-await-in-loop -- publish order is the point
     await broker.publish({ kind: 'host' }, 'notes.v1', undefined, `n${i}`);
   }
+  await flush();
 };
 
 describe('subscriptions and start positions', () => {
