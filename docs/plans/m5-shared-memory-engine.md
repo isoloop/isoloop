@@ -14,6 +14,7 @@ Can start after M2, since it depends only on the `LogEngine` interface and the t
 4. **Zero-copy reads in isolates:** the isolate runtime gets SAB handles at `init` when the host is cross-origin isolated (COOP/COEP), and falls back to `deliver` otherwise.
 5. **Benchmarks:** the M2 throughput bench plus memory per subscriber and fan-out at 10/50/100 subscribers, run against both engines on Chromium, Firefox and WebKit.
 6. **Publish results** in the docs and a post, including the case where the TS engine wins.
+7. **Evaluate a `SharedArrayBuffer` render channel** against `postMessage` patches (it could win back about one frame per click on Chromium; needs cross-origin isolation, as the engine does). See the [click-to-paint investigation](../investigations/click-to-paint-latency.md). An ADR only if the numbers justify it.
 
 ## Open risks
 
