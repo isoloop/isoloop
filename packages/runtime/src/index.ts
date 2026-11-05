@@ -3,7 +3,6 @@ export {
   type IsolateContext,
   type IsolateDefinition,
   type IsolateRoot,
-  type LegacyBus,
 } from './vanilla';
 export type { BusClient, SubscribeOptions } from './bus-client';
 export { BusError } from '@isoloop/protocol';

@@ -1,5 +1,6 @@
 import { defineIsolate } from '@isoloop/runtime';
-import { el, text } from './dom';
+import { count, note as noteTopic } from '../topics';
+import { el } from './dom';
 
 // A · Counter
 export default defineIsolate<HTMLElement>({
@@ -13,10 +14,10 @@ export default defineIsolate<HTMLElement>({
     inc.addEventListener('click', () => {
       n++;
       big.textContent = String(n);
-      ctx.legacyBus.publish('count', n);
+      void ctx.bus.publish(count, { value: n });
     });
-    ctx.legacyBus.subscribe('note', (value, from) => {
-      note.textContent = `${from} says: ${text(value)}`;
+    ctx.bus.subscribe(noteTopic, (r) => {
+      note.textContent = `${r.producer} says: ${r.value}`;
     });
     root.append(
       el(
@@ -24,7 +25,7 @@ export default defineIsolate<HTMLElement>({
         { class: 'stack' },
         big,
         inc,
-        el('p', { class: 'muted' }, 'Publishes "count" on the bus.'),
+        el('p', { class: 'muted' }, 'Publishes count.v1 on the bus.'),
         note,
       ),
     );

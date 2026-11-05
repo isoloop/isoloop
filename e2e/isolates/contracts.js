@@ -17,7 +17,14 @@ export const notes = {
   retention: { kind: 'last-n', n: 100 },
 };
 
-const topics = [notes];
+/** What the headless isolate reports about itself (isolation suite). */
+export const headless = {
+  name: 'headless.v1',
+  schema: schema((v) => typeof v === 'object' && v !== null),
+  retention: { kind: 'last-n', n: 100 },
+};
+
+const topics = [notes, headless];
 
 export default {
   '~isoloop': 'contracts',

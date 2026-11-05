@@ -13,13 +13,12 @@ import {
   isHostToIsolate,
   type InitPayload,
   type IsolateToHost,
-  type LegacyIsolateToHost,
   type ShutdownReason,
 } from '@isoloop/protocol';
 
 declare const self: DedicatedWorkerGlobalScope;
 
-const post = (msg: IsolateToHost | LegacyIsolateToHost): void => {
+const post = (msg: IsolateToHost): void => {
   self.postMessage(msg);
 };
 

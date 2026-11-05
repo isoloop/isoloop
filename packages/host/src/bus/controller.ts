@@ -60,6 +60,8 @@ export type BusControllerOptions = {
   supervisor: SupervisorConfig;
   dev: boolean;
   events: BusControllerEvents;
+  /** Every message from the bus worker, before it is handled (the kernel's I7 count). */
+  onControlMessage?: (msg: unknown) => void;
   /** Host publishes buffered while no bus worker runs. Default 1,000. */
   inboxLimit?: number;
 };
@@ -232,6 +234,7 @@ export function createBusController(o: BusControllerOptions): BusController {
     worker = w;
     const mine = gen;
     w.addEventListener('message', (e: MessageEvent<unknown>) => {
+      o.onControlMessage?.(e.data);
       if (worker === w && isBusToHost(e.data)) onMessage(e.data);
     });
     w.addEventListener('error', (e) => {

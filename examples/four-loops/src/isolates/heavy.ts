@@ -1,4 +1,5 @@
 import { defineIsolate } from '@isoloop/runtime';
+import { count as countTopic, primes as primesTopic } from '../topics';
 import { el } from './dom';
 
 // C · Heavy work
@@ -36,7 +37,7 @@ export default defineIsolate<HTMLElement>({
       }
       const ms = Math.round(performance.now() - t);
       result.textContent = `${count.toLocaleString()} primes below 30M in ${ms} ms`;
-      ctx.legacyBus.publish('primes', { count, ms });
+      void ctx.bus.publish(primesTopic, { value: { count, ms } });
     });
 
     const hang = el('button', {}, 'Hang');
@@ -52,8 +53,8 @@ export default defineIsolate<HTMLElement>({
       throw new Error('Isolate C threw on purpose');
     });
 
-    ctx.legacyBus.subscribe('count', (n) => {
-      showLast(typeof n === 'number' ? n : null);
+    ctx.bus.subscribe(countTopic, (r) => {
+      showLast(r.value);
     });
     root.append(
       el(

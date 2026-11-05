@@ -3,7 +3,7 @@
  * isolate (name, status, restarts, restart button, crash overlay), the
  * main-thread fps chip, the block-main button and the bus log.
  */
-import type { BusDelivery, IsolateSnapshot, Kernel } from '@isoloop/host';
+import type { IsolateSnapshot, Kernel } from '@isoloop/host';
 
 export type Pane = {
   id: string;
@@ -71,8 +71,11 @@ export function createPane(root: HTMLElement, id: string, name: string, kernel: 
   };
 }
 
-export function busLogText({ from, topic, value, targets }: BusDelivery): string {
-  return `bus: ${from} → "${topic}" ${JSON.stringify(value)} → ${targets.join(', ') || 'no subscribers'}`;
+export function busLogText(
+  topic: string,
+  r: { offset: number; producer: string; value: unknown },
+): string {
+  return `bus: ${r.producer} → ${topic}#${r.offset} ${JSON.stringify(r.value)}`;
 }
 
 export function startFps(chip: HTMLElement): void {

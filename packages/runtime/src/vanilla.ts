@@ -6,10 +6,8 @@
  */
 import {
   isHostToIsolate,
-  isLegacyHostToIsolate,
   type InitPayload,
   type IsolateToHost,
-  type LegacyIsolateToHost,
   type ShutdownReason,
 } from '@isoloop/protocol';
 import { createBusClient, type BusClient } from './bus-client';
@@ -31,15 +29,6 @@ export interface IsolateRoot {
   addEventListener(type: string, fn: (event: never) => void, options?: unknown): void;
 }
 
-/**
- * M0's main-thread bus over the isolate port, kept as `ctx.legacyBus` until
- * four-loops moves to topics (M2 task 11), which removes it.
- */
-export type LegacyBus = {
-  publish(topic: string, value: unknown): void;
-  subscribe(topic: string, fn: (value: unknown, from: string) => void): void;
-};
-
 export type IsolateContext<Root = IsolateRoot> = {
   readonly id: string;
   /** `manifest.config`, passed through. */
@@ -49,8 +38,6 @@ export type IsolateContext<Root = IsolateRoot> = {
   readonly host: HostApi;
   /** The log bus, on its own port to the bus worker (design §5). */
   readonly bus: BusClient;
-  /** M0's main-thread bus, until four-loops moves to topics; removed in M2 task 11. */
-  readonly legacyBus: LegacyBus;
   /** Adds stylesheets to the surface (design §4.8); a no-op when headless. */
   styles(css: string | readonly string[]): void;
   /** Runs on stop, within the host's grace period, before the worker goes. */
@@ -70,7 +57,7 @@ export function defineIsolate<Root = IsolateRoot>(
   return def;
 }
 
-type Post = (msg: IsolateToHost | LegacyIsolateToHost) => void;
+type Post = (msg: IsolateToHost) => void;
 
 export type VanillaRuntime = {
   ctx: IsolateContext<unknown>;
@@ -91,7 +78,6 @@ export function createVanillaIsolate(init: InitPayload, post: Post, scope: objec
     surface: render !== null,
     navigate: init.grants.navigate === true,
   });
-  const subs = new Map<string, ((value: unknown, from: string) => void)[]>();
   const bus = createBusClient(init.busPort, {
     onError: (err) => {
       const p =
@@ -109,19 +95,6 @@ export function createVanillaIsolate(init: InitPayload, post: Post, scope: objec
     root: render?.root,
     host: calls.api,
     bus: bus.client,
-    legacyBus: {
-      publish(topic, value) {
-        post({ v: 1, t: 'x-pub', p: { topic, value } });
-      },
-      subscribe(topic, fn) {
-        const list = subs.get(topic);
-        if (list) list.push(fn);
-        else {
-          subs.set(topic, [fn]);
-          post({ v: 1, t: 'x-sub', p: { topic } });
-        }
-      },
-    },
     styles: (css) => render?.styles(css),
     onShutdown: (fn) => {
       onShutdown.push(fn);
@@ -137,10 +110,6 @@ export function createVanillaIsolate(init: InitPayload, post: Post, scope: objec
         if (msg.t === 'event') render?.receive(msg.p);
         else if (msg.t === 'reattach') bus.reattach(msg.p.busPort);
         else if (msg.t === 'result' && msg.re !== undefined) calls.receive(msg.re, msg.p);
-        return;
-      }
-      if (isLegacyHostToIsolate(msg)) {
-        for (const fn of subs.get(msg.p.topic) ?? []) fn(msg.p.value, msg.p.from);
       }
     },
     async shutdown(reason) {

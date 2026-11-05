@@ -6,7 +6,6 @@
 import {
   BusError,
   isIsolateToHost,
-  isLegacyIsolateToHost,
   isSystemTopic,
   ROUTE_KEY,
   routeTopic,
@@ -22,12 +21,10 @@ import {
   type HostMethod,
   type Rect,
   type HostToIsolate,
-  type LegacyHostToIsolate,
 } from '@isoloop/protocol';
 import { createBusController, HOST_CONNECTION_PREFIX, type BusController } from './bus/controller';
 import { createCompositor, type FallbackRender, type SurfaceStats } from './compositor';
 import { missingFeatures } from './features';
-import { createLegacyBus, type BusDelivery } from './legacy-bus';
 import { load, type LoadedWorker } from './loader';
 import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from './render/isoloop-dom';
 import { createRouter, type OnNavigate, type Router } from './router';
@@ -50,7 +47,8 @@ export type KernelConfig = {
   /**
    * The topics (ADR 0003): `url` is the ES module the bus worker imports,
    * `list` its default export, imported by the host. Needs `workers.bus`.
-   * Without it there is no bus worker; M2 task 11 makes it required.
+   * Without both there is no bus worker: isolates get an unconnected port,
+   * and `kernel.publish` rejects with `bus_unavailable`.
    */
   contracts?: { url: string; list: ContractsList };
   workers: {
@@ -167,8 +165,6 @@ export type KernelEvents = {
   'isolate:error': { id: string; message: string };
   /** More live workers than `workers.budget`. Emitted once per kernel. */
   'workers:budget': { live: number; budget: number };
-  /** A publish on the M0 main-thread bus. */
-  'bus:publish': BusDelivery;
   /** The bus worker loaded its contracts. `first` is false after a restart. */
   'bus:ready': { first: boolean };
   'bus:crash': { reason: CrashReason; message: string };
@@ -221,8 +217,12 @@ export interface Kernel {
    */
   syncRoute(): void;
   destroy(): Promise<void>;
-  /** @internal Test hooks; not part of the API. */
-  readonly debug: { crashBus(): void };
+  /**
+   * @internal Test hooks; not part of the API. `messages()` counts what the
+   * main thread received from isolate workers and the bus control port, by
+   * type, for invariant I7 (no topic record crosses the main thread).
+   */
+  readonly debug: { crashBus(): void; messages(): Record<string, number> };
 }
 
 type Slot = {
@@ -339,7 +339,6 @@ export function createKernel(config: KernelConfig): Kernel {
     'isolate:failed': new Set(),
     'isolate:error': new Set(),
     'workers:budget': new Set(),
-    'bus:publish': new Set(),
     'bus:ready': new Set(),
     'bus:crash': new Set(),
     'bus:restart': new Set(),
@@ -359,15 +358,17 @@ export function createKernel(config: KernelConfig): Kernel {
     for (const fn of listeners[event]) fn(data);
   };
 
-  const post = (slot: Slot, msg: HostToIsolate | LegacyHostToIsolate): void => {
+  const post = (slot: Slot, msg: HostToIsolate): void => {
     slot.loaded?.worker.postMessage(msg);
   };
 
-  const bus = createLegacyBus((to, d) => {
-    const slot = slots.get(to);
-    if (slot)
-      post(slot, { v: 1, t: 'x-deliver', p: { topic: d.topic, value: d.value, from: d.from } });
-  });
+  /** Messages the main thread received, by type: the I7 test hook (`kernel.debug`). */
+  const received: Record<string, number> = {};
+  const count = (msg: unknown): void => {
+    const t: unknown = typeof msg === 'object' && msg !== null ? Reflect.get(msg, 't') : undefined;
+    const k = typeof t === 'string' ? t : '?';
+    received[k] = (received[k] ?? 0) + 1;
+  };
 
   const terminate = (slot: Slot): void => {
     clearTimeout(slot.graceTimer);
@@ -376,7 +377,6 @@ export function createKernel(config: KernelConfig): Kernel {
     slot.loaded.worker.terminate();
     slot.loaded = null;
     controller?.detach(slot.manifest.id);
-    bus.remove(slot.manifest.id);
     slot.onClosed();
   };
 
@@ -591,14 +591,6 @@ export function createKernel(config: KernelConfig): Kernel {
           return;
       }
     }
-    if (isLegacyIsolateToHost(msg)) {
-      if (msg.t === 'x-sub') bus.subscribe(id, msg.p.topic);
-      else {
-        const targets = bus.publish(id, msg.p.topic, msg.p.value);
-        emit('bus:publish', { from: id, topic: msg.p.topic, value: msg.p.value, targets });
-      }
-      return;
-    }
     slot.dropped++;
   };
 
@@ -631,6 +623,7 @@ export function createKernel(config: KernelConfig): Kernel {
       return;
     }
     loaded.worker.addEventListener('message', (e: MessageEvent<unknown>) => {
+      count(e.data);
       if (slot.loaded === loaded) onMessage(slot, e.data);
     });
     loaded.worker.addEventListener('error', (e) => {
@@ -679,6 +672,7 @@ export function createKernel(config: KernelConfig): Kernel {
           heartbeatMs: everyMs,
           supervisor: cfg,
           dev: config.dev ?? false,
+          onControlMessage: (m) => count(m),
           events: {
             ready: (first) => {
               emit('bus:ready', { first });
@@ -881,6 +875,7 @@ export function createKernel(config: KernelConfig): Kernel {
 
     debug: {
       crashBus: () => controller?.crash(),
+      messages: () => ({ ...received }),
     },
 
     on(event, fn) {
