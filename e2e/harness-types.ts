@@ -10,6 +10,7 @@ type HarnessKernel = {
     surface?: Element;
     pool?: string;
     config?: unknown;
+    grants?: { publish: string[]; subscribe: string[]; navigate?: boolean };
   }): unknown;
   on(event: 'isolate:ready', fn: (e: { id: string }) => void): () => void;
   on(
@@ -19,6 +20,11 @@ type HarnessKernel = {
   on(
     event: 'isolate:state',
     fn: (e: { id: string; state: string; prev: string }) => void,
+  ): () => void;
+  on(event: 'bus:ready', fn: (e: { first: boolean }) => void): () => void;
+  on(
+    event: 'route:navigate_error',
+    fn: (e: { from: string; href: string; error: string }) => void,
   ): () => void;
   on(
     event: 'bus:publish',
@@ -30,16 +36,29 @@ type HarnessKernel = {
     restarts: number;
     surface?: { queued: number; applied: number };
   }[];
+  syncRoute(): void;
+  debug: { crashBus(): void };
   destroy(): Promise<void>;
+};
+
+type HarnessConfig = {
+  supervisor?: { strategy?: 'one-for-one' | 'never' };
+  heartbeat?: { blockedAfterMs?: number; killAfterMs?: number };
+  budget?: number;
+  routing?: boolean;
+  basePath?: string;
+  onNavigate?: (req: {
+    href: string;
+    replace: boolean;
+    state?: unknown;
+    from: string;
+  }) => boolean | Promise<boolean>;
 };
 declare global {
   interface Window {
     harness: {
-      createKernel(config?: {
-        supervisor?: { strategy?: 'one-for-one' | 'never' };
-        heartbeat?: { blockedAfterMs?: number; killAfterMs?: number };
-        budget?: number;
-      }): HarnessKernel;
+      createKernel(config?: HarnessConfig): HarnessKernel;
+      createBusKernel(contractsUrl: string, config?: HarnessConfig): Promise<HarnessKernel>;
     };
     /** four-loops' kernel (examples/four-loops/src/main.ts). */
     kernel: HarnessKernel;

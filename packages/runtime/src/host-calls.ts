@@ -15,8 +15,14 @@ export class HostCallError extends Error {
   }
 }
 
-/** What `ctx.host` offers until the vanilla API (task 11) adds `navigate`. */
+/** What `ctx.host` offers (design §4.7). */
 export type HostApi = {
+  /**
+   * Asks the host to navigate (ADR 0002). Needs `grants.navigate`, else
+   * `forbidden`. `/x` resolves against the host's `basePath`. Resolves with
+   * the host's answer: `true` accepted, `false` refused.
+   */
+  navigate(href: string, o?: { replace?: boolean; state?: unknown }): Promise<boolean>;
   /** The node's box relative to the surface, after pending patches apply. */
   measure(node: unknown): Promise<Rect>;
   focus(node: unknown): Promise<void>;
@@ -37,6 +43,8 @@ export type HostCallsOptions = {
   idOf(node: unknown): string | undefined;
   /** Whether the isolate has a surface; without one the host answers `no_surface`. */
   surface: boolean;
+  /** `grants.navigate`: without it `navigate` rejects here, before reaching the host. */
+  navigate: boolean;
   timeoutMs?: number;
 };
 
@@ -57,12 +65,7 @@ export function createHostCalls(opts: HostCallsOptions): {
   >();
   let seq = 0;
 
-  const call = (method: HostMethod, node: unknown, extra: unknown[] = []): Promise<unknown> => {
-    const nodeId = opts.idOf(node);
-    if (opts.surface && nodeId === undefined) {
-      return Promise.reject(new HostCallError('not_found', `${method}: not a rendered node`));
-    }
-    opts.beforeCall();
+  const send = (method: HostMethod, args: unknown[]): Promise<unknown> => {
     const id = `c${++seq}`;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -70,12 +73,34 @@ export function createHostCalls(opts: HostCallsOptions): {
         reject(new HostCallError('timeout', `${method}: no answer within ${timeoutMs} ms`));
       }, timeoutMs);
       pending.set(id, { resolve, reject, timer });
-      opts.post({ v: 1, t: 'call', id, p: { method, args: [nodeId ?? null, ...extra] } });
+      opts.post({ v: 1, t: 'call', id, p: { method, args } });
     });
+  };
+
+  const call = (method: HostMethod, node: unknown, extra: unknown[] = []): Promise<unknown> => {
+    const nodeId = opts.idOf(node);
+    if (opts.surface && nodeId === undefined) {
+      return Promise.reject(new HostCallError('not_found', `${method}: not a rendered node`));
+    }
+    opts.beforeCall();
+    return send(method, [nodeId ?? null, ...extra]);
   };
 
   return {
     api: {
+      async navigate(href, o = {}) {
+        if (!opts.navigate) {
+          throw new HostCallError(
+            'forbidden',
+            'navigate: this isolate has no navigate grant (ADR 0002)',
+          );
+        }
+        const value = await send('navigate', [
+          href,
+          { replace: o.replace ?? false, state: o.state },
+        ]);
+        return value === true;
+      },
       async measure(node) {
         const value = await call('measure', node);
         if (!isRect(value)) throw new HostCallError('invalid', 'measure: the host sent no rect');

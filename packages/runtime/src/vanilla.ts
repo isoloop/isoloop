@@ -89,6 +89,7 @@ export function createVanillaIsolate(init: InitPayload, post: Post, scope: objec
     beforeCall: () => render?.dom.flush(),
     idOf: (node) => (render ? render.idOf(node) : undefined),
     surface: render !== null,
+    navigate: init.grants.navigate === true,
   });
   const subs = new Map<string, ((value: unknown, from: string) => void)[]>();
   const bus = createBusClient(init.busPort, {
