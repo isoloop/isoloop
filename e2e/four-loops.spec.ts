@@ -71,7 +71,7 @@ test('(d) a note typed in D appears in A', async ({ page }) => {
   await input.fill('hello from D');
   await input.press('Enter');
   await expect(pane(page, 'A')).toContainText('D says: hello from D');
-  await expect(pane(page, 'D').locator('.log li').first()).toHaveText('me → note: hello from D');
+  await expect(pane(page, 'D').locator('.log li').first()).toHaveText('D note: hello from D');
   await expect(input).toHaveValue('');
 });
 

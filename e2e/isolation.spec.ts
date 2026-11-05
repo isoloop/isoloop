@@ -19,7 +19,10 @@ async function open(page: Page, query = ''): Promise<void> {
   await expect
     .poll(() =>
       page.evaluate(() =>
-        window.kernel.isolates().every((s) => (s.surface?.queued ?? 0) === 0 && s.surface),
+        window.kernel
+          .isolates()
+          .filter((s) => s.id !== 'S') // the headless store has no surface
+          .every((s) => (s.surface?.queued ?? 0) === 0 && s.surface),
       ),
     )
     .toBe(true);
