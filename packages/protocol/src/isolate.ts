@@ -42,7 +42,9 @@ export type IsolateToHost =
   | Envelope<'patch', { fmt: string; batch: unknown }>
   | Envelope<'call', { method: HostMethod; args: unknown[] }>
   | Envelope<'beat', { lagMs: number; heapBytes?: number }>
-  | Envelope<'error', ErrorPayload>;
+  | Envelope<'error', ErrorPayload>
+  /** Last message after `shutdown`: handlers ran, the host may terminate now (design §7.6). */
+  | Envelope<'bye', Record<string, never>>;
 
 export const HOST_TO_ISOLATE: MessageTypes<HostToIsolate> = {
   init: true,
@@ -58,6 +60,7 @@ export const ISOLATE_TO_HOST: MessageTypes<IsolateToHost> = {
   call: true,
   beat: true,
   error: true,
+  bye: true,
 };
 
 export const isHostToIsolate: (x: unknown) => x is HostToIsolate =

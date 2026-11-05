@@ -7,5 +7,13 @@
     // All of it runs in Node: configs, and the Playwright test runner.
     "types": ["node"]
   },
-  "include": ["*.config.ts", "packages/*/*.config.ts", "examples/*/*.config.ts", "e2e"]
+  "include": [
+    "*.config.ts",
+    "packages/*/*.config.ts",
+    "examples/*/*.config.ts",
+    "e2e/harness/*.config.ts",
+    "e2e"
+  ],
+  // The harness page has its own DOM tsconfig.
+  "exclude": ["e2e/harness/src"]
 }

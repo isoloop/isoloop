@@ -2,7 +2,8 @@
 /*
  * Isolate worker entry, built as isolate-bootstrap.js. Waits for `init`,
  * checks the protocol range, starts the heartbeat, then imports the isolate
- * module from `init.src` and calls its default export.
+ * module from `init.src` and calls its default export. On `shutdown` it says
+ * `bye` and closes; `onShutdown` handlers arrive with the vanilla API.
  */
 import {
   PROTOCOL,
@@ -51,11 +52,26 @@ async function boot(init: InitPayload): Promise<void> {
     post,
   });
   self.addEventListener('message', (e: MessageEvent<unknown>) => {
+    if (isHostToIsolate(e.data) && e.data.t === 'shutdown') {
+      post({ v: 1, t: 'bye', p: {} });
+      self.close();
+      return;
+    }
     runtime.receive(e.data);
   });
   startHeartbeat(init.heartbeatMs);
 
-  const mod: unknown = await import(/* @vite-ignore */ init.src);
+  let mod: unknown;
+  try {
+    mod = await import(/* @vite-ignore */ init.src);
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    const cross = new URL(init.src).origin !== self.location.origin;
+    fatal(
+      `Could not import ${init.src}: ${why}${cross ? ' (a cross-origin isolate needs CORS headers; see docs/guide/hosting.md)' : ''}`,
+    );
+    return;
+  }
   const main: unknown =
     typeof mod === 'object' && mod !== null && 'default' in mod ? mod.default : undefined;
   if (typeof main !== 'function') {

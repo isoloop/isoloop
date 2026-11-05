@@ -1,5 +1,7 @@
 export {
   createKernel,
+  KernelError,
+  type KernelErrorCode,
   type IsolateHandle,
   type IsolateManifest,
   type IsolateSnapshot,

@@ -1,0 +1,19 @@
+{
+  "name": "e2e-harness",
+  "private": true,
+  "type": "module",
+  "description": "A blank page with a kernel factory on window, for E2E tests that need their own isolates.",
+  "scripts": {
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@isoloop/host": "workspace:*",
+    "@isoloop/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

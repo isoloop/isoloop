@@ -28,6 +28,7 @@ function setup(o: { backoffMs?: number } = {}) {
     'isolate:crash': [],
     'isolate:failed': [],
     'isolate:error': [],
+    'workers:budget': [],
     'bus:publish': [],
   };
   kernel.on('isolate:state', (e) => {
