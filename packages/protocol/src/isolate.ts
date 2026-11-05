@@ -9,12 +9,15 @@ export type ShutdownReason = 'stop' | 'restart' | 'suspend';
 /** Calls an isolate can make to the host (design §4.7). */
 export type HostMethod = 'measure' | 'focus' | 'navigate' | 'scrollIntoView' | 'requestCanvas';
 
+/** What `measure` returns: a node's box relative to its surface, in CSS pixels. */
+export type Rect = { x: number; y: number; width: number; height: number };
+
 /** First message to an isolate. The host's half of the version handshake. */
 export type InitPayload = {
   isolateId: string;
   /** Protocol versions the host accepts. */
   protocol: { min: number; max: number };
-  /** `remote-dom@1`, `legacy-vdom@1`, or `none` (headless). */
+  /** `isoloop-dom@1`, `legacy-vdom@1`, or `none` (headless). */
   renderFmt: string;
   /** `manifest.config`, passed through. */
   config: unknown;

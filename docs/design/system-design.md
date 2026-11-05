@@ -300,7 +300,7 @@ interface HostRenderBridge {
 
 ### 4.7 Host calls
 
-`call` → `result`, with a 5 s default timeout on the isolate side.
+`call` → `result`, with a 5 s default timeout on the isolate side (`timeout`). The isolate flushes its pending patches before it posts a call, and the host runs DOM calls through the compositor after every batch queued before them. A node id that names no rendered node fails with `not_found`; a method that isn't built yet (`requestCanvas` until M3) with `unsupported`; DOM calls from a headless isolate with `no_surface`.
 
 | Method | Behaviour |
 | --- | --- |

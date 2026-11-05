@@ -57,6 +57,19 @@ describe('isoloop-dom in the kernel', () => {
     expect(input.value).toBe('hello');
   });
 
+  it('host calls: measure returns the rect after a pending resize patch, not before', async () => {
+    const { shadow } = spawn(bootstrap, fixture('dom-measure'));
+    await waitFor(() => shadow()?.querySelector('.grow') !== null);
+    shadow()?.querySelector<HTMLButtonElement>('.grow')?.click();
+    await waitFor(() => (shadow()?.querySelector('.out')?.textContent ?? '') !== '');
+    // x is relative to the surface (the box's 7 px margin), width the new 300 px.
+    expect(shadow()?.querySelector('.out')?.textContent).toBe('7,300');
+    // A node the host never rendered is rejected on the isolate side.
+    await waitFor(() => shadow()?.querySelector('.err')?.textContent === 'HostCallError not_found');
+    // focus runs after the patches too, and lands in the surface.
+    await waitFor(() => shadow()?.activeElement === shadow()?.querySelector('input'));
+  });
+
   it('an isolate reporting another renderFmt fails with render-fmt-mismatch and is not restarted', async () => {
     const { handle, log } = spawn(worker('../__fixtures__/bogus-fmt-bootstrap.ts'), 'unused');
     await waitFor(() => handle.snapshot().state === 'failed');

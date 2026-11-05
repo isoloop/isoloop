@@ -8,6 +8,7 @@ import {
   createDom,
   install,
   ISOLOOP_DOM_FMT,
+  WNode,
   type WElement,
   type WorkerDom,
 } from '@isoloop/dom/worker';
@@ -23,6 +24,8 @@ export type Render = {
   readonly dom: WorkerDom;
   /** Delivers an `event` from the host. Ids that aren't numbers are ignored. */
   receive(event: SerializedEvent): void;
+  /** The id the host knows a node by, as host calls send it; `undefined` for anything else. */
+  idOf(node: unknown): string | undefined;
 };
 
 /**
@@ -38,6 +41,8 @@ export function createRender(post: (msg: IsolateToHost) => void, scope?: object)
   return {
     root: dom.root,
     dom,
+    idOf: (node) =>
+      node instanceof WNode && node.isConnected ? String(dom.idOf(node)) : undefined,
     receive(e) {
       const target = nodeId(e.target);
       if (target === undefined) return;
