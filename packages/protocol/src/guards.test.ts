@@ -58,9 +58,9 @@ describe('guards are per port', () => {
       [false, false, true, false, true, false],
     ],
     [
-      'result goes to isolates from host and bus',
+      'result goes to isolates from host and bus, and to the host from the bus',
       'result',
-      [true, false, false, true, false, false],
+      [true, false, false, true, false, true],
     ],
   ] as const)('%s', (_name, t, expected) => {
     expect(ports.map(([, guard]) => guard(env(t)))).toEqual(expected);

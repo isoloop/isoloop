@@ -1,5 +1,5 @@
 import { envelopeGuard, type Envelope, type MessageTypes } from './envelope';
-import type { ErrorCode, ErrorPayload } from './errors';
+import type { CallResult, ErrorCode, ErrorPayload } from './errors';
 import type { Grants } from './grants';
 
 export type Retention =
@@ -34,9 +34,17 @@ export type BusMetrics = {
 
 /** Control port: host → bus worker. */
 export type HostToBus =
-  | Envelope<'boot', { contractsUrl: string; topics: TopicConfig[] }>
+  /**
+   * `heartbeatMs`: how often the bus sends `beat`, default 100. `dev`: check
+   * that schema outputs survive `structuredClone` (ADR 0003, decision 11).
+   */
+  | Envelope<
+      'boot',
+      { contractsUrl: string; topics: TopicConfig[]; heartbeatMs?: number; dev?: boolean }
+    >
   | Envelope<'attach', { isolateId: string; grants: Grants; port: MessagePort }>
   | Envelope<'detach', { isolateId: string; keepOffsets: boolean }>
+  /** `kernel.publish`. With `id` set, the bus replies with `result`. */
   | Envelope<'publish', { topic: string; key?: string; value: unknown }>;
 
 /** Control port: bus worker → host. */
@@ -49,6 +57,9 @@ export type BusToHost =
   /** A record arrived for a suspended isolate (ADR 0001). */
   | Envelope<'wake', { isolateId: string; topic: string }>
   | Envelope<'metrics', BusMetrics>
+  /** Answers a host `publish` sent with an `id`. */
+  | Envelope<'result', CallResult>
+  /** `fatal` with a contracts `code` means the bus can't start; the host doesn't retry it (ADR 0003). */
   | Envelope<'error', ErrorPayload>;
 
 export const HOST_TO_BUS: MessageTypes<HostToBus> = {
@@ -63,6 +74,7 @@ export const BUS_TO_HOST: MessageTypes<BusToHost> = {
   beat: true,
   wake: true,
   metrics: true,
+  result: true,
   error: true,
 };
 
