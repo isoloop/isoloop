@@ -39,6 +39,14 @@ export default defineIsolate<HTMLElement>({
       ctx.bus.publish('primes', { count, ms });
     });
 
+    const hang = el('button', {}, 'Hang');
+    hang.addEventListener('click', () => {
+      // Never returns: the heartbeat stops, and the supervisor kills the worker.
+      for (;;) {
+        // Spin.
+      }
+    });
+
     const crash = el('button', {}, 'Crash');
     crash.addEventListener('click', () => {
       throw new Error('Isolate C threw on purpose');
@@ -51,7 +59,7 @@ export default defineIsolate<HTMLElement>({
       el(
         'div',
         { class: 'stack' },
-        el('div', { class: 'row' }, block, primes, crash),
+        el('div', { class: 'row' }, block, primes, hang, crash),
         result,
         last,
       ),

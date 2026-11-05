@@ -1,4 +1,4 @@
-import { createKernel } from '@isoloop/host';
+import { createKernel, type Kernel } from '@isoloop/host';
 import bootstrap from '@isoloop/runtime/bootstrap?worker&url';
 import { blockMain, busLogText, createPane, startFps } from './chrome';
 import counter from './isolates/counter?isolate';
@@ -19,10 +19,21 @@ sheet.replaceSync(surfaceCss);
 
 // The real supervisor's defaults: backoff 250 ms × 2ⁿ, and the fourth crash
 // within 60 s fails the isolate, which then shows the kernel's fallback.
+// `?killAfterMs=…` shortens the hang limit, for the E2E kill-path test.
+const killAfterMs = Number(new URLSearchParams(location.search).get('killAfterMs')) || undefined;
 const kernel = createKernel({
   workers: { isolateBootstrap: bootstrap },
   styles: [sheet],
+  ...(killAfterMs ? { heartbeat: { killAfterMs } } : {}),
 });
+
+declare global {
+  interface Window {
+    /** For the E2E suite: the demo's kernel, to observe its events. */
+    kernel: Kernel;
+  }
+}
+window.kernel = kernel;
 
 const isolates = [
   { id: 'A', name: 'A · Counter', src: counter },
