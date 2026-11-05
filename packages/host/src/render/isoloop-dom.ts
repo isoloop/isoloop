@@ -2,30 +2,39 @@
  * HostRenderBridge for isoloop-dom@1 (ADR 0010, ADR 0011): the applier from
  * @isoloop/dom/host under a container in the surface's shadow root, the
  * component registry as its sanitising policy, and host-owned input rules
- * (design §4.6). Delegated listeners for the fixed event set turn DOM events
- * into SerializedEvents; default actions move to the EventBridge in task 8.
+ * (design §4.6). The EventBridge (`../events.ts`) listens on the shadow root
+ * and asks the applier which events the isolate registered for.
  */
-import { createApplier, ISOLOOP_DOM_FMT, type SanitisePolicy } from '@isoloop/dom/host';
+import {
+  createApplier,
+  ISOLOOP_DOM_FMT,
+  type DomEvent,
+  type SanitisePolicy,
+} from '@isoloop/dom/host';
 import type { EventType, SerializedEvent } from '@isoloop/protocol';
+import { listenEvents } from '../events';
 import type { HostRenderBridge } from './bridge';
 import type { ComponentRegistry } from './registry';
 
 export { ISOLOOP_DOM_FMT };
 
-/** Event types the host forwards (design §4.6). Pointer moves are opt-in and come later. */
-const EVENTS: readonly EventType[] = [
-  'click',
-  'dblclick',
-  'input',
-  'change',
-  'keydown',
-  'keyup',
-  'submit',
-  'focusin',
-  'focusout',
-  'pointerdown',
-  'pointerup',
-];
+/** An event record from the applier as the protocol's SerializedEvent (ids as strings). */
+function serialize(rec: DomEvent, type: EventType): SerializedEvent {
+  const event: SerializedEvent = {
+    type,
+    target: String(rec.target),
+    currentTargets: rec.currentTargets.map(String),
+    mods: rec.mods,
+  };
+  if (rec.value !== undefined) event.value = rec.value;
+  if (rec.checked !== undefined) event.checked = rec.checked;
+  if (rec.key !== undefined) event.key = rec.key;
+  if (rec.code !== undefined) event.code = rec.code;
+  if (rec.x !== undefined) event.x = rec.x;
+  if (rec.y !== undefined) event.y = rec.y;
+  if (rec.button !== undefined) event.button = rec.button;
+  return event;
+}
 
 const isFocused = (el: Element): boolean => {
   const root = el.getRootNode();
@@ -78,30 +87,17 @@ export function createIsoloopDomBridge(registry: ComponentRegistry): HostRenderB
       const a = createApplier(container, policy);
       applier = a;
       abort = new AbortController();
-      for (const type of EVENTS) {
-        shadow.addEventListener(
-          type,
-          (e) => {
+      listenEvents(
+        shadow,
+        {
+          toEvent: (e, type) => {
             const rec = a.eventFor(e);
-            if (!rec) return;
-            const event: SerializedEvent = {
-              type,
-              target: String(rec.target),
-              currentTargets: rec.currentTargets.map(String),
-              mods: rec.mods,
-            };
-            if (rec.value !== undefined) event.value = rec.value;
-            if (rec.checked !== undefined) event.checked = rec.checked;
-            if (rec.key !== undefined) event.key = rec.key;
-            if (rec.code !== undefined) event.code = rec.code;
-            if (rec.x !== undefined) event.x = rec.x;
-            if (rec.y !== undefined) event.y = rec.y;
-            if (rec.button !== undefined) event.button = rec.button;
-            send(event);
+            return rec ? serialize(rec, type) : null;
           },
-          { signal: abort.signal },
-        );
-      }
+          send,
+        },
+        abort.signal,
+      );
     },
 
     apply(batch) {

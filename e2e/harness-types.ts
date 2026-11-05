@@ -17,6 +17,7 @@ declare global {
     harness: {
       createKernel(config?: {
         supervisor?: { strategy?: 'one-for-one' | 'never' };
+        heartbeat?: { blockedAfterMs?: number; killAfterMs?: number };
         budget?: number;
       }): HarnessKernel;
     };
