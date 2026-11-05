@@ -28,7 +28,7 @@ flowchart TB
     BR[Broker] --- EN[LogEngine: TS]
   end
   subgraph PA["Isolate worker A (visual)"]
-    RA[Runtime + adapter + Remote DOM]
+    RA[Runtime + adapter + isoloop-dom]
   end
   subgraph PB["Isolate worker B (headless)"]
     RBB[Runtime only]
@@ -71,8 +71,8 @@ flowchart LR
 | `@isoloop/protocol` | everywhere | nothing | anything |
 | `@isoloop/codec` (M2b) | bus worker, Node | nothing | DOM types |
 | `@isoloop/bus` | bus worker, Node | `protocol`, `codec` (M2b) | DOM types, `host`, `runtime` |
-| `@isoloop/host` | main thread | `protocol`, `@remote-dom/core` (host side, inside `RenderBridge` only) | `runtime`, `bus` source (it loads their bundles by URL) |
-| `@isoloop/runtime` | isolate worker | `protocol`, `@remote-dom/core` (polyfill, inside `RenderBridge` only) | `host`, `bus` |
+| `@isoloop/host` | main thread | `protocol` | `runtime`, `bus` source (it loads their bundles by URL) |
+| `@isoloop/runtime` | isolate worker | `protocol` | `host`, `bus` |
 | `@isoloop/react`, `@isoloop/preact` | isolate worker | `runtime`, the framework (peer dep) | `host` |
 | `@isoloop/devtools` | main thread | `host` | `runtime` |
 
@@ -141,7 +141,7 @@ export type BusToHost =
 export type InitPayload = {
   isolateId: string;
   protocol: { min: number; max: number };
-  renderFmt: string;              // 'remote-dom@1', 'legacy-vdom@1', or 'none' (headless)
+  renderFmt: string;              // 'isoloop-dom@1', 'legacy-vdom@1', or 'none' (headless)
   config: unknown;                // manifest.config, passed through
   grants: Grants;
   busPort: MessagePort;           // transferred
@@ -272,11 +272,11 @@ Owns every surface in the DOM and is the **only** code that writes to it.
 
 ### 4.5 RenderBridge (host side)
 
-The only module that imports Remote DOM on the main thread ([ADR 0006](../adr/0006-render-bridge-over-remote-dom.md)).
+Applies `isoloop-dom@1` batches from an isolate's worker-side DOM subset ([ADR 0010](../adr/0010-own-render-bridge.md)). It has no dependency. A batch is a list of plain records keyed by our node ids: `insert`, `move` (one record, so node identity survives), `remove`, `text`, `attr`, `prop` and `listen`. Every tag, attribute and URL goes through the component registry first.
 
 ```ts
 interface HostRenderBridge {
-  readonly fmt: string;                                    // 'remote-dom@1' | 'legacy-vdom@1'
+  readonly fmt: string;                                    // 'isoloop-dom@1' | 'legacy-vdom@1'
   mount(root: ShadowRoot, registry: ComponentRegistry): void;
   apply(batch: unknown): void;                             // called only by the Compositor
   idFor(node: Node): string | undefined;                   // for the EventBridge
@@ -314,7 +314,7 @@ An isolate sends stylesheet text in a patch-side side channel (`styles: string[]
 
 The runtime that runs inside each isolate worker.
 
-- **Bootstrap** (`isolate-bootstrap.js`): waits for `init`, checks the protocol range, sets up the RenderBridge polyfill if the isolate has a surface (installs the Remote DOM `window`/`document` shim; skipped when `renderFmt` is `'none'`), starts the heartbeat, connects the bus port, then `await import(init.src)`. The isolate module's default export is an `IsolateDefinition`, and the bootstrap calls `definition.start(ctx)`.
+- **Bootstrap** (`isolate-bootstrap.js`): waits for `init`, checks the protocol range, installs the `isoloop-dom` DOM subset as `document` and the DOM globals if the isolate has a surface ([ADR 0010](../adr/0010-own-render-bridge.md); skipped when `renderFmt` is `'none'`), starts the heartbeat, connects the bus port, then `await import(init.src)`. The isolate module's default export is an `IsolateDefinition`, and the bootstrap calls `definition.start(ctx)`.
 - **Heartbeat:** `setInterval(everyMs)`. `lagMs = max(0, now - last - everyMs)`. Adds `performance.memory.usedJSHeapSize` where available.
 - **Errors:** `self.onerror` and `onunhandledrejection` post `error { fatal: false }`. A throw during `start` is fatal. The host also catches `Worker.onerror` for errors the runtime can't see.
 - **IsolateContext** (what adapters build on):
@@ -323,7 +323,7 @@ The runtime that runs inside each isolate worker.
 interface IsolateContext {
   id: string;
   config: unknown;
-  root?: RemoteRootElement;                        // render target (Remote DOM); undefined when headless
+  root?: Element;                                  // render target (isoloop-dom subset); undefined when headless
   bus: BusClient;
   host: { measure(id: string): Promise<Rect>; focus(id: string): Promise<void>;
           navigate(href: string, o?: { replace?: boolean; state?: unknown }): Promise<boolean>;
@@ -466,7 +466,7 @@ sequenceDiagram
   U->>E: click on <iso-button>
   E->>E: target → nodeId, has listener?
   E->>P: event {type:'click', target, ...}
-  P->>P: dispatch to remote node listener, framework re-renders
+  P->>P: dispatch to the worker-side node listener, framework re-renders
   P->>C: patch {batch}
   C->>C: next rAF: apply
 ```
@@ -615,7 +615,7 @@ Starting targets, to be calibrated in M1/M2 benches and then enforced in CI with
 | RFC 0001 goal or item | Where it's designed | Milestone |
 | --- | --- | --- |
 | Thread isolation | §1, §4.2, ADR 0001 | M1 |
-| Single-writer rendering | §4.4–4.6, ADR 0006 | M1 |
+| Single-writer rendering | §4.4–4.6, ADR 0010 | M1 |
 | Messages as the only contract | §3, §6.1, ADR 0003 | M0–M2 |
 | Durable, replayable bus | §6, §7.3–7.4, ADR 0005 | M2 |
 | Supervision | §4.3, §7.4–7.5, §7.7, ADR 0007 | M1 (isolates), M2 (bus) |

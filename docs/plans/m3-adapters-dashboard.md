@@ -8,8 +8,8 @@ Gets a full task list when M2 closes.
 
 ## Main work items
 
-1. **Preact adapter** (`packages/preact`): `defineIsolate`, `useTopic(topic, { from })`, `usePublish`, `useRequest`, `useHost` (measure, focus, navigate), `useRoute()` (subscribes to `routeTopic` only when used, [ADR 0002](../adr/0002-host-owns-routing.md)). Rendering into `ctx.root` via the Remote DOM polyfill. First, because Preact is small and works on Remote DOM today.
-2. **React adapter** (`packages/react`): the same hooks; Remote DOM's React support for the reconciler; verify concurrent features and `useSyncExternalStore` for topics.
+1. **Preact adapter** (`packages/preact`): `defineIsolate`, `useTopic(topic, { from })`, `usePublish`, `useRequest`, `useHost` (measure, focus, navigate), `useRoute()` (subscribes to `routeTopic` only when used, [ADR 0002](../adr/0002-host-owns-routing.md)). Rendering into `ctx.root`, the `isoloop-dom` subset ([ADR 0010](../adr/0010-own-render-bridge.md)). First, because Preact is small and the M1 smoke test already renders it.
+2. **React adapter** (`packages/react`): the same hooks; React DOM renders into the `isoloop-dom` subset (M1 smoke test); verify concurrent features and `useSyncExternalStore` for topics.
 3. **Adapter conformance tests:** one fixture app per adapter, run through the same E2E suite (render, events, inputs, replay).
 4. **Canvas isolates:** `requestCanvas` host call; a small chart helper on `OffscreenCanvas` in the worker; resize events.
 5. **`examples/dashboard`**, a markets dashboard that needs no backend:

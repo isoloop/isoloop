@@ -1,6 +1,6 @@
 # M2c: Worker pools (outline)
 
-**Goal:** a headless isolate can opt into a named pool (`manifest.pool: 'light'`) and share one worker with the other members of that pool, while own-worker isolates keep the full isolation guarantee ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). Visual isolates with `pool` stay rejected (`pools_headless_only`) until a Remote DOM surface can be scoped per isolate inside one worker.
+**Goal:** a headless isolate can opt into a named pool (`manifest.pool: 'light'`) and share one worker with the other members of that pool, while own-worker isolates keep the full isolation guarantee ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). Visual isolates with `pool` stay rejected (`pools_headless_only`) until an `isoloop-dom` surface can be scoped per isolate inside one worker.
 
 **Done when:** in an E2E test, pooled and own-worker isolates run side by side; a member that loops forever gets its pool restarted (every member replays from its committed offsets) while own-worker isolates and other pools are unaffected.
 

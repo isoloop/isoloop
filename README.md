@@ -63,7 +63,7 @@ Isoloop runs in the browser tab, on today's browsers, with no server-side story.
 ```
 
 - **Thread isolation:** one dedicated worker per isolate, with its own heap and event loop.
-- **Single-writer rendering:** isolates render into a remote tree (built on Shopify Remote DOM); the host mirrors it to the DOM, batched once per frame.
+- **Single-writer rendering:** isolates render into a small DOM subset of our own in their worker; the host mirrors it to the real DOM, batched once per frame.
 - **Messages as the only contract:** isolates never import each other; they depend on versioned topic schemas.
 - **Log-based bus:** append-only topics with retention, consumer offsets, replay, schema validation and backpressure, running in a dedicated bus worker.
 - **Pluggable log engine:** a TypeScript engine in v1; an opt-in Rust/WASM engine on `SharedArrayBuffer` later, for zero-copy reads on cross-origin-isolated pages, shipped only if benchmarks justify it.
@@ -137,7 +137,7 @@ export default defineIsolate({
 Details, dependencies and task lists are in the [plans index](docs/plans/README.md).
 
 1. **M0 Foundations:** pnpm workspaces, TypeScript 7, OXC (oxlint, oxfmt, tsdown), Vite 8, Vitest, Playwright, GitHub Actions; protocol types; proof of concept ported to TypeScript.
-2. **M1 Kernel:** loader, supervisor, heartbeats, frame-batched compositor on Remote DOM.
+2. **M1 Kernel:** loader, supervisor, heartbeats, frame-batched compositor on our own render bridge.
 3. **M2 Bus:** topics, schemas, retention, offsets, replay, backpressure; bus worker with the TS log engine; opt-in suspension of idle isolates.
 4. **M2b Durable log:** persistent topics in OPFS that survive a bus crash or a page reload. Required for 0.1.
 5. **M2c Worker pools:** opt-in named pools for small headless isolates, if a benchmark shows they pay off.
