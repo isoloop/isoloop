@@ -4,10 +4,13 @@
  *
  * 200 clicks on a counter rendered by an isoloop-dom isolate, then 200 on the
  * same counter rendered directly on the main thread. Each sample is the time
- * from the host's `pointerdown` to the moment the new count is in the DOM:
- * for the isolate, that's inside the compositor's frame; on the main thread,
- * it's the click handler itself. Report only, no threshold yet: the numbers
- * calibrate the budget (p95 overhead ≤ 8 ms).
+ * from the host's `pointerdown` to the animation frame that paints the new
+ * count. For the isolate, the compositor writes the change inside that frame's
+ * rAF callback; on the main thread, the click handler writes it and the next
+ * rAF callback is that frame. Ending both at the frame keeps the comparison
+ * fair: a main-thread change isn't on screen until the next frame either
+ * (docs/investigations/click-to-paint-latency.md). Report only, no threshold
+ * yet: the numbers calibrate the budget (p95 overhead ≤ 8 ms).
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
@@ -53,7 +56,11 @@ const stats = (xs: number[]): Stats => {
   };
 };
 
-/** Arms a recorder in the page: pointerdown on `root` starts a sample, the counter's change ends it. */
+/**
+ * Arms a recorder in the page: pointerdown on `root` starts a sample; the frame
+ * that paints the counter's change ends it. For the isolate that's the
+ * compositor's rAF (the change itself); on the main thread, the rAF after it.
+ */
 const arm = (page: Page, which: 'isolate' | 'main') =>
   page.evaluate((side) => {
     const section = document.getElementById(side);
@@ -77,10 +84,14 @@ const arm = (page: Page, which: 'isolate' | 'main') =>
       },
       { capture: true },
     );
-    new MutationObserver(() => {
+    const end = (): void => {
       if (start < 0) return;
       samples.push(performance.now() - start);
       start = -1;
+    };
+    new MutationObserver(() => {
+      if (side === 'isolate') end();
+      else requestAnimationFrame(end);
     }).observe(root, { subtree: true, childList: true, characterData: true });
     Object.assign(window, { [`samples_${side}`]: { samples, clickGaps } });
   }, which);
@@ -101,6 +112,18 @@ async function run(
     await button.click();
     // oxlint-disable-next-line no-await-in-loop
     await expect(count).toHaveText(String(i));
+    // The sample ends a frame after the text changes on the main thread: wait
+    // for it, so the next pointerdown can't start before this one ends.
+    // oxlint-disable-next-line no-await-in-loop
+    await expect
+      .poll(() =>
+        page.evaluate((side): number => {
+          const rec: unknown = Reflect.get(window, `samples_${side}`);
+          const xs: unknown = typeof rec === 'object' && rec ? Reflect.get(rec, 'samples') : null;
+          return Array.isArray(xs) ? xs.length : -1;
+        }, which),
+      )
+      .toBe(i);
   }
   const out: unknown = await page.evaluate(
     (side): unknown => Reflect.get(window, `samples_${side}`),
@@ -155,7 +178,7 @@ test('click-to-paint: isolate vs main thread', async ({ page }, info) => {
     bench: 'click-to-paint',
     browser: info.project.name,
     clicks: CLICKS,
-    unit: 'ms, pointerdown → new count in the DOM',
+    unit: 'ms, pointerdown → the frame that paints the new count',
     isolate,
     main,
     overhead,
