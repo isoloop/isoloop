@@ -18,6 +18,7 @@ Short records of decisions that shape Isoloop's design. Each has a status:
 | [0008](0008-isolates-and-surfaces.md) | The unit is an *isolate*; a *surface* (DOM) is optional, so headless isolates are first-class | Accepted |
 | [0009](0009-toolchain.md) | Toolchain: pnpm 12 workspaces, Node 26, TypeScript 7 (`tsc` checks), oxlint + oxfmt, tsdown with `isolatedDeclarations`, Vite 8, Vitest 5, Playwright; Baseline widely available; exact pins, no hooks | Accepted |
 | [0010](0010-own-render-bridge.md) | Our own render bridge, `isoloop-dom@1`: a worker-side DOM subset sized to what Preact and React use, plain id-based records with one-record moves, no dependency; supersedes 0006 | Proposed |
+| [0011](0011-dom-package.md) | `@isoloop/dom` holds the bridge: `/worker`, `/host` and `/testing` entries, each half type-checked with its own `lib`; no dependencies; owns the `isoloop-dom@1` format; sanitising policy passed in; exact fmt match; published as internal | Proposed |
 
 Ideas an ADR deferred are collected in [would-like](../would-like.md).
 

@@ -150,7 +150,7 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 Plain pnpm workspaces. M0 has `protocol`, `host`, `runtime`, `bus` (empty until M2) and `four-loops`; the rest arrives with its milestone.
 
 ```text
-packages/  protocol · host · runtime · bus · codec (M2b) · bus-wasm (M5) · react · preact · devtools
+packages/  protocol · dom (M1) · host · runtime · bus · codec (M2b) · bus-wasm (M5) · react · preact · devtools
 examples/  four-loops (minimal) · dashboard (flagship sandbox)
 docs/      site + rfcs/
 bench/     click-to-paint, throughput, memory per isolate
