@@ -1,7 +1,7 @@
 # Isoloop system design
 
 - **Status:** Draft
-- **Updated:** 2026-11-03
+- **Updated:** 2026-11-05 (as built through M2)
 - **Builds on:** [RFC 0001](../rfcs/0001-threaded-runtime.md) (the *why* and the public shape) and the [ADRs](../adr/README.md) (individual decisions)
 
 This document covers the *how*: runtime topology, package boundaries, the interfaces between modules, the main sequences, and the invariants tests must prove. When it disagrees with RFC 0001, this document wins and the RFC gets a note.
@@ -34,34 +34,37 @@ flowchart TB
     RBB[Runtime only]
   end
 
-  K <-- "isolate port: init, patch, event, call/result, beat, error, shutdown" --> RA
-  K <-- "isolate port: init, beat, error, call/result, shutdown" --> RBB
-  BC <-- "control port: attach/detach, beat, metrics" --> BR
-  RA <-- "bus port: publish, subscribe, deliver, commit" --> BR
+  K <-- "isolate port: init, patch, event, call/result, beat, error, shutdown, reattach" --> RA
+  K <-- "isolate port: init, beat, error, call/result, shutdown, reattach" --> RBB
+  BC <-- "control port: boot, attach/detach, ready, beat, wake, metrics" --> BR
+  RA <-- "bus port: publish, subscribe, deliver, commit, request/reply, reset" --> BR
   RBB <-- "bus port" --> BR
 ```
 
 | Channel | Ends | Carries | Created by |
 | --- | --- | --- | --- |
-| Isolate port | main ↔ isolate worker (the `Worker` itself) | `init`, `ready`, `patch`, `event`, `call`/`result`, `beat`, `error`, `shutdown` | Loader |
-| Bus port | isolate worker ↔ bus worker (`MessageChannel`) | `publish`, `subscribe`, `unsubscribe`, `deliver`, `commit`, `result` | Bus controller, at each isolate start |
-| Control port | main ↔ bus worker (the `Worker` itself) | `attach`, `detach`, `topics`, `beat`, `metrics`, host-side `publish` | Bus controller |
+| Isolate port | main ↔ isolate worker (the `Worker` itself) | `init`, `ready`, `patch`, `event`, `call`/`result`, `beat`, `error`, `shutdown`, `bye`, `reattach` | Loader |
+| Bus port | isolate worker ↔ bus worker (`MessageChannel`) | `publish`, `subscribe`, `unsubscribe`, `commit`, `request`, `reply`, `deliver`, `reset`, `result` | Bus controller, at each isolate start |
+| Control port | main ↔ bus worker (the `Worker` itself) | `boot` (contracts URL and topic configs), `attach`, `detach`, host-side `publish`; back: `ready`, `beat`, `wake`, `metrics`, `result`, `error` | Bus controller |
 | Canvas handoff | main → isolate worker, once | a transferred `OffscreenCanvas` | Compositor, on request |
 
-**Rule:** no topic record crosses the main thread, except records the host itself publishes or subscribes to through `kernel.publish` / `kernel.subscribe` ([ADR 0005](../adr/0005-bus-topology-message-channels.md)).
+**Rule:** no topic record crosses the main thread, except records the host itself publishes or subscribes to through `kernel.publish` / `kernel.subscribe` ([ADR 0005](../adr/0005-bus-topology-message-channels.md)). `kernel.subscribe` opens its own bus port, attached as `isoloop:host:<n>`, so ids starting with `isoloop:` are reserved for the kernel (ADR 0005 amendment pending).
 
 ## 2. Packages and dependency rules
 
 ```mermaid
 flowchart LR
   protocol
+  dom
   bus --> protocol
-  bus --> codec
+  bus -. "M2b" .-> codec
   host --> protocol
+  host --> dom
   runtime --> protocol
-  react --> runtime
-  preact --> runtime
-  devtools --> host
+  runtime --> dom
+  react["react (M3)"] --> runtime
+  preact["preact (M3)"] --> runtime
+  devtools["devtools (M4)"] --> host
   host -. "starts (URL only)" .-> bus
   host -. "starts (URL only)" .-> runtime
 ```
@@ -74,12 +77,12 @@ flowchart LR
 | `@isoloop/dom` | isolate worker (`/worker`), main thread (`/host`) | nothing at runtime (`/testing`: optional peer on Vitest) | any `@isoloop/*` package; DOM types in `/worker` |
 | `@isoloop/host` | main thread | `protocol`, `dom/host` | `runtime`, `bus` source (it loads their bundles by URL) |
 | `@isoloop/runtime` | isolate worker | `protocol`, `dom/worker` | `host`, `bus` |
-| `@isoloop/react`, `@isoloop/preact` | isolate worker | `runtime`, the framework (peer dep) | `host` |
-| `@isoloop/devtools` | main thread | `host` | `runtime` |
+| `@isoloop/react`, `@isoloop/preact` (M3) | isolate worker | `runtime`, the framework (peer dep) | `host` |
+| `@isoloop/devtools` (M4) | main thread | `host` | `runtime` |
 
 Enforced by pnpm's strict `node_modules` (a package can only import what its `package.json` lists) plus an oxlint `no-restricted-imports` rule per package ([ADR 0009](../adr/0009-toolchain.md)). `bus` builds with `lib: ["ES2022", "WebWorker"]` minus DOM, so a stray DOM type fails the build; its tests run in Node.
 
-The host ships two prebuilt worker entry bundles, `bus-worker.js` and `isolate-bootstrap.js`. Users serve them from their origin; a Vite plugin (M3) automates this.
+Two packages ship a prebuilt worker entry bundle, loaded by URL: `@isoloop/bus/worker` (`bus-worker.js`) and `@isoloop/runtime/bootstrap` (`bootstrap.js`). Users serve them from their origin and pass the URLs in `KernelConfig.workers`; four-loops imports them with Vite's `?worker&url`. A Vite plugin (M3) automates this.
 
 ## 3. `@isoloop/protocol`
 
@@ -107,10 +110,10 @@ export type HostToIsolate =
 // Isolate port: isolate → host
 export type IsolateToHost =
   | Envelope<'ready', { runtime: string; adapter: string; renderFmt: string }>
-  | Envelope<'patch', { fmt: string; batch: unknown }>
+  | Envelope<'patch', { fmt: string; batch: unknown; styles?: string[] }>   // styles: sheets added since the last patch (§4.8)
   | Envelope<'call', { method: HostMethod; args: unknown[] }>
-  | Envelope<'beat', { lagMs: number; heapBytes?: number }>
-  | Envelope<'error', { message: string; stack?: string; fatal: boolean }>
+  | Envelope<'beat', { lagMs: number; heapBytes?: number; idle?: IdleReport }>   // idle: for the suspension check (ADR 0001)
+  | Envelope<'error', ErrorPayload>
   | Envelope<'bye', {}>;                                         // last message after shutdown: handlers done, terminate now (§7.6)
 
 // Bus port: isolate ↔ bus worker
@@ -129,8 +132,8 @@ export type BusToIsolate =
 // Control port: host ↔ bus worker
 export type HostToBus =
   | Envelope<'boot', { contractsUrl: string; topics: TopicConfig[]; heartbeatMs?: number; dev?: boolean }>   // topics = cloneable part of contracts.list, for the boot check (ADR 0003); dev = structuredClone check
-  | Envelope<'attach', { isolateId: string; grants: Grants; port: MessagePort }>
-  | Envelope<'detach', { isolateId: string; keepOffsets: boolean }>
+  | Envelope<'attach', { isolateId: string; grants: Grants; port: MessagePort; reattach?: boolean }>   // reattach: after a bus restart, memory topics answer with reset (ADR 0007)
+  | Envelope<'detach', { isolateId: string; keepOffsets: boolean; wake?: boolean }>                  // wake: suspended; the bus sends wake on a record (ADR 0001)
   | Envelope<'publish', { topic: string; key?: string; value: unknown }>;
 export type BusToHost =
   | Envelope<'ready', { engine: string; storage: 'memory' | 'opfs'; restored: { topic: string; head: number }[] }>
@@ -138,7 +141,7 @@ export type BusToHost =
   | Envelope<'wake', { isolateId: string; topic: string }>   // record for a suspended isolate (ADR 0001)
   | Envelope<'metrics', BusMetrics>
   | Envelope<'result', CallResult>                          // answers a host publish sent with an id
-  | Envelope<'error', { message: string; stack?: string; fatal: boolean; code?: ErrorCode }>;   // fatal + contracts code: kernel start fails, no retry
+  | Envelope<'error', ErrorPayload>;   // fatal + contracts code: the bus can't start, no retry (ADR 0003)
 
 export type InitPayload = {
   isolateId: string;
@@ -149,18 +152,25 @@ export type InitPayload = {
   busPort: MessagePort;           // transferred
   heartbeatMs: number;
   src: string;                    // isolate module URL, imported by the bootstrap
+  wake?: boolean;                 // woken from suspension: `latest` subscriptions start from `committed`
 };
+
+export type IdleReport = { sinceDeliveryMs: number; inFlight: number; holds: { ageMs: number; stack?: string }[] };
+export type ErrorPayload = { message: string; stack?: string; fatal: boolean; code?: ErrorCode };
 
 export type BusRecord = { offset: number; key?: string; value: unknown; ts: number; producer: string; req?: { from: string; id: string } };   // req: set on bus.request records
 export type StartPosition = 'latest' | 'earliest' | 'committed';
 export type Grants = { publish: string[]; subscribe: string[]; navigate?: boolean };   // navigate: programmatic navigate() allowed (ADR 0002), default false
 export type HostMethod = 'measure' | 'focus' | 'navigate' | 'scrollIntoView' | 'requestCanvas';
-export type CallResult = { ok: true; value: unknown } | { ok: false; error: { code: string; message: string } };
+export type CallError = { code: ErrorCode; message: string; issues?: { message: string; path: (string | number)[] }[] };
+export type CallResult = { ok: true; value: unknown } | { ok: false; error: CallError };
 ```
+
+The source of truth is `packages/protocol/src` (`isolate.ts`, `bus.ts`, `control.ts`, `errors.ts`); this block follows it.
 
 `init` / `ready` are the version handshake. The host sends its supported range. The isolate replies with the runtime version and render format it actually uses, or posts `error { fatal: true, code: 'protocol_mismatch' }`. Each side drops (and counts) envelopes with an unknown `v` or `t`, so old isolates don't crash on new message types.
 
-The package also exports `isEnvelope`, `assertNever`, the error-code enum, the `Grants` matcher (topic globs like `catalog.*`), and `routeTopic` (`isoloop.route.v1`, value `{ href, pathname, path, search, hash, state }`, [ADR 0002](../adr/0002-host-owns-routing.md)). Routing error codes: `cross_origin`, `routing_disabled`, `navigate_failed`.
+The package also exports `isEnvelope`, `assertNever`, the error-code list (`ERROR_CODES`), the `Grants` matchers (`matchTopic`, `matchAny`; topic globs like `catalog.*`), `BusError` (what `publish`, `request` and `reply` reject with), the system topics (`SYSTEM_TOPICS`, `systemTopic`), and the structural topic types host and runtime use so they never import `bus`: `TopicRef`, `TypedRecord`, `SchemaTypes`, `ContractsList` and `topicConfigOf`. It also exports `routeTopic` (`isoloop.route.v1`, value `{ href, pathname, path, search, hash, state }`, [ADR 0002](../adr/0002-host-owns-routing.md)). Routing error codes: `cross_origin`, `routing_disabled`, `navigate_failed`.
 
 Some codes never travel on a port: the host API throws them as a `KernelError`. `createKernel` throws `unsupported_browser`, with every missing feature named, when the browser lacks module workers, `MessageChannel`, adopted stylesheets on a `ShadowRoot`, or OPFS ([ADR 0009](../adr/0009-toolchain.md#rules) rule 7). `createKernel` also throws `invalid_config` for a malformed `components` entry. `spawn` throws `pools_unsupported`, `invalid_manifest` and `bus_failed` (§4.1).
 
@@ -174,16 +184,18 @@ The public façade and wiring point. It owns no logic of its own beyond configur
 createKernel(config: KernelConfig): Kernel
 
 type KernelConfig = {
-  contracts: { url: string; list: Contracts };   // url: ES module the bus worker imports; list: its default export, imported by the host (ADR 0003)
+  workers: { isolateBootstrap: string; bus?: string; budget?: number };   // bundle URLs (§2); budget = soft worker-count warning, default 32 (ADR 0001)
+  contracts?: { url: string; list: ContractsList };   // url: ES module the bus worker imports; list: its default export, imported by the host (ADR 0003)
   components?: Record<string, HostComponent>;   // HostComponent = { tag: string; attributes?: string[] }: isolate tag → host custom element (§4.5)
-  supervisor?: { strategy: 'one-for-one' | 'never'; maxRestarts: number; withinMs: number; backoff?: Backoff };
-  heartbeat?: { everyMs: number; blockedAfterMs: number; killAfterMs: number; readyTimeoutMs: number };
+  supervisor?: { strategy?: 'one-for-one' | 'never'; maxRestarts?: number; withinMs?: number; backoff?: Partial<Backoff> };
+  heartbeat?: { everyMs?: number; blockedAfterMs?: number; killAfterMs?: number; readyTimeoutMs?: number };
   compositor?: { frameBudgetMs: number };
-  workers?: { bus: string; isolateBootstrap: string; budget?: number };   // bundle URLs; budget = soft worker-count warning, default 32 (ADR 0001)
+  styles?: readonly CSSStyleSheet[];        // adopted into every surface's shadow root (§4.8)
+  suspend?: { maxConcurrentWakes?: number };   // default 4 (ADR 0001)
   routing?: boolean;                        // default true; false = no route topic, no link interception, navigate rejects routing_disabled (ADR 0002)
   basePath?: string;                        // default '/'; must match the host router's basename
   onNavigate?: (req: NavigateRequest) => boolean | Promise<boolean>;   // default: history.pushState/replaceState; true = accepted, not finished
-  dev?: boolean;                            // default false; the bus checks schema outputs with structuredClone (ADR 0003)
+  dev?: boolean;                            // default false; dev checks: structuredClone of schema outputs (ADR 0003), the 10-minute keepAwake warning, the basePath warning (ADR 0002)
 };
 
 type NavigateRequest = { href: string; replace: boolean; state?: unknown; from: string };   // href absolute, same-origin; from = isolate id
@@ -194,19 +206,26 @@ interface Kernel {
   stop(id: string): Promise<void>;
   restart(id: string): Promise<void>;
   resume(id: string): Promise<void>;                   // wake a suspended isolate (ADR 0001); no-op unless suspended
-  publish<T>(topic: TopicDef<T>, rec: { key?: string; value: T }): Promise<void>;
-  subscribe<T>(topic: TopicDef<T>, fn: (r: BusRecord) => void, opts?: { from?: StartPosition }): () => void;
-  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:ready, bus:crash, bus:restart, bus:failed, bus:metrics, bus:seeded, bus:seed_rejected, bus:orphaned_topics, route:state_dropped, route:navigate_error, ...
+  publish<In>(topic: TopicRef<In>, rec: { key?: string; value: In }): Promise<void>;   // rejects with a BusError
+  subscribe<Out>(topic: TopicRef<unknown, Out>, fn: (r: TypedRecord<Out>) => void, opts?: { from?: StartPosition }): () => void;   // from 'latest' by default
+  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:ready, bus:crash, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
   isolates(): IsolateSnapshot[];                                      // used by devtools
   syncRoute(): void;                                   // host router changed the URL; republish isoloop.route.v1 if href/state differ (ADR 0002)
-  dropTopic(name: string, o?: { force?: boolean }): Promise<void>;   // delete an orphaned persistent topic; seed_pending / force rules (ADR 0003)
+  dropTopic(name: string, o?: { force?: boolean }): Promise<void>;   // M2b: delete an orphaned persistent topic; seed_pending / force rules (ADR 0003)
   destroy(): Promise<void>;
+  readonly debug: { crashBus(): void; messages(): Record<string, number> };   // internal test hooks, not API: messages() counts main-thread messages by type (I7)
 }
 ```
 
+`IsolateManifest` is `{ id, src, surface?: Element, config?, grants?, fallback?, pool?, suspend?, bus?: { onReset? } }` (`packages/host/src/kernel.ts`).
+
 Defaults: heartbeat `100 / 400 / 10_000` ms, ready timeout `10_000` ms, frame budget `8` ms, supervisor `one-for-one`, 3 restarts in 60 s, backoff `250 ms × 2ⁿ` capped at 4 s.
 
-`spawn` throws a `KernelError` with a `code`: `pools_unsupported` (until M2c), `invalid_manifest` (also for ids starting with `isoloop:`, which name the kernel's own bus connections), or `bus_failed` once the bus couldn't load its contracts. A contracts failure also fails every running isolate (reason `bus-failed`): nothing can run without contracts. `kernel.publish` rejects with a `BusError` carrying the broker's code. The manifest's `bus: { onReset: 'restart' }` opts an isolate into a restart instead of `reset` after a bus restart ([ADR 0007](../adr/0007-bus-worker-supervision.md)). Hosting requirements (CSP, CORS) are in [the hosting guide](../guide/hosting.md).
+`contracts` and `workers.bus` come together: giving only one throws `invalid_config`. Without both there is no bus worker: isolates get an unconnected bus port and `kernel.publish` rejects with `bus_unavailable`.
+
+`createKernel` stays synchronous, so isolates start while the bus loads its contracts. If loading fails, every isolate fails with reason `bus-failed` (no restart) and `bus:failed { code }` is emitted (ADR 0003 amendment pending). `spawn` throws a `KernelError` with a `code`: `pools_unsupported` (until M2c), `invalid_manifest` (also for ids starting with `isoloop:`, which name the kernel's own bus connections), or `bus_failed` once the bus couldn't load its contracts. `kernel.publish` rejects with a `BusError` carrying the broker's code. A host publish the bus never answered before it crashed rejects with `bus_unavailable`, while isolates re-send theirs (§5; ADR 0007 amendment pending); host publishes made while the bus restarts are queued. Once the bus has failed for good, isolates get a port that answers every call with `bus_unavailable`.
+
+With `suspend` set, an isolate subscribed to a `last-n` or `time` topic gets a console warning, since records may expire while it sleeps. It comes from the bus metrics, so about a second after the subscribe. The manifest's `bus: { onReset: 'restart' }` opts an isolate into a restart instead of `reset` after a bus restart ([ADR 0007](../adr/0007-bus-worker-supervision.md)). Hosting requirements (CSP, CORS) are in [the hosting guide](../guide/hosting.md).
 
 ### 4.2 Loader
 
@@ -219,24 +238,29 @@ Turns a manifest into a running worker.
 
 CSP needs: `worker-src 'self'`, `script-src` allowing the isolate CDN (for `import()` inside the worker), and `connect-src` to match. The docs list these.
 
-The PoC prepended the runtime string to a blob, which needs `worker-src blob:` and doesn't support cross-origin ES modules. The bootstrap approach replaces it at M1.
+The M0 proof of concept prepended the runtime to a blob, which needed `worker-src blob:` and didn't support cross-origin ES modules; the bootstrap replaced it in M1.
 
 ### 4.3 Supervisor
 
 A pure state machine per isolate plus timers, separated so it can be unit-tested with fake clocks:
 
 ```ts
-type IsolateState = 'loading' | 'running' | 'blocked' | 'stopped' | 'crashed' | 'restarting' | 'failed';
+type IsolateState = 'loading' | 'running' | 'blocked' | 'stopped' | 'crashed' | 'restarting' | 'failed' | 'suspended';
 type SupervisorInput =
-  | { k: 'ready' } | { k: 'beat'; at: number; lagMs: number } | { k: 'tick'; at: number }
-  | { k: 'error'; fatal: boolean; message: string } | { k: 'workerError'; message: string }
-  | { k: 'stop' } | { k: 'respawn' };
+  | { k: 'spawned'; at: number } | { k: 'ready' } | { k: 'beat'; at: number; lagMs: number } | { k: 'tick'; at: number }
+  | { k: 'error'; at: number; fatal: boolean; message: string } | { k: 'workerError'; at: number; message: string }
+  | { k: 'spawnFailed' | 'renderFmtMismatch' | 'busFailed'; at: number; message: string }
+  | { k: 'stop' } | { k: 'respawn' } | { k: 'suspend' } | { k: 'wake' } | { k: 'hidden' } | { k: 'visible'; at: number };
 type SupervisorEffect =
-  | { k: 'terminate' } | { k: 'spawn'; afterMs: number } | { k: 'showBusy' | 'hideBusy' }
-  | { k: 'showFallback'; reason: string } | { k: 'emit'; event: KernelEvent; data: unknown };
+  | { k: 'terminate' } | { k: 'spawn'; afterMs: number } | { k: 'shutdown'; graceMs: number }
+  | { k: 'showBusy' | 'hideBusy' } | { k: 'suspend'; graceMs: number } | { k: 'wake' }
+  | { k: 'showFallback'; reason: CrashReason; message: string } | { k: 'hideFallback' }
+  | { k: 'emit'; event: KernelEvent; data: unknown };
 
 function step(s: IsolateSupervision, input: SupervisorInput): { s: IsolateSupervision; effects: SupervisorEffect[] };
 ```
+
+The source is `packages/host/src/supervisor/machine.ts`. `crashed` is passed through, never rested in.
 
 Transitions (matching the RFC lifecycle diagram):
 
@@ -251,11 +275,12 @@ Transitions (matching the RFC lifecycle diagram):
 | running / blocked | `workerError` or fatal `error` | crashed | terminate, emit `isolate:crash` |
 | crashed | restarts in window < max | restarting | spawn after backoff |
 | crashed | restarts in window ≥ max, or strategy `never` | failed | showFallback, emit `isolate:failed` |
-| restarting | (spawned) | loading | – |
+| restarting | `spawned` | loading | – |
 | any but failed | `stop` | stopped | `shutdown` with grace, then terminate |
-| failed / stopped | `respawn` | loading | resets restart window |
-| running | `suspend` set, idle for `afterMs` (no visible surface, no deliveries, no `keepAwake` hold, nothing in flight; ADR 0001) | suspended | `shutdown` with grace, `detach { keepOffsets: true }` (leaves consumer groups), terminate, keep surface snapshot |
-| suspended | surface visible (visual), bus `wake` (headless), or `resume` | loading | queued: at most 4 spawns at once, visible first; subscriptions use `from: 'committed'`; restart window untouched |
+| failed / stopped | `respawn` | restarting, then `spawned` → loading | resets restart window |
+| any but failed | `busFailed` (contracts couldn't load) | failed | reason `bus-failed`, no restart; showFallback, emit `isolate:failed` |
+| running | `suspend` set, idle for `afterMs` (no visible surface, no deliveries, no `keepAwake` hold, nothing in flight; ADR 0001) | suspended | `shutdown` with grace, `detach { keepOffsets: true, wake: true }` (leaves consumer groups), terminate, keep surface snapshot |
+| suspended | surface visible (visual), bus `wake` (headless), `resume`, or a bus restart (every suspended headless isolate, since the new bus has lost their wake subscriptions; ADR 0001 amendment pending) | loading | queued: at most `suspend.maxConcurrentWakes` (4) spawns at once, visible first; `latest` subscriptions start from `committed` (`init.wake`); restart window untouched |
 | any | `spawn-failed` | crashed | reason `spawn-failed`; before the retry, suspend every idle suspendable isolate |
 | any | document hidden | (same) | pause hang judgement (no showBusy, no kill) |
 | any | document visible, or Page Lifecycle `resume` | (same) | reset every heartbeat clock (isolates and bus) |
@@ -282,15 +307,15 @@ Applies `isoloop-dom@1` batches from an isolate's worker-side DOM subset ([ADR 0
 ```ts
 interface HostRenderBridge {
   readonly fmt: string;                                    // 'isoloop-dom@1'
-  mount(root: ShadowRoot, registry: ComponentRegistry): void;
-  apply(batch: unknown): void;                             // called only by the Compositor
-  idFor(node: Node): string | undefined;                   // for the EventBridge
-  nodeFor(id: string): Element | undefined;                // for measure/focus
+  mount(root: ShadowRoot, send: (event: SerializedEvent) => void): void;   // the registry is given when the bridge is created
+  apply(batch: unknown): boolean;                          // called only by the Compositor; false = malformed, nothing changed
+  idFor?(node: Node): string | undefined;                  // for the EventBridge; optional for test bridges
+  nodeFor?(id: string): Element | undefined;               // for measure/focus; optional for test bridges
   unmount(): void;
 }
 ```
 
-**Component registry** (`render/registry.ts`). An allow-list of safe HTML tags (the PoC's list plus headings, `br`, `hr`, `a`, `img`, `table` family, `form` family, and an `svg` subset for icons and charts), plus host components (`iso-button` → design-system element) registered through `KernelConfig.components`. Unknown tags render as `div` (`g` inside SVG). Attributes are allow-listed per tag (global, `aria-*` and `data-*` everywhere). `script`, `iframe`, `object`, `embed`, `style`, `foreignObject`, `on*` attributes and `srcdoc` are never created. `href`/`src` are restricted to `http(s):`, `mailto:` and relative URLs, after stripping the whitespace and control characters browsers ignore in a scheme. SVG `<use>` may only reference the same document (`#id`). Form `action`/`formaction` are dropped (submits are always prevented, §4.6). Isolates may set only the `value`, `checked` and `selected` properties. With routing on, same-origin `<a href>` is rewritten to the absolute URL from the route resolver (`/x` → `basePath + x`) on render and on every patch that changes it ([ADR 0002](../adr/0002-host-owns-routing.md)).
+**Component registry** (`render/registry.ts`). An allow-list of safe HTML tags (the M0 proof of concept's list plus headings, `br`, `hr`, `a`, `img`, `table` family, `form` family, and an `svg` subset for icons and charts), plus host components (`iso-button` → design-system element) registered through `KernelConfig.components`. Unknown tags render as `div` (`g` inside SVG). Attributes are allow-listed per tag (global, `aria-*` and `data-*` everywhere). `script`, `iframe`, `object`, `embed`, `style`, `foreignObject`, `on*` attributes and `srcdoc` are never created. `href`/`src` are restricted to `http(s):`, `mailto:` and relative URLs, after stripping the whitespace and control characters browsers ignore in a scheme. SVG `<use>` may only reference the same document (`#id`). Form `action`/`formaction` are dropped (submits are always prevented, §4.6). Isolates may set only the `value`, `checked` and `selected` properties. With routing on, same-origin `<a href>` is rewritten to the absolute URL from the route resolver (`/x` → `basePath + x`) on render and on every patch that changes it ([ADR 0002](../adr/0002-host-owns-routing.md)).
 
 ### 4.6 EventBridge and inputs
 
@@ -319,31 +344,33 @@ An isolate calls `ctx.styles(css)`, and the stylesheet text travels with its nex
 
 The runtime that runs inside each isolate worker.
 
-- **Bootstrap** (`isolate-bootstrap.js`): waits for `init`, checks the protocol range, installs the `isoloop-dom` DOM subset as `document` and the DOM globals if the isolate has a surface ([ADR 0010](../adr/0010-own-render-bridge.md); skipped when `renderFmt` is `'none'`), starts the heartbeat, connects the bus port, then `await import(init.src)`. The isolate module's default export is an `IsolateDefinition`, and the bootstrap calls `definition.start(ctx)`.
+- **Bootstrap** (`@isoloop/runtime/bootstrap`, `bootstrap.js`): waits for `init`, checks the protocol range, installs the `isoloop-dom` DOM subset as `document` and the DOM globals if the isolate has a surface ([ADR 0010](../adr/0010-own-render-bridge.md); skipped when `renderFmt` is `'none'`), starts the heartbeat, connects the bus port, then `await import(init.src)`. The isolate module's default export is an `IsolateDefinition`, and the bootstrap calls `definition.start(ctx)`.
 - **Heartbeat:** `setInterval(everyMs)`. `lagMs = max(0, now - last - everyMs)`. Adds `performance.memory.usedJSHeapSize` where available.
 - **Errors:** `self.onerror` and `onunhandledrejection` post `error { fatal: false }`. A throw during `start` is fatal. The host also catches `Worker.onerror` for errors the runtime can't see.
 - **IsolateContext** (what adapters build on):
 
 ```ts
-interface IsolateContext {
+interface IsolateContext<Root = IsolateRoot> {
   id: string;
   config: unknown;
-  root?: Element;                                  // render target (isoloop-dom subset); undefined when headless
+  root: Root | undefined;                          // render target (isoloop-dom subset); undefined when headless
   bus: BusClient;
-  host: { measure(id: string): Promise<Rect>; focus(id: string): Promise<void>;
-          navigate(href: string, o?: { replace?: boolean; state?: unknown }): Promise<boolean>;
-          requestCanvas(el: Element, size: Size): Promise<OffscreenCanvas> };
+  host: { measure(node): Promise<Rect>; focus(node): Promise<void>;
+          scrollIntoView(node, opts?): Promise<void>;
+          navigate(href: string, o?: { replace?: boolean; state?: unknown }): Promise<boolean> };
+          // takes worker-side nodes; requestCanvas(el, size) arrives in M3
   styles(css: string | string[]): void;
   onShutdown(fn: (reason: ShutdownReason) => void | Promise<void>): void;   // reason includes 'suspend'
   keepAwake(): () => void;                         // hold against suspension; call the result to release (ADR 0001)
 }
 
 interface BusClient {
-  publish<In, Out>(topic: TopicDef<In, Out>, rec: { key?: string; value: In }): Promise<void>;   // rejects on schema/ACL error
-  subscribe<In, Out>(topic: TopicDef<In, Out>, fn: (r: TypedRecord<Out>) => void | Promise<void>,
-               opts?: { from?: StartPosition; group?: string; autoCommit?: boolean }): () => void;
-  request<In, Out, RIn, ROut>(topic: TopicDef<In, Out, RIn, ROut>, value: In, opts?: { timeoutMs?: number }): Promise<ROut>;   // topics with a reply schema only
+  publish<In>(topic: TopicRef<In>, rec: { key?: string; value: In }): Promise<void>;   // rejects with a BusError on schema/ACL error
+  subscribe<Out>(topic: TopicRef<unknown, Out>, fn: (r: TypedRecord<Out>) => void | Promise<void>,
+               opts?: { from?: StartPosition; group?: string; autoCommit?: boolean; onReset?: () => void; onGap?: (g: { from: number; to: number }) => void }): () => void;
+  request<In, ROut>(topic: TopicRef<In, unknown, unknown, ROut>, value: In, opts?: { key?: string; timeoutMs?: number }): Promise<ROut>;   // reply schema only; timeout default 30 s
   reply(record: TypedRecord<unknown>, value: unknown): Promise<void>;   // validated against the reply schema; invalid / already_replied (ADR 0003)
+  commit(record: TypedRecord<unknown>): void;      // for autoCommit: false
 }
 ```
 
@@ -351,13 +378,13 @@ interface BusClient {
 
 `defineIsolate(fn)` in each adapter wraps a framework component into an `IsolateDefinition`. Vanilla and headless isolates export `{ start(ctx) {} }` directly; `@isoloop/runtime` exports `defineIsolate<Root>(def)` to type it (`defineIsolate<HTMLElement>` gives `ctx.root` the DOM's types in DOM-typed code). `onShutdown` handlers run when the host sends `shutdown`, and `bye` follows once they settle or the grace runs out (§7.6).
 
-`ctx.bus` is the `BusClient` above (M2 task 9), plus `commit(record)` for `autoCommit: false` and an `onReset` option for memory topics lost in a bus restart. Handlers run one record at a time, in order. A handler that throws is reported as a non-fatal `error` and stops that subscription's commits, so the record and those after it come back on the next start. On `reattach` the client sends every subscription again, then every publish and request the old bus never answered, in order; past the inbox limit (1,000 unanswered) calls reject with `bus_unavailable`. Woken from suspension, an isolate's `latest` subscriptions start from `committed` (`init.wake`), so it replays what it missed; `onGap` reports records retention dropped meanwhile. Each beat carries an idle report (time since the last delivery, calls in flight, open `keepAwake()` holds with age and stack) that the kernel's idle check reads.
+`ctx.bus` is the `BusClient` above (`packages/runtime/src/bus-client.ts`). `onReset` is for memory topics lost in a bus restart. Handlers run one record at a time, in order. A handler that throws is reported as a non-fatal `error` and stops that subscription's commits, so the record and those after it come back on the next start. On `reattach` the client sends every subscription again, then every publish and request the old bus never answered, in order; past the inbox limit (1,000 unanswered) calls reject with `bus_unavailable`. Woken from suspension, an isolate's `latest` subscriptions start from `committed` (`init.wake`), so it replays what it missed; `onGap` reports records retention dropped meanwhile. Each beat carries an idle report (time since the last delivery, calls in flight, open `keepAwake()` holds with age and stack) that the kernel's idle check reads.
 
-**Headless isolates** ([ADR 0008](../adr/0008-isolates-and-surfaces.md)) get the same bootstrap, heartbeat, error handling and `BusClient`, but no polyfill and no `root`. `styles()` is a no-op, and the DOM host calls reject with `no_surface`. A typical headless isolate is a store: it subscribes to command topics, keeps state, and publishes snapshots to a compacted topic that visual isolates read with `from: 'earliest'`.
+**Headless isolates** ([ADR 0008](../adr/0008-isolates-and-surfaces.md)) get the same bootstrap, heartbeat, error handling and `BusClient`, but no `isoloop-dom` subset and no `root`. `styles()` is a no-op, and the DOM host calls reject with `no_surface`. A typical headless isolate is a store: it subscribes to command topics, keeps state, and publishes snapshots to a compacted topic that visual isolates read with `from: 'earliest'`.
 
 ## 6. `@isoloop/bus`
 
-No DOM, so it's testable in Node. The bus worker entry (`bus-worker.js`) is a thin shell that wires ports to a `Broker`.
+No DOM, so it's testable in Node. The bus worker entry (`@isoloop/bus/worker`, `bus-worker.js`) is a thin shell that wires ports to a `Broker`.
 
 ### 6.1 Topics and records
 
@@ -369,14 +396,14 @@ type TopicDef<In, Out = In, RIn = never, ROut = RIn> = {
   seed?: { from: TopicDef<any, any>; map: (value: unknown, rec: BusRecord) => In; follow?: boolean };   // M2b, ADR 0003
   retention: { kind: 'last-n'; n: number } | { kind: 'time'; ms: number } | { kind: 'compacted' };
   maxRecordBytes?: number;                       // default 256 KiB, rough estimate by structured size
-  durability?: 'memory' | 'persistent';          // default 'memory'; 'persistent' = OPFS (ADR 0007, M2b)
+  durability?: 'memory' | 'persistent';          // default 'memory'; 'persistent' = OPFS (ADR 0007, M2b); until M2b it behaves as 'memory', with one console warning
 };
 function topic<In, Out, RIn, ROut>(name: string, def: Omit<TopicDef<In, Out, RIn, ROut>, 'name'>): TopicDef<In, Out, RIn, ROut>;
 function contracts(...topics: TopicDef<any, any, any, any>[]): Contracts;   // default export of the contracts module; rejects duplicate names
 function unchecked<T>(): StandardSchemaV1<T, T>;
 ```
 
-`TopicDef` objects are what host, isolates and the bus worker share through the contracts package ([ADR 0003](../adr/0003-schema-format-standard-schema.md)). On the wire only the name travels. The bus worker builds its topics only from the module at `contracts.url`; at `boot` it compares them with the host's `list` and fails with `contracts_mismatch` if they differ. `contracts_failed`, `contracts_invalid`, `contracts_mismatch` and `reserved_topic` (a contracts module exporting `isoloop.*`) are fatal and not retried: kernel start fails with `bus:failed`. While the module loads, the bus accepts `attach`/`subscribe` and buffers publishes (the bus-restart buffer, `bus_unavailable` past the inbox limit). System topics are defined in `@isoloop/protocol` with hand-written validators.
+`TopicDef` objects are what host, isolates and the bus worker share through the contracts package ([ADR 0003](../adr/0003-schema-format-standard-schema.md)). On the wire only the name travels. The bus worker builds its topics only from the module at `contracts.url`; at `boot` it compares them with the host's `list` and fails with `contracts_mismatch` if they differ. `contracts_failed`, `contracts_invalid`, `contracts_mismatch` and `reserved_topic` (a contracts module exporting `isoloop.*`) are fatal and not retried: every isolate fails with `bus-failed` and the kernel emits `bus:failed` (§4.1; ADR 0003 amendment pending). While the module loads, the bus accepts `attach`/`subscribe` and buffers publishes per port inside the bus worker, validated in order once the broker exists; past 1,000 they reject with `bus_unavailable` (ADR 0003 amendment pending: the ADR says the restart buffer). System topics are defined in `@isoloop/protocol` with hand-written validators.
 
 **Seeding (M2b).** A topic with `seed` starts in a *seeding* state on a device where `seed.from` has data: its publishes are buffered and its subscribers get nothing until every `from` record has been mapped, validated against the new schema and appended (original `ts`/`producer` kept, progress stored atomically with the appends, so exactly once and resumable). Rejected records are skipped and reported (`bus:seed_rejected`), their offsets kept in the seed metadata; `bus:seeded { topic, copied, rejected }` marks the end. `map` must be synchronous (`seed_async` otherwise). `follow: true` keeps forwarding new `from` records while both topics are listed. Persistent topics no longer listed are reported as `bus:orphaned_topics` and kept until `kernel.dropTopic`, which rejects with `seed_pending` while a pending seed needs the topic and needs `{ force: true }` if rejected seed records from it are recorded.
 
@@ -430,7 +457,7 @@ Responsibilities, in order, for a `publish`:
 
 **Groups.** Subscribers sharing a `group` get each record once among them, by hash of key (records with no key go round-robin). That keeps per-key order within a group while its membership is stable: if a record's member is out of credit, the group waits rather than skip ahead. The group's offset moves only past records every member has committed. A member that leaves hands its uncommitted records to the others, which get them before anything new.
 
-**Delivery and backpressure (credits).** Each subscription has `credit`, starting at the inbox limit (default 1,000). The broker pushes `deliver` batches (up to 64 records, coalesced per microtask) while `credit > 0`, and subtracts the number sent. A `commit` restores credit for the committed records. At 0 credit the subscription is *paused*: nothing is queued in memory, only its read cursor is kept. When credit comes back, the broker reads from the log at the cursor. Records that expired while paused are skipped, and the isolate gets a `deliver` with `gap: { from, to }` so it can tell.
+**Delivery and backpressure (credits).** Each subscription has `credit`, starting at the inbox limit (default 1,000). The broker pushes `deliver` batches (up to 64 records, coalesced per microtask) while `credit > 0`, and subtracts the number sent. Each publish reaches the bus worker as its own task, so in practice a batch holds one record; batching across tasks is the [M5b spike](../plans/m5b-delivery-batching.md). A `commit` restores credit for the committed records. At 0 credit the subscription is *paused*: nothing is queued in memory, only its read cursor is kept. When credit comes back, the broker reads from the log at the cursor. Records that expired while paused are skipped, and the isolate gets a `deliver` with `gap: { from, to }` so it can tell.
 
 **Request/response.** `bus.request(topic, value)` sends `request { timeoutMs }`, which goes through the publish pipeline and is appended with `req: { from, id }` (the caller's isolate id and request id) on the record. Responders call `reply(record, value)` (`reply { topic, offset, value }`), which the broker validates against the topic's `reply` schema and sends straight to the caller's port as `result { re }`, not through a log. Only an isolate the request record was delivered to may reply; the first valid reply wins and later ones reject with `already_replied`. An invalid reply rejects the responder with `invalid` and sends the caller `reply_invalid` at once. `request` on a topic without `reply` rejects with `not_requestable`. Timeout errors are raised on the caller side; the broker forgets the request after `timeoutMs` (a later reply gets `timeout`), and a reply to a caller that has gone is dropped.
 
@@ -447,12 +474,12 @@ sequenceDiagram
   participant B as Bus worker
   participant P as Isolate worker
   participant C as Compositor
-  H->>K: spawn({ id, src, surface: '#cart' })
+  H->>K: spawn({ id, src, surface: cartEl })
   K->>C: create shadow root + busy shell
-  K->>P: new Worker(isolate-bootstrap.js)
+  K->>P: new Worker(bootstrap.js)
   K->>B: attach {isolateId, grants, port2}
   K->>P: init {isolateId, protocol, renderFmt, grants, busPort: port1, src}
-  P->>P: install polyfill, heartbeat, import(src), start(ctx)
+  P->>P: install isoloop-dom, heartbeat, import(src), start(ctx)
   P->>K: ready {runtime, adapter, renderFmt}
   P->>K: patch {fmt, batch}
   K->>C: enqueue(batch)
@@ -552,44 +579,44 @@ sequenceDiagram
   participant B as Bus worker (old)
   participant K as Kernel/Supervisor
   participant B2 as Bus worker (new)
-  participant S as OPFS
+  participant S as OPFS (M2b)
   participant I as Isolate (still running)
   B-->>K: Worker.onerror, or no beat past killAfterMs
   K->>B: terminate()
   Note over I: BusClient buffers publishes
   K->>B2: new Worker + boot {contractsUrl, topics}
-  B2->>S: open(): load persistent segments + offsets
-  B2->>K: ready {storage:'opfs', restored}
-  K->>B2: attach {isolateId, grants, port}
+  B2->>S: M2b: open(), load persistent segments + offsets
+  B2->>K: ready {storage, restored} (M2: 'memory', nothing restored)
+  K->>B2: attach {isolateId, grants, port, reattach: true}
   K->>I: reattach {busPort}
   I->>B2: subscribe (re-sent for every topic)
-  B2->>I: deliver (persistent topic, from committed+1)
+  B2->>I: deliver (M2b: persistent topic, from committed+1)
   B2->>I: reset {topic, reason:'bus_restart'} (memory topic)
   I->>B2: publish (buffered records)
 ```
 
-An isolate with `bus: { onReset: 'restart' }` is restarted instead of receiving `reset`. If the new bus crashes again while loading, safe mode sets the newest segments aside and the kernel emits `bus:recovered`.
+An isolate with `bus: { onReset: 'restart' }` is restarted instead of receiving `reset`. After the new bus is `ready`, the kernel republishes the route topic and wakes every suspended headless isolate (§4.3). In M2b, if the new bus crashes again while loading, safe mode sets the newest segments aside and the kernel emits `bus:recovered`.
 
 ## 8. Invariants
 
-Each invariant has at least one automated test (unit **U**, browser **B**, Playwright **E2E**).
+Each invariant has at least one automated test (unit **U**, browser **B**, Playwright **E2E**). The column lists what exists today; I12 waits for M2b.
 
 | # | Invariant | Test |
 | --- | --- | --- |
-| I1 | Only the compositor writes to the DOM under a surface | E2E: `MutationObserver` on the roots records only compositor-flushed changes; lint rule forbids DOM writes elsewhere |
+| I1 | Only the compositor writes to the DOM under a surface | E2E: `MutationObserver` on the roots records only compositor-flushed changes (no lint rule yet) |
 | I2 | A blocked isolate doesn't delay other isolates' paints by more than one frame | E2E: block C 3 s, B's clock keeps updating, main fps ≥ 55 |
 | I3 | A crashed isolate doesn't affect others and restarts under its limit | E2E + U (supervisor table tests) |
-| I4 | An isolate can only publish/receive granted topics | U (broker) + E2E (isolate attempts forbidden publish) |
+| I4 | An isolate can only publish/receive granted topics | U (broker); E2E covers only the `navigate` grant |
 | I5 | Order is kept per topic and per key; offsets are monotonic | U, plus property-based tests on the engine |
 | I6 | A restarted isolate with `from: 'committed'` sees every record after its last commit, once retained | U + E2E replay test (M2 done-criterion) |
-| I7 | No topic record crosses the main thread | B: instrument main-thread `postMessage`/`onmessage` and assert no `deliver`/`publish` from isolates |
+| I7 | No topic record crosses the main thread | E2E (four-loops, replay) and the throughput bench: `kernel.debug.messages()` counts main-thread messages by type, and no `deliver` appears |
 | I8 | A frame applies at least one batch, and no more than budget + one batch | U (compositor with fake clock) |
-| I9 | Unknown tags render as `div`; `script`/`iframe`/`on*` never appear | U (registry) + E2E |
+| I9 | Unknown tags render as `div`; `script`/`iframe`/`on*` never appear | U (registry) |
 | I10 | Protocol mismatch fails at `init` with a clear error, never mid-render | U |
 | I11 | A bus restart never restarts an isolate (unless it opted in); every subscription to a memory topic gets exactly one `reset` | B + E2E (M2) |
 | I12 | A persistent topic loses no acknowledged record across a bus crash or a page reload | U (storage fault injection) + E2E (M2b) |
-| I13 | An isolate is suspended only if `suspend` is set and it is idle (including no `keepAwake` hold); on resume it sees every retained record since its committed offset, and any loss arrives as `gap` or `reset`, never silently | B + E2E (M2) |
-| I14 | Hiding or freezing the tab for longer than `killAfterMs` never restarts an isolate or the bus once the tab is visible again | E2E (M1) |
+| I13 | An isolate is suspended only if `suspend` is set and it is idle (including no `keepAwake` hold); on resume it sees every retained record since its committed offset, and any loss arrives as `gap` or `reset`, never silently | B |
+| I14 | Hiding or freezing the tab for longer than `killAfterMs` never restarts an isolate or the bus once the tab is visible again | B |
 
 ## 9. Performance budgets
 
@@ -600,8 +627,7 @@ Starting targets, to be calibrated in M1/M2 benches and then enforced in CI with
 | Click-to-paint overhead vs. the same UI single-threaded | p95 ≤ 1 frame in every engine | `bench/click-to-paint` (all three engines, report-only) |
 | Compositor DOM work per frame | ≤ 8 ms (default budget) | compositor stats |
 | Heartbeat-detected blocking | ≤ 500 ms to show busy | E2E |
-
-| Idle isolate memory, vanilla / Preact / React | ≤ 3 / 5 / 12 MB (measure first) | `bench/memory-per-isolate` |
+| Idle isolate memory, vanilla / Preact / React | ≤ 3 / 5 / 12 MB (measure first) | `bench/memory-per-isolate` (not built yet) |
 | Bus throughput, TS engine, 10 subscribers, 200-byte records | ≥ 50k records/s delivered (M2: 45.5k on CI; [M5b spike](../plans/m5b-delivery-batching.md)) | `bench/throughput` |
 | Restart to first paint (no replay) | ≤ 300 ms after backoff | E2E timing |
 
@@ -609,10 +635,10 @@ The click-to-paint budget is one frame because a render through `postMessage` ca
 
 ## 10. Testing strategy
 
-- **Unit (Vitest, Node):** `protocol` guards, `bus` (broker, engine conformance suite, retention, credits, groups), supervisor `step()` tables, compositor scheduling with a fake rAF and clock, registry sanitising.
-- **Browser (Vitest browser mode, Chromium):** isolate runtime in a real worker, RenderBridge round-trip, EventBridge serialisation, host calls.
-- **E2E (Playwright, Chromium + Firefox + WebKit):** against `examples/four-loops` and, from M3, `examples/dashboard`. Isolation (I2, I3), ACL (I4), replay (I6), input latency smoke checks.
-- **Bench (`bench/`):** run in CI on Chromium. Results are stored as artifacts and compared with the main-branch baseline. Fail on more than 20% regression.
+- **Unit (Vitest, Node):** `protocol` guards and `bus` (broker, engine conformance suite, retention, credits, groups). `pnpm test:node`.
+- **Browser (Vitest browser mode, Chromium):** `host` (supervisor `step()` tables, compositor scheduling with a fake rAF and clock, registry sanitising, bus controller, suspension), `runtime` (the bootstrap in a real worker, the `BusClient`), `dom` (the `isoloop-dom` conformance suite) and `bus-browser` (`*.browser.test.ts`: the bus worker in a real `Worker`). `pnpm test:browser`.
+- **E2E (Playwright, Chromium + Firefox + WebKit):** against `examples/four-loops` and the `e2e/harness` page; from M3 the dashboard in the separate examples repo. Isolation (I2, I3), loader, inputs, routing, replay (I6, I7).
+- **Bench (`bench/`):** `bench:click-to-paint` (all three engines) and `bench:throughput` (Chromium) run in CI's `bench` job, report only: results go to the `bench-results` artifact, with no baseline comparison or threshold yet. `pnpm bench` runs the engine micro-bench.
 
 ## 11. Security posture
 
@@ -636,4 +662,4 @@ The click-to-paint budget is one frame because a render through `postMessage` ca
 | Devtools | §6.3 metrics, `Kernel.isolates()`, compositor stats | M4 |
 | Shared-memory engine | §6.2 `LogEngine` | M5 |
 
-Every wire message in RFC 0001 appears in §7: `init`, `ready`, `patch`, `event`, `beat` (7.1–7.2); `publish`, `deliver`, `commit`, `result` (7.3); `subscribe`, `error` (7.4); `call`/`result` (§4.7); `unsubscribe` and `shutdown` (7.6).
+Every wire message in RFC 0001 appears in §7 or nearby: `init`, `ready`, `patch`, `event`, `beat` (7.1–7.2); `publish`, `deliver`, `commit`, `result` (7.3); `subscribe`, `error` (7.4); `call`/`result` (§4.7); `shutdown` and `bye` (7.6); `reattach` and `reset` (7.7); `unsubscribe`, `request` and `reply` (§3, §6.3).

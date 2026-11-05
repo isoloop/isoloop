@@ -4,11 +4,11 @@
 
 **A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-Status: **M0 done, pre-release.** The proof of concept runs from the repo on a thin first host and runtime, with CI on Chromium, Firefox and WebKit; nothing is on npm yet. M1 (the real kernel) is next. The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
+Status: **M0–M2 done, pre-release.** The kernel (loader, supervisor, frame-batched compositor on our own render bridge) and the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension) run from the repo, with CI on Chromium, Firefox and WebKit; nothing is on npm yet. M2b (durable log), M2c (worker pools) and M3 (adapters and the dashboard) are next. The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
 
 ## Run the demo
 
-**Live:** [isoloop.github.io/isoloop](https://isoloop.github.io/isoloop/). Four isolates, four event loops: block one, crash one, or block the main thread, and watch what keeps running.
+**Live:** [isoloop.github.io/isoloop](https://isoloop.github.io/isoloop/). Four visual isolates, each on its own event loop, plus a headless store: block one, crash one, or block the main thread, and watch what keeps running. The isolates talk only through Zod-typed topics on the bus; crash D (Messages) and it replays its log from the bus when it restarts.
 
 Locally, with Node 26 and pnpm 12 ([setup](CONTRIBUTING.md#setup)):
 
@@ -17,7 +17,7 @@ pnpm install
 pnpm dev
 ```
 
-The source is in [`examples/four-loops`](examples/four-loops): each pane is an isolate module in `src/isolates/`, spawned by [`@isoloop/host`](packages/host) into a shadow-DOM surface.
+The source is in [`examples/four-loops`](examples/four-loops): each pane is an isolate module in `src/isolates/`, spawned by [`@isoloop/host`](packages/host) into a shadow-DOM surface; `store.ts` is the headless one, and `src/contracts.ts` defines the topics.
 
 ## Why
 
@@ -49,17 +49,20 @@ Isoloop runs in the browser tab, on today's browsers, with no server-side story.
 ## How it works
 
 ```
-┌──────────────── Main thread: host kernel (only DOM writer) ────────────────┐
-│  Loader          Compositor          Bus bridge          Supervisor       │
-│  starts workers  patches per frame   routes records to   heartbeats,      │
-│                                      the bus worker      restarts         │
-└──────────────▲──────────────────────▲──────────────────────▲───────────────┘
-               │ messages only        │                      │
-        ┌──────┴──────┐        ┌──────┴──────┐        ┌──────┴──────┐
-        │ Isolate A   │        │ Isolate B   │        │ Isolate C   │
-        │ own worker  │        │ own worker  │        │ own worker  │
-        │ React UI    │        │ Preact UI   │        │ headless    │
-        └─────────────┘        └─────────────┘        └─────────────┘
+┌──────────────── Main thread: host kernel (only DOM writer) ─────────────────┐
+│  Loader          Compositor          Bus controller         Supervisor      │
+│  starts workers  patches per frame   starts and watches     heartbeats,     │
+│                                      the bus worker         restarts        │
+└──────▲──────────────────▲──────────────────▲─────────────────────▲──────────┘
+       │ UI, events,      │                  │                     │ control
+       │ heartbeats       │                  │                     │
+┌──────┴──────┐    ┌──────┴──────┐    ┌──────┴──────┐    ┌─────────┴─────────┐
+│ Isolate A   │    │ Isolate B   │    │ Isolate C   │    │ Bus worker        │
+│ own worker  │    │ own worker  │    │ own worker  │    │ topic logs,       │
+│ UI          │    │ UI          │    │ headless    │    │ schemas, offsets  │
+└──────┬──────┘    └──────┬──────┘    └──────┬──────┘    └─────────▲─────────┘
+       └──────────────────┴──────────────────┴─────────────────────┘
+                 records: one MessageChannel per isolate, never via the main thread
 ```
 
 - **Thread isolation:** one dedicated worker per isolate, with its own heap and event loop.
@@ -69,7 +72,7 @@ Isoloop runs in the browser tab, on today's browsers, with no server-side story.
 - **Pluggable log engine:** a TypeScript engine in v1; an opt-in Rust/WASM engine on `SharedArrayBuffer` later, for zero-copy reads on cross-origin-isolated pages, shipped only if benchmarks justify it.
 - **Parallel charts:** canvas widgets draw with `OffscreenCanvas` inside their own worker, never touching the main thread.
 - **Supervision:** heartbeats detect blocked isolates; crashed isolates restart one-for-one and replay their topics.
-- **Framework-agnostic:** adapters for Preact and React first; plain JS always works.
+- **Framework-agnostic:** plain JS works today; Preact and React adapters come in M3.
 
 ## API sketch
 
@@ -86,6 +89,8 @@ import { createKernel } from '@isoloop/host';
 import list from '@acme/contracts';
 
 const kernel = createKernel({
+  // Worker entry bundles from @isoloop/runtime/bootstrap and @isoloop/bus/worker, served from your origin
+  workers: { isolateBootstrap: '/isoloop/bootstrap.js', bus: '/isoloop/bus-worker.js' },
   contracts: { url: '/contracts.js', list },   // the bus worker imports the same module from url
   supervisor: { strategy: 'one-for-one', maxRestarts: 3, withinMs: 60_000 },
 });
@@ -94,19 +99,20 @@ const kernel = createKernel({
 kernel.spawn({
   id: 'cart',
   src: 'https://cdn.example.com/cart/isolate.js',
-  surface: '#cart',
-  topics: { publish: ['cart.items.v1'], subscribe: ['catalog.selected.v1'] },
+  surface: document.querySelector('#cart')!,
+  grants: { publish: ['cart.items.v1'], subscribe: ['catalog.selected.v1'] },
 });
 
 // A headless isolate: no surface, only bus traffic
 kernel.spawn({
   id: 'pricing',
   src: 'https://cdn.example.com/pricing/isolate.js',
-  topics: { publish: ['cart.totals.v1'], subscribe: ['cart.items.v1'] },
+  grants: { publish: ['cart.totals.v1'], subscribe: ['cart.items.v1'] },
 });
 ```
 
 ```tsx
+// The React adapter is planned for M3
 import { defineIsolate, useTopic, usePublish } from '@isoloop/react';
 
 export default defineIsolate(() => {
@@ -138,23 +144,27 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 
 1. **M0 Foundations:** pnpm workspaces, TypeScript 7, OXC (oxlint, oxfmt, tsdown), Vite 8, Vitest, Playwright, GitHub Actions; protocol types; proof of concept ported to TypeScript.
 2. **M1 Kernel** (done; write-up: [Crashing an isolate on purpose](docs/posts/m1-crashing-an-isolate.md)): loader, supervisor, heartbeats, frame-batched compositor on our own render bridge.
-3. **M2 Bus:** topics, schemas, retention, offsets, replay, backpressure; bus worker with the TS log engine; opt-in suspension of idle isolates.
+3. **M2 Bus** (done): topics, schemas, retention, offsets, replay, backpressure; bus worker with the TS log engine; opt-in suspension of idle isolates. The write-up is still to come.
 4. **M2b Durable log:** persistent topics in OPFS that survive a bus crash or a page reload. Required for 0.1.
 5. **M2c Worker pools:** opt-in named pools for small headless isolates, if a benchmark shows they pay off.
 6. **M3 Adapters and dashboard sandbox:** Preact and React adapters; a markets dashboard (live public exchange feeds, cross-market aggregates and alerts) that runs single-threaded or on Isoloop at the flip of a toggle, with live metrics (main-thread fps, long tasks, input latency, loop lag per worker, memory, bus throughput).
 7. **M4 Devtools and 0.1:** health and bus overlay, docs site, npm release.
 8. **M5 Shared-memory engine:** opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
+9. **M5b Delivery batching (spike):** whether batching bus traffic across tasks gets the TS engine from 45.5k to its 50k records/s budget.
 
 ## Repo layout
 
-Plain pnpm workspaces. M0 has `protocol`, `host`, `runtime`, `bus` (empty until M2) and `four-loops`; the rest arrives with its milestone.
+Plain pnpm workspaces. Today: `protocol`, `dom`, `host`, `runtime` and `bus`, plus the `four-loops` example; the rest arrives with its milestone.
 
 ```text
-packages/  protocol · dom (M1) · host · runtime · bus · codec (M2b) · bus-wasm (M5) · react · preact · devtools
-examples/  four-loops (minimal) · dashboard (flagship sandbox)
-docs/      site + rfcs/
-bench/     click-to-paint, throughput, memory per isolate
+packages/  protocol · dom · host · runtime · bus · codec (M2b) · bus-wasm (M5) · react, preact (M3) · devtools (M4)
+examples/  four-loops (minimal; the E2E suites run against it)
+e2e/       Playwright suites and their harness page
+docs/      rfcs · design · adr · plans · guide · investigations · posts
+bench/     click-to-paint, throughput
 ```
+
+The markets dashboard (M3) goes in a separate `isoloop/examples` repository ([should-do](docs/should-do.md)).
 
 ## Non-goals (v1)
 
