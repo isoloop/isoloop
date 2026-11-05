@@ -21,7 +21,6 @@ import {
 } from '@isoloop/protocol';
 import { createLegacyIsolate } from './legacy/runtime';
 import { LEGACY_VDOM } from './legacy/vdom';
-import { createVanillaIsolate } from './vanilla';
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -116,6 +115,8 @@ function startLegacy(init: InitPayload, main: Function): void {
 }
 
 async function startIsolate(init: InitPayload, start: (ctx: unknown) => unknown): Promise<void> {
+  // Loaded on demand, so a worker's first beat doesn't wait for the DOM subset.
+  const { createVanillaIsolate } = await import('./vanilla');
   const runtime = createVanillaIsolate(init, post, self);
   self.addEventListener('message', (e: MessageEvent<unknown>) => {
     runtime.receive(e.data);
