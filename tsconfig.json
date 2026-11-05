@@ -12,7 +12,8 @@
     "packages/*/*.config.ts",
     "examples/*/*.config.ts",
     "e2e/harness/*.config.ts",
-    "e2e"
+    "e2e",
+    "bench/click-to-paint"
   ],
   // The harness page has its own DOM tsconfig.
   "exclude": ["e2e/harness/src"]

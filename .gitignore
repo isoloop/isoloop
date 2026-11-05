@@ -15,6 +15,7 @@ coverage/
 # Test output
 playwright-report/
 test-results/
+bench-results/
 
 # Env
 .env
