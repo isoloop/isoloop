@@ -215,6 +215,31 @@ describe('supervisor transition table', () => {
       ],
     ],
     [
+      'running → failed on busFailed, with no restart (ADR 0003, decision 7)',
+      at('running'),
+      { k: 'busFailed', at: 5, message: 'contracts_mismatch' },
+      { state: 'failed', reason: 'bus-failed', restarts: 0, window: [] },
+      [
+        { k: 'terminate' },
+        moved('running', 'crashed'),
+        crashed('bus-failed', 'contracts_mismatch'),
+        moved('crashed', 'failed'),
+        { k: 'showFallback', reason: 'bus-failed', message: 'contracts_mismatch' },
+        {
+          k: 'emit',
+          event: 'isolate:failed',
+          data: { reason: 'bus-failed', message: 'contracts_mismatch' },
+        },
+      ],
+    ],
+    [
+      'busFailed on a stopped isolate is ignored',
+      at('stopped'),
+      { k: 'busFailed', at: 5, message: 'x' },
+      { state: 'stopped' },
+      [],
+    ],
+    [
       'renderFmtMismatch outside loading is ignored',
       at('running'),
       { k: 'renderFmtMismatch', at: 5, message: 'late' },

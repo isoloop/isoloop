@@ -1,4 +1,4 @@
-import { SYSTEM_TOPICS, checks, systemSchema, systemTopic } from '@isoloop/protocol';
+import { SYSTEM_TOPICS, checks, systemSchema, systemTopic, type TopicRef } from '@isoloop/protocol';
 import * as v from 'valibot';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
@@ -75,6 +75,18 @@ describe('schemas through the Standard Schema interface', () => {
     expectTypeOf<ReplyInputOf<typeof lookup>>().toEqualTypeOf<{ price: unknown }>();
     expectTypeOf<ReplyOutputOf<typeof lookup>>().toEqualTypeOf<{ price: number }>();
     expectTypeOf<ReplyInputOf<typeof zodItem>>().toBeNever();
+  });
+
+  it("fits protocol's TopicRef, which host and runtime take, with the same types", () => {
+    type RefIn<T> = T extends TopicRef<infer In, any, any, any> ? In : never;
+    type RefOut<T> = T extends TopicRef<any, infer Out, any, any> ? Out : never;
+    const u = topic('u.v1', { schema: unchecked<string>(), retention: last10 });
+    expectTypeOf<RefIn<typeof zodItem>>().toEqualTypeOf<{
+      sku: string;
+      qty?: number | undefined;
+    }>();
+    expectTypeOf<RefOut<typeof zodItem>>().toEqualTypeOf<{ sku: string; qty: number }>();
+    expectTypeOf<RefOut<typeof u>>().toEqualTypeOf<string>();
   });
 });
 

@@ -1,4 +1,10 @@
-import { isSystemTopic, type ErrorCode, type Retention, type TopicConfig } from '@isoloop/protocol';
+import {
+  isSystemTopic,
+  topicConfigOf,
+  type ErrorCode,
+  type Retention,
+  type TopicConfig,
+} from '@isoloop/protocol';
 import type { StandardSchemaV1 } from './standard-schema';
 
 export type { Retention } from '@isoloop/protocol';
@@ -171,12 +177,5 @@ export function isContracts(x: unknown): x is Contracts {
 
 /** The structured-cloneable part of a topic, sent at `boot` for the contracts check (ADR 0003, decision 5). */
 export function topicConfig(t: AnyTopicDef): TopicConfig {
-  const cfg: TopicConfig = {
-    name: t.name,
-    retention: { ...t.retention },
-    requestable: t.reply !== undefined,
-  };
-  if (t.maxRecordBytes !== undefined) cfg.maxRecordBytes = t.maxRecordBytes;
-  if (t.durability !== undefined) cfg.durability = t.durability;
-  return cfg;
+  return topicConfigOf(t);
 }

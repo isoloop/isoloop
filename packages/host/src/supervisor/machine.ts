@@ -33,7 +33,9 @@ export type CrashReason =
   /** `new Worker` threw. */
   | 'spawn-failed'
   /** `ready.renderFmt` isn't one the host speaks. Fails at once: a restart can't fix it (ADR 0011). */
-  | 'render-fmt-mismatch';
+  | 'render-fmt-mismatch'
+  /** The bus couldn't load its contracts. Fails at once: the error is deterministic (ADR 0003). */
+  | 'bus-failed';
 
 export type SupervisorConfig = {
   /** `never` fails on the first crash. */
@@ -87,6 +89,8 @@ export type SupervisorInput =
   | { k: 'workerError'; at: number; message: string }
   | { k: 'spawnFailed'; at: number; message: string }
   | { k: 'renderFmtMismatch'; at: number; message: string }
+  /** The bus failed its contracts check: stop and fail, no restart. */
+  | { k: 'busFailed'; at: number; message: string }
   | { k: 'stop' }
   | { k: 'respawn' }
   | { k: 'hidden' }
@@ -202,6 +206,11 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
       return s.state === 'loading'
         ? crash(s, input.at, 'render-fmt-mismatch', input.message, cfg, true)
         : same;
+
+    case 'busFailed':
+      return s.state === 'stopped' || s.state === 'failed'
+        ? same
+        : crash(s, input.at, 'bus-failed', input.message, cfg, true);
 
     case 'stop':
       if (s.state === 'stopped' || s.state === 'failed') return same;

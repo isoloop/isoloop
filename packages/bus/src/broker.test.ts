@@ -1,7 +1,7 @@
 import { checks, systemSchema, systemTopic, type Grants } from '@isoloop/protocol';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { connect, flush } from '../test/memory-port';
+import { connect, fakeIsolate, flush } from '../test/memory-port';
 import { Broker, type BrokerOptions } from './broker';
 import { TsEngine } from './engine/ts-engine';
 import type { StandardSchemaV1 } from './standard-schema';
@@ -441,5 +441,40 @@ describe('I6: a restarted isolate resumes after its last commit', () => {
     old.send({ v: 1, t: 'publish', p: { topic: 'notes.v1', value: 'ghost' } });
     await fresh.call('subscribe', { topic: 'notes.v1', from: 'earliest' });
     expect(fresh.values('notes.v1')).toEqual([]);
+  });
+});
+
+describe('reattach after a bus restart (ADR 0007)', () => {
+  it('answers the first subscribe to each memory topic with one reset', async () => {
+    const { broker } = setup();
+    const d = fakeIsolate('D');
+    broker.attach('D', all, d.port, { reattach: true });
+    await d.call('subscribe', { topic: 'notes.v1', from: 'committed' });
+    await d.call('subscribe', { topic: 'notes.v1', from: 'committed' });
+    await d.call('subscribe', { topic: 'cart.items.v1', from: 'committed' });
+    const resets = d.inbox.filter((m) => m.t === 'reset').map((m) => m.p);
+    expect(resets).toEqual([
+      { topic: 'notes.v1', reason: 'bus_restart' },
+      { topic: 'cart.items.v1', reason: 'bus_restart' },
+    ]);
+    // The reset comes before the subscribe's result.
+    expect(d.inbox[0]?.t).toBe('reset');
+  });
+
+  it('sends no reset on a first attach, or for a durable topic', async () => {
+    const { broker } = setup();
+    const a = connect(broker, 'A', all);
+    await a.call('subscribe', { topic: 'notes.v1', from: 'earliest' });
+    expect(a.inbox.some((m) => m.t === 'reset')).toBe(false);
+
+    const durable = new Broker({
+      contracts: contracts(notes),
+      engine: new TsEngine(),
+      durable: (t) => t === 'notes.v1',
+    });
+    const d = fakeIsolate('D');
+    durable.attach('D', all, d.port, { reattach: true });
+    await d.call('subscribe', { topic: 'notes.v1', from: 'committed' });
+    expect(d.inbox.some((m) => m.t === 'reset')).toBe(false);
   });
 });
