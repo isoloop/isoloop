@@ -10,8 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@isoloop/bus": "workspace:*",
     "@isoloop/host": "workspace:*",
-    "@isoloop/runtime": "workspace:*"
+    "@isoloop/runtime": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",

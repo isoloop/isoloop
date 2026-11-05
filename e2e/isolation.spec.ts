@@ -182,48 +182,57 @@ test('headless: supervised like any isolate, no DOM writes, measure answers no_s
 }) => {
   await page.goto(HARNESS);
   await expect(page.locator('body[data-ready]')).toBeAttached();
-  const out = await page.evaluate(async (src) => {
-    const writes: string[] = [];
-    new MutationObserver((records) => {
-      for (const r of records) writes.push(r.type);
-    }).observe(document.body, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      characterData: true,
-    });
-    const kernel = window.harness.createKernel({
-      heartbeat: { blockedAfterMs: 200, killAfterMs: 800 },
-    });
-    const states: string[] = [];
-    const reports: unknown[] = [];
-    const crashes: string[] = [];
-    kernel.on('isolate:state', ({ state }) => states.push(state));
-    kernel.on('isolate:crash', ({ reason }) => crashes.push(reason));
-    kernel.on('bus:publish', ({ topic, value }) => {
-      if (topic === 'headless') reports.push(value);
-    });
-    kernel.spawn({ id: 'H', src, config: { hangAfterMs: 300 } });
-    // Up, blocked, killed, restarted and up again.
-    await new Promise<void>((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error(`states: ${states.join(' → ')}`)), 8000);
-      const poll = () => {
-        if (states.filter((s) => s === 'running').length >= 2) {
-          clearTimeout(t);
-          resolve();
-        } else setTimeout(poll, 20);
+  const out = await page.evaluate(
+    async ({ src, contracts }) => {
+      const writes: string[] = [];
+      new MutationObserver((records) => {
+        for (const r of records) writes.push(r.type);
+      }).observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        characterData: true,
+      });
+      const kernel = await window.harness.createBusKernel(contracts, {
+        heartbeat: { blockedAfterMs: 200, killAfterMs: 800 },
+      });
+      const states: string[] = [];
+      const reports: unknown[] = [];
+      const crashes: string[] = [];
+      kernel.on('isolate:state', ({ state }) => states.push(state));
+      kernel.on('isolate:crash', ({ reason }) => crashes.push(reason));
+      kernel.subscribe({ name: 'headless.v1' }, (r) => reports.push(r.value), { from: 'earliest' });
+      kernel.spawn({
+        id: 'H',
+        src,
+        config: { hangAfterMs: 300 },
+        grants: { publish: ['headless.v1'], subscribe: [] },
+      });
+      // Up, blocked, killed, restarted and up again.
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error(`states: ${states.join(' → ')}`)), 8000);
+        const poll = () => {
+          if (states.filter((s) => s === 'running').length >= 2) {
+            clearTimeout(t);
+            resolve();
+          } else setTimeout(poll, 20);
+        };
+        poll();
+      });
+      await kernel.destroy();
+      return {
+        states,
+        reports,
+        crashes,
+        writes,
+        surfaces: document.querySelectorAll('iso-surface').length,
       };
-      poll();
-    });
-    await kernel.destroy();
-    return {
-      states,
-      reports,
-      crashes,
-      writes,
-      surfaces: document.querySelectorAll('iso-surface').length,
-    };
-  }, new URL('headless.js', ISOLATES_CORS).href);
+    },
+    {
+      src: new URL('headless.js', ISOLATES_CORS).href,
+      contracts: new URL('contracts.js', ISOLATES_CORS).href,
+    },
+  );
 
   expect(out.states.slice(0, 7)).toEqual([
     'loading',

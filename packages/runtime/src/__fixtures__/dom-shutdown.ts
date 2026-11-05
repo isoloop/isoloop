@@ -1,5 +1,4 @@
-// Test isolate: an onShutdown handler that changes the DOM after a delay,
-// and the M1 bus.
+// Test isolate: an onShutdown handler that changes the DOM after a delay.
 import { defineIsolate, type IsolateDefinition } from '../vanilla';
 
 const isolate: IsolateDefinition = defineIsolate({
@@ -10,10 +9,7 @@ const isolate: IsolateDefinition = defineIsolate({
       await new Promise((r) => setTimeout(r, 50));
       root.textContent = `bye: ${reason}`;
     });
-    ctx.legacyBus.subscribe('note', (value, from) => {
-      root.textContent = `${from}: ${String(value)}`;
-    });
-    ctx.legacyBus.publish('hello', ctx.id);
+    root.textContent = 'up';
   },
 });
 

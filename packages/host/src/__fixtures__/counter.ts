@@ -1,12 +1,6 @@
 // Test isolate on isoloop-dom@1, or headless when spawned without a surface.
 // Typed structurally: host may not import @isoloop/runtime.
-type Ctx = {
-  root?: Element;
-  legacyBus: {
-    publish(topic: string, value: unknown): void;
-    subscribe(topic: string, fn: (value: unknown, from: string) => void): void;
-  };
-};
+type Ctx = { root?: Element };
 
 function button(label: string, fn: () => void): HTMLButtonElement {
   const b = document.createElement('button');
@@ -33,7 +27,6 @@ export default {
       count,
       button('inc', () => {
         show(n + 1);
-        ctx.legacyBus.publish('count', n);
       }),
       button('crash', () => {
         throw new Error('fixture crash');
@@ -46,9 +39,5 @@ export default {
       }),
     );
     root.append(wrap);
-    ctx.legacyBus.subscribe('count', (value, from) => {
-      show(typeof value === 'number' ? value * 100 : -1);
-      ctx.legacyBus.publish('seen', from);
-    });
   },
 };

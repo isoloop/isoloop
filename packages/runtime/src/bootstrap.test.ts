@@ -1,7 +1,7 @@
-import type { HostToIsolate, IsolateToHost, LegacyIsolateToHost } from '@isoloop/protocol';
+import type { HostToIsolate, IsolateToHost } from '@isoloop/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-type Msg = IsolateToHost | LegacyIsolateToHost;
+type Msg = IsolateToHost;
 
 const workers: Worker[] = [];
 afterEach(() => {
@@ -158,12 +158,9 @@ describe('isolate bootstrap', () => {
     expect(got.some((m) => m.t === 'error')).toBe(false);
   });
 
-  it('runs onShutdown handlers before bye, and speaks the M1 bus', async () => {
+  it('runs onShutdown handlers before bye', async () => {
     const { got, send } = spawn(fixture('dom-shutdown'), undefined, 'isoloop-dom@1');
-    await until(() => got.some((m) => m.t === 'x-sub'));
-    expect(got.find((m) => m.t === 'x-pub')).toMatchObject({ p: { topic: 'hello', value: 'T' } });
-    send({ v: 1, t: 'x-deliver', p: { topic: 'note', value: 'hi', from: 'D' } });
-    await until(() => JSON.stringify(patches(got)).includes('D: hi'));
+    await until(() => JSON.stringify(patches(got)).includes('up'));
     send({ v: 1, t: 'shutdown', p: { reason: 'stop', graceMs: 1000 } });
     await until(() => got.some((m) => m.t === 'bye'));
     const types = got.map((m) => m.t);

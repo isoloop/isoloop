@@ -1,4 +1,6 @@
+/// <reference lib="dom" />
 import { expect, test, type Page } from '@playwright/test';
+import './harness-types';
 
 // The proof of concept's guarantees, checked against the built demo. These
 // become the I2/I3 regression tests in M1 (plan m0-foundations, task 8).
@@ -71,6 +73,23 @@ test('(d) a note typed in D appears in A', async ({ page }) => {
   await expect(pane(page, 'A')).toContainText('D says: hello from D');
   await expect(pane(page, 'D').locator('.log li').first()).toHaveText('me → note: hello from D');
   await expect(input).toHaveValue('');
+});
+
+test('(f) I7: bus records travel worker to worker; none crosses the main thread', async ({
+  page,
+}) => {
+  await pane(page, 'A').getByRole('button', { name: 'Increment' }).click();
+  const input = pane(page, 'D').getByPlaceholder('Send a note to A');
+  await input.fill('note one');
+  await input.press('Enter');
+  await expect(pane(page, 'A')).toContainText('D says: note one');
+  await expect(pane(page, 'D').locator('.log')).toContainText('A count = 1');
+  const counts: Record<string, number> = await page.evaluate(() => window.__isoloop.messages());
+  // What the main thread saw from isolate workers and the bus control port.
+  expect(counts['beat']).toBeGreaterThan(0);
+  expect(counts['patch']).toBeGreaterThan(0);
+  for (const t of ['publish', 'deliver', 'subscribe', 'commit', 'x-pub', 'x-sub'])
+    expect(counts[t] ?? 0).toBe(0);
 });
 
 test('(e) the fourth crash within 60 s fails C and shows the fallback; Retry brings it back', async ({

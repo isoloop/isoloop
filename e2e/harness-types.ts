@@ -26,10 +26,12 @@ type HarnessKernel = {
     event: 'route:navigate_error',
     fn: (e: { from: string; href: string; error: string }) => void,
   ): () => void;
-  on(
-    event: 'bus:publish',
-    fn: (e: { from: string; topic: string; value: unknown }) => void,
+  subscribe(
+    topic: { name: string },
+    fn: (r: { offset: number; value: unknown; producer: string }) => void,
+    opts?: { from?: 'latest' | 'earliest' | 'committed' },
   ): () => void;
+  publish(topic: { name: string }, rec: { key?: string; value: unknown }): Promise<void>;
   isolates(): {
     id: string;
     state: string;
@@ -37,7 +39,7 @@ type HarnessKernel = {
     surface?: { queued: number; applied: number };
   }[];
   syncRoute(): void;
-  debug: { crashBus(): void };
+  debug: { crashBus(): void; messages(): Record<string, number> };
   destroy(): Promise<void>;
 };
 
@@ -62,6 +64,8 @@ declare global {
     };
     /** four-loops' kernel (examples/four-loops/src/main.ts). */
     kernel: HarnessKernel;
+    /** four-loops' test hook: main-thread message counts by type (I7). */
+    __isoloop: HarnessKernel['debug'];
   }
 }
 

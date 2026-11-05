@@ -6,7 +6,6 @@ export * from './isolate';
 export * from './bus';
 export * from './bus-error';
 export * from './control';
-export * from './legacy';
 export * from './system-topics';
 export * from './route';
 export * from './topics';

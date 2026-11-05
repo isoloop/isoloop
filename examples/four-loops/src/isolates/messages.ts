@@ -1,8 +1,6 @@
 import { defineIsolate } from '@isoloop/runtime';
-import { el, text } from './dom';
-
-const isPrimes = (p: unknown): p is { count: number; ms: number } =>
-  typeof p === 'object' && p !== null && 'count' in p && 'ms' in p;
+import { count, note, primes } from '../topics';
+import { el } from './dom';
 
 // D · Messages
 export default defineIsolate<HTMLElement>({
@@ -16,11 +14,11 @@ export default defineIsolate<HTMLElement>({
       lines.length = Math.min(lines.length, 5);
       log.replaceChildren(...lines.map((l) => el('li', {}, l)));
     };
-    ctx.legacyBus.subscribe('count', (n, from) => {
-      push(`${from} count = ${text(n)}`);
+    ctx.bus.subscribe(count, (r) => {
+      push(`${r.producer} count = ${r.value}`);
     });
-    ctx.legacyBus.subscribe('primes', (p, from) => {
-      if (isPrimes(p)) push(`${from} primes = ${p.count} (${p.ms} ms)`);
+    ctx.bus.subscribe(primes, (r) => {
+      push(`${r.producer} primes = ${r.value.count} (${r.value.ms} ms)`);
     });
 
     const input = el('input', { placeholder: 'Send a note to A' });
@@ -28,8 +26,12 @@ export default defineIsolate<HTMLElement>({
     const send = async () => {
       const draft = input.value;
       if (!draft.trim()) return;
-      ctx.legacyBus.publish('note', draft);
-      push(`me → note: ${draft}`);
+      try {
+        await ctx.bus.publish(note, { value: draft });
+        push(`me → note: ${draft}`);
+      } catch (e) {
+        push(`note rejected: ${e instanceof Error ? e.message : String(e)}`);
+      }
       // The host owns a focused input's value (design §4.6), so focus moves off
       // the input before it's cleared. Until an isolate can force a value,
       // that's the way to reset one.

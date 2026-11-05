@@ -23,12 +23,11 @@ function setup(o: { backoffMs?: number } = {}) {
   });
   kernels.push(kernel);
   const events: {
-    [E in 'isolate:state' | 'isolate:crash' | 'isolate:error' | 'bus:publish']: KernelEvents[E][];
+    [E in 'isolate:state' | 'isolate:crash' | 'isolate:error']: KernelEvents[E][];
   } = {
     'isolate:state': [],
     'isolate:crash': [],
     'isolate:error': [],
-    'bus:publish': [],
   };
   kernel.on('isolate:state', (e) => {
     events['isolate:state'].push(e);
@@ -38,9 +37,6 @@ function setup(o: { backoffMs?: number } = {}) {
   });
   kernel.on('isolate:error', (e) => {
     events['isolate:error'].push(e);
-  });
-  kernel.on('bus:publish', (e) => {
-    events['bus:publish'].push(e);
   });
   const spawn = (id: string) => {
     const target = document.createElement('section');
@@ -87,24 +83,6 @@ describe('kernel', () => {
     a.click('inc');
     await waitFor(() => a.text() === '1');
     expect(a.handle.snapshot().surface?.rejected).toBe(0);
-  });
-
-  it('routes the main-thread bus to other subscribers only', async () => {
-    const { spawn, events } = setup();
-    const a = spawn('A');
-    const b = spawn('B');
-    await waitFor(() => a.text() === '0' && b.text() === '0');
-    a.click('inc');
-    // B receives A's count; A doesn't receive its own.
-    await waitFor(() => b.text() === '100');
-    expect(a.text()).toBe('1');
-    await waitFor(() => events['bus:publish'].some((d) => d.topic === 'seen'));
-    expect(events['bus:publish'][0]).toEqual({
-      from: 'A',
-      topic: 'count',
-      value: 1,
-      targets: ['B'],
-    });
   });
 
   it('stop removes the surface and the isolate', async () => {
