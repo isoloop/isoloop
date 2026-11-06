@@ -1,6 +1,7 @@
 # Installs Playwright browsers and their system packages for CI.
 # System packages (apt) are installed on every run, with a time limit and
-# retries (see deps.sh); browser binaries are cached per Playwright version.
+# retries, from .deb files cached per runner image (see deps.sh). Browser
+# binaries are cached per Playwright version.
 name: Install Playwright browsers
 description: Playwright browsers and their system dependencies, with retries and a cache
 inputs:
@@ -12,16 +13,27 @@ runs:
   steps:
     - id: version
       shell: bash
-      run: echo "playwright=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      run: |
+        echo "playwright=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        echo "image=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
     - id: cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-${{ steps.version.outputs.playwright }}-${{ inputs.browsers }}
+    # A new runner image starts from the last image's packages (restore-keys)
+    # and saves its own set once installed.
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/isoloop-apt
+        key: apt-${{ steps.version.outputs.image }}-${{ inputs.browsers }}
+        restore-keys: |
+          apt-${{ steps.version.outputs.image }}-
+          apt-
     - name: System dependencies
       shell: bash
       run: |
-        "$GITHUB_ACTION_PATH/deps.sh" ${{ inputs.browsers }}
+        APT_DEBS="$HOME/.cache/isoloop-apt" "$GITHUB_ACTION_PATH/deps.sh" ${{ inputs.browsers }}
     - name: Browsers
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
