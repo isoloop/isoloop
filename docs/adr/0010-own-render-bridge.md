@@ -1,9 +1,9 @@
 # ADR 0010: Our own render bridge (`isoloop-dom@1`)
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Supersedes:** [ADR 0006](0006-render-bridge-over-remote-dom.md) (Remote DOM behind a `RenderBridge`)
-- **Evidence:** the M1 task 4 spike, draft PR #23 (branch `spike/m1-remote-dom`, `spikes/remote-dom/README.md`)
+- **Evidence:** the M1 task 4 spike, PR #23 (closed unmerged; its files hold `spikes/remote-dom/README.md` and the usage logs)
 
 ## Context
 
@@ -33,7 +33,7 @@ The maintainer's preference is to own the stack and keep dependencies to a minim
    - **Attributes:** `setAttribute`, `removeAttribute`, `getAttribute`, `attributes`.
    - **`style`:** property writes, `setProperty`, `removeProperty`, `cssText`, recorded as the `style` attribute.
    - **Synced properties:** `value`, `checked`, `selected`, plus `defaultValue`, `defaultChecked`, `name` and `type`, which map to attributes.
-   - **Events:** `EventTarget` with `addEventListener`, `removeEventListener` and `dispatchEvent` (capture and bubble, inside the worker); `Event` with `isTrusted`.
+   - **Events:** `EventTarget` with `addEventListener`, `removeEventListener` and `dispatchEvent` (capture and bubble, inside the worker); `Event`. `isTrusted` is always `false` in the worker, including for events the host forwards: the worker can't forge it, and code that checks it must not treat forwarded input as trusted.
    - **`instanceof` classes:** `HTMLInputElement`, `HTMLTextAreaElement`, `HTMLSelectElement`, `HTMLIFrameElement`.
 3. **Records keep ADR 0006's contracts.** A `patch` envelope carries `{ fmt: 'isoloop-dom@1', batch }`. A batch is an array of plain tuples, one per change, collected per microtask:
    - `insert(parentId, node, beforeId | null)`, where `node` is a new subtree;
@@ -42,23 +42,35 @@ The maintainer's preference is to own the stack and keep dependencies to a minim
    - `listen(nodeId, type, on)`, so listener registration travels as data. Functions never cross the boundary.
 
    Node ids are ours, assigned when a node is created. Records reference nodes and siblings by id, not by index.
+
+   Both halves of the fmt ship in the host app's build: the worker starts from the app's `workers.isolateBootstrap`, which holds the worker half, and only then imports the isolate module. An isolate built and hosted separately (from a CDN, say) carries only its own code and adapter and renders into the `document` the bootstrap installed, so it can't bring a different fmt. That's why an exact fmt match ([ADR 0011](0011-dom-package.md), decision 8) is enough; a range is needed only if the bootstrap is ever loaded from the isolate's origin.
 4. **The host side** applies batches through the compositor only. It keeps `id → Node` and `Node → id` (`nodeFor`, `idFor`). Every tag, attribute and URL passes the component registry first (sanitising, I9). Host-owned inputs (design §4.6) decide whether a `prop` record for `value` or `checked` is applied.
 5. **Package layout:** `@isoloop/dom`, see [ADR 0011](0011-dom-package.md).
 6. **Done means the conformance suite passes** (M1 task 4b, `@isoloop/dom/testing` per [ADR 0011](0011-dom-package.md)) **with no known gaps**, and Preact and React render into the subset in a framework smoke test per adapter (M3).
 7. **It grows only on evidence.** A member is added when a conformance case, an adapter test or a real isolate needs it, and each addition comes with a test. `legacy-vdom` was deleted after M1; benchmarks compare against plain single-threaded DOM (design §9).
 
-### Out of scope
+### Frameworks and versions
 
-These aren't built. Each one would come in only by a later decision:
+- **v1 (0.1) supports plain JS, Preact `^10 || ^11` and React `^18 || ^19`.** The adapters declare those ranges as `peerDependencies`, so apps bring any release of a supported major.
+- **CI proves each major.** The catalog pins one exact version per major (for example `react18: npm:react@18.3.1`, per [ADR 0009](0009-toolchain.md) rule 8), the adapter tests run once per major, and Dependabot moves each forward weekly. A release that calls a member we lack shows up as a red update PR, not on `main`.
+- **Each major gets its own DOM usage log and smoke test,** because majors differ: React 19 hoists `<title>`, `<meta>` and `<link>` into `document.head`, which React 18 doesn't.
+- **Solid and Svelte come after 0.1, Vue is a later evaluation** ([would-like](../would-like.md)). All three compile markup to HTML strings, parse them once in a `<template>` and copy them with `cloneNode(true)` or `importNode`, so they need group 2's HTML parsing plus `cloneNode` first.
+- **Web Components:** an isolate can render elements the **page** defines; the host creates them on the real DOM through the registry. Defining custom elements in the worker stays out.
+- **Angular** stays out of scope (it needs a real DOM at runtime).
 
-- **HTML parsing:** `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `DOMParser`, templates.
-- **Queries:** `querySelector`, `querySelectorAll`, `getElementById`, `matches`, `closest`. The frameworks don't use them; isolates keep their own references.
-- **Layout and focus in the worker:** `getBoundingClientRect`, `getComputedStyle`, sizes and offsets, `focus()`, `blur()`, scrolling. These are host calls (`measure`, `focus`, `scrollIntoView`).
-- **Comments, `DocumentFragment`, `classList`, `dataset`,** and namespaces other than HTML and SVG.
-- **`MutationObserver`,** custom elements in the worker, Shadow DOM in the worker, `contenteditable`, selection and ranges.
-- **Hydration and server rendering.**
-- **Canvas.** It arrives through `requestCanvas` as an `OffscreenCanvas`.
-- **Remote DOM's `RemoteElement` custom elements** and function proxying.
+### Beyond the frameworks
+
+Preact and React need only the list above, but the libraries apps use with them (charts, icons, tables, portals) call more. The rest of the DOM falls into three groups:
+
+1. **Planned for M3: cheap, worker-only.** `classList`, `dataset`, `getElementById`, `contains`, `DocumentFragment` and comment nodes (one new record each). Pure tree logic over nodes the worker already has.
+2. **Built when a library M3 picks needs it.** M3 chooses the dashboard's libraries up front and logs their DOM usage, as the spike did for Preact and React. What they call becomes conformance cases first, then code:
+   - **Queries:** `querySelector`, `querySelectorAll`, `matches`, `closest`, with a selector subset (tag, class, id, attribute, descendant and child combinators, `:not`), not all of Selectors Level 4.
+   - **HTML parsing:** `innerHTML`, `insertAdjacentHTML`, `<template>`, with a forgiving parser for well-formed markup, not the spec's full algorithm. The host's sanitiser still sees every resulting record.
+   - **`MutationObserver`** in the worker, fed from the records we already collect.
+   - **`cloneNode`** and `importNode`, which template-cloning frameworks need with HTML parsing.
+3. **Out: synchronous answers only the page has.** `getBoundingClientRect`, `getComputedStyle`, sizes and offsets, `focus()` with an immediate `document.activeElement`, scrolling, selection and ranges, `contenteditable`. The worker has no layout, and libraries expect these synchronously. They stay asynchronous host calls (`measure`, `focus`, `scrollIntoView`). M5's `SharedArrayBuffer` channel may make some of them synchronous; that would be its own decision.
+
+Also not built: namespaces other than HTML and SVG, custom elements and Shadow DOM in the worker, hydration and server rendering, and Remote DOM's `RemoteElement` and function proxying. Canvas arrives through `requestCanvas` as an `OffscreenCanvas`.
 
 ## Consequences
 

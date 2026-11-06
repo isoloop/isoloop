@@ -25,7 +25,7 @@ Today all the front-end code on a page (micro-frontends, widgets and headless en
 3. **Messages as the only contract:** isolates never import each other; they depend on versioned topic schemas.
 4. **Durable, replayable bus:** topics are append-only logs with retention and consumer offsets.
 5. **Supervision:** liveness heartbeats, crash detection and restart strategies, built in.
-6. **Framework-agnostic isolates:** an isolate can be written in React, Preact, Svelte, Solid or plain JS.
+6. **Framework-agnostic isolates:** an isolate can be written in React, Preact, Svelte, Solid or plain JS. v1 ships plain JS, Preact and React; Solid and Svelte follow after 0.1 ([ADR 0010](../adr/0010-own-render-bridge.md#frameworks-and-versions)).
 
 **Non-goals for v1**
 
@@ -216,11 +216,12 @@ An adapter is a thin package that boots a framework inside the worker's `isoloop
 
 | Framework | Fit | Notes |
 | --- | --- | --- |
-| Plain JS / Web Components | Good | Reference adapter; smallest |
-| Preact | Good | Small runtime; best first adapter (M3) |
-| React | Good, heavier | The `isoloop-dom` subset covers what `react-dom` uses (smoke test in M3); bigger bundle per isolate |
-| Solid | Likely good | Fine-grained updates map well to small patches; to verify |
-| Svelte | Likely good | Compiled output uses plain DOM calls; to verify |
+| Plain JS | Good | No adapter needed; smallest |
+| Web Components | Partial | Rendering elements the page defines works; defining custom elements in the worker doesn't ([ADR 0010](../adr/0010-own-render-bridge.md#frameworks-and-versions)) |
+| Preact | Good | Small runtime; first adapter (M3), `^10 \|\| ^11` |
+| React | Good, heavier | The `isoloop-dom` subset covers what `react-dom` uses (smoke test in M3); bigger bundle per isolate; M3, `^18 \|\| ^19` |
+| Solid | Likely good | Fine-grained updates map well to small patches; needs HTML parsing and `cloneNode` in the subset; after 0.1 |
+| Svelte | Likely good | Compiled output uses plain DOM calls, plus template cloning (HTML parsing, `cloneNode`); after 0.1 |
 | Vue | Uncertain | Runtime DOM renderer probably works; custom renderer possible |
 | Angular | Poor | Assumes a real DOM and browser globals in many places; out of scope for v1 |
 
