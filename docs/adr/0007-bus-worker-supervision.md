@@ -24,7 +24,7 @@ We considered two ways to survive that:
 
 ### 1. Supervise the bus like an isolate
 
-The bus worker sends `beat` on its control port. The supervisor tracks it with the same blocked and kill timeouts, and restarts it up to 3 times in 60 s. Past the limit the kernel emits `bus:failed`, and isolates keep running with every publish rejected (`bus_unavailable`). The kernel emits `bus:crash`, `bus:restart` and `bus:failed`.
+The bus worker sends `beat` on its control port. The supervisor tracks it with the same blocked and kill timeouts, and restarts it up to 3 times in 60 s. Past the limit the kernel emits `bus:failed`, and isolates keep running with every publish rejected (`bus_unavailable`). The kernel emits `bus:ready { first }`, `bus:crash`, `bus:restart` and `bus:failed`. A contracts module that fails to load also ends in `bus:failed`, but with a `code`, and fails the isolates as well ([ADR 0003](0003-schema-format-standard-schema.md), decision 7).
 
 ### 2. Durability per topic
 
@@ -48,7 +48,8 @@ The `LogEngine` stays the broker's only interface. Durability is a `LogStorage` 
    - **persistent topics** resume from the committed offset, with no gap;
    - **memory topics** answer with `reset { topic, reason: 'bus_restart' }`. Adapters clear their topic state and replay from `earliest` (for example, `useTopic` empties and refills). Plain `subscribe` callers get an `onReset` callback.
 4. An isolate that can't handle a reset declares `bus: { onReset: 'restart' }` in its manifest, and the supervisor restarts it.
-5. Publishes made during the restart are buffered by the `BusClient` (up to its inbox limit), then sent; past the limit they reject with `bus_unavailable`.
+5. Publishes made during the restart are buffered by the `BusClient` (up to its inbox limit of 1,000 unanswered calls), then sent; past the limit they reject with `bus_unavailable`. Publishes the old bus never answered are sent again on the new port, after the subscriptions. The old memory log is gone, so nothing is duplicated.
+6. On the host, `kernel.publish` calls the old bus never answered reject with `bus_unavailable`, because the host can't tell whether they were appended. Calls made while no bus is running wait for the new one, up to the same limit of 1,000.
 
 Until M2b ships, every topic is `memory`, so step 3 turns every subscription into a reset. That is still better than restarting every isolate, and the code path is the same.
 
