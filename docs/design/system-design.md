@@ -606,7 +606,7 @@ Each invariant has at least one automated test (unit **U**, browser **B**, Playw
 | I1 | Only the compositor writes to the DOM under a surface | E2E: `MutationObserver` on the roots records only compositor-flushed changes (no lint rule yet) |
 | I2 | A blocked isolate doesn't delay other isolates' paints by more than one frame | E2E: block C 3 s, B's clock keeps updating, main fps ≥ 55 |
 | I3 | A crashed isolate doesn't affect others and restarts under its limit | E2E + U (supervisor table tests) |
-| I4 | An isolate can only publish/receive granted topics | U (broker); E2E covers only the `navigate` grant |
+| I4 | An isolate can only publish/receive granted topics | U (broker); B: `host/grants.test.ts` runs a granted and an ungranted isolate on the real kernel, runtime and bus worker (publish and subscribe refused with `forbidden`, nothing ungranted delivered); E2E: the `navigate` grant |
 | I5 | Order is kept per topic and per key; offsets are monotonic | U, plus property-based tests on the engine |
 | I6 | A restarted isolate with `from: 'committed'` sees every record after its last commit, once retained | U + E2E replay test (M2 done-criterion) |
 | I7 | No topic record crosses the main thread | E2E (four-loops, replay) and the throughput bench: `kernel.debug.messages()` counts main-thread messages by type, and no `deliver` appears |
