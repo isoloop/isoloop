@@ -48,7 +48,7 @@ flowchart TB
 | Control port | main ↔ bus worker (the `Worker` itself) | `boot` (contracts URL and topic configs), `attach`, `detach`, host-side `publish`; back: `ready`, `beat`, `wake`, `metrics`, `result`, `error` | Bus controller |
 | Canvas handoff | main → isolate worker, once | a transferred `OffscreenCanvas` | Compositor, on request |
 
-**Rule:** no topic record crosses the main thread, except records the host itself publishes or subscribes to through `kernel.publish` / `kernel.subscribe` ([ADR 0005](../adr/0005-bus-topology-message-channels.md)). `kernel.subscribe` opens its own bus port, attached as `isoloop:host:<n>`, so ids starting with `isoloop:` are reserved for the kernel (ADR 0005 amendment pending).
+**Rule:** no topic record crosses the main thread, except records the host itself publishes or subscribes to through `kernel.publish` / `kernel.subscribe` ([ADR 0005](../adr/0005-bus-topology-message-channels.md)). `kernel.subscribe` opens its own bus port, attached as `isoloop:host:<n>`, so ids starting with `isoloop:` are reserved for the kernel.
 
 ## 2. Packages and dependency rules
 
