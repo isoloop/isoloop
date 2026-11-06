@@ -13,10 +13,11 @@ RFC 0001 places the broker in a dedicated bus worker, but routes records through
 ## Decision
 
 - The kernel starts the bus worker first, with a **control port** (main ↔ bus).
-- For each isolate it creates a `MessageChannel`. One port goes to the isolate in `init`; the other goes to the bus worker in a control message `attach { isolateId, grants, port }`.
-- All `publish`, `subscribe`, `unsubscribe`, `deliver` and `commit` messages travel on that port. **No record crosses the main thread.**
+- For each isolate it creates a `MessageChannel`. One port goes to the isolate in `init`; the other goes to the bus worker in a control message `attach { isolateId, grants, port, reattach? }`. `reattach` marks a new port after a bus restart ([ADR 0007](0007-bus-worker-supervision.md)).
+- All `publish`, `subscribe`, `unsubscribe`, `deliver` and `commit` messages travel on that port. **No record crosses the main thread**, except the host's own: `kernel.publish` goes over the control port, and `kernel.subscribe` gets its own bus port, so those records reach the main thread because the host asked for them.
 - **Grants (ACL)** come from the isolate manifest and are given to the bus worker by the kernel at `attach`. The bus worker enforces them; the isolate can't widen them.
-- On isolate stop or restart the kernel sends `detach { isolateId }`; the bus worker closes the port and keeps the isolate's committed offsets.
+- On isolate stop or restart the kernel sends `detach { isolateId, keepOffsets, wake? }`; the bus worker closes the port. Isolates always keep their committed offsets. `wake` marks a suspended isolate whose subscriptions the bus keeps watching ([ADR 0001](0001-one-worker-per-isolate.md)).
+- **Host connections:** each `kernel.subscribe` is attached as `isoloop:host:<n>`, with grants to subscribe to everything and publish nothing. Unsubscribing detaches it with `keepOffsets: false`. Ids starting with `isoloop:` are reserved for the kernel, so `spawn` rejects them with `invalid_manifest`.
 - Devtools and metrics read from the control port (sampled, not every record).
 
 The "bus bridge" in the kernel becomes a **bus controller**: it starts the bus worker, wires ports, and forwards host-side `kernel.publish()` calls (rare).
