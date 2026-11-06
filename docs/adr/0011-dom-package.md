@@ -27,7 +27,7 @@ Other forces:
    There is no root entry point (`.`). The name says what it is, a DOM bridge. Canvas (`requestCanvas`) and any other output that isn't DOM don't belong here.
 2. **Import rules, enforced by oxlint `no-restricted-imports`:**
    - `runtime` may import `@isoloop/dom/worker` only.
-   - `host` may import `@isoloop/dom/host` only (and `@isoloop/dom/testing` from its tests).
+   - `host` may import `@isoloop/dom/host` only, and only in `render/isoloop-dom.ts`, the bridge the compositor drives (invariant I1); its tests may also import `@isoloop/dom/testing`.
    - `protocol`, `bus` and `codec` never import `dom`.
    - `dom` imports no other `@isoloop/*` package.
 3. **No runtime dependencies; `/testing` has an optional peer on Vitest.** Not even `protocol`. Node ids are plain numbers that `dom` defines. `runtime` and `host` relate them to protocol types if they need to.

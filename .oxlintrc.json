@@ -81,8 +81,24 @@
           {
             "patterns": [
               {
+                "group": ["@isoloop/**", "!@isoloop/protocol"],
+                "message": "host may only import protocol, and @isoloop/dom/host only in render/isoloop-dom.ts, the bridge the compositor drives (invariant I1); it loads bus and runtime bundles by URL (system design §2, ADR 0011)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/host/src/render/isoloop-dom.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
                 "group": ["@isoloop/**", "!@isoloop/protocol", "!@isoloop/dom/host"],
-                "message": "host may only import protocol and @isoloop/dom/host; it loads bus and runtime bundles by URL (system design §2, ADR 0011)."
+                "message": "the bridge may import protocol and @isoloop/dom/host only (ADR 0011)."
               }
             ]
           }

@@ -233,8 +233,14 @@ export interface Kernel {
    * @internal Test hooks; not part of the API. `messages()` counts what the
    * main thread received from isolate workers and the bus control port, by
    * type, for invariant I7 (no topic record crosses the main thread).
+   * `onSurfaceWrite(fn)` calls `fn` when the compositor starts and stops
+   * writing to surfaces, for invariant I1 (only the compositor writes there).
    */
-  readonly debug: { crashBus(): void; messages(): Record<string, number> };
+  readonly debug: {
+    crashBus(): void;
+    messages(): Record<string, number>;
+    onSurfaceWrite(fn: (phase: 'start' | 'end') => void): () => void;
+  };
 }
 
 type Slot = {
@@ -387,7 +393,11 @@ export function createKernel(config: KernelConfig): Kernel {
   };
   const budget = config.workers.budget ?? 32;
   let warnedBudget = false;
+  const surfaceWrites = new Set<(phase: 'start' | 'end') => void>();
   const compositor = createCompositor({
+    onWrite: (phase) => {
+      for (const fn of surfaceWrites) fn(phase);
+    },
     ...(config.styles ? { styles: config.styles } : {}),
     ...(config.compositor ? { frameBudgetMs: config.compositor.frameBudgetMs } : {}),
   });
@@ -1063,6 +1073,12 @@ export function createKernel(config: KernelConfig): Kernel {
     debug: {
       crashBus: () => controller?.crash(),
       messages: () => ({ ...received }),
+      onSurfaceWrite: (fn) => {
+        surfaceWrites.add(fn);
+        return () => {
+          surfaceWrites.delete(fn);
+        };
+      },
     },
 
     on(event, fn) {
