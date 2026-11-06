@@ -1,6 +1,6 @@
 # ADR 0011: `@isoloop/dom`, the render bridge package
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Builds on:** [ADR 0010](0010-own-render-bridge.md) (our own render bridge, `isoloop-dom@1`)
 
@@ -22,7 +22,7 @@ Other forces:
 1. **One package, `@isoloop/dom` (`packages/dom`), with three entry points:**
    - `@isoloop/dom/worker`: the DOM subset (ADR 0010 point 2), the change recorder, and event delivery.
    - `@isoloop/dom/host`: the applier and the node-id map.
-   - `@isoloop/dom/testing`: the bridge conformance suite, `runBridgeConformance(makeBridgePair)`.
+   - `@isoloop/dom/testing`: the bridge conformance suite, `runBridgeConformance(makeBridgePair)`. Published like the other entries and just as internal, so repositories outside this one (the M3 adapters' fixtures in `isoloop/examples`, any later bridge) can run it against prerelease publishes.
 
    There is no root entry point (`.`). The name says what it is, a DOM bridge. Canvas (`requestCanvas`) and any other output that isn't DOM don't belong here.
 2. **Import rules, enforced by oxlint `no-restricted-imports`:**
@@ -46,9 +46,10 @@ Other forces:
    - **`dom/worker`:** installs the subset, records changes into batches, and calls an `onBatch(batch)` hook that `runtime` provides. Its `deliver(nodeId, event)` dispatches an incoming event record to a node by id, with capture and bubble inside the worker.
    - **`dom/host`:** applies a batch, keeps `idFor` / `nodeFor` both ways, and turns a DOM event into a plain event record, but only for listeners the isolate registered (`listen` records).
    - **`runtime` keeps:** the per-microtask schedule, posting `patch` messages, `ctx.root`.
+   - **The transport belongs to `runtime` and `host`, not `dom`.** A faster channel, such as M5's `SharedArrayBuffer` evaluation, changes how batches travel, not what they contain: the records stay `isoloop-dom@1` and `dom` doesn't change. The fmt bumps only when the record shape does, for example for a binary encoding.
    - **`host` keeps:** the compositor and its frame budget, the EventBridge wiring (which events to listen for, default actions), host-owned input rules, host calls, Shadow DOM styles.
 7. **Sanitising is passed in, and required.** `dom/host` takes a policy when a bridge is created, with no default. Every tag, attribute, URL and `prop` record goes through it, so the applier can't create an element or set an attribute without it (invariant I9). The policy itself, the component registry, stays in `host/src/render/registry.ts`. Host-owned input rules reach the applier through the same policy.
-8. **Format mismatch is a hard error.** `runtime` and `host` are released together. If an isolate's `ready.renderFmt` isn't exactly the fmt `dom/host` speaks (and isn't `'none'` for a headless isolate), the isolate crashes with reason `render-fmt-mismatch` and goes straight to `failed`: no restart, since a restart can't change the outcome. A version range waits for a real need to run isolates built against older releases.
+8. **Format mismatch is a hard error.** `runtime` and `host` are released together: every `@isoloop/*` package is in one Changesets `fixed` group and always shares one version (set up with the release pipeline in M4). If an isolate's `ready.renderFmt` isn't exactly the fmt `dom/host` speaks (and isn't `'none'` for a headless isolate), the isolate crashes with reason `render-fmt-mismatch` and goes straight to `failed`: no restart, since a restart can't change the outcome. No range is needed: both halves of the fmt ship in the host app's build ([ADR 0010](0010-own-render-bridge.md)). Isolates built apart from the host are versioned by what they call instead, `ctx`, the DOM subset and the adapter hooks ([ADR 0012](0012-isolates-built-apart.md)).
 9. **Published, documented as internal.** `@isoloop/dom` is on npm because `runtime` and `host` depend on it. App and adapter authors never import it. Its README says so, and its API carries no semver promise beyond the fmt version: a breaking record change bumps the fmt (`isoloop-dom@2`).
 10. **`legacy-vdom` stays where it is** (`runtime/src/legacy/vdom.ts`, `host/src/render/legacy-vdom.ts`). It runs the suite from `@isoloop/dom/testing`, with its known gaps marked, until M1 task 11 moves four-loops to the new bridge and deletes it. *Done: deleted in the M1 cleanup (#38).*
 
