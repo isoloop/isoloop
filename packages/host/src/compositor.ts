@@ -30,6 +30,12 @@ export type CompositorOptions = {
   /** For tests: a fake clock and frame scheduler. */
   now?: () => number;
   requestFrame?: (fn: () => void) => void;
+  /**
+   * Called when the compositor starts (`start`) and stops (`end`) writing to
+   * surfaces, around every frame and every other change it makes. The I1 test
+   * hook (`kernel.debug.onSurfaceWrite`): any write outside these is a bug.
+   */
+  onWrite?: (phase: 'start' | 'end') => void;
 };
 
 /** What a failed isolate's fallback shows (design §4.3). */
@@ -150,7 +156,22 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
   let scheduled = false;
   let rotate = 0;
 
-  const frame = (): void => {
+  // Nested sections (a fallback render inside a frame) report once.
+  let depth = 0;
+  const { onWrite } = opts;
+  const writing = <A extends unknown[]>(fn: (...args: A) => void) =>
+    onWrite
+      ? (...args: A): void => {
+          if (depth++ === 0) onWrite('start');
+          try {
+            fn(...args);
+          } finally {
+            if (--depth === 0) onWrite('end');
+          }
+        }
+      : fn;
+
+  const frame = writing((): void => {
     scheduled = false;
     const order = [...surfaces.values()];
     if (order.length === 0) return;
@@ -190,7 +211,7 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
       }
     }
     finish(spent);
-  };
+  });
 
   const finish = (spent: Map<Surface, number>): void => {
     for (const [s, ms] of spent) s.lastFrameMs = ms;
@@ -213,7 +234,7 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
   };
 
   return {
-    attach(id, target, bridge, send) {
+    attach: writing<Parameters<Compositor['attach']>>((id, target, bridge, send) => {
       const host = document.createElement('iso-surface');
       host.dataset['isolateId'] = id;
       const shadow = host.attachShadow({ mode: 'open' });
@@ -243,9 +264,9 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
         sheets: [],
         snapshot: undefined,
       });
-    },
+    }),
 
-    freeze(id) {
+    freeze: writing<Parameters<Compositor['freeze']>>((id) => {
       const s = surfaces.get(id);
       if (!s) return;
       s.snapshot?.remove();
@@ -261,7 +282,7 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
       s.bridge.unmount();
       s.shadow.append(snap);
       s.snapshot = snap;
-    },
+    }),
 
     host(id) {
       return surfaces.get(id)?.host;
@@ -283,7 +304,7 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
       schedule();
     },
 
-    reset(id, bridge) {
+    reset: writing<Parameters<Compositor['reset']>>((id, bridge) => {
       const s = surfaces.get(id);
       if (!s) return;
       s.dropped += s.queue.filter((q) => q.k === 'batch').length;
@@ -293,28 +314,28 @@ export function createCompositor(opts: CompositorOptions = {}): Compositor {
       s.bridge.unmount();
       s.bridge = bridge;
       bridge.mount(s.shadow, s.send);
-    },
+    }),
 
-    detach(id) {
+    detach: writing<Parameters<Compositor['detach']>>((id) => {
       const s = surfaces.get(id);
       if (!s) return;
       s.bridge.unmount();
       s.host.remove();
       surfaces.delete(id);
-    },
+    }),
 
-    busy(id, on) {
+    busy: writing<Parameters<Compositor['busy']>>((id, on) => {
       const s = surfaces.get(id);
       if (s) s.busy.hidden = !on;
-    },
+    }),
 
-    fallback(id, info, render = defaultFallback) {
+    fallback: writing<Parameters<Compositor['fallback']>>((id, info, render = defaultFallback) => {
       const s = surfaces.get(id);
       if (!s) return;
       s.fallback.replaceChildren();
       s.fallback.hidden = info === null;
       if (info) render(s.fallback, info);
-    },
+    }),
 
     stats(id) {
       const s = surfaces.get(id);
