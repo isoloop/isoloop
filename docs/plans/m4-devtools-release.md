@@ -4,7 +4,7 @@
 
 **Done when** (RFC 0001): `0.1.0` is published with a launch post.
 
-Gets a full task list when M3 closes. Requires [M2b](m2b-durable-log.md) (durable log) to have landed.
+Gets a full task list when it's next to start, after [M3](m3-adapters-dashboard.md) (both epics) and [M2b](m2b-durable-log.md) (durable log) land. The `0.0.0-next` prerelease workflow from [M3b](m3b-dashboard.md) task 1 is replaced by the Changesets pipeline here.
 
 ## Main work items
 
