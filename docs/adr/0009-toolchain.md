@@ -22,7 +22,7 @@ Checked on the npm registry, 2026-11-04:
 | `oxlint` + `oxlint-tsgolint` | 1.91.0 + 7.0.2005 | Type-aware linting has been stable since 2026-07: 59 of 61 typescript-eslint type-aware rules, built on TS 7.0.2. |
 | `oxfmt` | 0.76.0 | Prettier-compatible formatter, released alongside oxlint. |
 | `tsdown` | 0.23.5 | Library bundler on Rolldown and OXC. |
-| `vite` / `vitest` | 8.3.5 / 5.1.0 | Vite 8 builds with Rolldown. Vitest 5 runs on Vite 8, with browser mode through `@vitest/browser-playwright`. |
+| `vite` / `vitest` | 8.3.5 / 5.0.5 | Vite 8 builds with Rolldown. Vitest 5 runs on Vite 8, with browser mode through `@vitest/browser-playwright`. |
 | `@playwright/test` | 1.64.1 | Ships the latest Chromium, Firefox and WebKit only. |
 | `pnpm` | 12.16.1 | |
 | Node | 26.13 LTS | Node 25 and later no longer bundle corepack. |
@@ -40,9 +40,9 @@ Checked on the npm registry, 2026-11-04:
 | Format | **oxfmt**. |
 | Package builds (JS + `.d.ts`) | **tsdown**. OXC writes `.d.ts` files through `isolatedDeclarations`, with no type checker in the build. |
 | Apps (examples, dashboard), dev server | **Vite 8**. |
-| Unit and browser tests | **Vitest 5**: `projects` in the root config, Node for `protocol` and `bus`, browser mode (Playwright, Chromium) for `host` and `runtime`. |
+| Unit and browser tests | **Vitest 5**: `projects` in the root config, Node for `protocol` and `bus`, browser mode (Playwright, Chromium) for `dom`, `host`, `runtime` and `bus-browser` (the bus's `*.browser.test.ts`, which run the bus worker in a real Worker). |
 | E2E | **Playwright**: Chromium, Firefox and WebKit. |
-| Benches | **`vitest bench`**. How browser benches are wired up is decided in M1 and M2. |
+| Benches | **Playwright** for browser benches (`bench/click-to-paint`, `bench/throughput`), run in Chromium, Firefox and WebKit. Node benches run with Vitest (`pnpm bench`). |
 
 ### Rules
 
@@ -67,7 +67,7 @@ Checked on the npm registry, 2026-11-04:
 9. **Supply chain.** pnpm's `minimumReleaseAge: 4320` (3 days) rejects versions younger than that. Lifecycle scripts stay blocked, which is pnpm's default, and the few packages that need one are allow-listed by name. Playwright browsers are installed by an explicit `pnpm exec playwright install`. `strictPeerDependencies: true`. GitHub Actions are pinned by commit SHA, with the tag in a comment.
 10. **No corepack.** `packageManager: "pnpm@12.16.1"` pins the version. Contributors install pnpm's standalone binary, and `pnpm self-update` maintains the pin. CI uses `pnpm/action-setup`, which reads the same field.
 11. **Editor config is committed for VS Code:** `.vscode/settings.json` (workspace TypeScript, oxc as the formatter, format on save, oxlint diagnostics) and `.vscode/extensions.json`. `CONTRIBUTING.md` has a short note for other editors.
-12. **CI runs on Ubuntu only, in three jobs.** `check` runs the format check, lint, typecheck, unit tests and build. `browser` runs Vitest browser mode on Chromium. `e2e` runs a Chromium/Firefox/WebKit matrix against the built example and uploads traces on failure. `browser` and `e2e` only start after `check` passes. Pages deploys from `main` only.
+12. **CI runs on Ubuntu only, in four jobs.** `check` runs the format check, lint, typecheck, unit tests and build. `browser` runs Vitest browser mode on Chromium. `e2e` runs a Chromium/Firefox/WebKit matrix against the built example and uploads traces on failure. `bench` runs the browser benches in all three engines. `browser`, `e2e` and `bench` only start after `check` passes, and install browsers through one local action (`.github/actions/install-browsers`), with time limits, retries and caches. Pages deploys from `main` only.
 
 ### Pre-agreed fallback
 

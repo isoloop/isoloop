@@ -50,7 +50,7 @@ Other forces:
 7. **Sanitising is passed in, and required.** `dom/host` takes a policy when a bridge is created, with no default. Every tag, attribute, URL and `prop` record goes through it, so the applier can't create an element or set an attribute without it (invariant I9). The policy itself, the component registry, stays in `host/src/render/registry.ts`. Host-owned input rules reach the applier through the same policy.
 8. **Format mismatch is a hard error.** `runtime` and `host` are released together. If an isolate's `ready.renderFmt` isn't exactly the fmt `dom/host` speaks (and isn't `'none'` for a headless isolate), the isolate crashes with reason `render-fmt-mismatch` and goes straight to `failed`: no restart, since a restart can't change the outcome. A version range waits for a real need to run isolates built against older releases.
 9. **Published, documented as internal.** `@isoloop/dom` is on npm because `runtime` and `host` depend on it. App and adapter authors never import it. Its README says so, and its API carries no semver promise beyond the fmt version: a breaking record change bumps the fmt (`isoloop-dom@2`).
-10. **`legacy-vdom` stays where it is** (`runtime/src/legacy/vdom.ts`, `host/src/render/legacy-vdom.ts`). It runs the suite from `@isoloop/dom/testing`, with its known gaps marked, until M1 task 11 moves four-loops to the new bridge and deletes it.
+10. **`legacy-vdom` stays where it is** (`runtime/src/legacy/vdom.ts`, `host/src/render/legacy-vdom.ts`). It runs the suite from `@isoloop/dom/testing`, with its known gaps marked, until M1 task 11 moves four-loops to the new bridge and deletes it. *Done: deleted in the M1 cleanup (#38).*
 
 ## Consequences
 
@@ -60,7 +60,7 @@ Other forces:
 - **`host` and `runtime` stay in charge of when and whether:** timing, budgets, input rules and policy. `dom` can't paint anything the registry hasn't allowed.
 - **A new package to maintain and publish,** with its own changesets. It's internal, so its API can change freely as long as the fmt version is bumped when records change.
 - **Strict versioning:** a host and an isolate built from different releases can't render together until a range is supported.
-- **The conformance suite moves** from `packages/host/test` to `packages/dom/src/testing` with M1 task 5. Because Decision point 10 still runs it against `legacy-vdom`, the move lands in the same PR as the new bridge.
+- **The conformance suite moves** from `packages/host/test` to `packages/dom/src/testing` with M1 task 5. Because Decision point 10 still runs it against `legacy-vdom`, the move lands in the same PR as the new bridge. *Done in #29.*
 
 ## Alternatives considered
 
