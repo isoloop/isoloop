@@ -611,7 +611,7 @@ Each invariant has at least one automated test (unit **U**, browser **B**, Playw
 | I6 | A restarted isolate with `from: 'committed'` sees every record after its last commit, once retained | U + E2E replay test (M2 done-criterion) |
 | I7 | No topic record crosses the main thread | E2E (four-loops, replay) and the throughput bench: `kernel.debug.messages()` counts main-thread messages by type, and no `deliver` appears |
 | I8 | A frame applies at least one batch, and no more than budget + one batch | U (compositor with fake clock) |
-| I9 | Unknown tags render as `div`; `script`/`iframe`/`on*` never appear | U (registry) |
+| I9 | Unknown tags render as `div`; `script`/`iframe`/`on*` never appear | U (registry); E2E: a hostile isolate (`e2e/sanitising.spec.ts`) sends scripts, frames, handlers and script URLs through the DOM subset and as hand-made patches, and none reach the page |
 | I10 | Protocol mismatch fails at `init` with a clear error, never mid-render | U |
 | I11 | A bus restart never restarts an isolate (unless it opted in); every subscription to a memory topic gets exactly one `reset` | B + E2E (M2) |
 | I12 | A persistent topic loses no acknowledged record across a bus crash or a page reload | U (storage fault injection) + E2E (M2b) |
