@@ -12,8 +12,9 @@ Gets a full task list when it's next to start, after [M3](m3-adapters-dashboard.
 2. **Docs site** (`docs/site`, e.g. VitePress or Starlight): getting started, hosting (CSP/CORS), isolate authoring per adapter, the bus guide (semantics, idempotent handlers), and **"What Isoloop can't hide"** (sync layout, `window`/`document` globals, drag and drop) up front, as the RFC asks. API reference generated from TSDoc.
 3. **CLI** (unscoped `isoloop` package): `isoloop contracts export` → JSON Schema draft 2020-12 through the vendored Standard JSON Schema interface (input and output when they differ, plus `reply`; `unchecked` topics flagged; schemas without the interface reported as not exportable) ([ADR 0003](../adr/0003-schema-format-standard-schema.md)); maybe `isoloop new isolate`.
 4. **Release pipeline:** Changesets, with every `@isoloop/*` package in one `fixed` group ([ADR 0011](../adr/0011-dom-package.md), decision 8), npm provenance, `@isoloop/*` scope claimed ([ADR 0004](../adr/0004-npm-name.md)), semver policy for the protocol version vs package versions.
-5. **API review:** freeze public API names; mark experimental parts (groups, request/response) with `@experimental`.
-6. **Launch post** with the M3 dashboard recording and bench numbers.
+5. **Trim the interim changesets** before the first release. `.changeset/` holds one entry per M1/M2 task, and several describe states later work removed (for example "`navigate` fails until M2" and `ctx.legacyBus`). Merge them into a short set that describes 0.1 as shipped, per package, so the generated `CHANGELOG.md` reads as a first release, not a build log. Entries written during M2b and M3 get the same pass.
+6. **API review:** freeze public API names; mark experimental parts (groups, request/response) with `@experimental`.
+7. **Launch post** with the M3 dashboard recording and bench numbers.
 
 ## Open risks
 
