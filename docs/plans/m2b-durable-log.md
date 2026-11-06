@@ -28,3 +28,4 @@ Gets a full task list when M2 closes.
 - Codec cost could eat the gains; measure early (item 1) on realistic dashboard records.
 - OPFS behaviour differs by browser (sync handle availability, quota, private browsing); run the E2E suite on Chromium, Firefox and WebKit from the first task.
 - Compaction rewriting large compacted topics must not stall the bus worker; chunk it across tasks.
+- **Re-sent publishes can duplicate.** After a bus crash, an isolate's `BusClient` sends again every publish the old bus never answered ([ADR 0007](../adr/0007-bus-worker-supervision.md), step 5). With memory topics the old log is gone, so nothing duplicates. With persistent topics the old bus may have flushed the record before it crashed, and the re-send appends it twice. Decide before shipping: reject those publishes with `bus_unavailable`, as the host already does (step 6), or give each publish an id the bus deduplicates on.
