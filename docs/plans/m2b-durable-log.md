@@ -18,12 +18,12 @@
 
 ## Tasks
 
-### 1. Decide: re-sent publishes on persistent topics
-- From the open risk below and [ADR 0007](../adr/0007-bus-worker-supervision.md) steps 5 and 6. After a bus crash, an isolate re-sends publishes the old bus never answered; on a persistent topic the old bus may already have flushed them. **Decision for the user:** reject them with `bus_unavailable`, as the host does, or give each publish a producer id and sequence number that the bus deduplicates on (stored in the record frame, so it shapes task 5). Recorded as an ADR 0007 amendment.
+### 1. Record the decision: deduplicate re-sent publishes
+- From the open risk below and [ADR 0007](../adr/0007-bus-worker-supervision.md) steps 5 and 6. After a bus crash, an isolate re-sends publishes the old bus never answered; on a persistent topic the old bus may already have flushed them. **Decided (2026-11-06): deduplicate.** Rejecting wouldn't prevent the duplicate, because an app that retries after `bus_unavailable` writes the record again. Each record frame carries `(producer, epoch, seq)`: the isolate id, its instance, and a per-instance counter. The bus keeps the last `seq` per producer and topic, rebuilt from each segment's tail on load, and answers a re-send it already has with the original offset. The host's `kernel.publish` gets the same treatment instead of rejecting, so both sides behave alike. Memory topics are unchanged. Written up as an ADR 0007 amendment; it shapes the frame in task 5.
 - **Tests:** none; task 20 implements it.
 
 ### 2. Codec: evaluate
-- Benchmark a MessagePack and a CBOR library against `JSON` and structured clone on realistic records (the dashboard's trades and book updates, the four-loops topics): encode and decode speed, size, bundle size. Then decide, own codec or wrapped library, as an ADR. The default is our own, behind our own interface, as with the render bridge.
+- Benchmark a MessagePack and a CBOR library against `JSON` and structured clone on realistic records (the dashboard's trades and book updates, the four-loops topics): encode and decode speed, size, bundle size. **Decided (2026-11-06):** our own codec, covering exactly the structured-clone types topics allow, unless a library is more than 2× faster on these records; then it comes in wrapped behind our interface, with conformance tests. The ADR records the numbers and the outcome.
 - **Files:** `bench/codec/`, `docs/investigations/codec.md`.
 - **Tests:** the bench runs and reports.
 
@@ -87,7 +87,7 @@
 - **Tests (browser):** with a storage stub reporting 81 % and then 100 %, the event fires once and publishes reject.
 
 ### 15. Fallback without sync access handles
-- **Decision for the user**, with support data at the time: IndexedDB-backed storage, or memory with a warning. Then build the chosen one.
+- **Decided (2026-11-06): memory with a warning.** Without sync access handles, persistent topics behave like memory topics, the bus reports `ready.storage: 'memory'`, and the kernel emits `bus:durability-degraded` with reason `no-sync-access`, as for a second tab (ADR 0007, decision 6). IndexedDB storage moves to [would-like](../would-like.md). The investigation checks the support data first; if a major browser lacks sync access in normal browsing, the decision is revisited. An ADR 0007 amendment replaces its IndexedDB fallback.
 - **Files:** `packages/bus/src/storage/` (the fallback), `docs/investigations/opfs-support.md`.
 - **Tests (browser):** with sync handles hidden, the bus starts, reports the fallback in `ready.storage`, and the done-criterion E2E passes or degrades as decided.
 

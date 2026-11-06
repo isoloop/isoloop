@@ -88,7 +88,7 @@
 - **Tests (E2E):** blocking one chart keeps input latency on the others under the [§9](../design/system-design.md#9-performance-budgets) budget.
 
 ### 15. Local kernel for single-thread mode
-- The same widget code mounted on the main thread, through a kernel that shares the API (same hooks, no workers). It needs the broker in-thread, and `host` must not depend on `bus` source (design §2), so it lives in a new package, `@isoloop/local` (depends on `bus`, `runtime` and `dom`). **Decision for the user:** the package and its dependency exception, as an ADR, before code.
+- The same widget code mounted on the main thread, through a kernel that shares the API (same hooks, no workers). It needs the broker in-thread, and `host` must not depend on `bus` source (design §2), so it lives in a new package, `@isoloop/local` (depends on `bus`, `runtime` and `dom`). **Decided (2026-11-06):** published, but labelled internal like `@isoloop/dom`: its README says it exists for the single-thread comparison and tests, with no semver promise, and it stays out of the docs site's API reference. It's published because `isoloop/examples` installs from npm. It joins the `fixed` release group. ADR 0013 records the dependency exception before code, enforced by oxlint: `local` may import `bus`, `runtime` and `dom`, and nothing imports `local`. Making it a supported API (e.g. for testing isolates without workers) would be a later decision.
 - **Files:** `packages/local/src/index.ts` (main repo).
 - **Tests (browser):** the four-loops isolates run unchanged under the local kernel; the adapter conformance fixtures pass on it.
 
