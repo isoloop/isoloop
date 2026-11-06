@@ -4,7 +4,7 @@
 
 **A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-Status: **M0–M2 done, pre-release.** The kernel (loader, supervisor, frame-batched compositor on our own render bridge) and the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension) run from the repo, with CI on Chromium, Firefox and WebKit; nothing is on npm yet. M2b (durable log), M2c (worker pools) and M3 (adapters and the dashboard) are next. The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
+Status: **M0–M2 done, pre-release.** The kernel (loader, supervisor, frame-batched compositor on our own render bridge) and the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension) run from the repo, with CI on Chromium, Firefox and WebKit; nothing is on npm yet. M3 (adapters, then the dashboard) and M2b (durable log) are next, in parallel; M2c and M5 come after 0.1. The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
 
 ## Run the demo
 
@@ -146,10 +146,10 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 2. **M1 Kernel** (done; write-up: [Crashing an isolate on purpose](docs/posts/m1-crashing-an-isolate.md)): loader, supervisor, heartbeats, frame-batched compositor on our own render bridge.
 3. **M2 Bus** (done): topics, schemas, retention, offsets, replay, backpressure; bus worker with the TS log engine; opt-in suspension of idle isolates. The write-up is still to come.
 4. **M2b Durable log:** persistent topics in OPFS that survive a bus crash or a page reload. Required for 0.1.
-5. **M2c Worker pools:** opt-in named pools for small headless isolates, if a benchmark shows they pay off.
-6. **M3 Adapters and dashboard sandbox:** Preact and React adapters; a markets dashboard (live public exchange feeds, cross-market aggregates and alerts) that runs single-threaded or on Isoloop at the flip of a toggle, with live metrics (main-thread fps, long tasks, input latency, loop lag per worker, memory, bus throughput).
+5. **M2c Worker pools** (after 0.1): opt-in named pools for small headless isolates, if a benchmark shows they pay off.
+6. **M3 Adapters and dashboard sandbox**, in two epics: **M3a** Preact and React adapters (Preact 10 and 11, React 18 and 19); **M3b** a markets dashboard (live public exchange feeds, cross-market aggregates and alerts) that runs single-threaded or on Isoloop at the flip of a toggle, with live metrics (main-thread fps, long tasks, input latency, loop lag per worker, memory, bus throughput).
 7. **M4 Devtools and 0.1:** health and bus overlay, docs site, npm release.
-8. **M5 Shared-memory engine:** opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
+8. **M5 Shared-memory engine** (after 0.1): opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
 9. **M5b Delivery batching (spike):** whether batching bus traffic across tasks gets the TS engine from 45.5k to its 50k records/s budget.
 
 ## Repo layout
@@ -164,7 +164,7 @@ docs/      rfcs · design · adr · plans · guide · investigations · posts
 bench/     click-to-paint, throughput
 ```
 
-The markets dashboard (M3) goes in a separate `isoloop/examples` repository ([should-do](docs/should-do.md)).
+The markets dashboard (M3b) goes in a separate `isoloop/examples` repository ([M3b plan](docs/plans/m3b-dashboard.md)).
 
 ## Non-goals (v1)
 

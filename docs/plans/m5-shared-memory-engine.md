@@ -4,7 +4,7 @@
 
 **Done when** (RFC 0001): benchmark results are published, whichever engine wins.
 
-Can start after M2, since it depends only on the `LogEngine` interface and the throughput bench.
+Depends only on the `LogEngine` interface and the throughput bench, and reuses M2b's codec. Planned for after 0.1 (M4); it gets a full task list when it's next to start.
 
 ## Main work items
 

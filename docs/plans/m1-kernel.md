@@ -63,7 +63,7 @@
   - an isolate reporting another `renderFmt` fails with `render-fmt-mismatch` and isn't restarted;
   - a 1,000-node list renders;
   - a batch round-trip leaves identical `innerHTML` on both sides;
-  - ~~Preact and React render a small app into the subset~~: moved to the M3 adapters, which bring the frameworks in as devDependencies ([should-do](../should-do.md)).
+  - ~~Preact and React render a small app into the subset~~: moved to the M3 adapters, which bring the frameworks in as devDependencies ([M3a](m3a-adapters.md) task 3).
 
 ### 6. Component registry and sanitising
 - **Files:** `packages/host/src/render/registry.ts`.

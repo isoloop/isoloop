@@ -15,6 +15,11 @@ Ideas we've consciously deferred or want to explore later. None of them is plann
 - **Solid and Svelte adapters.** Both compile markup to HTML strings, parse them in a `<template>` and copy them with `cloneNode(true)` or `importNode`, so they need HTML parsing and `cloneNode` in the `isoloop-dom` subset first (group 2). Next after 0.1. ([ADR 0010](adr/0010-own-render-bridge.md#frameworks-and-versions))
 - **Vue adapter.** Evaluate after Solid and Svelte: its runtime DOM renderer probably works on the same additions, or a custom renderer could target records directly. ([ADR 0010](adr/0010-own-render-bridge.md#frameworks-and-versions))
 
+## Storage
+
+- **IndexedDB storage when OPFS sync access is missing.** Today such a tab falls back to memory topics with `bus:durability-degraded` (`no-sync-access`). A second storage engine is worth it only if a major browser lacks sync access in normal browsing. ([ADR 0007](adr/0007-bus-worker-supervision.md), M2b task 15)
+- **`@isoloop/local` as a supported API,** for testing isolates without workers or as a fallback where workers aren't available. Published as internal for the single-thread comparison until users ask. (M3b task 15)
+
 ## Multiple tabs
 
 - **Share the bus across tabs.** Today a second tab falls back to memory topics with `bus:durability-degraded` and runs its own isolates, so a backend-less app opened in two tabs fetches everything twice (two sets of exchange WebSockets in the markets dashboard). Options: the bus in a `SharedWorker`, or a leader tab elected through Web Locks that runs the feeds and relays records over `BroadcastChannel`. Out of v1 by [ADR 0005](adr/0005-bus-topology-message-channels.md) and [ADR 0007](adr/0007-bus-worker-supervision.md). Backend-less apps are the use case that would justify it.

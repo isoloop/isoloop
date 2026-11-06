@@ -4,9 +4,9 @@
 
 **Done when:** in an E2E test, pooled and own-worker isolates run side by side; a member that loops forever gets its pool restarted (every member replays from its committed offsets) while own-worker isolates and other pools are unaffected.
 
-**Depends on:** M2 (per-isolate bus ports, replay from committed offsets). Not required for 0.1 (M4); it can land before or after.
+**Depends on:** M2 (per-isolate bus ports, replay from committed offsets). Not required for 0.1 (M4); planned for after it.
 
-Gets a full task list when M2 closes.
+Gets a full task list when it's next to start, after 0.1.
 
 ## Main work items
 

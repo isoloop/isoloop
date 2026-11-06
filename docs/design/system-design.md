@@ -323,7 +323,7 @@ interface HostRenderBridge {
 - An event fires only if the isolate registered a listener for `(nodeId, type)` on the target or an ancestor. Those registrations travel in patches.
 - Serialized event: `{ type, target: nodeId, currentTargets: nodeId[], value?, checked?, key?, code?, mods, x?, y?, button? }`.
 - **Default actions:** `submit` and with routing on, plain primary-button clicks on same-origin `<a>` (hash-only included) are always prevented on the host and go to `onNavigate` with `from` set to the isolate; they need no `navigate` grant. Clicks with a modifier key, a non-primary button, `target` other than `_self`, or `download` keep the browser's behaviour ([ADR 0002](../adr/0002-host-owns-routing.md)). Other defaults run normally. An isolate can't call `preventDefault` synchronously, so the docs list this limit.
-- **Host-owned inputs:** `input`, `textarea` and `select` keep their own value and caret on the host. The isolate gets `input` events with the value. A `value` from the isolate is applied only if it differs from the live value and the element isn't focused. A `force` option for focused inputs is planned for M3, after the adapters ([should-do](../should-do.md)). That avoids caret jumps and the per-keystroke round trip.
+- **Host-owned inputs:** `input`, `textarea` and `select` keep their own value and caret on the host. The isolate gets `input` events with the value. A `value` from the isolate is applied only if it differs from the live value and the element isn't focused. A `force` option for focused inputs is planned for M3a ([task 6](../plans/m3a-adapters.md#6-force-for-host-owned-inputs)). That avoids caret jumps and the per-keystroke round trip.
 
 ### 4.7 Host calls
 
