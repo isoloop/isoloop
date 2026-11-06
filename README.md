@@ -144,7 +144,7 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 
 1. **M0 Foundations:** pnpm workspaces, TypeScript 7, OXC (oxlint, oxfmt, tsdown), Vite 8, Vitest, Playwright, GitHub Actions; protocol types; proof of concept ported to TypeScript.
 2. **M1 Kernel** (done; write-up: [Crashing an isolate on purpose](docs/posts/m1-crashing-an-isolate.md)): loader, supervisor, heartbeats, frame-batched compositor on our own render bridge.
-3. **M2 Bus** (done): topics, schemas, retention, offsets, replay, backpressure; bus worker with the TS log engine; opt-in suspension of idle isolates. The write-up is still to come.
+3. **M2 Bus** (done; write-up: [A Kafka-shaped bus in a Web Worker](docs/posts/m2-bus-in-a-worker.md)): topics, schemas, retention, offsets, replay, backpressure; bus worker with the TS log engine; opt-in suspension of idle isolates.
 4. **M2b Durable log:** persistent topics in OPFS that survive a bus crash or a page reload. Required for 0.1.
 5. **M2c Worker pools** (after 0.1): opt-in named pools for small headless isolates, if a benchmark shows they pay off.
 6. **M3 Adapters and dashboard sandbox**, in two epics: **M3a** Preact and React adapters (Preact 10 and 11, React 18 and 19); **M3b** a markets dashboard (live public exchange feeds, cross-market aggregates and alerts) that runs single-threaded or on Isoloop at the flip of a toggle, with live metrics (main-thread fps, long tasks, input latency, loop lag per worker, memory, bus throughput).

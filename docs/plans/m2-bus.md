@@ -1,6 +1,6 @@
 # M2: Bus
 
-**Status:** done (tasks 1–13, [#13](https://github.com/isoloop/isoloop/pull/13)–[#53](https://github.com/isoloop/isoloop/pull/53)). Where the build differs from a task, the task has an *As built* note.
+**Status:** done (tasks 1–13, [#13](https://github.com/isoloop/isoloop/pull/13)–[#53](https://github.com/isoloop/isoloop/pull/53)). Where the build differs from a task, the task has an *As built* note. Write-up: [A Kafka-shaped bus in a Web Worker](../posts/m2-bus-in-a-worker.md).
 
 **Goal:** the log-based bus in its own worker: topics with schemas, retention, offsets, replay and backpressure, behind the `LogEngine` interface with the TS engine.
 
@@ -104,4 +104,4 @@ Tasks 1–6 are pure TypeScript in Node and can start right after M0, in paralle
 
 ## Demo / write-up
 
-Four-loops with the bus log visible: crash D and watch it replay its history; publish an invalid record from the console and watch the broker reject it. Post: "A Kafka-shaped bus in a Web Worker" (not written yet).
+Four-loops with the bus log visible: crash D and watch it replay its history; publish an invalid record from the console and watch the broker reject it. Post: [A Kafka-shaped bus in a Web Worker](../posts/m2-bus-in-a-worker.md).
