@@ -1,7 +1,7 @@
 import type { BusRecord, TopicConfig } from '@isoloop/protocol';
-import { encodeFrame } from '../storage/frame';
+import { decodeFrame, encodeFrame } from '../storage/frame';
 import { MemoryStorage, effectiveDurability } from './memory-storage';
-import type { EngineOptions, LogEngine, LogStorage, NewRecord } from './types';
+import type { EngineOptions, LogEngine, LogStorage, NewRecord, StoredState } from './types';
 
 /** Default records per chunk. Chunk `i` holds offsets `[i * size, (i + 1) * size)`. */
 export const CHUNK = 4096;
@@ -86,8 +86,50 @@ export class TsEngine implements LogEngine {
     const t = this.#topic(topic);
     // Encoded first: a value the codec refuses throws before anything changes.
     const frame = t.durable ? encodeFrame({ ...rec, offset: t.head }) : undefined;
-    const offset = t.head++;
     if (frame) this.#storage.appendBatch(topic, [frame]);
+    return this.#place(t, rec, t.head);
+  }
+
+  /**
+   * Rebuilds durable topics from what the storage found on open (M2b task 7):
+   * every stored record, in order and at its own offset, with retention
+   * applied as if it had just been appended, and the committed offsets.
+   * Call after `createTopic`, before any append. Returns each restored
+   * topic's head.
+   */
+  async restore(state: StoredState): Promise<{ topic: string; head: number }[]> {
+    const restored: { topic: string; head: number }[] = [];
+    for (const { topic, tail, head } of state.topics) {
+      const t = this.#topics.get(topic);
+      if (!t?.durable) continue;
+      if (t.head !== 0) throw new Error(`${topic} isn't empty`);
+      t.head = t.tail = tail;
+      t.base = Math.floor(tail / this.#size);
+      let from = tail;
+      while (from < head) {
+        // oxlint-disable-next-line no-await-in-loop -- segment by segment, in order
+        const frames = await this.#storage.readSegment(topic, from);
+        if (frames.length === 0) break;
+        for (const f of frames) {
+          const { offset, epoch: _e, seq: _s, ...rec } = decodeFrame(f);
+          this.#place(t, rec, offset);
+          from = offset + 1;
+        }
+      }
+      // Offsets a corrupt frame left out are skipped, never reused (I5).
+      t.head = Math.max(t.head, head);
+      for (const [consumer, offset] of Object.entries(state.offsets[topic] ?? {})) {
+        t.commits.set(consumer, offset);
+      }
+      restored.push({ topic, head: t.head });
+    }
+    return restored;
+  }
+
+  /** Stores a record at `offset` (≥ head; a gap is left as dropped slots) and applies retention. */
+  #place(t: Topic, rec: NewRecord, at: number): number {
+    t.head = at + 1;
+    const offset = at;
     const ci = Math.floor(offset / this.#size);
     if (t.chunks.length === 0) t.base = ci;
     let chunk = t.chunks[ci - t.base];

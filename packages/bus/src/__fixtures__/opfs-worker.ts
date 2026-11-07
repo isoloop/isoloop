@@ -56,7 +56,85 @@ async function reopen(dir: string) {
   return state;
 }
 
+/** Writes 100 records to saved.v1 and closes; returns the segment's handle helper. */
+async function hundred(dir: string): Promise<void> {
+  const { storage, engine } = await engineOn(dir);
+  for (let i = 0; i < 100; i++) engine.append('saved.v1', { value: i, ts: i, producer: 'p' });
+  engine.commit('saved.v1', 'c', 60);
+  await engine.flush();
+  await storage.close();
+}
+
+/** Edits a file of saved.v1 through a sync access handle. */
+async function edit(dir: string, name: string, f: (h: FileSystemSyncAccessHandle) => void) {
+  const topicDir = await (await root(dir)).getDirectoryHandle('saved.v1');
+  const handle = await (
+    await topicDir.getFileHandle(name, { create: true })
+  ).createSyncAccessHandle();
+  try {
+    f(handle);
+    handle.flush();
+  } finally {
+    handle.close();
+  }
+}
+
+/** Opens storage and engine as the bus does after a crash, then appends once and reads it all back. */
+async function recover(dir: string) {
+  const storage = new OpfsStorage({ root: await root(dir) });
+  const state = await storage.open();
+  const engine = new TsEngine({ storage });
+  engine.createTopic({
+    name: 'saved.v1',
+    retention: saved.retention,
+    requestable: false,
+    durability: 'persistent',
+  });
+  const restored = await engine.restore(state);
+  const values = engine.read('saved.v1', 0, 1000).map((r) => r.value);
+  const next = engine.append('saved.v1', { value: 'next', ts: 0, producer: 'p' });
+  await engine.flush();
+  const onDisk = (await readAll(storage, 'saved.v1')).map((r) => r.value);
+  await storage.close();
+  return {
+    state: state.topics,
+    restored,
+    count: values.length,
+    missing: Array.from({ length: 100 }, (_, i) => i).filter((i) => !values.includes(i)),
+    committed: engine.committed('saved.v1', 'c'),
+    next,
+    onDiskTail: onDisk.slice(-2),
+    onDiskCount: onDisk.length,
+  };
+}
+
 const scenarios: Record<string, (dir: string) => Promise<unknown>> = {
+  async 'recovery: a truncated last frame'(dir) {
+    await hundred(dir);
+    await edit(dir, '0000000000000000.seg', (h) => h.truncate(h.getSize() - 3));
+    return recover(dir);
+  },
+
+  async 'recovery: a flipped byte'(dir) {
+    await hundred(dir);
+    await edit(dir, '0000000000000000.seg', (h) => {
+      const bytes = new Uint8Array(h.getSize());
+      h.read(bytes, { at: 0 });
+      // Every frame here is the same size: the 51st frame's body, last byte.
+      const frame = bytes.length / 100;
+      const at = frame * 51 - 1;
+      h.write(new Uint8Array([(bytes[at] ?? 0) ^ 0xff]), { at });
+    });
+    return recover(dir);
+  },
+
+  async 'recovery: an empty segment'(dir) {
+    await hundred(dir);
+    // A crash right after rolling over: the new segment exists, empty.
+    await edit(dir, '0000000000000100.seg', () => {});
+    return recover(dir);
+  },
+
   async 'offsets survive a reopen'(dir) {
     const { storage, engine } = await engineOn(dir);
     engine.append('saved.v1', { value: 1, ts: 0, producer: 'p' });

@@ -20,7 +20,9 @@ import {
   type TopicConfig,
 } from '@isoloop/protocol';
 import { Broker, type BrokerStats, type BusPort } from './broker';
+import { MemoryStorage } from './engine/memory-storage';
 import { TsEngine } from './engine/ts-engine';
+import type { LogStorage } from './engine/types';
 import { isContracts, topicConfig, type Contracts } from './topic';
 
 /** The part of a worker scope the bus uses. */
@@ -301,15 +303,21 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
     startBeat(p.heartbeatMs ?? 100);
     let list: Contracts;
     let b: Broker;
+    let storage: LogStorage;
+    let restored: { topic: string; head: number }[];
     try {
       list = await loadContracts(p.contractsUrl, p.topics, importModule);
-      const engine = new TsEngine();
+      storage = new MemoryStorage();
+      const stored = await storage.open();
+      const engine = new TsEngine({ storage });
       b = new Broker({
         contracts: list,
         engine,
         dev: p.dev ?? false,
         onWake: (isolateId, topic) => post({ v: 1, t: 'wake', p: { isolateId, topic } }),
       });
+      // Persistent topics come back from disk before anything is let in.
+      restored = await engine.restore(stored);
     } catch (e) {
       fatal(
         e instanceof BootError
@@ -319,7 +327,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
       return;
     }
     broker = b;
-    post({ v: 1, t: 'ready', p: { engine: 'ts', storage: 'memory', restored: [] } });
+    post({ v: 1, t: 'ready', p: { engine: 'ts', storage: storage.kind, restored } });
     for (const msg of early.splice(0)) control(msg, b);
     startMetrics(b);
   };
