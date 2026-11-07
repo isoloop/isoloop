@@ -20,6 +20,7 @@ import {
   type TopicRef,
   type TypedRecord,
   type ErrorCode,
+  type Issue,
   type Grants,
   type HostMethod,
   type Rect,
@@ -202,6 +203,21 @@ export type KernelEvents = {
    * carry on.
    */
   'bus:quota': { usage: number; quota: number };
+  /**
+   * A source record a seed skipped: `map` threw or returned a promise
+   * (`seed_async`), or the topic's schema rejected the result (ADR 0003,
+   * decision 18). It stays in `from`. At most 10 a second per topic; the rest
+   * are counted in `bus:seeded`.
+   */
+  'bus:seed_rejected': {
+    topic: string;
+    from: string;
+    offset: number;
+    code: ErrorCode;
+    issues: Issue[];
+  };
+  /** A seed ended and the topic opened: `copied` records, `rejected` skipped. */
+  'bus:seeded': { topic: string; copied: number; rejected: number };
   /** A new bus worker is starting; running isolates get a new bus port (ADR 0007). */
   'bus:restart': { restarts: number };
   /**
@@ -433,6 +449,8 @@ export function createKernel(config: KernelConfig): Kernel {
     'bus:recovered': new Set(),
     'bus:durability-degraded': new Set(),
     'bus:quota': new Set(),
+    'bus:seed_rejected': new Set(),
+    'bus:seeded': new Set(),
     'bus:restart': new Set(),
     'bus:failed': new Set(),
     'bus:metrics': new Set(),
@@ -880,6 +898,14 @@ export function createKernel(config: KernelConfig): Kernel {
             crash: (reason, message) => emit('bus:crash', { reason, message }),
             recovered: (quarantined) => emit('bus:recovered', { quarantined }),
             degraded: (reason) => emit('bus:durability-degraded', { reason }),
+            seed: (e) => {
+              if (e.kind === 'seeded') {
+                emit('bus:seeded', { topic: e.topic, copied: e.copied, rejected: e.rejected });
+              } else {
+                const { topic, from, offset, code, issues } = e;
+                emit('bus:seed_rejected', { topic, from, offset, code, issues });
+              }
+            },
             restart: (restarts) => emit('bus:restart', { restarts }),
             metrics: (m) => {
               warnLossyTopics(m.subscriptions);
