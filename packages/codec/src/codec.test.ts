@@ -69,6 +69,43 @@ describe('round trip', () => {
   });
 });
 
+describe('shared chunks', () => {
+  it('earlier results stay intact as later ones fill and outgrow the chunk', () => {
+    const values = Array.from({ length: 5000 }, (_, i) => ({ i, s: 'x'.repeat(i % 300) }));
+    const encoded = values.map((v) => encode(v));
+    encoded.forEach((b, i) => expect(decode(b)).toStrictEqual(values[i]));
+  });
+
+  it('a value larger than a chunk', () => {
+    const big = { s: 'y'.repeat(100_000), a: Array.from({ length: 10_000 }, (_, i) => i) };
+    const before = encode('before');
+    const b = encode(big);
+    expect(decode(b)).toStrictEqual(big);
+    expect(decode(before)).toBe('before');
+  });
+
+  it('a failed encode leaves earlier results and the next one intact', () => {
+    const a = encode({ a: 1 });
+    expect(() => encode({ big: 'z'.repeat(20_000), f: () => 1 })).toThrow();
+    const b = encode({ b: 2 });
+    expect(decode(a)).toEqual({ a: 1 });
+    expect(decode(b)).toEqual({ b: 2 });
+  });
+
+  it('a getter that encodes during encode', () => {
+    const inner: Uint8Array[] = [];
+    const v = {
+      x: 1,
+      get y(): number {
+        inner.push(encode({ nested: 'yes' }));
+        return 2;
+      },
+    };
+    expect(decode(encode(v))).toEqual({ x: 1, y: 2 });
+    expect(decode(inner[0] ?? new Uint8Array())).toEqual({ nested: 'yes' });
+  });
+});
+
 describe('byte layout (isoloop-codec@1)', () => {
   // Changing any of these changes the on-disk format: that needs a new version.
   it.each<[string, unknown, string]>([
