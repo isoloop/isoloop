@@ -368,8 +368,12 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
     let degraded: DurabilityDegraded | undefined;
     let storage: LogStorage;
     if (opts.storage) storage = opts.storage();
-    else if (!persistent || !OpfsStorage.available()) storage = new MemoryStorage();
-    else if (await takeBusLock(p.restart ? RESTART_LOCK_WAIT_MS : 0)) storage = new OpfsStorage();
+    else if (!persistent) storage = new MemoryStorage();
+    else if (!OpfsStorage.available()) {
+      // No sync access handles here: memory, with a warning (M2b task 15).
+      storage = new MemoryStorage();
+      degraded = 'no-sync-access';
+    } else if (await takeBusLock(p.restart ? RESTART_LOCK_WAIT_MS : 0)) storage = new OpfsStorage();
     else {
       // Another tab's bus owns the files: this one runs everything in memory.
       storage = new MemoryStorage();
