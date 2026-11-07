@@ -15,7 +15,7 @@ const testPolicy: SanitisePolicy = {
   attribute: (_tag, isoNs, name, value) =>
     /^on/i.test(name) || name === 'srcdoc' || /^\s*javascript:/i.test(value) ? null : value,
   // Host-owned inputs: never overwrite the value the user is typing into.
-  property: (el, name) => !(name === 'value' && isFocused(el)),
+  property: (el, name, _value, force) => force || !(name === 'value' && isFocused(el)),
 };
 const isFocused = (el: Element) => {
   const root = el.getRootNode();

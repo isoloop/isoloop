@@ -52,11 +52,9 @@ export default defineIsolate<HTMLElement>({
       } catch (e) {
         push(`note rejected: ${e instanceof Error ? e.message : String(e)}`);
       }
-      // The host owns a focused input's value (design §4.6), so focus moves off
-      // the input before it's cleared. Until an isolate can force a value,
-      // that's the way to reset one.
-      await ctx.host.focus(sendButton);
-      input.value = '';
+      // The host owns a focused input's value (design §4.6): `force` clears it
+      // while the user is still in it, caret and focus kept.
+      ctx.setValue(input, '', { force: true });
     };
     sendButton.addEventListener('click', () => void send());
     input.addEventListener('keydown', (e) => {

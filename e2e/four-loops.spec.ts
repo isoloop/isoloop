@@ -72,7 +72,11 @@ test('(d) a note typed in D appears in A', async ({ page }) => {
   await input.press('Enter');
   await expect(pane(page, 'A')).toContainText('D says: hello from D');
   await expect(pane(page, 'D').locator('.log li').first()).toHaveText('D note: hello from D');
+  // D clears its box with a forced value (M3a task 6): no blur, focus stays.
   await expect(input).toHaveValue('');
+  await expect(input).toBeFocused();
+  await input.pressSequentially('next');
+  await expect(input).toHaveValue('next');
 });
 
 test('(f) I7: bus records travel worker to worker; none crosses the main thread', async ({

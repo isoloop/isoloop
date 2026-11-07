@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ROOT_ID, type DomBatch, type DomRecord } from '../shared/records';
+import { isDomBatch, ROOT_ID, type DomBatch, type DomRecord } from '../shared/records';
 import {
   createDom,
   WElement,
@@ -269,6 +269,27 @@ describe('what the usage logs asked for (M3a task 2)', () => {
     expect(doc.querySelector('body > title')).toBe(null);
     expect(records()).toEqual([]);
     expect(() => doc.querySelector('.cls')).toThrow(/isn't supported/);
+  });
+});
+
+describe('setValue (M3a task 6)', () => {
+  it('records a forced value as a prop record with force, even when the worker holds it', () => {
+    const { dom: d, doc, root, records } = setup();
+    const input = doc.createElement('input');
+    root.append(input);
+    records();
+    d.setValue(input, 'a');
+    d.setValue(input, 'a', { force: true });
+    d.setValue(input, 'b', { force: true });
+    const id = d.idOf(input);
+    expect(records()).toEqual([
+      ['prop', id, 'value', 'a'],
+      ['prop', id, 'value', 'a', true],
+      ['prop', id, 'value', 'b', true],
+    ]);
+    expect(isDomBatch([['prop', id, 'value', 'b', true]])).toBe(true);
+    expect(isDomBatch([['prop', id, 'value', 'b', false]])).toBe(false);
+    expect(() => d.setValue(doc.createElement('div'), 'x')).toThrow(/not an input/);
   });
 });
 

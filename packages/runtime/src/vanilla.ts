@@ -14,6 +14,7 @@ import {
 import { createBusClient, type BusClient } from './bus-client';
 import { createHostCalls, type HostApi } from './host-calls';
 import { createKeepAwake } from './keep-awake';
+import { WNode } from '@isoloop/dom/worker';
 import { createRender } from './render';
 
 /**
@@ -42,6 +43,13 @@ export type IsolateContext<Root = IsolateRoot> = {
   readonly bus: BusClient;
   /** Adds stylesheets to the surface (design §4.8); a no-op when headless. */
   styles(css: string | readonly string[]): void;
+  /**
+   * Sets an `<input>`'s, `<textarea>`'s or `<select>`'s value. The host owns
+   * a focused input's value (design §4.6), so a plain `input.value = …` waits
+   * until the user leaves it; with `force` the host applies it at once and
+   * keeps the caret at the end, e.g. to clear a chat box after sending.
+   */
+  setValue(node: unknown, value: string, opts?: { force?: boolean }): void;
   /** Runs on stop, within the host's grace period, before the worker goes. */
   onShutdown(fn: (reason: ShutdownReason) => void | Promise<void>): void;
   /**
@@ -105,6 +113,11 @@ export function createVanillaIsolate(init: InitPayload, post: Post, scope: objec
     host: calls.api,
     bus: bus.client,
     styles: (css) => render?.styles(css),
+    setValue(node, value, o) {
+      if (!render) return;
+      if (!(node instanceof WNode)) throw new TypeError('setValue: not a node of this isolate');
+      render.dom.setValue(node, value, o);
+    },
     onShutdown: (fn) => {
       onShutdown.push(fn);
     },
