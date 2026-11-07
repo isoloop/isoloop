@@ -58,6 +58,13 @@ export function createApplier(container: Element, policy: SanitisePolicy): Appli
   const nodes = new Map<NodeId, Node>([[ROOT_ID, container]]);
   const ids = new WeakMap<Node, NodeId>([[container, ROOT_ID]]);
   const listens = new Map<NodeId, Set<string>>();
+  // Each checkbox's `checked` as the worker last knew it: from its own records
+  // or from an event that reported it. A click fires click, input and change
+  // in one task, all with the same `checked`; only the first may report it.
+  // The others would overwrite whatever the worker set in between (React
+  // restores a controlled checkbox right after the click), and the worker's
+  // next render would look like a no-op.
+  const known = new WeakMap<Element, boolean>();
 
   const setAttr = (el: Element, name: string, value: string | null): void => {
     const safe = value === null ? null : policy.attribute(el.localName, nsOf(el), name, value);
@@ -70,6 +77,7 @@ export function createApplier(container: Element, policy: SanitisePolicy): Appli
   };
 
   const setProp = (el: Element, name: SyncedProp, value: string | boolean, force = false): void => {
+    if (name === 'checked') known.set(el, Boolean(value));
     if (!policy.property(el, name, value, force)) return;
     if (name === 'checked' && el instanceof HTMLInputElement) el.checked = Boolean(value);
     else if (name === 'selected' && el instanceof HTMLOptionElement) el.selected = Boolean(value);
@@ -232,8 +240,15 @@ export function createApplier(container: Element, policy: SanitisePolicy): Appli
         el instanceof HTMLSelectElement
       )
         out.value = el.value;
-      if (el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio'))
+      if (el instanceof HTMLInputElement && el.type === 'radio') out.checked = el.checked;
+      else if (
+        el instanceof HTMLInputElement &&
+        el.type === 'checkbox' &&
+        known.get(el) !== el.checked
+      ) {
         out.checked = el.checked;
+        known.set(el, el.checked);
+      }
       if (e instanceof MouseEvent || e instanceof KeyboardEvent) {
         out.mods = { alt: e.altKey, ctrl: e.ctrlKey, meta: e.metaKey, shift: e.shiftKey };
       }
