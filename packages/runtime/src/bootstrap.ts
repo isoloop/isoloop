@@ -1,8 +1,9 @@
 /// <reference lib="webworker" />
 /*
  * Isolate worker entry, built as isolate-bootstrap.js. Waits for `init`,
- * checks the protocol range, starts the heartbeat, then imports the isolate
- * module from `init.src` and starts it. The module's default export is
+ * checks the protocol range, starts the heartbeat, installs the DOM subset
+ * (when it has a surface), then imports the isolate module from `init.src`
+ * and starts it. The module's default export is
  * `{ start(ctx) }`: rendered with isoloop-dom@1 into `ctx.root`, the DOM
  * subset installed as `document` when it has a surface.
  *
@@ -16,6 +17,7 @@ import {
   type IsolateToHost,
   type ShutdownReason,
 } from '@isoloop/protocol';
+import type { VanillaRuntime } from './vanilla';
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -62,6 +64,12 @@ async function boot(init: InitPayload): Promise<void> {
   });
   startHeartbeat(init.heartbeatMs);
 
+  // The runtime first, so the DOM subset is the worker's `document` before
+  // the isolate module loads: React checks for a DOM at load time (M3a).
+  // Loaded on demand, so a worker's first beat doesn't wait for the subset.
+  const { createVanillaIsolate } = await import('./vanilla');
+  const runtime = createVanillaIsolate(init, post, self);
+
   let mod: unknown;
   try {
     mod = await import(/* @vite-ignore */ init.src);
@@ -78,7 +86,7 @@ async function boot(init: InitPayload): Promise<void> {
   if (typeof main === 'object' && main !== null && 'start' in main) {
     const start: unknown = main.start;
     if (typeof start === 'function') {
-      await startIsolate(init, (ctx) => Reflect.apply(start, main, [ctx]));
+      await startIsolate(runtime, (ctx) => Reflect.apply(start, main, [ctx]));
       return;
     }
   }
@@ -88,10 +96,10 @@ async function boot(init: InitPayload): Promise<void> {
 /** Set by a `{ start(ctx) }` isolate: runs its onShutdown handlers. */
 let shutdownHook: ((reason: ShutdownReason) => Promise<void>) | null = null;
 
-async function startIsolate(init: InitPayload, start: (ctx: unknown) => unknown): Promise<void> {
-  // Loaded on demand, so a worker's first beat doesn't wait for the DOM subset.
-  const { createVanillaIsolate } = await import('./vanilla');
-  const runtime = createVanillaIsolate(init, post, self);
+async function startIsolate(
+  runtime: VanillaRuntime,
+  start: (ctx: unknown) => unknown,
+): Promise<void> {
   self.addEventListener('message', (e: MessageEvent<unknown>) => {
     runtime.receive(e.data);
   });
