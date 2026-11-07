@@ -9,12 +9,15 @@
  * ```
  */
 import type { Plugin } from 'vite';
+import { buildPlugin, type BuildOptions } from './build';
 import { devPlugin, type HeaderOptions, type WorkersOptions } from './dev';
 
 export { devCsp, headersFor, WORKERS_ID, type HeaderOptions, type WorkersOptions } from './dev';
 
-export type IsoloopOptions = HeaderOptions & WorkersOptions;
+export { ISOLATES_ID, MANIFEST, type BuildOptions, type IsolateManifest } from './build';
+
+export type IsoloopOptions = HeaderOptions & WorkersOptions & BuildOptions;
 
 export function isoloop(o: IsoloopOptions = {}): Plugin[] {
-  return [devPlugin(o)];
+  return [buildPlugin(o), ...(o.library ? [] : [devPlugin(o)])];
 }

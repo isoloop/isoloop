@@ -1,4 +1,5 @@
-// The smallest app that uses @isoloop/vite: it only reads the worker URLs.
+// The smallest app that uses @isoloop/vite: it reads the worker and isolate URLs.
+import isolates from 'virtual:isoloop/isolates';
 import workers from 'virtual:isoloop/workers';
 
-console.log(workers.isolateBootstrap, workers.bus);
+console.log(workers.isolateBootstrap, workers.bus, isolates);
