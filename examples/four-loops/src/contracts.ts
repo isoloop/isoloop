@@ -28,4 +28,10 @@ export const store = topic('store.v1', {
   retention: { kind: 'compacted' },
 });
 
-export default contracts(count, note, primes, store);
+/** A vote from P (Preact) or R (React): both tally every vote, from the log. */
+export const vote = topic('vote.v1', {
+  schema: z.enum(['preact', 'react']),
+  retention: { kind: 'last-n', n: 1000 },
+});
+
+export default contracts(count, note, primes, store, vote);

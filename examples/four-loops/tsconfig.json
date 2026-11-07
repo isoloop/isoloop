@@ -2,7 +2,16 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    // P and R: React's JSX by default, Preact's where a file asks for it. The
+    // frameworks come from the adapter packages; the build pins the majors.
+    "jsx": "react-jsx",
+    "paths": {
+      "preact": ["../../packages/preact/node_modules/preact11"],
+      "preact/*": ["../../packages/preact/node_modules/preact11/*"],
+      "react": ["../../packages/react/node_modules/@types/react"],
+      "react/*": ["../../packages/react/node_modules/@types/react/*"]
+    }
   },
   "include": ["src"]
 }

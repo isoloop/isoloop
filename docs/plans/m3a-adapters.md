@@ -1,6 +1,6 @@
 # M3a: Adapters
 
-**Status:** not started. First epic of the [M3 initiative](m3-adapters-dashboard.md).
+**Status:** done, 2026-11-07 (write-up: [Preact and React in a Web Worker](../posts/m3a-preact-react-in-a-worker.md)). First epic of the [M3 initiative](m3-adapters-dashboard.md).
 
 **Goal:** Preact and React adapters with bus and host hooks, on every major we support, plus what both need from the kernel: DOM group 1, the version check for isolates built apart from the host, canvas isolates and a Vite plugin.
 

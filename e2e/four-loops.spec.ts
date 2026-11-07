@@ -120,3 +120,20 @@ test('(e) the fourth crash within 60 s fails C and shows the fallback; Retry bri
   await expect(status(page, 'C')).toContainText('loop ok', { timeout: 5_000 });
   await expect(fallback).toBeHidden();
 });
+
+test('(g) P (Preact) and R (React) share vote.v1, and a crashed R replays the tally', async ({
+  page,
+}) => {
+  const tally = (id: string) => pane(page, id).locator('.tally');
+  await expect(tally('P')).toHaveText('0 : 0');
+  await pane(page, 'P').locator('.vote').click();
+  await pane(page, 'R').locator('.vote').click();
+  await pane(page, 'R').locator('.vote').click();
+  await expect(tally('P')).toHaveText('1 : 2');
+  await expect(tally('R')).toHaveText('1 : 2');
+  await pane(page, 'R').locator('.crash').click();
+  await expect(pane(page, 'R').locator('.restarts')).toHaveText('restarts: 1');
+  await expect(tally('R')).toHaveText('1 : 2');
+  await pane(page, 'R').locator('.vote').click();
+  await expect(tally('P')).toHaveText('1 : 3');
+});
