@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.lib.json",
+  "compilerOptions": {
+    // WebWorker, not DOM: the codec runs in the bus worker and in Node, and
+    // only needs TextEncoder and TextDecoder beyond ES2022.
+    "lib": ["ES2022", "WebWorker"]
+  },
+  "include": ["src"]
+}

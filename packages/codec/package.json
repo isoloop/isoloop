@@ -1,0 +1,39 @@
+{
+  "name": "@isoloop/codec",
+  "version": "0.0.0",
+  "description": "Binary codec for Isoloop topic records: the structured-clone types topics allow, no dependencies.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isoloop/isoloop.git",
+    "directory": "packages/codec"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "@isoloop/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown --platform neutral --dts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "fast-check": "catalog:",
+    "typescript": "catalog:"
+  }
+}

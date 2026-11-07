@@ -91,6 +91,7 @@ export default defineConfig({
   test: {
     projects: [
       node('protocol'),
+      node('codec'),
       node('bus'),
       browser('bus-browser', 'packages/bus/src/**/*.browser.test.ts'),
       browser('dom'),
