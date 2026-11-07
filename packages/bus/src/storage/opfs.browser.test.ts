@@ -205,3 +205,15 @@ describe.skipIf(skip)('safe mode (M2b task 12)', () => {
     });
   });
 });
+
+describe.skipIf(skip)('seeding (M2b task 17)', () => {
+  it('copies v1 from disk, paging evicted records in, and puts v2 publishes after the history', async () => {
+    expect(await run('seeding from v1 on disk, with v1 partly evicted')).toEqual({
+      evicted: true,
+      result: { ok: true, value: { offset: 2000 } },
+      count: 2001,
+      inOrder: true,
+      last: { i: -1, v: 2 },
+    });
+  });
+});

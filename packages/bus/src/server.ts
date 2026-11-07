@@ -439,6 +439,9 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
     }
     const { b, restored } = built;
     broker = b;
+    // Seeds run where the files are (ADR 0003, decision 18). They mark their
+    // topics before any port is attached; other topics don't wait.
+    if (storage.kind === 'opfs') void b.seed();
     post({
       v: 1,
       t: 'ready',

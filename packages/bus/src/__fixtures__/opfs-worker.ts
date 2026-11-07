@@ -7,7 +7,7 @@ import { Broker } from '../broker';
 import { TsEngine } from '../engine/ts-engine';
 import { decodeFrame } from '../storage/frame';
 import { type CompactionStep, OpfsStorage, type OpfsStorageOptions } from '../storage/opfs';
-import { contracts, topic, unchecked } from '../topic';
+import { contracts, topic, topicConfig, unchecked } from '../topic';
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -48,6 +48,10 @@ async function readAll(storage: OpfsStorage, name: string) {
     from = (recs.at(-1)?.offset ?? from) + 1;
   }
   return out;
+}
+
+function isRecordWith(value: unknown, i: number): boolean {
+  return typeof value === 'object' && value !== null && 'i' in value && value.i === i;
 }
 
 async function reopen(dir: string) {
@@ -567,6 +571,58 @@ const scenarios: Record<string, (dir: string) => Promise<unknown>> = {
       setAside: files.some(
         (f) => f.startsWith(before.at(-1) ?? '?') && f.endsWith('.to-0000000000000050.quarantined'),
       ),
+    };
+  },
+
+  async 'seeding from v1 on disk, with v1 partly evicted'(dir) {
+    const v1 = topic('cart.items.v1', {
+      schema: unchecked<{ i: number; note: string }>(),
+      retention: { kind: 'last-n', n: 1_000_000 },
+      durability: 'persistent',
+    });
+    const v2 = topic('cart.items.v2', {
+      schema: unchecked<{ i: number; v: 2 }>(),
+      retention: { kind: 'last-n', n: 1_000_000 },
+      durability: 'persistent',
+      seed: { from: v1, map: (v: { i: number }) => ({ i: v.i, v: 2 as const }) },
+    });
+    const n = 2000;
+    const note = 'z'.repeat(200);
+    {
+      const storage = new OpfsStorage({ root: await root(dir), segmentBytes: 16 * 1024 });
+      await storage.open();
+      const engine = new TsEngine({ storage });
+      engine.createTopic(topicConfig(v1));
+      for (let i = 0; i < n; i++)
+        engine.append(v1.name, { value: { i, note }, ts: 10 + i, producer: 'old' });
+      await engine.flush();
+      await storage.close();
+    }
+    // A new bus with v2 in the contracts: v2 starts empty, so it seeds.
+    const storage = new OpfsStorage({ root: await root(dir), segmentBytes: 16 * 1024 });
+    const stored = await storage.open();
+    const engine = new TsEngine({ storage, chunkSize: 256, residentBytes: 64 * 1024 });
+    const broker = new Broker({ contracts: contracts(v1, v2), engine });
+    await engine.restore(stored);
+    const evicted = !engine.readable(v1.name, 0);
+    const seeded = broker.seed();
+    const a = connect(broker, 'A', { publish: ['*'], subscribe: ['*'] });
+    const pub = a.call('publish', { topic: v2.name, value: { i: -1, v: 2 } });
+    await seeded;
+    const result = await pub;
+    await engine.flush();
+    await storage.close();
+    // Read v2 back from disk.
+    const again = new OpfsStorage({ root: await root(dir), segmentBytes: 16 * 1024 });
+    await again.open();
+    const onDisk = await readAll(again, v2.name);
+    await again.close();
+    return {
+      evicted,
+      result,
+      count: onDisk.length,
+      inOrder: onDisk.slice(0, n).every((r, k) => isRecordWith(r.value, k) && r.ts === 10 + k),
+      last: onDisk.at(-1)?.value,
     };
   },
 };
