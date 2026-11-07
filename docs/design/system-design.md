@@ -268,6 +268,7 @@ Transitions (matching the RFC lifecycle diagram):
 | --- | --- | --- | --- |
 | loading | `ready` | running | emit `isolate:ready` |
 | loading | `ready` with a `renderFmt` the host doesn't speak | failed | reason `render-fmt-mismatch`, no restart ([ADR 0011](../adr/0011-dom-package.md)); showFallback, emit `isolate:failed` |
+| loading | `ready` with a `requires` outside `[FLOOR, VERSION]` | failed | reason `runtime-too-old` (newer than `VERSION`) or `isolate-too-old` (older than `FLOOR`), no restart ([ADR 0012](../adr/0012-isolates-built-apart.md)); showFallback, emit `isolate:failed` |
 | loading | tick past `readyTimeoutMs` | crashed | terminate |
 | running | tick, no beat for `blockedAfterMs` | blocked | showBusy |
 | blocked | `beat` | running | hideBusy |

@@ -41,7 +41,11 @@ export type CrashReason =
   /** `ready.renderFmt` isn't one the host speaks. Fails at once: a restart can't fix it (ADR 0011). */
   | 'render-fmt-mismatch'
   /** The bus couldn't load its contracts. Fails at once: the error is deterministic (ADR 0003). */
-  | 'bus-failed';
+  | 'bus-failed'
+  /** `ready.requires` is newer than this host's `VERSION`. Fails at once (ADR 0012). */
+  | 'runtime-too-old'
+  /** `ready.requires` is older than this host's `FLOOR`. Fails at once (ADR 0012). */
+  | 'isolate-too-old';
 
 export type SupervisorConfig = {
   /** `never` fails on the first crash. */
@@ -95,6 +99,13 @@ export type SupervisorInput =
   | { k: 'workerError'; at: number; message: string }
   | { k: 'spawnFailed'; at: number; message: string }
   | { k: 'renderFmtMismatch'; at: number; message: string }
+  /** `ready.requires` outside `[FLOOR, VERSION]` (ADR 0012). */
+  | {
+      k: 'versionMismatch';
+      at: number;
+      reason: 'runtime-too-old' | 'isolate-too-old';
+      message: string;
+    }
   /** The bus failed its contracts check: stop and fail, no restart. */
   | { k: 'busFailed'; at: number; message: string }
   | { k: 'stop' }
@@ -219,6 +230,11 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
     case 'renderFmtMismatch':
       return s.state === 'loading'
         ? crash(s, input.at, 'render-fmt-mismatch', input.message, cfg, true)
+        : same;
+
+    case 'versionMismatch':
+      return s.state === 'loading'
+        ? crash(s, input.at, input.reason, input.message, cfg, true)
         : same;
 
     case 'busFailed':
