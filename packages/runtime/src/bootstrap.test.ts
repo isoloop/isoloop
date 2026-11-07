@@ -150,6 +150,12 @@ describe('isolate bootstrap', () => {
     ]);
   });
 
+  it('installs the DOM subset before it imports the isolate module', async () => {
+    const { got } = spawn(fixture('dom-at-load'));
+    await until(() => patches(got).length === 1);
+    expect(JSON.stringify(patches(got)[0])).toContain('document at load');
+  });
+
   it('a headless { start(ctx) } module gets no root and no DOM', async () => {
     const { got } = spawn(fixture('dom-headless'), undefined, 'none');
     await until(() => got.some((m) => m.t === 'ready'));
