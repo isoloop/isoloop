@@ -32,6 +32,7 @@ export type TopicShape = {
   readonly maxRecordBytes?: number;
   readonly durability?: 'memory' | 'persistent';
   readonly reply?: unknown;
+  readonly seed?: { readonly from: { readonly name: string }; readonly follow?: boolean };
 };
 
 /** What `KernelConfig.contracts.list` holds: a `contracts()` list, seen structurally. */
@@ -50,5 +51,6 @@ export function topicConfigOf(t: TopicShape): TopicConfig {
   };
   if (t.maxRecordBytes !== undefined) cfg.maxRecordBytes = t.maxRecordBytes;
   if (t.durability !== undefined) cfg.durability = t.durability;
+  if (t.seed !== undefined) cfg.seed = { from: t.seed.from.name, follow: t.seed.follow ?? false };
   return cfg;
 }

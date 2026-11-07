@@ -15,6 +15,7 @@ import {
 } from '@isoloop/protocol';
 import type { LogEngine, NewRecord } from './engine/types';
 import { estimateSize } from './size';
+import { copySeed, seedOrder, type SeedVerdict } from './seed';
 import { toIssues, type StandardSchemaV1 } from './standard-schema';
 import { DEFAULT_MAX_RECORD_BYTES, topicConfig, type AnyTopicDef, type Contracts } from './topic';
 
@@ -78,6 +79,11 @@ type Topic = {
   def: AnyTopicDef;
   maxBytes: number;
   queue: Pending[];
+  /**
+   * Set while the topic seeds from an older one (ADR 0003, decision 18): its
+   * publishes wait in `queue`, and subscribes wait here, until the seed ends.
+   */
+  seeding: HeldSubscribe[] | undefined;
   /** Records appended since the broker started, and their estimated bytes. */
   records: number;
   bytes: number;
@@ -93,6 +99,14 @@ export type BrokerStats = {
 };
 
 type Validated = StandardSchemaV1.Result<unknown> | { thrown: unknown };
+
+/** A subscribe to a seeding topic, answered when the seed ends. */
+type HeldSubscribe = {
+  conn: Connection;
+  from: unknown;
+  group: unknown;
+  reply: (r: CallResult) => void;
+};
 
 /** A publish waiting for its (possibly async) validation, in publish order per topic. */
 type Pending = {
@@ -234,6 +248,7 @@ export class Broker {
         def,
         maxBytes: def.maxRecordBytes ?? DEFAULT_MAX_RECORD_BYTES,
         queue: [],
+        seeding: undefined,
         records: 0,
         bytes: 0,
       });
@@ -318,6 +333,65 @@ export class Broker {
    */
   flush(): Promise<void> {
     return this.#engine.flush({ now: true });
+  }
+
+  /**
+   * Starts every declared seed whose topic is empty and whose source has
+   * records, or is seeding itself (ADR 0003, decision 18). The topics are
+   * marked seeding before this returns, so call it before any connection is
+   * attached. Resolves when every seed has ended. The bus worker calls it
+   * only when it holds the files: elsewhere persistent topics start empty.
+   */
+  seed(): Promise<void> {
+    const runs = new Map<string, Promise<void>>();
+    for (const def of seedOrder([...this.#topics.values()].map((t) => t.def))) {
+      const topic = this.#topics.get(def.name);
+      const seed = def.seed;
+      if (!topic || !seed) continue;
+      const from = seed.from.name;
+      const before = runs.get(from);
+      const hasData = this.#engine.head(from) > this.#engine.tail(from);
+      if (this.#engine.head(def.name) > 0 || (!hasData && !before)) continue;
+      topic.seeding = [];
+      const run = (before ?? Promise.resolve())
+        .then(() =>
+          copySeed({
+            engine: this.#engine,
+            to: def.name,
+            from,
+            map: seed.map,
+            accept: (value) => {
+              const v = validate(def.schema, value);
+              const verdict = (r: Validated): SeedVerdict => {
+                const c = this.#check(def.name, r, def.durability === 'persistent');
+                return c.ok ? { ok: true, value: c.value } : { ok: false, reason: c.error };
+              };
+              return v instanceof Promise ? v.then(verdict) : verdict(v);
+            },
+          }),
+        )
+        .then(
+          () => this.#open(def.name, topic),
+          (e: unknown) => {
+            console.warn(`[isoloop] seeding ${def.name} from ${from} failed`, e);
+            this.#open(def.name, topic);
+          },
+        );
+      runs.set(def.name, run);
+    }
+    return Promise.all(runs.values()).then(() => {});
+  }
+
+  /** A seed ended: the topic takes its waiting publishes, then its waiting subscribes. */
+  #open(name: string, topic: Topic): void {
+    const held = topic.seeding ?? [];
+    topic.seeding = undefined;
+    this.#drain(name, topic);
+    for (const h of held) {
+      if (this.#conns.get(h.conn.isolateId) !== h.conn) continue; // detached meanwhile
+      h.reply(this.#subscribe(h.conn, name, h.from, h.group));
+    }
+    if (this.#engine.durable(name)) void this.#engine.flush();
   }
 
   /** Retention pass over every topic (`time` and `compacted`); the bus worker runs it every second. */
@@ -441,10 +515,26 @@ export class Broker {
       case 'reply':
         this.#reply(conn, msg.p.topic, msg.p.offset, msg.p.value, reply);
         return;
-      case 'subscribe':
+      case 'subscribe': {
+        const held = this.#topics.get(msg.p.topic)?.seeding;
+        if (held && (isSystemTopic(msg.p.topic) || matchAny(conn.grants.subscribe, msg.p.topic))) {
+          // Answered once the seed ends, so history comes before anything new.
+          held.push({ conn, from: msg.p.from, group: msg.p.group, reply });
+          return;
+        }
         reply(this.#subscribe(conn, msg.p.topic, msg.p.from, msg.p.group));
         return;
+      }
       case 'unsubscribe': {
+        const held = this.#topics.get(msg.p.topic)?.seeding;
+        if (held) {
+          for (let i = held.length - 1; i >= 0; i--) {
+            const h = held[i];
+            if (h?.conn !== conn) continue;
+            held.splice(i, 1);
+            h.reply(fail('invalid', 'unsubscribed before the seed ended'));
+          }
+        }
         const sub = conn.subs.get(msg.p.topic);
         if (sub) this.#leave(sub);
         conn.subs.delete(msg.p.topic);
@@ -517,7 +607,7 @@ export class Broker {
       settle,
     };
     const result = validate(topic.def.schema, value);
-    if (!(result instanceof Promise) && topic.queue.length === 0) {
+    if (!(result instanceof Promise) && topic.queue.length === 0 && !topic.seeding) {
       // Fast path: nothing ahead of this publish on the topic.
       pending.result = result;
       this.#finish(name, topic, pending);
@@ -533,6 +623,7 @@ export class Broker {
 
   /** Finishes queued publishes in order, stopping at the first still validating. */
   #drain(name: string, topic: Topic): void {
+    if (topic.seeding) return;
     while (topic.queue[0]?.done) {
       const next = topic.queue.shift();
       if (next) this.#finish(name, topic, next);

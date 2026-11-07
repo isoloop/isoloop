@@ -1,6 +1,7 @@
 import {
   isSystemTopic,
   topicConfigOf,
+  type BusRecord,
   type ErrorCode,
   type Retention,
   type TopicConfig,
@@ -35,6 +36,18 @@ export type TopicDef<In, Out = In, RIn = never, ROut = RIn> = {
    * `bus:durability-degraded`.
    */
   readonly durability?: 'memory' | 'persistent';
+  /**
+   * Starts this topic from an older one (ADR 0003, decision 18). On the first
+   * boot where this topic is empty and `from` has records, the bus copies
+   * them through `map` and this topic's schema before it opens: its publishes
+   * wait and its subscribers get nothing until then. `map` must be pure and
+   * synchronous. `follow` keeps mapping new `from` records afterwards.
+   */
+  readonly seed?: {
+    readonly from: AnyTopicDef;
+    readonly map: (value: any, record: BusRecord) => In;
+    readonly follow?: boolean;
+  };
 };
 
 export type AnyTopicDef = TopicDef<any, any, any, any>;
@@ -129,6 +142,15 @@ function problemOf(t: AnyTopicDef): string | undefined {
   if (t.durability !== undefined && t.durability !== 'memory' && t.durability !== 'persistent') {
     return "has a durability other than 'memory' or 'persistent'";
   }
+  if (t.seed !== undefined) {
+    const s = t.seed as { from?: { name?: unknown }; map?: unknown; follow?: unknown } | null;
+    if (!isRecord(s) || !isRecord(s.from) || typeof s.from.name !== 'string')
+      return 'has a seed without a `from` topic';
+    if (typeof s.map !== 'function') return 'has a seed without a `map` function';
+    if (s.follow !== undefined && typeof s.follow !== 'boolean')
+      return 'has a seed whose `follow` is not a boolean';
+    if (s.from.name === t.name) return 'seeds from itself';
+  }
   return undefined;
 }
 
@@ -165,11 +187,43 @@ export function contracts(...topics: AnyTopicDef[]): Contracts {
       names,
     );
   }
+  for (const t of topics) {
+    if (t.seed && !byName.has(t.seed.from.name)) {
+      throw new ContractsError(
+        'contracts_invalid',
+        `topic ${t.name} seeds from ${t.seed.from.name}, which the contracts don't list`,
+        [t.name],
+      );
+    }
+  }
+  const cycle = seedCycle(byName);
+  if (cycle) {
+    throw new ContractsError(
+      'contracts_invalid',
+      `seeds form a cycle: ${cycle.join(' → ')}`,
+      cycle,
+    );
+  }
   return Object.freeze({
     '~isoloop': 'contracts' as const,
     topics: Object.freeze([...topics]),
     get: (name: string) => byName.get(name),
   });
+}
+
+/** A chain of seeds that comes back to where it started, if there is one. */
+function seedCycle(byName: Map<string, AnyTopicDef>): string[] | undefined {
+  for (const start of byName.values()) {
+    const path = [start.name];
+    let at = start.seed?.from.name;
+    while (at !== undefined) {
+      if (at === start.name) return [...path, at];
+      if (path.includes(at)) break;
+      path.push(at);
+      at = byName.get(at)?.seed?.from.name;
+    }
+  }
+  return undefined;
 }
 
 /** True for a value built by `contracts()`, from any copy of this package. */
