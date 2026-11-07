@@ -504,6 +504,43 @@ const scenarios: Record<string, (dir: string) => Promise<unknown>> = {
   'compaction: stop at done'(dir) {
     return stopAt(dir, 'done');
   },
+
+  async 'eviction: a subscriber from earliest on a topic larger than memory'(dir) {
+    const storage = new OpfsStorage({ root: await root(dir), segmentBytes: 16 * 1024 });
+    await storage.open();
+    const engine = new TsEngine({ storage, chunkSize: 256, residentBytes: 64 * 1024 });
+    const broker = new Broker({ contracts: contracts(saved), engine });
+    const p = connect(broker, 'P', { publish: ['*'], subscribe: [] });
+    const note = 'e'.repeat(200);
+    const n = 3000;
+    for (let i = 0; i < n; i++)
+      p.send({ v: 1, t: 'publish', p: { topic: 'saved.v1', value: { i, note } } });
+    await engine.flush();
+    const resident = engine.resident('saved.v1');
+    const s = connect(broker, 'S', { publish: [], subscribe: ['*'] });
+    s.send({ v: 1, t: 'subscribe', p: { topic: 'saved.v1', from: 'earliest' } });
+    // Commits whatever arrived, as the isolate would, until everything has.
+    let committed = -1;
+    const deadline = performance.now() + 90_000;
+    while (s.records('saved.v1').length < n && performance.now() < deadline) {
+      // oxlint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 2));
+      const last = s.records('saved.v1').at(-1);
+      if (!last || last.offset === committed) continue;
+      committed = last.offset;
+      // oxlint-disable-next-line no-await-in-loop
+      await s.call('commit', { topic: 'saved.v1', offset: committed });
+    }
+    const got = s.records('saved.v1');
+    await storage.close();
+    return {
+      evicted: resident > n / 2,
+      count: got.length,
+      inOrder: got.every(
+        (r, k) => r.offset === k && JSON.stringify(r.value) === JSON.stringify({ i: k, note }),
+      ),
+    };
+  },
 };
 
 self.addEventListener(

@@ -185,3 +185,11 @@ describe.skipIf(skip)('compaction on disk (M2b task 10)', () => {
     });
   }, 60_000);
 });
+
+describe.skipIf(skip)('eviction and replay from disk (M2b task 11)', () => {
+  it('a subscriber from earliest on a topic larger than memory gets every record, in order', async () => {
+    expect(await run('eviction: a subscriber from earliest on a topic larger than memory')).toEqual(
+      { evicted: true, count: 3000, inOrder: true },
+    );
+  }, 60_000);
+});

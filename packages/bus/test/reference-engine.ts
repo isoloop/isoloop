@@ -67,6 +67,14 @@ export class ReferenceEngine implements LogEngine {
     return Promise.resolve();
   }
 
+  readable(_topic: string, _fromOffset: number): boolean {
+    return true;
+  }
+
+  page(_topic: string, _fromOffset: number): Promise<void> {
+    return Promise.resolve();
+  }
+
   compact(topic: string): void {
     const t = this.#topic(topic);
     const r = t.cfg.retention;
