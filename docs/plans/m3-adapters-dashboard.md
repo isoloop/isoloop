@@ -10,6 +10,7 @@ M3 is an initiative with two epics. Each has its own done-when, demo and write-u
 | --- | --- | --- |
 | M3a Adapters | [m3a-adapters.md](m3a-adapters.md) | Both adapters pass the adapter conformance suite on every supported major (Preact 10 and 11, React 18 and 19) |
 | M3b Dashboard | [m3b-dashboard.md](m3b-dashboard.md) | The initiative's done-when above |
+| M3c Make the gain visible | [m3c-visible-gain.md](m3c-visible-gain.md) | At Normal size, native visibly stutters and Isoloop stays smooth |
 
 M3a comes first; M3b's data pipeline (feeds, replay, aggregator, alerts) only needs the vanilla API and can start during M3a. [M2b](m2b-durable-log.md) runs in parallel with both, and M4 needs M3 and M2b.
 

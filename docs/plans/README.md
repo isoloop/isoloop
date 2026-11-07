@@ -9,14 +9,15 @@ One plan per milestone of [RFC 0001](../rfcs/0001-threaded-runtime.md#mvp-roadma
 | M2 Bus | [m2-bus.md](m2-bus.md) | Full | Done | A restarted isolate rebuilds its state from the log in a test |
 | M2b Durable log | [m2b-durable-log.md](m2b-durable-log.md) | Full | Done | A persistent topic loses no acknowledged record across a bus crash or a page reload |
 | M2c Worker pools | [m2c-worker-pools.md](m2c-worker-pools.md) | Outline | Not started | Pooled and own-worker isolates run side by side; a pool crash restarts only that pool |
-| M3 Adapters + dashboard (initiative) | [m3-adapters-dashboard.md](m3-adapters-dashboard.md) | Overview | Done but the public deploy | Dashboard live on a public URL; recorded comparison in the README |
+| M3 Adapters + dashboard (initiative) | [m3-adapters-dashboard.md](m3-adapters-dashboard.md) | Overview | M3a and M3b done; M3c next | Dashboard live on a public URL; recorded comparison in the README |
 | ↳ M3a Adapters (epic) | [m3a-adapters.md](m3a-adapters.md) | Full | Done | Both adapters pass the adapter conformance suite on every supported major |
-| ↳ M3b Dashboard (epic) | [m3b-dashboard.md](m3b-dashboard.md) | Full | Done but the public deploy | The M3 done-when |
+| ↳ M3b Dashboard (epic) | [m3b-dashboard.md](m3b-dashboard.md) | Full | Done (live since `markets-v0.1.0`) | The M3 done-when |
+| ↳ M3c Make the gain visible (epic) | [m3c-visible-gain.md](m3c-visible-gain.md) | Full | Not started | At Normal size, native visibly stutters and Isoloop stays smooth, with realistic work only |
 | M4 Devtools + 0.1 | [m4-devtools-release.md](m4-devtools-release.md) | Outline | Not started | `0.1.0` on npm with a launch post |
 | M5 Shared-memory engine | [m5-shared-memory-engine.md](m5-shared-memory-engine.md) | Outline | Not started | Benchmark results published, whichever engine wins |
 | M5b Delivery batching (spike) | [m5b-delivery-batching.md](m5b-delivery-batching.md) | Outline | Not started | Findings written up; ADR amending §6.3 or a recalibrated §9 budget accepted |
 
-An outline gets its full task list when it's next to start, so the list reflects what was learned. Next: the first `markets-v*` tag (M3b's public deploy), then M4 (0.1). M2c, M5 and M5b come after 0.1.
+An outline gets its full task list when it's next to start, so the list reflects what was learned. Next: M3c (make the gain visible), then M4 (0.1). M2c, M5 and M5b come after 0.1.
 
 ```mermaid
 flowchart LR
