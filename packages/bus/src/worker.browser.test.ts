@@ -11,6 +11,7 @@ import type {
 } from '@isoloop/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import list from './__fixtures__/contracts';
+import persistentList from './__fixtures__/persistent-contracts';
 import { topicConfig } from './topic';
 
 const fixture = (name: string): string =>
@@ -26,8 +27,13 @@ afterEach(() => {
 
 let ids = 0;
 
-function startBus(contractsUrl = fixture('contracts'), topics = TOPICS) {
-  const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+function startBus(
+  contractsUrl = fixture('contracts'),
+  topics = TOPICS,
+  // A literal `new Worker(new URL(…))` at each call site, so Vite builds it as a worker.
+  make = (): Worker => new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }),
+) {
+  const worker = make();
   workers.push(worker);
   const got: BusToHost[] = [];
   worker.addEventListener('message', (e: MessageEvent<BusToHost>) => {
@@ -179,5 +185,33 @@ describe('bus worker', () => {
     it('an isoloop.* export: reserved_topic', async () => {
       expect(await fatal(startBus(fixture('reserved')))).toMatchObject({ code: 'reserved_topic' });
     });
+  });
+});
+
+describe('bus worker without OPFS sync access handles (M2b task 15)', () => {
+  it('starts in memory and reports no-sync-access; persistent topics work as memory ones', async () => {
+    const bus = startBus(
+      fixture('persistent-contracts'),
+      persistentList.topics.map(topicConfig),
+      () =>
+        new Worker(new URL('./__fixtures__/no-sync-worker.ts', import.meta.url), {
+          type: 'module',
+        }),
+    );
+    const ready = await bus.first('ready');
+    expect(ready.p).toEqual({
+      engine: 'ts',
+      storage: 'memory',
+      restored: [],
+      degraded: 'no-sync-access',
+    });
+    const a = bus.attach('A');
+    await a.call('subscribe', { topic: 'kept.v1', from: 'earliest' });
+    expect(await a.call('publish', { topic: 'kept.v1', value: 7 })).toEqual({
+      ok: true,
+      value: { offset: 0 },
+    });
+    await vi.waitUntil(() => a.records('kept.v1').length === 1);
+    expect(a.records('kept.v1').map((r) => r.value)).toEqual([7]);
   });
 });
