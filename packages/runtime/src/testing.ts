@@ -108,6 +108,7 @@ export function createTestContext(o: TestContextOptions = {}): TestContext {
     measure: () => Promise.resolve(ZERO),
     focus: () => Promise.resolve(),
     scrollIntoView: () => Promise.resolve(),
+    requestCanvas: () => Promise.resolve(new OffscreenCanvas(1, 1)),
     ...o.host,
   };
 

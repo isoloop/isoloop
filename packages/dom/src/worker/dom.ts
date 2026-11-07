@@ -1167,6 +1167,9 @@ function toEvent(e: DomEvent): Event {
     button: { value: e.button ?? 0 },
     clientX: { value: e.x ?? 0 },
     clientY: { value: e.y ?? 0 },
+    // `resize` on a transferred canvas (design §4.7).
+    width: { value: e.width },
+    height: { value: e.height },
   });
   return ev;
 }

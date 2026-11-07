@@ -27,6 +27,17 @@ export type HostApi = {
   measure(node: unknown): Promise<Rect>;
   focus(node: unknown): Promise<void>;
   scrollIntoView(node: unknown, opts?: ScrollIntoViewOptionsLike): Promise<void>;
+  /**
+   * Hands a rendered `<canvas>` to the isolate as an `OffscreenCanvas`
+   * (design §4.7), at `size` in canvas pixels if given. Draw on it from the
+   * worker. The element then gets `resize` events with its CSS `width` and
+   * `height`, the first at once. Each canvas goes once; a second request
+   * rejects with `invalid`, a headless isolate's with `no_surface`.
+   */
+  requestCanvas(
+    node: unknown,
+    size?: { width?: number; height?: number },
+  ): Promise<OffscreenCanvas>;
 };
 
 export type ScrollIntoViewOptionsLike = {
@@ -113,6 +124,13 @@ export function createHostCalls(opts: HostCallsOptions): {
       },
       async scrollIntoView(node, o) {
         await call('scrollIntoView', node, o === undefined ? [] : [o]);
+      },
+      async requestCanvas(node, size) {
+        const value = await call('requestCanvas', node, size === undefined ? [] : [size]);
+        if (!(value instanceof OffscreenCanvas)) {
+          throw new HostCallError('invalid', 'requestCanvas: the host sent no OffscreenCanvas');
+        }
+        return value;
       },
     },
     pending: () => pending.size,

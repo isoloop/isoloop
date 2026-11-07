@@ -107,6 +107,20 @@ describe('isoloop-dom in the kernel', () => {
     }
   });
 
+  it('requestCanvas hands over the rendered canvas once, and resize events follow', async () => {
+    const { shadow } = spawn(bootstrap, fixture('dom-canvas'));
+    const q = (cls: string) => shadow()?.querySelector(`.${cls}`)?.textContent ?? '';
+    await waitFor(() => q('got') !== '');
+    expect(q('got')).toBe('OffscreenCanvas');
+    await waitFor(() => q('again') !== '');
+    expect(q('again')).toBe('rejected invalid');
+    await waitFor(() => q('size') === '40x30');
+    const canvas = shadow()?.querySelector('canvas');
+    if (!canvas) throw new Error('no canvas');
+    canvas.style.width = '60px';
+    await waitFor(() => q('size') === '60x30');
+  });
+
   it('an isolate reporting another renderFmt fails with render-fmt-mismatch and is not restarted', async () => {
     const { handle, log } = spawn(worker('../__fixtures__/bogus-fmt-bootstrap.ts'), 'unused');
     await waitFor(() => handle.snapshot().state === 'failed');

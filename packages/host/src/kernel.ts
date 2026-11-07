@@ -269,6 +269,10 @@ type Slot = {
   warnedHold: boolean;
   /** `dev`: already warned that this isolate renders into `document.head`. */
   warnedHead: boolean;
+  /** Canvases handed over with `requestCanvas`; each goes once. */
+  canvases: WeakSet<HTMLCanvasElement>;
+  /** Resize observers on those canvases, disconnected when the worker goes. */
+  observers: ResizeObserver[];
   warnedTopics: Set<string>;
 };
 
@@ -311,6 +315,12 @@ function headOf(x: unknown): string[] | undefined {
     .filter((t): t is string => typeof t === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(t))
     .slice(0, 8);
   return tags.length > 0 ? tags : undefined;
+}
+
+/** A canvas side from `requestCanvas`'s size: a positive integer up to 16,384, or nothing. */
+function canvasSide(size: unknown, k: 'width' | 'height'): number | undefined {
+  const v: unknown = typeof size === 'object' && size !== null ? Reflect.get(size, k) : undefined;
+  return typeof v === 'number' && Number.isInteger(v) && v > 0 && v <= 16_384 ? v : undefined;
 }
 
 /** `scrollIntoView` options from an isolate, keeping only what the DOM accepts. */
@@ -418,8 +428,8 @@ export function createKernel(config: KernelConfig): Kernel {
     for (const fn of listeners[event]) fn(data);
   };
 
-  const post = (slot: Slot, msg: HostToIsolate): void => {
-    slot.loaded?.worker.postMessage(msg);
+  const post = (slot: Slot, msg: HostToIsolate, transfer: Transferable[] = []): void => {
+    slot.loaded?.worker.postMessage(msg, transfer);
   };
 
   /** Messages the main thread received, by type: the I7 test hook (`kernel.debug`). */
@@ -433,6 +443,7 @@ export function createKernel(config: KernelConfig): Kernel {
   const terminate = (slot: Slot): void => {
     clearTimeout(slot.graceTimer);
     slot.graceTimer = undefined;
+    for (const o of slot.observers.splice(0)) o.disconnect();
     if (!slot.loaded) return;
     slot.loaded.worker.terminate();
     slot.loaded = null;
@@ -612,9 +623,56 @@ export function createKernel(config: KernelConfig): Kernel {
           });
         return;
       }
-      case 'requestCanvas':
-        fail('unsupported', 'requestCanvas arrives in M3');
+      case 'requestCanvas': {
+        if (!slot.manifest.surface) {
+          fail('no_surface', 'requestCanvas: a headless isolate has no surface (ADR 0008)');
+          return;
+        }
+        const [nodeId, size] = args;
+        if (typeof nodeId !== 'string') {
+          fail('not_found', 'requestCanvas: not a rendered node');
+          return;
+        }
+        compositor.after(slot.manifest.id, ({ bridge }) => {
+          const el = bridge.nodeFor?.(nodeId);
+          if (!(el instanceof HTMLCanvasElement)) {
+            fail('not_found', `requestCanvas: no rendered <canvas> ${JSON.stringify(nodeId)}`);
+            return;
+          }
+          if (slot.canvases.has(el)) {
+            fail('invalid', 'requestCanvas: this canvas was already handed over');
+            return;
+          }
+          const w = canvasSide(size, 'width');
+          const h = canvasSide(size, 'height');
+          if (w !== undefined) el.width = w;
+          if (h !== undefined) el.height = h;
+          const off = el.transferControlToOffscreen();
+          slot.canvases.add(el);
+          // Its CSS size, as `resize` events (the first one comes at once).
+          const watch = new ResizeObserver(([entry]) => {
+            if (!entry || !slot.loaded) return;
+            const { width, height } = entry.contentRect;
+            post(slot, {
+              v: 1,
+              t: 'event',
+              p: {
+                type: 'resize',
+                target: nodeId,
+                currentTargets: [nodeId],
+                mods: { alt: false, ctrl: false, meta: false, shift: false },
+                width,
+                height,
+              },
+            });
+          });
+          watch.observe(el);
+          slot.observers.push(watch);
+          if (slot.loaded)
+            post(slot, { v: 1, t: 'result', re, p: { ok: true, value: off } }, [off]);
+        });
         return;
+      }
       default:
         fail('unsupported', `Unknown host method ${JSON.stringify(method)}`);
     }
@@ -1035,6 +1093,8 @@ export function createKernel(config: KernelConfig): Kernel {
         queuedWake: false,
         warnedHold: false,
         warnedHead: false,
+        canvases: new WeakSet(),
+        observers: [],
         warnedTopics: new Set(),
       };
       slots.set(manifest.id, slot);
