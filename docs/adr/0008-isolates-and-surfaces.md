@@ -1,6 +1,6 @@
 # ADR 0008: Isolates are the unit; surfaces are optional
 
-- **Status:** Accepted
+- **Status:** Accepted; updated 2026-11-07 for `requestCanvas` (M3a task 14)
 - **Date:** 2026-11-03
 - **Refines:** RFC 0001 "Pane model and lifecycle"
 
@@ -20,7 +20,7 @@ RFC 0001 called the unit of isolation a *pane*: a UI region with its own worker.
 - **Headless isolates:**
   - `init.renderFmt` is `'none'`; no RenderBridge polyfill is installed (smaller and faster start), and `ctx.root` is `undefined`;
   - they never reach the compositor and never post `patch` (the host drops and counts it if they do);
-  - the DOM host calls (`measure`, `focus`, `scrollIntoView`) reject with `no_surface`; `navigate` still works. `requestCanvas` rejects with `unsupported` for every isolate until it ships in M3;
+  - the DOM host calls (`measure`, `focus`, `scrollIntoView`) and `requestCanvas` reject with `no_surface`; `navigate` still works. (`requestCanvas` shipped in M3a; until then it rejected with `unsupported` for every isolate.)
   - supervision, heartbeats, bus access and replay are identical to visual isolates. A crashed headless isolate has no fallback UI; the host sees `isolate:crash` / `isolate:failed` events.
 - A visual isolate's surface can be **detached and re-attached** later (for example a widget moved between dashboard slots) without restarting the worker. The compositor replays the current tree to the new surface. This is an M3 feature, not a v1 promise.
 
