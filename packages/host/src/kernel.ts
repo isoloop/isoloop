@@ -10,6 +10,7 @@ import {
   ROUTE_KEY,
   routeTopic,
   type BusMetrics,
+  type DurabilityDegraded,
   type BusRecord,
   type CallResult,
   type ContractsList,
@@ -185,6 +186,13 @@ export type KernelEvents = {
    * (ADR 0007, decision 5). `quarantined` lists them as `<topic>/<file>`.
    */
   'bus:recovered': { quarantined: string[] };
+  /**
+   * Persistent topics run in memory on this bus, so they won't survive a
+   * reload (ADR 0007, decision 6). `another-tab`: another tab's bus holds the
+   * origin's files; `no-sync-access`: OPFS sync access handles are missing;
+   * `open-failed`: the files couldn't be opened.
+   */
+  'bus:durability-degraded': { reason: DurabilityDegraded };
   /** A new bus worker is starting; running isolates get a new bus port (ADR 0007). */
   'bus:restart': { restarts: number };
   /**
@@ -414,6 +422,7 @@ export function createKernel(config: KernelConfig): Kernel {
     'bus:ready': new Set(),
     'bus:crash': new Set(),
     'bus:recovered': new Set(),
+    'bus:durability-degraded': new Set(),
     'bus:restart': new Set(),
     'bus:failed': new Set(),
     'bus:metrics': new Set(),
@@ -860,6 +869,7 @@ export function createKernel(config: KernelConfig): Kernel {
             },
             crash: (reason, message) => emit('bus:crash', { reason, message }),
             recovered: (quarantined) => emit('bus:recovered', { quarantined }),
+            degraded: (reason) => emit('bus:durability-degraded', { reason }),
             restart: (restarts) => emit('bus:restart', { restarts }),
             metrics: (m) => {
               warnLossyTopics(m.subscriptions);
