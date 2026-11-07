@@ -39,6 +39,14 @@ export interface LogEngine {
   durable(topic: string): boolean;
   /** Resolves once every append so far to a durable topic is on disk. */
   flush(): Promise<void>;
+  /**
+   * Whether `read(topic, fromOffset, …)` can answer now. False when the
+   * records from there were evicted to disk and aren't paged in: call `page`
+   * first (M2b task 11). Memory topics are always readable.
+   */
+  readable(topic: string, fromOffset: number): boolean;
+  /** Pages evicted records from `fromOffset` back in from disk, so `read` sees them. */
+  page(topic: string, fromOffset: number): Promise<void>;
 }
 
 /** Options every engine takes. */

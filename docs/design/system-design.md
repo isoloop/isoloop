@@ -421,10 +421,16 @@ interface LogEngine {
   commit(topic: string, consumer: string, offset: number): void;
   committed(topic: string, consumer: string): number | undefined;
   compact(topic: string): void;                                          // retention pass
+  durable(topic: string): boolean;                                       // appends go to disk: ack after flush
+  flush(): Promise<void>;
+  readable(topic: string, fromOffset: number): boolean;                  // false: evicted, call page first
+  page(topic: string, fromOffset: number): Promise<void>;                // reads evicted records back in
 }
 ```
 
 The TS engine stores each topic as a chunked array plus, for compacted topics, a `Map<key, offset>`. Retention runs on append (`last-n`), on a 1 s timer (`time`), and at a dirty-ratio threshold (`compacted`). Offsets are monotonic per topic and never reused. The M5 WASM engine implements the same interface, and a shared conformance test suite runs against both.
+
+A persistent topic keeps only its recent records in memory, about 8 MiB (`residentBytes`); older chunks are evicted, since they're on disk. When a subscription's cursor is on an evicted offset, the broker calls `page`, which reads the segment holding it back from disk, and pumps again once it's in.
 
 **Storage under the engine** ([ADR 0007](../adr/0007-bus-worker-supervision.md)). The engine writes through a `LogStorage` for topics with `durability: 'persistent'`:
 
@@ -435,7 +441,8 @@ interface LogStorage {
   appendBatch(topic: string, encoded: Uint8Array[]): void;        // buffered; group commit every 5 ms / 256 records
   flush(): Promise<void>;                                         // resolves when the batch is durable → publish acked
   saveOffsets(offsets: Record<string, Record<string, number>>): void;
-  rewrite(topic: string, keep: (offset: number) => boolean): Promise<void>;   // retention/compaction on disk
+  dropBelow(topic: string, tail: number): void;                   // retention on disk: whole segments
+  rewrite(topic: string, keep: (offset: number, key?: string) => boolean): Promise<void>;   // compaction on disk
   readSegment(topic: string, fromOffset: number): Promise<Uint8Array[]>;      // replay of evicted segments
   quarantineNewest(): Promise<string[]>;                          // safe mode
 }

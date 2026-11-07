@@ -2,7 +2,11 @@ import type { Retention, TopicConfig } from '@isoloop/protocol';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { runEngineConformance } from '../../test/engine-conformance';
+import { FakeDisk } from '../../test/fake-disk';
+import { connect, flush } from '../../test/memory-port';
 import { ReferenceEngine } from '../../test/reference-engine';
+import { Broker } from '../broker';
+import { contracts, topic, unchecked } from '../topic';
 import { TsEngine } from './ts-engine';
 
 runEngineConformance('ts', (opts) => new TsEngine(opts));
@@ -111,5 +115,113 @@ describe('TsEngine', () => {
       ),
       { numRuns: 300 },
     );
+  });
+});
+
+const durable = (retention: Retention): TopicConfig => ({
+  ...cfg(retention),
+  durability: 'persistent',
+});
+
+/** Every record from `from`, paging evicted ones back in as the broker does. */
+async function readAll(e: TsEngine, from = 0) {
+  const out = [];
+  let o = from;
+  while (o < e.head('t')) {
+    // oxlint-disable-next-line no-await-in-loop -- page by page, in order
+    while (!e.readable('t', o)) await e.page('t', o);
+    const recs = e.read('t', o, 100);
+    const last = recs.at(-1);
+    if (!last) break;
+    out.push(...recs);
+    o = last.offset + 1;
+  }
+  return out;
+}
+
+describe('TsEngine: eviction and replay from disk (M2b task 11)', () => {
+  it('keeps only recent chunks in memory and pages older ones back in, in order', async () => {
+    const disk = new FakeDisk(50);
+    const e = new TsEngine({ chunkSize: 100, residentBytes: 20_000, storage: disk });
+    e.createTopic(durable({ kind: 'last-n', n: 1_000_000 }));
+    for (let i = 0; i < 5000; i++) e.append('t', rec(i));
+    expect(e.chunkCount('t')).toBeLessThan(10);
+    expect(e.resident('t')).toBeGreaterThan(0);
+    expect(e.readable('t', 0)).toBe(false);
+    expect(e.read('t', 0, 10)).toEqual([]);
+    const all = await readAll(e);
+    expect(all.map((r) => r.value)).toEqual(Array.from({ length: 5000 }, (_, i) => i));
+    expect(all.map((r) => r.offset)).toEqual(Array.from({ length: 5000 }, (_, i) => i));
+    expect(disk.reads).toBeGreaterThan(5000 / 50 / 2);
+  });
+
+  it('leaves memory topics alone', () => {
+    const e = new TsEngine({ chunkSize: 100, residentBytes: 10, storage: new FakeDisk() });
+    e.createTopic(cfg({ kind: 'last-n', n: 1_000_000 }));
+    for (let i = 0; i < 1000; i++) e.append('t', rec(i));
+    expect(e.resident('t')).toBe(0);
+    expect(e.read('t', 0, 2000)).toHaveLength(1000);
+  });
+
+  it('a paged read skips what compaction superseded', async () => {
+    const e = new TsEngine({
+      chunkSize: 10,
+      residentBytes: 2000,
+      storage: new FakeDisk(10),
+    });
+    e.createTopic(durable({ kind: 'compacted' }));
+    // Evicted before any compaction ran: the superseded records are on disk only.
+    for (let i = 0; i < 300; i++) e.append('t', rec(i, `k${i % 7}`));
+    e.compact('t');
+    expect(e.resident('t')).toBeGreaterThan(0);
+    expect(e.readable('t', 0)).toBe(false);
+    const all = await readAll(e);
+    // Only the latest of each key is left, as the in-memory compaction would leave it.
+    expect(all.map((r) => r.value)).toEqual([293, 294, 295, 296, 297, 298, 299]);
+  });
+
+  it('time retention expires evicted chunks whole, once their newest record has expired', () => {
+    let now = 0;
+    const e = new TsEngine({
+      chunkSize: 10,
+      residentBytes: 2000,
+      storage: new FakeDisk(10),
+      now: () => now,
+    });
+    e.createTopic(durable({ kind: 'time', ms: 100 }));
+    for (let i = 0; i < 300; i++) e.append('t', rec(i, undefined, i));
+    const resident = e.resident('t');
+    expect(resident).toBeGreaterThan(100);
+    now = 205; // ts < 105 expires: offsets 0–104
+    e.compact('t');
+    // Chunks 0–9 … 90–99 go whole; 100–109 holds ts 105–109, so the tail stops at 100.
+    expect(e.tail('t')).toBe(100);
+    now = 10_000;
+    e.compact('t');
+    expect(e.tail('t')).toBe(300);
+  });
+
+  it('a subscriber from earliest gets every record of a topic larger than memory, in order', async () => {
+    const t = topic('big.v1', {
+      schema: unchecked<number>(),
+      retention: { kind: 'last-n', n: 1_000_000 },
+      durability: 'persistent',
+    });
+    const engine = new TsEngine({ chunkSize: 64, residentBytes: 4096, storage: new FakeDisk(32) });
+    const broker = new Broker({ contracts: contracts(t), engine });
+    const p = connect(broker, 'P', { publish: ['*'], subscribe: [] });
+    for (let i = 0; i < 2000; i++) p.send({ v: 1, t: 'publish', p: { topic: 'big.v1', value: i } });
+    await flush();
+    expect(engine.resident('big.v1')).toBeGreaterThan(1000);
+    const s = connect(broker, 'S', { publish: [], subscribe: ['*'] });
+    s.send({ v: 1, t: 'subscribe', p: { topic: 'big.v1', from: 'earliest' } });
+    for (let round = 0; round < 500 && s.records('big.v1').length < 2000; round++) {
+      // oxlint-disable-next-line no-await-in-loop -- commits as the isolate would
+      await flush();
+      const last = s.records('big.v1').at(-1);
+      // oxlint-disable-next-line no-await-in-loop
+      if (last) await s.call('commit', { topic: 'big.v1', offset: last.offset });
+    }
+    expect(s.values('big.v1')).toEqual(Array.from({ length: 2000 }, (_, i) => i));
   });
 });

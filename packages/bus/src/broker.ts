@@ -810,6 +810,17 @@ export class Broker {
     });
   }
 
+  /**
+   * Reads evicted records back from disk (M2b task 11), then calls `then`
+   * to pump again. A page that fails is retried by the next pump: the next
+   * publish or commit.
+   */
+  #pageIn(topic: string, offset: number, then: () => void): void {
+    this.#engine.page(topic, offset).then(then, (e: unknown) => {
+      console.warn(`[isoloop] reading ${topic}@${offset} back from disk failed`, e);
+    });
+  }
+
   #scheduleGroup(g: Group): void {
     if (g.scheduled) return;
     g.scheduled = true;
@@ -853,6 +864,11 @@ export class Broker {
     if (gap) sub.cursor = gap.to + 1;
     const head = this.#engine.head(sub.topic);
     while (sub.credit > 0 && sub.cursor < head) {
+      if (!this.#engine.readable(sub.topic, sub.cursor)) {
+        // Evicted to disk: read back in, then go on from here.
+        this.#pageIn(sub.topic, sub.cursor, () => this.#schedule(sub));
+        break;
+      }
       const records = this.#engine.read(sub.topic, sub.cursor, Math.min(this.#batch, sub.credit));
       const last = records.at(-1);
       if (!last) {
@@ -905,6 +921,11 @@ export class Broker {
     let blocked = false;
     while (g.redeliver.length > 0) {
       const offset = g.redeliver[0] ?? 0;
+      if (offset >= tail && !this.#engine.readable(g.topic, offset)) {
+        this.#pageIn(g.topic, offset, () => this.#scheduleGroup(g));
+        blocked = true;
+        break;
+      }
       const rec = offset >= tail ? this.#engine.read(g.topic, offset, 1)[0] : undefined;
       if (rec?.offset !== offset) {
         // Gone from the log meanwhile: nothing left to hand over.
@@ -925,6 +946,10 @@ export class Broker {
     const head = this.#engine.head(g.topic);
     let more = !blocked;
     while (more && g.cursor < head) {
+      if (!this.#engine.readable(g.topic, g.cursor)) {
+        this.#pageIn(g.topic, g.cursor, () => this.#scheduleGroup(g));
+        break;
+      }
       const records = this.#engine.read(g.topic, g.cursor, this.#batch);
       if (records.length === 0) {
         g.cursor = head;
