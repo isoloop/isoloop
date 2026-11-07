@@ -206,6 +206,7 @@ export class Broker {
   readonly #inboxLimit: number;
   readonly #timers: Timers;
   readonly #durable: (topic: string) => boolean;
+  #storageFull = false;
   readonly #topics = new Map<string, Topic>();
   readonly #conns = new Map<string, Connection>();
   readonly #groups = new Map<string, Group>();
@@ -301,6 +302,14 @@ export class Broker {
       subscriptions,
       rejected: { ...this.#rejected },
     };
+  }
+
+  /**
+   * The origin's storage is full (M2b task 14): publishes to persistent
+   * topics reject with `quota_exceeded`, memory topics carry on.
+   */
+  setStorageFull(full: boolean): void {
+    this.#storageFull = full;
   }
 
   /** Retention pass over every topic (`time` and `compacted`); the bus worker runs it every second. */
@@ -528,6 +537,10 @@ export class Broker {
       p.settle(checked);
       return;
     }
+    if (this.#storageFull && this.#engine.durable(name)) {
+      p.settle(fail('quota_exceeded', `${name}: the origin's storage is full`));
+      return;
+    }
     let rec: NewRecord = { value: checked.value, ts: this.#now(), producer: p.producer };
     if (p.key !== undefined) rec = { ...rec, key: p.key };
     if (p.req) rec = { ...rec, req: { from: p.req.from.isolateId, id: p.req.id } };
@@ -539,7 +552,12 @@ export class Broker {
       // Acknowledged once its batch is on disk (ADR 0007, decision 2).
       this.#engine.flush().then(
         () => p.settle({ ok: true, value: { offset } }),
-        (e: unknown) => p.settle(fail('bus_unavailable', `${name}: write failed: ${String(e)}`)),
+        (e: unknown) =>
+          p.settle(
+            e instanceof DOMException && e.name === 'QuotaExceededError'
+              ? fail('quota_exceeded', `${name}: the origin's storage is full`)
+              : fail('bus_unavailable', `${name}: write failed: ${String(e)}`),
+          ),
       );
     } else p.settle({ ok: true, value: { offset } });
     this.#fanOut(name);

@@ -46,7 +46,12 @@ export type ServeOptions = {
    * handles exist (a dedicated worker), else `MemoryStorage`.
    */
   storage?: () => LogStorage;
+  /** Default `navigator.storage.estimate()`; read every second while the bus keeps files. */
+  estimate?: () => Promise<StorageEstimate>;
 };
+
+/** Storage use at or past this share of the quota counts as full (M2b task 14). */
+const FULL = 1;
 
 /** How long a restarting bus waits for the worker it replaces to release the files' lock. */
 const RESTART_LOCK_WAIT_MS = 2000;
@@ -286,10 +291,27 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
     }, everyMs);
   };
 
-  const startMetrics = (b: Broker): void => {
+  const startMetrics = (b: Broker, kind: LogStorage['kind']): void => {
     let prev: BrokerStats = b.stats();
     let at = now();
+    let storage: BusMetrics['storage'];
+    const estimate = opts.estimate ?? (() => navigator.storage.estimate());
+    /** Reads the origin's storage use: it goes into the next metrics, and tells the broker when it's full. */
+    const sample = (): void => {
+      if (kind !== 'opfs') return;
+      estimate().then(
+        (e) => {
+          const usage = e.usage ?? 0;
+          const quota = e.quota ?? 0;
+          storage = { usage, quota };
+          b.setStorageFull(quota > 0 && usage >= quota * FULL);
+        },
+        () => {},
+      );
+    };
+    sample();
     setInterval(() => {
+      sample();
       b.compact();
       const stats = b.stats();
       const t = now();
@@ -303,6 +325,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         })),
         subscriptions: stats.subscriptions,
         rejected: stats.rejected,
+        ...(storage ? { storage } : {}),
       };
       prev = stats;
       at = t;
@@ -400,7 +423,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
       },
     });
     for (const msg of early.splice(0)) control(msg, b);
-    startMetrics(b);
+    startMetrics(b, storage.kind);
   };
 
   scope.addEventListener('message', (e) => {
