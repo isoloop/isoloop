@@ -629,7 +629,7 @@ Starting targets, to be calibrated in M1/M2 benches and then enforced in CI with
 | Click-to-paint overhead vs. the same UI single-threaded | p95 ≤ 1 frame in every engine | `bench/click-to-paint` (all three engines, report-only) |
 | Compositor DOM work per frame | ≤ 8 ms (default budget) | compositor stats |
 | Heartbeat-detected blocking | ≤ 500 ms to show busy | E2E |
-| Idle isolate memory, vanilla / Preact / React | ≤ 3 / 5 / 12 MB (measure first) | `bench/memory-per-isolate` (not built yet) |
+| Idle isolate memory, vanilla / Preact / React | ≤ 3 / 5 / 12 MB (measure first) | `bench/memory-per-isolate` (`pnpm bench:memory`, Chromium; JS heap per worker from `measureUserAgentSpecificMemory`) |
 | Bus throughput, TS engine, 10 subscribers, 200-byte records | ≥ 50k records/s delivered (M2: 45.5k on CI; [M5b spike](../plans/m5b-delivery-batching.md)) | `bench/throughput` |
 | Restart to first paint (no replay) | ≤ 300 ms after backoff | E2E timing |
 

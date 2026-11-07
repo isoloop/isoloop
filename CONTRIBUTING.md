@@ -38,7 +38,7 @@ Tools are only called through these root scripts, never as binaries ([ADR 0009](
 | `pnpm test` | Vitest: `protocol` and `bus` in Node; `dom`, `host` and `runtime` in Chromium; the bus worker and its storage (`*.browser.test.ts`) in Chromium, Firefox and WebKit. `test:node` and `test:browser` run each half. |
 | `pnpm e2e` | Playwright against the built demo in all three engines. `pnpm e2e --project=webkit` runs one. |
 | `pnpm bench` | Node micro-benches (`bench/**/*.bench.ts`, e.g. the log engine), kept out of `pnpm test`. |
-| `pnpm bench:click-to-paint` / `pnpm bench:throughput` | Playwright benches in the browser: click-to-paint latency in all three engines, and bus throughput in Chromium. Report only; results go to `bench-results/`. |
+| `pnpm bench:click-to-paint` / `pnpm bench:throughput` / `pnpm bench:memory` | Playwright benches in the browser: click-to-paint latency in all three engines, bus throughput and memory per idle isolate in Chromium. Report only; results go to `bench-results/`. |
 | `pnpm bench:codec` | The codec evaluation (`bench/codec`, [investigation](docs/investigations/codec.md)) in all three engines: our codec against MessagePack, CBOR and JSON. Report only, in the log. `pnpm bench` runs its Node half, with bundle sizes. |
 | `pnpm test:install-browsers` | Installs Chromium, Firefox and WebKit for Playwright. |
 | `pnpm build` | tsdown for the packages, Vite for the demo. |

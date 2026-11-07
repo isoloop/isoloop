@@ -9,7 +9,11 @@
   "dependencies": {
     "@isoloop/bus": "workspace:*",
     "@isoloop/codec": "workspace:*",
-    "@isoloop/protocol": "workspace:*"
+    "@isoloop/host": "workspace:*",
+    "@isoloop/preact": "workspace:*",
+    "@isoloop/protocol": "workspace:*",
+    "@isoloop/react": "workspace:*",
+    "@isoloop/runtime": "workspace:*"
   },
   "devDependencies": {
     "@msgpack/msgpack": "catalog:",

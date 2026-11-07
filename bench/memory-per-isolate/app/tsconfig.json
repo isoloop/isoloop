@@ -1,0 +1,16 @@
+{
+  // The bench page and its isolates: DOM, JSX (React's by default, Preact's
+  // where a file asks for it), frameworks from the adapter packages.
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "paths": {
+      "preact": ["../../../packages/preact/node_modules/preact11"],
+      "preact/*": ["../../../packages/preact/node_modules/preact11/*"],
+      "react": ["../../../packages/react/node_modules/@types/react"],
+      "react/*": ["../../../packages/react/node_modules/@types/react/*"]
+    }
+  },
+  "include": ["."]
+}
