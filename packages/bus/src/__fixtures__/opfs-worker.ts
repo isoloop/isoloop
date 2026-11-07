@@ -6,7 +6,7 @@ import { connect } from '../../test/memory-port';
 import { Broker } from '../broker';
 import { TsEngine } from '../engine/ts-engine';
 import { decodeFrame } from '../storage/frame';
-import { OpfsStorage, type OpfsStorageOptions } from '../storage/opfs';
+import { type CompactionStep, OpfsStorage, type OpfsStorageOptions } from '../storage/opfs';
 import { contracts, topic, unchecked } from '../topic';
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -107,6 +107,150 @@ async function recover(dir: string) {
     onDiskTail: onDisk.slice(-2),
     onDiskCount: onDisk.length,
   };
+}
+
+// Compaction on disk (M2b task 10): ~2 KiB records in 8 KiB segments, so
+// three to a segment and plenty of segments to rewrite.
+const COMPACT_SEGMENT = 8 * 1024;
+const note2k = 'z'.repeat(2000);
+
+async function compactedOn(
+  dir: string,
+  onCompactionStep?: OpfsStorageOptions['onCompactionStep'],
+  dirtyMin = 64,
+) {
+  const storage = new OpfsStorage({
+    root: await root(dir),
+    segmentBytes: COMPACT_SEGMENT,
+    ...(onCompactionStep ? { onCompactionStep } : {}),
+  });
+  const state = await storage.open();
+  const engine = new TsEngine({ storage, dirtyMin });
+  engine.createTopic({
+    name: 'saved.v1',
+    retention: { kind: 'compacted' },
+    requestable: false,
+    durability: 'persistent',
+  });
+  await engine.restore(state);
+  return { storage, engine };
+}
+
+/**
+ * 15 rounds over 10 keys, a keyless record every 25, then four keyless
+ * fillers: more than a segment, so the newest segment, which compaction
+ * leaves alone, holds fillers only.
+ */
+function writeKeyed(engine: TsEngine): void {
+  for (let i = 0; i < 150; i++) {
+    const key = i % 25 === 24 ? undefined : `k${i % 10}`;
+    engine.append('saved.v1', {
+      value: { i, note: note2k },
+      ts: i,
+      producer: 'p',
+      ...(key === undefined ? {} : { key }),
+    });
+  }
+  for (let i = 0; i < 4; i++)
+    engine.append('saved.v1', { value: { filler: i, note: note2k }, ts: 0, producer: 'p' });
+}
+
+const brief = (r: { offset: number; key?: string | undefined }) => [r.offset, r.key ?? null];
+
+/** Whether no key appears twice, and offsets ascend. */
+function latestOnly(recs: { offset: number; key?: string | undefined }[]): boolean {
+  const keys = recs.flatMap((r) => (r.key === undefined ? [] : [r.key]));
+  return (
+    new Set(keys).size === keys.length &&
+    recs.every((r, i) => i === 0 || r.offset > (recs[i - 1]?.offset ?? 0))
+  );
+}
+
+/** Topic files other than segments: compaction markers left behind. */
+async function markers(dir: string): Promise<string[]> {
+  const topicDir = await (await root(dir)).getDirectoryHandle('saved.v1');
+  const out: string[] = [];
+  for await (const name of topicDir.keys()) if (name.startsWith('compact')) out.push(name);
+  return out;
+}
+
+/** Opens the storage alone after a crash (recovery runs in `open`); the files may still be held for a moment. */
+async function openAfterCrash(dir: string): Promise<OpfsStorage> {
+  for (let i = 0; ; i++) {
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- retried until the dead worker lets go
+      const storage = new OpfsStorage({ root: await root(dir), segmentBytes: COMPACT_SEGMENT });
+      // oxlint-disable-next-line no-await-in-loop
+      await storage.open();
+      return storage;
+    } catch (e) {
+      if (i >= 50 || !(e instanceof DOMException) || e.name !== 'NoModificationAllowedError')
+        throw e;
+      // oxlint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  }
+}
+
+/**
+ * Writes a compacted topic, has a child worker compact it and stop at
+ * `step`, kills that worker, and reopens.
+ */
+async function crashAt(dir: string, step: CompactionStep) {
+  // Never compacts by itself: the child does it.
+  const first = await compactedOn(dir, undefined, Number.MAX_SAFE_INTEGER);
+  writeKeyed(first.engine);
+  await first.engine.flush();
+  // In memory; on disk, segments wholly below the new tail go.
+  first.engine.compact('saved.v1');
+  const latest = JSON.stringify(first.engine.read('saved.v1', 0, 10_000).map(brief));
+  await first.storage.close();
+  const before = await openAfterCrash(dir);
+  const all = JSON.stringify((await readAll(before, 'saved.v1')).map(brief));
+  await before.close();
+
+  const child = new Worker(new URL('./opfs-worker.ts', import.meta.url), { type: 'module' });
+  await new Promise<void>((resolve, reject) => {
+    child.addEventListener('error', (e) => reject(new Error(`child worker: ${e.message}`)));
+    child.addEventListener('message', (e: MessageEvent<{ error?: string }>) => {
+      if (e.data.error !== undefined) reject(new Error(e.data.error));
+      else resolve();
+    });
+    child.postMessage({ id: 1, scenario: `compaction: stop at ${step}`, dir });
+  });
+  child.terminate();
+
+  const storage = await openAfterCrash(dir);
+  const names = await storage.segments('saved.v1');
+  const onDisk = JSON.stringify((await readAll(storage, 'saved.v1')).map(brief));
+  await storage.close();
+  // The bus's own reopen: the restore compacts in memory, and on disk again.
+  const again = await compactedOn(dir);
+  const restored = JSON.stringify(again.engine.read('saved.v1', 0, 10_000).map(brief));
+  await again.storage.compacting('saved.v1');
+  await again.storage.close();
+  return {
+    oldSegments: onDisk === all,
+    compactedSegments: onDisk === latest,
+    restoredLatest: restored === latest,
+    outputs: names.some((n) => /\.\d+\.seg$/.test(n)),
+    markers: await markers(dir),
+  };
+}
+
+/** Child side of `crashAt`: opening restores, which starts the compaction; hangs at `step`. */
+async function stopAt(dir: string, step: CompactionStep): Promise<string> {
+  let reached: (() => void) | undefined;
+  const at = new Promise<void>((r) => {
+    reached = r;
+  });
+  await compactedOn(dir, (s) => {
+    if (s !== step) return undefined;
+    reached?.();
+    return new Promise<void>(() => {}); // the crash: never goes on
+  });
+  await at;
+  return step;
 }
 
 const scenarios: Record<string, (dir: string) => Promise<unknown>> = {
@@ -293,6 +437,72 @@ const scenarios: Record<string, (dir: string) => Promise<unknown>> = {
     const onDiskAfterAck = (await readAll(storage, 'saved.v1')).map((r) => r.value);
     await storage.close();
     return { ackedEarly, onDiskBeforeAck, result, onDiskAfterAck, waitedForCommit: ms >= 90 };
+  },
+
+  async 'compaction on disk: latest per key'(dir) {
+    let engine: TsEngine | undefined;
+    let over = false;
+    let flushedDuring: boolean | undefined;
+    let late: number[] = [];
+    const opened = await compactedOn(dir, (step) => {
+      if (step !== 'begin' || !engine) return;
+      // Appends during the compaction, and a flush that mustn't wait for it.
+      for (let i = 0; i < 3; i++)
+        late.push(
+          engine.append('saved.v1', { value: { late: i }, ts: 0, producer: 'p', key: 'late' }),
+        );
+      void engine.flush().then(() => {
+        flushedDuring ??= !over;
+      });
+    });
+    engine = opened.engine;
+    const { storage } = opened;
+    writeKeyed(engine);
+    await engine.flush();
+    const segmentsBefore = (await storage.segments('saved.v1')).length;
+    engine.compact('saved.v1');
+    await storage.compacting('saved.v1');
+    over = true;
+    await engine.flush();
+    const onDisk = await readAll(storage, 'saved.v1');
+    const inMemory = engine.read('saved.v1', 0, 10_000);
+    // A reopen compacts in memory too, so of the late appends only the last is restored.
+    engine.compact('saved.v1');
+    const compacted = engine.read('saved.v1', 0, 10_000);
+    const segmentsAfter = (await storage.segments('saved.v1')).length;
+    await storage.close();
+    const again = await compactedOn(dir);
+    const restored = again.engine.read('saved.v1', 0, 10_000);
+    await again.storage.close();
+    late = late.filter((o) => o > (onDisk.at(-4)?.offset ?? 0));
+    return {
+      shrank: segmentsAfter < segmentsBefore / 4,
+      // 10 keys, 6 keyless, 4 fillers and the 3 late appends.
+      count: onDisk.length,
+      sameAsMemory: JSON.stringify(onDisk.map(brief)) === JSON.stringify(inMemory.map(brief)),
+      latestOnlyBeforeTheNewest: latestOnly(onDisk.filter((r) => r.key !== 'late')),
+      lateAtTheEnd: onDisk.slice(-3).map((r) => r.key),
+      lateAfterEverything: late.length,
+      flushedDuring,
+      restoredSame: JSON.stringify(restored.map(brief)) === JSON.stringify(compacted.map(brief)),
+      markers: await markers(dir),
+    };
+  },
+
+  'compaction on disk: a crash mid-rewrite'(dir) {
+    return crashAt(dir, 'begin');
+  },
+
+  'compaction on disk: a crash after the output is written'(dir) {
+    return crashAt(dir, 'done');
+  },
+
+  'compaction: stop at begin'(dir) {
+    return stopAt(dir, 'begin');
+  },
+
+  'compaction: stop at done'(dir) {
+    return stopAt(dir, 'done');
   },
 };
 

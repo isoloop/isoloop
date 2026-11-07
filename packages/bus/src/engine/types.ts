@@ -74,8 +74,11 @@ export interface LogStorage {
    * all below `tail`. Never the newest segment.
    */
   dropBelow(topic: string, tail: number): void;
-  /** Compaction on disk. */
-  rewrite(topic: string, keep: (offset: number) => boolean): Promise<void>;
+  /**
+   * Compaction on disk: rewrites the segments before the newest one, keeping
+   * the records `keep` accepts. In the background; appends don't wait for it.
+   */
+  rewrite(topic: string, keep: (offset: number, key: string | undefined) => boolean): Promise<void>;
   /** Replay of evicted segments. */
   readSegment(topic: string, fromOffset: number): Promise<Uint8Array[]>;
   /** Safe mode: moves the newest segments aside and returns their names. */

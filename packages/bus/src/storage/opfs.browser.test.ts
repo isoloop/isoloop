@@ -146,3 +146,42 @@ describe.skipIf(skip)('retention on disk (M2b task 9)', () => {
     });
   });
 });
+
+describe.skipIf(skip)('compaction on disk (M2b task 10)', () => {
+  it('leaves only the latest record per key, in order, with appends during it after it', async () => {
+    expect(await run('compaction on disk: latest per key')).toEqual({
+      shrank: true,
+      count: 10 + 6 + 4 + 3,
+      sameAsMemory: true,
+      latestOnlyBeforeTheNewest: true,
+      lateAtTheEnd: ['late', 'late', 'late'],
+      lateAfterEverything: 3,
+      flushedDuring: true,
+      restoredSame: true,
+      markers: [],
+    });
+  });
+
+  // The crash is real: a child worker is killed partway. Firefox takes a
+  // while to release a killed worker's files, hence the timeouts.
+  it('a crash mid-rewrite leaves the old segments', async () => {
+    expect(await run('compaction on disk: a crash mid-rewrite')).toEqual({
+      oldSegments: true,
+      compactedSegments: false,
+      // The restore compacts in memory, so what the bus serves is the latest per key.
+      restoredLatest: true,
+      outputs: false,
+      markers: [],
+    });
+  }, 60_000);
+
+  it('a crash once the output is written finishes the swap on reopen', async () => {
+    expect(await run('compaction on disk: a crash after the output is written')).toEqual({
+      oldSegments: false,
+      compactedSegments: true,
+      restoredLatest: true,
+      outputs: true,
+      markers: [],
+    });
+  }, 60_000);
+});

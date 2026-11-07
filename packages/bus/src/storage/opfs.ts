@@ -1,5 +1,5 @@
 import type { LogStorage, StoredState } from '../engine/types';
-import { frameOffset, pack, scanFrames, unpack } from './frame';
+import { decodeFrame, frameOffset, pack, scanFrames, unpack } from './frame';
 import { nextOffset, scanSegment } from './recover';
 
 /** Segment files roll over past this size (design §6.2). */
@@ -9,13 +9,21 @@ export const COMMIT_MS = 5;
 /** …or once it holds this many records, whichever comes first. */
 export const COMMIT_RECORDS = 256;
 
+/** Where a compaction has got to; the test hook stops there to stand in for a crash. */
+export type CompactionStep = 'begin' | 'output' | 'done';
+
 export type OpfsStorageOptions = {
   /** Directory the topics live under. Default `isoloop/topics` in the origin's OPFS root. */
   root?: FileSystemDirectoryHandle;
   segmentBytes?: number;
   commitMs?: number;
   commitRecords?: number;
+  /** Tests only: awaited at each step of a compaction. */
+  onCompactionStep?: (step: CompactionStep) => void | Promise<void>;
 };
+
+/** A segment file: its first offset, and its name. */
+type Seg = { first: number; name: string };
 
 /** The segment being appended to, held open: sync access handles are exclusive. */
 type Active = { name: string; handle: FileSystemSyncAccessHandle; size: number };
@@ -24,12 +32,29 @@ type TopicFiles = {
   dir: FileSystemDirectoryHandle;
   /** Generation of the newest offsets slot written; 0 before the first. */
   generation: number;
-  /** First offset of each segment, ascending; the file is named after it. */
-  segments: number[];
+  /** Ascending by first offset; ranges never overlap. */
+  segments: Seg[];
   active: Active | undefined;
+  /** Highest compaction generation in a segment name. */
+  compactions: number;
+  /** Retention waiting for a running compaction to finish. */
+  deferredDrop: number | undefined;
 };
 
-const SEGMENT = /^(\d{16})\.seg$/;
+// A segment is named after its first offset. A compaction's output also
+// carries the compaction's generation, so it never takes the name of a
+// segment it replaces: `0000000000000000.3.seg`.
+const SEGMENT = /^(\d{16})(?:\.(\d+))?\.seg$/;
+
+// Compaction (M2b task 10) writes its output next to the segments it
+// replaces, then swaps. Two marker frames make a crash at any point safe:
+// `compact.begin` (the generation) is on disk before any output, and
+// `compact.done` (the generation and the replaced segments) once all output
+// is. On open, a `done` finishes the swap and a lone `begin` rolls it back by
+// deleting that generation's output, so a crash leaves the old segments or
+// the new ones, never both.
+const BEGIN = 'compact.begin';
+const DONE = 'compact.done';
 
 // Committed offsets: two slot files written in turn, each one frame holding a
 // generation and the offsets. A write killed halfway leaves a torn slot, and
@@ -38,6 +63,9 @@ const SEGMENT = /^(\d{16})\.seg$/;
 const SLOTS = ['offsets.0', 'offsets.1'] as const;
 
 type Commits = Record<string, number>;
+
+/** Whether compaction keeps a record, from its offset and key. */
+type Keep = (offset: number, key: string | undefined) => boolean;
 
 const isCommits = (x: unknown): x is Commits =>
   typeof x === 'object' &&
@@ -66,7 +94,52 @@ async function readOffsets(
   }
   return best;
 }
-const segmentName = (first: number): string => `${String(first).padStart(16, '0')}.seg`;
+const segmentName = (first: number, generation = 0): string =>
+  `${String(first).padStart(16, '0')}${generation > 0 ? `.${generation}` : ''}.seg`;
+
+/** A marker frame: its generation and, for `done`, the segments it replaced. */
+async function readMarker(
+  dir: FileSystemDirectoryHandle,
+  name: string,
+): Promise<{ generation: number; replaced: string[] } | undefined> {
+  let bytes: Uint8Array;
+  try {
+    bytes = await readFile(dir, name);
+  } catch {
+    return undefined;
+  }
+  const frame = scanFrames(bytes).frames[0];
+  if (!frame) return undefined;
+  const value = unpack(frame);
+  const replaced = Array.isArray(value) && value.every((v) => typeof v === 'string') ? value : [];
+  return { generation: frameOffset(frame), replaced };
+}
+
+/** Writes a whole small file and flushes it. */
+async function writeFile(
+  dir: FileSystemDirectoryHandle,
+  name: string,
+  bytes: Uint8Array,
+): Promise<void> {
+  const file = await dir.getFileHandle(name, { create: true });
+  const handle = await file.createSyncAccessHandle();
+  try {
+    handle.write(bytes, { at: 0 });
+    handle.truncate(bytes.length);
+    handle.flush();
+  } finally {
+    handle.close();
+  }
+}
+
+/** Deletes a file; one already gone is fine. */
+async function remove(dir: FileSystemDirectoryHandle, name: string): Promise<void> {
+  try {
+    await dir.removeEntry(name);
+  } catch (e) {
+    if (!(e instanceof DOMException && e.name === 'NotFoundError')) throw e;
+  }
+}
 
 /** Topic names may hold characters a file name can't. */
 const dirName = (topic: string): string => encodeURIComponent(topic);
@@ -113,7 +186,8 @@ function readAll(handle: FileSystemSyncAccessHandle): Uint8Array {
  */
 export class OpfsStorage implements LogStorage {
   readonly kind = 'opfs' as const;
-  readonly #opts: Required<Omit<OpfsStorageOptions, 'root'>>;
+  readonly #opts: Required<Omit<OpfsStorageOptions, 'root' | 'onCompactionStep'>>;
+  readonly #onStep: OpfsStorageOptions['onCompactionStep'];
   #root: FileSystemDirectoryHandle | undefined;
   readonly #rootOption: FileSystemDirectoryHandle | undefined;
   readonly #topics = new Map<string, TopicFiles>();
@@ -129,9 +203,16 @@ export class OpfsStorage implements LogStorage {
   #failed: Error | undefined;
   /** Commits run one at a time, in order: opening a segment is async. */
   #chain: Promise<void> = Promise.resolve();
+  /** Per topic: the compaction running, and the one queued behind it. */
+  readonly #rewrites = new Map<
+    string,
+    { running: Promise<void>; queued?: { keep: Keep; promise: Promise<void> } | undefined }
+  >();
+  #closing = false;
 
   constructor(opts: OpfsStorageOptions = {}) {
     this.#rootOption = opts.root;
+    this.#onStep = opts.onCompactionStep;
     this.#opts = {
       segmentBytes: opts.segmentBytes ?? SEGMENT_BYTES,
       commitMs: opts.commitMs ?? COMMIT_MS,
@@ -161,13 +242,14 @@ export class OpfsStorage implements LogStorage {
       (await names(root)).map(async (entry) => {
         const topic = decodeURIComponent(entry);
         const files = await this.#files(topic);
+        await this.#settleCompaction(files);
         const saved = await readOffsets(files.dir);
         files.generation = saved.generation;
         if (Object.keys(saved.commits).length > 0) state.offsets[topic] = saved.commits;
         const first = files.segments[0];
         const last = files.segments.at(-1);
         if (first === undefined || last === undefined) return undefined;
-        return { topic, tail: first, head: await this.#recoverNewest(files, last) };
+        return { topic, tail: first.first, head: await this.#recoverNewest(files, last) };
       }),
     );
     for (const t of found) if (t) state.topics.push(t);
@@ -176,9 +258,8 @@ export class OpfsStorage implements LogStorage {
   }
 
   /** Truncates the newest segment after its last intact frame; returns the head. */
-  async #recoverNewest(files: TopicFiles, first: number): Promise<number> {
-    const name = segmentName(first);
-    const handle = await (await files.dir.getFileHandle(name)).createSyncAccessHandle();
+  async #recoverNewest(files: TopicFiles, seg: Seg): Promise<number> {
+    const handle = await (await files.dir.getFileHandle(seg.name)).createSyncAccessHandle();
     try {
       const bytes = readAll(handle);
       const scan = scanSegment(bytes);
@@ -186,7 +267,7 @@ export class OpfsStorage implements LogStorage {
         handle.truncate(scan.valid);
         handle.flush();
       }
-      return nextOffset(scan, first);
+      return nextOffset(scan, seg.first);
     } finally {
       handle.close();
     }
@@ -197,13 +278,23 @@ export class OpfsStorage implements LogStorage {
     if (known) return known;
     const root = (this.#root ??= this.#rootOption ?? (await defaultRoot()));
     const dir = await root.getDirectoryHandle(dirName(topic), { create: true });
-    const segments: number[] = [];
+    const segments: Seg[] = [];
+    let compactions = 0;
     for (const name of await names(dir)) {
       const m = SEGMENT.exec(name);
-      if (m?.[1] !== undefined) segments.push(Number(m[1]));
+      if (m?.[1] === undefined) continue;
+      segments.push({ first: Number(m[1]), name });
+      compactions = Math.max(compactions, Number(m[2] ?? 0));
     }
-    segments.sort((a, b) => a - b);
-    const files: TopicFiles = { dir, generation: 0, segments, active: undefined };
+    segments.sort((a, b) => a.first - b.first);
+    const files: TopicFiles = {
+      dir,
+      generation: 0,
+      segments,
+      active: undefined,
+      compactions,
+      deferredDrop: undefined,
+    };
     this.#topics.set(topic, files);
     return files;
   }
@@ -282,6 +373,11 @@ export class OpfsStorage implements LogStorage {
       for (const [topic, tail] of drops) {
         // oxlint-disable-next-line no-await-in-loop
         const files = this.#topics.get(topic) ?? (await this.#files(topic));
+        if (this.#rewrites.has(topic)) {
+          // The compaction may be reading these segments; it drops them after its swap.
+          files.deferredDrop = Math.max(tail, files.deferredDrop ?? 0);
+          continue;
+        }
         // oxlint-disable-next-line no-await-in-loop
         await this.#drop(files, tail);
       }
@@ -337,7 +433,7 @@ export class OpfsStorage implements LogStorage {
     const handle = await file.createSyncAccessHandle();
     const active: Active = { name, handle, size: handle.getSize() };
     files.active = active;
-    files.segments.push(first);
+    files.segments.push({ first, name });
     return active;
   }
 
@@ -351,16 +447,7 @@ export class OpfsStorage implements LogStorage {
   async #writeOffsets(files: TopicFiles, commits: Commits): Promise<void> {
     const generation = files.generation + 1;
     const slot = SLOTS[generation % 2] ?? SLOTS[0];
-    const frame = pack(generation, commits);
-    const file = await files.dir.getFileHandle(slot, { create: true });
-    const handle = await file.createSyncAccessHandle();
-    try {
-      handle.write(frame, { at: 0 });
-      handle.truncate(frame.length);
-      handle.flush();
-    } finally {
-      handle.close();
-    }
+    await writeFile(files.dir, slot, pack(generation, commits));
     files.generation = generation;
   }
 
@@ -375,16 +462,203 @@ export class OpfsStorage implements LogStorage {
   async #drop(files: TopicFiles, tail: number): Promise<void> {
     // A segment's records all sit below the next segment's first offset.
     let n = 0;
-    while (n + 1 < files.segments.length && (files.segments[n + 1] ?? 0) <= tail) n++;
-    for (const first of files.segments.splice(0, n)) {
+    while (n + 1 < files.segments.length && (files.segments[n + 1]?.first ?? 0) <= tail) n++;
+    for (const seg of files.segments.splice(0, n)) {
       // oxlint-disable-next-line no-await-in-loop -- one file at a time
-      await files.dir.removeEntry(segmentName(first));
+      await remove(files.dir, seg.name);
     }
   }
 
-  rewrite(_topic: string, _keep: (offset: number) => boolean): Promise<void> {
-    // M2b tasks 9 and 10.
-    return Promise.resolve();
+  /**
+   * Compaction on disk (M2b task 10): rewrites a topic's sealed segments,
+   * keeping the records `keep` accepts, and swaps the output in. The newest
+   * segment, which appends go to, is left alone, so appends during a
+   * compaction land after it. Runs in the background one segment at a time,
+   * each step queued with the commits, so a commit waits for one segment at
+   * most. A call while one runs queues one more run, with the latest `keep`.
+   */
+  rewrite(topic: string, keep: Keep): Promise<void> {
+    const state = this.#rewrites.get(topic);
+    if (state?.queued) {
+      state.queued.keep = keep;
+      return state.queued.promise;
+    }
+    if (state) {
+      const queued = {
+        keep,
+        promise: state.running.then(() => {
+          const s = this.#rewrites.get(topic);
+          const next = s?.queued?.keep ?? keep;
+          if (s) {
+            s.queued = undefined;
+            s.running = this.#compact(topic, next);
+          }
+          return s?.running;
+        }),
+      };
+      state.queued = queued;
+      return queued.promise;
+    }
+    const running = this.#compact(topic, keep);
+    this.#rewrites.set(topic, { running });
+    return running;
+  }
+
+  /** The topic's compaction, if one is running or queued; resolves when it ends. */
+  compacting(topic: string): Promise<void> {
+    const state = this.#rewrites.get(topic);
+    return (state?.queued?.promise ?? state?.running ?? Promise.resolve()).then(() => {});
+  }
+
+  /** Runs `fn` in the commit chain, between commits. */
+  #step<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.#chain = this.#chain.then(() => fn().then(resolve, reject));
+    });
+  }
+
+  async #compact(topic: string, keep: Keep): Promise<void> {
+    try {
+      await this.#compactOnce(topic, keep);
+    } finally {
+      const state = this.#rewrites.get(topic);
+      if (state && !state.queued) this.#rewrites.delete(topic);
+    }
+  }
+
+  async #compactOnce(topic: string, keep: Keep): Promise<void> {
+    const files = await this.#files(topic);
+    // What was appended before the call is compacted too: on disk first.
+    await this.flush();
+    // A compaction an earlier failure left behind is finished or undone first.
+    await this.#step(() => this.#settleCompaction(files));
+    // Sealed segments only: the newest one is where appends go.
+    const inputs = files.segments.slice(0, -1);
+    if (inputs.length === 0) return;
+    const generation = files.compactions + 1;
+    const replaced: Seg[] = [];
+    const outputs: Seg[] = [];
+    let out: Active | undefined;
+    const closeOut = (): void => {
+      out?.handle.flush();
+      out?.handle.close();
+      out = undefined;
+    };
+    let begun = false;
+    let done = false;
+    try {
+      for (const input of inputs) {
+        if (this.#closing) throw new Error('storage closed');
+        // oxlint-disable-next-line no-await-in-loop -- one segment per step
+        const wrote = await this.#step(async () => {
+          const frames = scanSegment(await readFile(files.dir, input.name)).frames;
+          const kept = frames.filter((f) => {
+            const rec = decodeFrame(f);
+            return keep(rec.offset, rec.key);
+          });
+          if (kept.length === frames.length) {
+            // Nothing to drop: the segment stays, and output after it starts a new file.
+            closeOut();
+            return false;
+          }
+          if (!begun) {
+            await writeFile(files.dir, BEGIN, pack(generation, []));
+            files.compactions = generation;
+            begun = true;
+          }
+          replaced.push(input);
+          for (const f of kept) {
+            if (!out || (out.size > 0 && out.size + f.length > this.#opts.segmentBytes)) {
+              closeOut();
+              const seg = { first: frameOffset(f), name: segmentName(frameOffset(f), generation) };
+              // oxlint-disable-next-line no-await-in-loop -- output files open one at a time
+              const file = await files.dir.getFileHandle(seg.name, { create: true });
+              // oxlint-disable-next-line no-await-in-loop
+              const handle = await file.createSyncAccessHandle();
+              out = { name: seg.name, handle, size: 0 };
+              outputs.push(seg);
+            }
+            const n = out.handle.write(f, { at: out.size });
+            if (n !== f.length) throw new Error(`short write: ${n} of ${f.length} bytes`);
+            out.size += n;
+          }
+          out?.handle.flush();
+          return true;
+        });
+        if (wrote) {
+          // oxlint-disable-next-line no-await-in-loop
+          await this.#onStep?.(replaced.length === 1 ? 'begin' : 'output');
+        }
+      }
+      if (!begun) return;
+      await this.#step(() => {
+        closeOut();
+        return Promise.resolve();
+      });
+      // Whatever superseded a dropped record was appended before `keep` said
+      // so: once that is on disk, the swap can't lose a key.
+      await this.flush();
+      await this.#step(async () => {
+        await writeFile(
+          files.dir,
+          DONE,
+          pack(
+            generation,
+            replaced.map((s) => s.name),
+          ),
+        );
+        done = true;
+      });
+      await this.#onStep?.('done');
+      await this.#step(async () => {
+        const gone = new Set(replaced.map((s) => s.name));
+        const segments = files.segments.filter((s) => !gone.has(s.name));
+        segments.push(...outputs);
+        segments.sort((a, b) => a.first - b.first);
+        files.segments = segments;
+        await this.#settleCompaction(files);
+        if (files.deferredDrop !== undefined) {
+          await this.#drop(files, files.deferredDrop);
+          files.deferredDrop = undefined;
+        }
+      });
+    } catch (e) {
+      // Undone now if possible; otherwise the markers undo or finish it on the next open.
+      if (!done && begun) {
+        await this.#step(async () => {
+          closeOut();
+          await this.#settleCompaction(files);
+        }).catch(() => {});
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Finishes or undoes a compaction from its markers (see BEGIN): with `done`,
+   * deletes the segments it replaced; with only `begin`, deletes its output.
+   */
+  async #settleCompaction(files: TopicFiles): Promise<void> {
+    const done = await readMarker(files.dir, DONE);
+    const begin = done ? undefined : await readMarker(files.dir, BEGIN);
+    const replaced = new Set(done?.replaced);
+    const suffix = begin ? `.${begin.generation}.seg` : undefined;
+    // With `done`, its replaced segments go; with only `begin`, its output.
+    const drop = (s: Seg): boolean =>
+      replaced.has(s.name) || (suffix !== undefined && s.name.endsWith(suffix));
+    for (const s of files.segments.filter(drop)) {
+      // oxlint-disable-next-line no-await-in-loop -- one file at a time
+      await remove(files.dir, s.name);
+    }
+    if (done)
+      for (const name of done.replaced) {
+        // A replaced segment no longer listed may still be on disk.
+        // oxlint-disable-next-line no-await-in-loop
+        await remove(files.dir, name);
+      }
+    files.segments = files.segments.filter((s) => !drop(s));
+    await remove(files.dir, DONE);
+    await remove(files.dir, BEGIN);
   }
 
   /**
@@ -394,10 +668,15 @@ export class OpfsStorage implements LogStorage {
    */
   async readSegment(topic: string, fromOffset: number): Promise<Uint8Array[]> {
     const files = await this.#files(topic);
+    // In the chain, so a compaction's swap never deletes a file mid-read.
+    return this.#step(() => this.#readFrom(files, fromOffset));
+  }
+
+  async #readFrom(files: TopicFiles, fromOffset: number): Promise<Uint8Array[]> {
     let i = 0;
-    while (i + 1 < files.segments.length && (files.segments[i + 1] ?? 0) <= fromOffset) i++;
+    while (i + 1 < files.segments.length && (files.segments[i + 1]?.first ?? 0) <= fromOffset) i++;
     for (; i < files.segments.length; i++) {
-      const name = segmentName(files.segments[i] ?? 0);
+      const name = files.segments[i]?.name ?? '';
       const bytes =
         files.active?.name === name
           ? readAll(files.active.handle)
@@ -416,11 +695,16 @@ export class OpfsStorage implements LogStorage {
 
   /** Segment files of a topic, oldest first. For tests and metrics. */
   async segments(topic: string): Promise<string[]> {
-    return (await this.#files(topic)).segments.map(segmentName);
+    return (await this.#files(topic)).segments.map((s) => s.name);
   }
 
   /** Writes what's pending, then releases every file handle. */
   async close(): Promise<void> {
+    // A running compaction stops at its next step and is undone.
+    this.#closing = true;
+    await Promise.all(
+      [...this.#rewrites.values()].map((s) => (s.queued?.promise ?? s.running).catch(() => {})),
+    );
     if (this.#timer !== undefined) {
       clearTimeout(this.#timer);
       this.#timer = undefined;
