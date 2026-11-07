@@ -45,6 +45,8 @@ type Core = {
   nextId: number;
   known: Map<NodeId, WNode>;
   record(r: DomRecord): void;
+  /** An element was inserted into `document.head`, which the bridge doesn't render. */
+  onHead(tag: string): void;
 };
 
 /** Listener storage and capture/bubble dispatch through `isoParentTarget()`. */
@@ -436,6 +438,9 @@ export class WElement extends WNode {
       throw domError('HierarchyRequestError', 'insertBefore: would create a cycle');
     }
     if (ref === child) ref = child.isoNext;
+    if (this === this.ownerDocument.head && child instanceof WElement) {
+      this.ownerDocument.isoCore.onHead(child.localName);
+    }
     const wasKnown = child.isoKnown;
     child.isoParent?.isoUnlink(child);
     this.isoLink(child, ref);
@@ -496,6 +501,101 @@ export class WElement extends WNode {
     this.isoChildCache = null;
   }
 }
+
+/**
+ * Event handler properties (`onclick`…), as in the DOM's GlobalEventHandlers.
+ * Frameworks check `'oninput' in document` and `'onclick' in el` to learn
+ * event names (React's input events, Preact 10's lowercasing); setting one
+ * adds the handler as a listener, as in the DOM.
+ */
+const HANDLER_EVENTS = [
+  'abort',
+  'animationend',
+  'animationiteration',
+  'animationstart',
+  'auxclick',
+  'beforeinput',
+  'blur',
+  'cancel',
+  'change',
+  'click',
+  'close',
+  'contextmenu',
+  'copy',
+  'cut',
+  'dblclick',
+  'drag',
+  'dragend',
+  'dragenter',
+  'dragleave',
+  'dragover',
+  'dragstart',
+  'drop',
+  'error',
+  'focus',
+  'input',
+  'invalid',
+  'keydown',
+  'keypress',
+  'keyup',
+  'load',
+  'mousedown',
+  'mouseenter',
+  'mouseleave',
+  'mousemove',
+  'mouseout',
+  'mouseover',
+  'mouseup',
+  'paste',
+  'pointercancel',
+  'pointerdown',
+  'pointerenter',
+  'pointerleave',
+  'pointermove',
+  'pointerout',
+  'pointerover',
+  'pointerup',
+  'reset',
+  'resize',
+  'scroll',
+  'select',
+  'submit',
+  'toggle',
+  'touchcancel',
+  'touchend',
+  'touchmove',
+  'touchstart',
+  'transitionend',
+  'wheel',
+];
+
+function defineHandlers(proto: WEventTarget): void {
+  const handlers = new WeakMap<WEventTarget, Map<string, ListenerFn>>();
+  for (const type of HANDLER_EVENTS) {
+    Object.defineProperty(proto, `on${type}`, {
+      configurable: true,
+      enumerable: true,
+      get(this: WEventTarget): ListenerFn | null {
+        return handlers.get(this)?.get(type) ?? null;
+      },
+      set(this: WEventTarget, fn: unknown) {
+        const own = handlers.get(this) ?? new Map<string, ListenerFn>();
+        handlers.set(this, own);
+        const old = own.get(type);
+        if (old) this.removeEventListener(type, old);
+        if (typeof fn === 'function') {
+          const handler: ListenerFn = (e) => {
+            Reflect.apply(fn, this, [e]);
+          };
+          own.set(type, handler);
+          this.addEventListener(type, handler);
+        } else own.delete(type);
+      },
+    });
+  }
+}
+
+defineHandlers(WElement.prototype);
 
 export class WHTMLElement extends WElement {}
 export class WSVGElement extends WElement {}
@@ -718,6 +818,8 @@ export class WDocument extends WEventTarget {
   }
 }
 
+defineHandlers(WDocument.prototype);
+
 /** The subtree as `insert` sends it. */
 function serialize(n: WNode): SerializedNode {
   if (n instanceof WText) return { k: 'text', id: n.isoId, data: n.isoData };
@@ -751,6 +853,12 @@ export type WorkerDomOptions = {
   onBatch(batch: DomBatch): void;
   /** Called once per batch with the flush to run; default `queueMicrotask`. */
   schedule?: (flush: () => void) => void;
+  /**
+   * An element was inserted into `document.head` (React 19 hoists `<title>`,
+   * `<meta>` and `<link>` there). The bridge doesn't render the head; the
+   * runtime tells the host, which warns in `dev` (M3a task 3).
+   */
+  onHead?: (tag: string) => void;
 };
 
 export interface WorkerDom {
@@ -779,6 +887,7 @@ export function createDom(opts: WorkerDomOptions): WorkerDom {
   const core: Core = {
     nextId: ROOT_ID + 1,
     known: new Map(),
+    onHead: opts.onHead ?? (() => {}),
     record(r) {
       pending.push(r);
       if (!scheduled) {

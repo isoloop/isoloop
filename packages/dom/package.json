@@ -29,10 +29,10 @@
       "types": "./dist/testing.d.ts",
       "import": "./dist/testing.js"
     },
-    "./testing/usage": {
-      "@isoloop/source": "./src/testing/usage.ts",
-      "types": "./dist/testing-usage.d.ts",
-      "import": "./dist/testing-usage.js"
+    "./testing/worker": {
+      "@isoloop/source": "./src/testing/worker.ts",
+      "types": "./dist/testing-worker.d.ts",
+      "import": "./dist/testing-worker.js"
     }
   },
   "publishConfig": {
@@ -49,9 +49,9 @@
         "types": "./dist/testing.d.ts",
         "import": "./dist/testing.js"
       },
-      "./testing/usage": {
-        "types": "./dist/testing-usage.d.ts",
-        "import": "./dist/testing-usage.js"
+      "./testing/worker": {
+        "types": "./dist/testing-worker.d.ts",
+        "import": "./dist/testing-worker.js"
       }
     }
   },

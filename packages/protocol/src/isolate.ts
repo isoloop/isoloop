@@ -57,8 +57,13 @@ export type HostToIsolate =
 export type IsolateToHost =
   /** The isolate's half of the handshake: what it actually runs. */
   | Envelope<'ready', { runtime: string; adapter: string; renderFmt: string }>
-  /** `styles`: stylesheets the isolate added since its last patch, applied before `batch` (design §4.8). */
-  | Envelope<'patch', { fmt: string; batch: unknown; styles?: string[] }>
+  /**
+   * `styles`: stylesheets the isolate added since its last patch, applied
+   * before `batch` (design §4.8). `head`: tags first inserted into the
+   * worker's `document.head` since then, which the bridge doesn't render
+   * (React 19 hoists `<title>` there); the host warns in `dev`.
+   */
+  | Envelope<'patch', { fmt: string; batch: unknown; styles?: string[]; head?: string[] }>
   | Envelope<'call', { method: HostMethod; args: unknown[] }>
   | Envelope<'beat', { lagMs: number; heapBytes?: number; idle?: IdleReport }>
   | Envelope<'error', ErrorPayload>

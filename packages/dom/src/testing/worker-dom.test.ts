@@ -240,6 +240,24 @@ describe('what the usage logs asked for (M3a task 2)', () => {
     expect([a.defaultSelected, b.disabled, select.multiple]).toEqual([true, true, true]);
   });
 
+  it('reports elements inserted into document.head, and records nothing for them', () => {
+    const batches: DomBatch[] = [];
+    const head: string[] = [];
+    const dom = createDom({
+      onBatch: (b) => batches.push(b),
+      schedule: () => {},
+      onHead: (tag) => head.push(tag),
+    });
+    const doc = dom.document;
+    doc.head.insertBefore(doc.createElement('title'), null);
+    doc.head.appendChild(doc.createElement('meta'));
+    doc.head.appendChild(doc.createTextNode('ignored'));
+    doc.body.appendChild(doc.createElement('title'));
+    dom.flush();
+    expect(head).toEqual(['title', 'meta']);
+    expect(batches).toEqual([]);
+  });
+
   it('document.head is detached, and querySelector finds `head > title` in it', () => {
     const { doc, records } = setup();
     expect(doc.ownerDocument).toBe(null);

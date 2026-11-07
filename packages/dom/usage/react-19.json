@@ -13,7 +13,9 @@
     "Element.getAttribute",
     "Element.hasAttribute",
     "Element.insertBefore",
+    "Element.lastChild",
     "Element.nodeName",
+    "Element.onclick",
     "Element.removeAttribute",
     "Element.removeChild",
     "Element.replaceChildren",
@@ -23,6 +25,7 @@
     "Element.textContent",
     "EventTarget.addEventListener",
     "EventTarget.dispatchEvent",
+    "EventTarget.removeEventListener",
     "HTMLInputElement.checked",
     "HTMLInputElement.defaultChecked",
     "HTMLInputElement.defaultValue",
@@ -38,8 +41,10 @@
     "Node.childNodes",
     "Node.contains",
     "Node.nextSibling",
-    "Node.parentNode"
+    "Node.parentNode",
+    "Text.data",
+    "Text.nodeValue"
   ],
-  "missing": ["contentEditable", "correspondingUseElement", "getRootNode"],
-  "probed": []
+  "missing": ["contentEditable", "correspondingUseElement", "documentMode", "getRootNode"],
+  "probed": ["documentMode"]
 }

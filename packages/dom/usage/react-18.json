@@ -13,6 +13,7 @@
     "Element.hasAttribute",
     "Element.insertBefore",
     "Element.nodeName",
+    "Element.onclick",
     "Element.removeAttribute",
     "Element.removeChild",
     "Element.replaceChildren",
@@ -37,6 +38,6 @@
     "Node.contains",
     "Node.nextSibling"
   ],
-  "missing": ["contentEditable", "correspondingUseElement"],
-  "probed": []
+  "missing": ["contentEditable", "correspondingUseElement", "createEvent", "documentMode"],
+  "probed": ["documentMode"]
 }

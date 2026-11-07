@@ -6,7 +6,7 @@ export default defineConfig({
     worker: 'src/worker/index.ts',
     host: 'src/host/index.ts',
     testing: 'src/testing/index.ts',
-    'testing-usage': 'src/testing/usage.ts',
+    'testing-worker': 'src/testing/worker.ts',
   },
   platform: 'browser',
   // The superset config (all of src, DOM lib); each half is still type-checked

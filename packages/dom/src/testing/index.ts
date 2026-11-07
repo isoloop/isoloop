@@ -13,4 +13,5 @@ export {
 } from './conformance';
 export { createIsoloopDomDriver } from './driver';
 export { checkDomUsage, TOLERATED_MISSING } from './check-usage';
-export type { UsageLog } from './usage';
+export { mountFixture, SMOKE_STEPS, snapshot, type FixtureHost } from './fixture';
+export type { FixtureMessage, UsageLog } from './worker';
