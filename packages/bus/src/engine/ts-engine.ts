@@ -39,6 +39,8 @@ type Topic = {
   durable: boolean;
   /** The tail the storage was last told to drop below. */
   dropped: number;
+  /** Compacted durable topics: superseded records still on disk. */
+  diskDirty: number;
 };
 
 /**
@@ -53,6 +55,8 @@ export class TsEngine implements LogEngine {
   readonly #storage: LogStorage;
   readonly #size: number;
   readonly #dirtyMin: number;
+  /** While restoring, records are read back from disk: don't compact it under the read. */
+  #restoring = false;
 
   constructor(opts: TsEngineOptions = {}) {
     this.#now = opts.now ?? Date.now;
@@ -73,6 +77,7 @@ export class TsEngine implements LogEngine {
     this.#topics.set(cfg.name, {
       durable,
       dropped: 0,
+      diskDirty: 0,
       cfg,
       base: 0,
       chunks: [],
@@ -102,6 +107,24 @@ export class TsEngine implements LogEngine {
    */
   async restore(state: StoredState): Promise<{ topic: string; head: number }[]> {
     const restored: { topic: string; head: number }[] = [];
+    this.#restoring = true;
+    try {
+      await this.#restoreTopics(state, restored);
+    } finally {
+      this.#restoring = false;
+    }
+    // What the restore found superseded on disk is compacted away now.
+    for (const { topic } of restored) {
+      const t = this.#topic(topic);
+      if (t.keys) this.#compactKeys(t);
+    }
+    return restored;
+  }
+
+  async #restoreTopics(
+    state: StoredState,
+    restored: { topic: string; head: number }[],
+  ): Promise<void> {
     for (const { topic, tail, head } of state.topics) {
       const t = this.#topics.get(topic);
       if (!t?.durable) continue;
@@ -126,7 +149,6 @@ export class TsEngine implements LogEngine {
       }
       restored.push({ topic, head: t.head });
     }
-    return restored;
   }
 
   /** Stores a record at `offset` (≥ head; a gap is left as dropped slots) and applies retention. */
@@ -149,6 +171,7 @@ export class TsEngine implements LogEngine {
     } else if (t.keys && rec.key !== undefined) {
       const prev = t.keys.get(rec.key);
       t.keys.set(rec.key, offset);
+      if (prev !== undefined && t.durable) t.diskDirty++;
       if (prev !== undefined && prev >= t.tail) {
         t.dirty++;
         if (t.dirty >= this.#dirtyMin && t.dirty >= t.live * DIRTY_RATIO) this.#compactKeys(t);
@@ -267,6 +290,24 @@ export class TsEngine implements LogEngine {
     }
     t.tail = Math.min(t.tail, t.head);
     this.#freeChunks(t);
+    this.#compactDisk(t);
+  }
+
+  /**
+   * Compaction on disk (M2b task 10), once at least half of what the disk
+   * holds for the topic is superseded: the same rule as in memory.
+   */
+  #compactDisk(t: Topic): void {
+    if (!t.durable || this.#restoring || t.diskDirty < this.#dirtyMin || t.diskDirty < t.live)
+      return;
+    t.diskDirty = 0;
+    const keys = t.keys;
+    const keep = (offset: number, key: string | undefined): boolean =>
+      offset >= t.tail && (key === undefined || keys?.get(key) === offset);
+    this.#storage.rewrite(t.cfg.name, keep).catch((e: unknown) => {
+      // The old segments are still there; the next compaction tries again.
+      console.warn(`[isoloop] compacting ${t.cfg.name} on disk failed`, e);
+    });
   }
 
   #chunkOf(t: Topic, offset: number): Chunk | undefined {

@@ -19,7 +19,10 @@ export class MemoryStorage implements LogStorage {
 
   dropBelow(_topic: string, _tail: number): void {}
 
-  rewrite(_topic: string, _keep: (offset: number) => boolean): Promise<void> {
+  rewrite(
+    _topic: string,
+    _keep: (offset: number, key: string | undefined) => boolean,
+  ): Promise<void> {
     return Promise.resolve();
   }
 
