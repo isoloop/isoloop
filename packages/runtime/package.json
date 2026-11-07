@@ -22,6 +22,11 @@
     "./bootstrap": {
       "@isoloop/source": "./src/bootstrap.ts",
       "import": "./dist/bootstrap.js"
+    },
+    "./testing": {
+      "@isoloop/source": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
     }
   },
   "publishConfig": {
@@ -32,6 +37,10 @@
       },
       "./bootstrap": {
         "import": "./dist/bootstrap.js"
+      },
+      "./testing": {
+        "types": "./dist/testing.d.ts",
+        "import": "./dist/testing.js"
       }
     }
   },
