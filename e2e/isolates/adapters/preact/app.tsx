@@ -9,7 +9,7 @@
  */
 import { defineIsolate, useHost, usePublish, useRoute, useTopic } from '@isoloop/preact';
 import type { TopicRef } from '@isoloop/protocol';
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import pkg from 'preact/package.json';
 
 const notes: TopicRef<string> = { name: 'notes.v1', schema: { '~standard': {} } };
@@ -21,11 +21,19 @@ function App() {
   const host = useHost();
   const [text, setText] = useState('');
   const count = Number(last ?? '0');
+  // The next value counts from what this isolate already sent, not only from
+  // what it has rendered: two clicks before the first record comes back from
+  // the bus would otherwise both publish count + 1.
+  const sent = useRef(0);
+  const inc = () => {
+    sent.current = Math.max(sent.current, count) + 1;
+    void publish(String(sent.current));
+  };
   return (
     <div>
       <p class="fw">{`preact ${pkg.version}`}</p>
       <p class="count">{count}</p>
-      <button class="inc" onClick={() => void publish(String(count + 1))}>
+      <button class="inc" onClick={inc}>
         +1
       </button>
       <input class="field" value={text} onInput={(e) => setText(e.currentTarget.value)} />
