@@ -1,6 +1,6 @@
 # ADR 0010: Our own render bridge (`isoloop-dom@1`)
 
-- **Status:** Accepted
+- **Status:** Accepted; amended 2026-11-07 (M3a, [below](#amended-in-m3a-2026-11-07))
 - **Date:** 2026-11-05
 - **Supersedes:** [ADR 0006](0006-render-bridge-over-remote-dom.md) (Remote DOM behind a `RenderBridge`)
 - **Evidence:** the M1 task 4 spike, PR #23 (closed unmerged; its files hold `spikes/remote-dom/README.md` and the usage logs)
@@ -48,6 +48,24 @@ The maintainer's preference is to own the stack and keep dependencies to a minim
 5. **Package layout:** `@isoloop/dom`, see [ADR 0011](0011-dom-package.md).
 6. **Done means the conformance suite passes** (M1 task 4b, `@isoloop/dom/testing` per [ADR 0011](0011-dom-package.md)) **with no known gaps**, and Preact and React render into the subset in a framework smoke test per adapter (M3).
 7. **It grows only on evidence.** A member is added when a conformance case, an adapter test or a real isolate needs it, and each addition comes with a test. `legacy-vdom` was deleted after M1; benchmarks compare against plain single-threaded DOM (design §9).
+
+### Amended in M3a (2026-11-07)
+
+`isoloop-dom@1` is amended in place, not bumped to `@2`: nothing has been published, so no host or isolate speaks the old shape.
+
+1. **Records** (point 3):
+   - An `insert` subtree can hold a **comment**, `{ k: 'comment', id, data }`. `text(nodeId, data)` updates a comment's data as well as a text node's. Comments are inert on the host.
+   - `prop(nodeId, name, value, force?)`: an optional fifth element, `true`, marks a **forced** value. The isolate sends it with `ctx.setValue(node, value, { force: true })`.
+   - **Fragments** need no record. Inserting a `DocumentFragment` inserts its children in order, as `insert` (or `move`) records, and empties it.
+2. **Host-owned inputs** (point 4): a forced `value` is applied even to a focused input, and the caret goes to its end. An unforced one still waits until the user leaves the input. Four-loops' D uses this to clear its note box after sending.
+3. **The subset grew on evidence** (point 7). These additions came from the DOM usage logs and framework smoke tests run per major in M3a tasks 2 and 3:
+   - **Event handler properties** (`onclick`, `oninput` and the rest) on elements and the document. Preact 10 lowercases an event name only if `'onclick' in el`, and React checks `'oninput' in document`.
+   - **Selects:** `select.options` and `multiple`; `option.value`, `defaultSelected` and `disabled`. React's controlled `<select>` walks them.
+   - **Documents:** `document.ownerDocument` (`null`), and a detached `document.head`. React 19 hoists `<title>`, `<meta>` and `<link>` into the head. The bridge doesn't render it; a `patch` names what landed there (`head`), and the kernel warns once in `dev`.
+   - **`document.querySelector`, type selectors only** (`title`, `head > title`): what React 19 asks when it hoists a `<title>`. Anything else throws `NotSupportedError`. Real queries stay in group 2.
+   - **Group 1** ([below](#beyond-the-frameworks)), as planned: `classList` (`DOMTokenList`), `dataset`, `id`, `getElementById`, `contains`, `DocumentFragment` and `Comment`.
+
+   Reads the frameworks make of members the subset doesn't have, and handle being `undefined`, are listed with their reasons in `TOLERATED_MISSING` (`@isoloop/dom/testing`). Examples: `moveBefore` and `getRootNode`, used when present; `documentMode`, for old IE.
 
 ### Frameworks and versions
 
