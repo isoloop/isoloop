@@ -24,7 +24,15 @@ export const headless = {
   retention: { kind: 'last-n', n: 100 },
 };
 
-const topics = [notes, headless];
+/** A persistent topic, kept in the origin's OPFS (durable suite, M2b). */
+export const saved = {
+  name: 'saved.v1',
+  schema: schema((v) => typeof v === 'number'),
+  retention: { kind: 'last-n', n: 100_000 },
+  durability: 'persistent',
+};
+
+const topics = [notes, headless, saved];
 
 export default {
   '~isoloop': 'contracts',

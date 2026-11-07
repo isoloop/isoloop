@@ -208,7 +208,7 @@ interface Kernel {
   resume(id: string): Promise<void>;                   // wake a suspended isolate (ADR 0001); no-op unless suspended
   publish<In>(topic: TopicRef<In>, rec: { key?: string; value: In }): Promise<void>;   // rejects with a BusError
   subscribe<Out>(topic: TopicRef<unknown, Out>, fn: (r: TypedRecord<Out>) => void, opts?: { from?: StartPosition }): () => void;   // from 'latest' by default
-  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:ready, bus:crash, bus:recovered, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
+  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:ready, bus:crash, bus:recovered, bus:durability-degraded, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
   isolates(): IsolateSnapshot[];                                      // used by devtools
   syncRoute(): void;                                   // host router changed the URL; republish isoloop.route.v1 if href/state differ (ADR 0002)
   dropTopic(name: string, o?: { force?: boolean }): Promise<void>;   // M2b: delete an orphaned persistent topic; seed_pending / force rules (ADR 0003)
@@ -448,7 +448,7 @@ interface LogStorage {
 }
 ```
 
-`MemoryStorage` (M2) is a no-op. `OpfsStorage` (M2b) keeps one directory per topic, segment files of up to 4 MiB, and an offsets file, all accessed through sync access handles inside the bus worker, under a Web Lock so only one tab writes. Records are encoded by a shared binary codec (`@isoloop/codec`, also used by M5).
+`MemoryStorage` (M2) is a no-op. `OpfsStorage` (M2b) keeps one directory per topic, segment files of up to 4 MiB, and an offsets file, all accessed through sync access handles inside the bus worker, under the Web Lock `isoloop-bus` so only one tab writes. A bus that doesn't get the lock runs every topic in memory and reports `ready.degraded: 'another-tab'`, and the kernel emits `bus:durability-degraded { reason }`; a restarting bus waits up to 2 s for the one it replaces to let go. Records are encoded by a shared binary codec (`@isoloop/codec`, also used by M5).
 
 ### 6.3 Broker
 

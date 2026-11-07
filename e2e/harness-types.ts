@@ -22,6 +22,7 @@ type HarnessKernel = {
     fn: (e: { id: string; state: string; prev: string }) => void,
   ): () => void;
   on(event: 'bus:ready', fn: (e: { first: boolean }) => void): () => void;
+  on(event: 'bus:durability-degraded', fn: (e: { reason: string }) => void): () => void;
   on(
     event: 'route:navigate_error',
     fn: (e: { from: string; href: string; error: string }) => void,
@@ -67,6 +68,8 @@ declare global {
     kernel: HarnessKernel;
     /** four-loops' test hook: main-thread message counts by type (I7). */
     __isoloop: HarnessKernel['debug'];
+    /** The durable suite's kernel and what it saw (e2e/durable.spec.ts). */
+    durable?: { kernel: HarnessKernel; degraded: string[] };
   }
 }
 

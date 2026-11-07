@@ -213,6 +213,32 @@ describe('bus controller', () => {
     expect(got.map((r) => [r.offset, r.value])).toEqual([[4, 9]]);
   });
 
+  it('one bus owns the files: a second runs in memory with bus:durability-degraded (M2b)', async () => {
+    const a = setup();
+    const aDegraded = a.log('bus:durability-degraded');
+    const aReady = a.log('bus:ready');
+    await vi.waitUntil(() => aReady.length === 1);
+    await a.kernel.publish(saved, { value: 1 });
+
+    const b = setup();
+    const bDegraded = b.log('bus:durability-degraded');
+    const bReady = b.log('bus:ready');
+    await vi.waitUntil(() => bReady.length === 1);
+    expect(bDegraded).toEqual([{ reason: 'another-tab' }]);
+    expect(aDegraded).toEqual([]);
+    // It works, in memory.
+    await b.kernel.publish(saved, { value: 2 });
+    const got: number[] = [];
+    b.kernel.subscribe(saved, (r) => got.push(r.value), { from: 'earliest' });
+    await vi.waitUntil(() => got.length === 1);
+    expect(got).toEqual([2]);
+
+    // A bus restart in the owning kernel keeps the files: it waits for the lock.
+    a.kernel.debug.crashBus();
+    await vi.waitUntil(() => aReady.length === 2, { timeout: 5000 });
+    expect(aDegraded).toEqual([]);
+  });
+
   it('a contracts mismatch is fatal: bus:failed, isolates fail, spawn throws', async () => {
     const differ = { ...list, topics: list.topics.filter((t) => t.name !== 'notes.v1') };
     const { kernel, log } = setup({ contracts: { url: contractsUrl, list: differ } });

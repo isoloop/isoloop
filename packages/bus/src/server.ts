@@ -15,6 +15,7 @@ import {
   type BusToHost,
   type BusToIsolate,
   type CallResult,
+  type DurabilityDegraded,
   type ErrorCode,
   type HostToBus,
   type TopicConfig,
@@ -23,6 +24,7 @@ import { Broker, type BrokerStats, type BusPort } from './broker';
 import { MemoryStorage } from './engine/memory-storage';
 import { TsEngine } from './engine/ts-engine';
 import type { LogStorage, StoredState } from './engine/types';
+import { takeBusLock } from './storage/lock';
 import { OpfsStorage } from './storage/opfs';
 import { isContracts, topicConfig, type Contracts } from './topic';
 
@@ -45,6 +47,9 @@ export type ServeOptions = {
    */
   storage?: () => LogStorage;
 };
+
+/** How long a restarting bus waits for the worker it replaces to release the files' lock. */
+const RESTART_LOCK_WAIT_MS = 2000;
 
 /** How often metrics are sampled and retention runs (design §6.2, §6.3). */
 const METRICS_MS = 1000;
@@ -336,8 +341,17 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
       return;
     }
     const dev = p.dev ?? false;
-    let storage =
-      opts.storage?.() ?? (OpfsStorage.available() ? new OpfsStorage() : new MemoryStorage());
+    const persistent = p.topics.some((t) => t.durability === 'persistent');
+    let degraded: DurabilityDegraded | undefined;
+    let storage: LogStorage;
+    if (opts.storage) storage = opts.storage();
+    else if (!persistent || !OpfsStorage.available()) storage = new MemoryStorage();
+    else if (await takeBusLock(p.restart ? RESTART_LOCK_WAIT_MS : 0)) storage = new OpfsStorage();
+    else {
+      // Another tab's bus owns the files: this one runs everything in memory.
+      storage = new MemoryStorage();
+      degraded = 'another-tab';
+    }
     let quarantined: string[] | undefined;
     let stored: StoredState;
     try {
@@ -348,6 +362,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
       console.warn('[isoloop] persistent topics are in memory: storage failed to open', e);
       storage = new MemoryStorage();
       stored = await storage.open();
+      degraded = 'open-failed';
     }
     let built: Awaited<ReturnType<typeof build>>;
     try {
@@ -369,13 +384,20 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
       console.warn('[isoloop] persistent topics are in memory: reading them back failed', e);
       storage = new MemoryStorage();
       built = await build(list, storage, await storage.open(), dev);
+      degraded = 'open-failed';
     }
     const { b, restored } = built;
     broker = b;
     post({
       v: 1,
       t: 'ready',
-      p: { engine: 'ts', storage: storage.kind, restored, ...(quarantined ? { quarantined } : {}) },
+      p: {
+        engine: 'ts',
+        storage: storage.kind,
+        restored,
+        ...(quarantined ? { quarantined } : {}),
+        ...(degraded && persistent ? { degraded } : {}),
+      },
     });
     for (const msg of early.splice(0)) control(msg, b);
     startMetrics(b);

@@ -24,6 +24,9 @@ export type TopicConfig = {
   seed?: { from: string; follow: boolean };
 };
 
+/** Why persistent topics run in memory (`bus:durability-degraded`). */
+export type DurabilityDegraded = 'another-tab' | 'no-sync-access' | 'open-failed';
+
 /** Sampled every second on the control port (design §6.3). */
 export type BusMetrics = {
   topics: { topic: string; recordsPerSec: number; bytesPerSec: number }[];
@@ -50,6 +53,8 @@ export type HostToBus =
          * loading, so it sets each persistent topic's newest segment aside.
          */
         safeMode?: boolean;
+        /** A bus restart: the worker it replaces may still hold the files' lock a moment. */
+        restart?: boolean;
       }
     >
   /**
@@ -76,6 +81,12 @@ export type BusToHost =
         restored: { topic: string; head: number }[];
         /** Safe mode only: the segments set aside, as `<topic>/<file>`. */
         quarantined?: string[];
+        /**
+         * Persistent topics run in memory, and why (ADR 0007, decision 6):
+         * another tab holds the files, sync access handles are missing, or
+         * the files failed to open.
+         */
+        degraded?: DurabilityDegraded;
       }
     >
   | Envelope<'beat', { lagMs: number }>

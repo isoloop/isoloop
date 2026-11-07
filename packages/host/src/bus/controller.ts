@@ -16,6 +16,7 @@ import {
   type BusToIsolate,
   type CallResult,
   type ContractsList,
+  type DurabilityDegraded,
   type ErrorCode,
   type Grants,
   type HostToBus,
@@ -43,6 +44,8 @@ export type BusControllerEvents = {
   ready(first: boolean): void;
   /** Safe mode set these segments aside, as `<topic>/<file>` (ADR 0007, decision 5). */
   recovered(quarantined: string[]): void;
+  /** Persistent topics run in memory on this bus (ADR 0007, decision 6). */
+  degraded(reason: DurabilityDegraded): void;
   crash(reason: CrashReason, message: string): void;
   restart(restarts: number): void;
   failed(f: BusFailure): void;
@@ -201,6 +204,7 @@ export function createBusController(o: BusControllerOptions): BusController {
         feed({ k: 'ready' });
         o.events.ready(first);
         if (msg.p.quarantined) o.events.recovered(msg.p.quarantined);
+        if (msg.p.degraded) o.events.degraded(msg.p.degraded);
         return;
       }
       case 'beat':
@@ -276,6 +280,7 @@ export function createBusController(o: BusControllerOptions): BusController {
         heartbeatMs: o.heartbeatMs,
         dev: o.dev,
         ...(safeMode ? { safeMode: true } : {}),
+        ...(mine > 0 ? { restart: true } : {}),
       },
     } satisfies HostToBus);
     for (const q of queue.splice(0)) w.postMessage(q.msg, q.transfer);
