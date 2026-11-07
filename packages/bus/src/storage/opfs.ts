@@ -1,5 +1,5 @@
 import type { LogStorage, StoredState } from '../engine/types';
-import { frameOffset, scanFrames } from './frame';
+import { frameOffset, pack, scanFrames, unpack } from './frame';
 
 /** Segment files roll over past this size (design §6.2). */
 export const SEGMENT_BYTES: number = 4 * 1024 * 1024;
@@ -21,12 +21,50 @@ type Active = { name: string; handle: FileSystemSyncAccessHandle; size: number }
 
 type TopicFiles = {
   dir: FileSystemDirectoryHandle;
+  /** Generation of the newest offsets slot written; 0 before the first. */
+  generation: number;
   /** First offset of each segment, ascending; the file is named after it. */
   segments: number[];
   active: Active | undefined;
 };
 
 const SEGMENT = /^(\d{16})\.seg$/;
+
+// Committed offsets: two slot files written in turn, each one frame holding a
+// generation and the offsets. A write killed halfway leaves a torn slot, and
+// the other one, a generation older, is read instead: the old offsets or the
+// new ones, never half. OPFS has no atomic rename for this.
+const SLOTS = ['offsets.0', 'offsets.1'] as const;
+
+type Commits = Record<string, number>;
+
+const isCommits = (x: unknown): x is Commits =>
+  typeof x === 'object' &&
+  x !== null &&
+  !Array.isArray(x) &&
+  Object.values(x).every((v) => typeof v === 'number');
+
+/** The newest intact slot of a topic: its generation and offsets. */
+async function readOffsets(
+  dir: FileSystemDirectoryHandle,
+): Promise<{ generation: number; commits: Commits }> {
+  let best = { generation: 0, commits: {} };
+  for (const slot of SLOTS) {
+    let bytes: Uint8Array;
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- two small files
+      bytes = await readFile(dir, slot);
+    } catch {
+      continue;
+    }
+    const frame = scanFrames(bytes).frames[0];
+    if (!frame) continue;
+    const generation = frameOffset(frame);
+    const commits = unpack(frame);
+    if (generation > best.generation && isCommits(commits)) best = { generation, commits };
+  }
+  return best;
+}
 const segmentName = (first: number): string => `${String(first).padStart(16, '0')}.seg`;
 
 /** Topic names may hold characters a file name can't. */
@@ -79,6 +117,8 @@ export class OpfsStorage implements LogStorage {
   readonly #rootOption: FileSystemDirectoryHandle | undefined;
   readonly #topics = new Map<string, TopicFiles>();
   readonly #pending = new Map<string, Uint8Array[]>();
+  /** Offsets to write at the next commit, per topic: the latest call wins. */
+  readonly #offsets = new Map<string, Commits>();
   #count = 0;
   #timer: ReturnType<typeof setTimeout> | undefined;
   #waiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
@@ -113,6 +153,9 @@ export class OpfsStorage implements LogStorage {
       (await names(root)).map(async (entry) => {
         const topic = decodeURIComponent(entry);
         const files = await this.#files(topic);
+        const saved = await readOffsets(files.dir);
+        files.generation = saved.generation;
+        if (Object.keys(saved.commits).length > 0) state.offsets[topic] = saved.commits;
         const first = files.segments[0];
         const last = files.segments.at(-1);
         if (first === undefined || last === undefined) return undefined;
@@ -137,7 +180,7 @@ export class OpfsStorage implements LogStorage {
       if (m?.[1] !== undefined) segments.push(Number(m[1]));
     }
     segments.sort((a, b) => a - b);
-    const files: TopicFiles = { dir, segments, active: undefined };
+    const files: TopicFiles = { dir, generation: 0, segments, active: undefined };
     this.#topics.set(topic, files);
     return files;
   }
@@ -156,7 +199,7 @@ export class OpfsStorage implements LogStorage {
 
   flush(): Promise<void> {
     if (this.#failed !== undefined) return Promise.reject(this.#failed);
-    if (this.#count === 0) return Promise.resolve();
+    if (this.#count === 0 && this.#offsets.size === 0) return Promise.resolve();
     return new Promise((resolve, reject) => this.#waiters.push({ resolve, reject }));
   }
 
@@ -174,16 +217,19 @@ export class OpfsStorage implements LogStorage {
   /** Takes the pending batch and queues its write behind any commit still running. */
   #commit(): Promise<void> {
     const batch = [...this.#pending];
+    const offsets = [...this.#offsets];
     const waiters = this.#waiters;
     this.#pending.clear();
+    this.#offsets.clear();
     this.#count = 0;
     this.#waiters = [];
-    this.#chain = this.#chain.then(() => this.#run(batch, waiters));
+    this.#chain = this.#chain.then(() => this.#run(batch, offsets, waiters));
     return this.#chain;
   }
 
   async #run(
     batch: [string, Uint8Array[]][],
+    offsets: [string, Commits][],
     waiters: { resolve: () => void; reject: (e: Error) => void }[],
   ): Promise<void> {
     try {
@@ -194,6 +240,13 @@ export class OpfsStorage implements LogStorage {
         const files = this.#topics.get(topic) ?? (await this.#files(topic));
         // oxlint-disable-next-line no-await-in-loop
         await this.#write(files, frames);
+      }
+      // Offsets after records, so a commit never points past what's on disk.
+      for (const [topic, commits] of offsets) {
+        // oxlint-disable-next-line no-await-in-loop
+        const files = this.#topics.get(topic) ?? (await this.#files(topic));
+        // oxlint-disable-next-line no-await-in-loop
+        await this.#writeOffsets(files, commits);
       }
       for (const w of waiters) w.resolve();
     } catch (e) {
@@ -251,8 +304,27 @@ export class OpfsStorage implements LogStorage {
     return active;
   }
 
-  saveOffsets(_offsets: Record<string, Record<string, number>>): void {
-    // M2b task 6.
+  saveOffsets(offsets: Record<string, Record<string, number>>): void {
+    for (const [topic, commits] of Object.entries(offsets))
+      this.#offsets.set(topic, { ...commits });
+    this.#commitSoon(this.#opts.commitMs);
+  }
+
+  /** Writes the next generation to the slot not holding the newest one. */
+  async #writeOffsets(files: TopicFiles, commits: Commits): Promise<void> {
+    const generation = files.generation + 1;
+    const slot = SLOTS[generation % 2] ?? SLOTS[0];
+    const frame = pack(generation, commits);
+    const file = await files.dir.getFileHandle(slot, { create: true });
+    const handle = await file.createSyncAccessHandle();
+    try {
+      handle.write(frame, { at: 0 });
+      handle.truncate(frame.length);
+      handle.flush();
+    } finally {
+      handle.close();
+    }
+    files.generation = generation;
   }
 
   rewrite(_topic: string, _keep: (offset: number) => boolean): Promise<void> {
@@ -289,7 +361,7 @@ export class OpfsStorage implements LogStorage {
       clearTimeout(this.#timer);
       this.#timer = undefined;
     }
-    if (this.#count > 0) void this.#commit();
+    if (this.#count > 0 || this.#offsets.size > 0) void this.#commit();
     await this.#chain;
     for (const files of this.#topics.values()) {
       files.active?.handle.close();
