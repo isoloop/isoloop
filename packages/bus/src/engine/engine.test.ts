@@ -48,6 +48,7 @@ describe('effective durability', () => {
       appendBatch: (t, e) => m.appendBatch(t, e),
       flush: async () => m.flush(),
       saveOffsets: (o) => m.saveOffsets(o),
+      dropBelow: (t, o) => m.dropBelow(t, o),
       rewrite: async (t, k) => m.rewrite(t, k),
       readSegment: async (t, f) => m.readSegment(t, f),
       quarantineNewest: async () => m.quarantineNewest(),

@@ -37,6 +37,8 @@ type Topic = {
   commits: Map<string, number>;
   /** Appends also go to the storage (a persistent topic on real storage). */
   durable: boolean;
+  /** The tail the storage was last told to drop below. */
+  dropped: number;
 };
 
 /**
@@ -70,6 +72,7 @@ export class TsEngine implements LogEngine {
     const durable = effectiveDurability(cfg, this.#storage) === 'persistent';
     this.#topics.set(cfg.name, {
       durable,
+      dropped: 0,
       cfg,
       base: 0,
       chunks: [],
@@ -103,7 +106,7 @@ export class TsEngine implements LogEngine {
       const t = this.#topics.get(topic);
       if (!t?.durable) continue;
       if (t.head !== 0) throw new Error(`${topic} isn't empty`);
-      t.head = t.tail = tail;
+      t.head = t.tail = t.dropped = tail;
       t.base = Math.floor(tail / this.#size);
       let from = tail;
       while (from < head) {
@@ -274,8 +277,12 @@ export class TsEngine implements LogEngine {
     return this.#chunkOf(t, offset)?.[offset % this.#size];
   }
 
-  /** Frees whole chunks below the tail. */
+  /** Frees whole chunks below the tail, and on disk the segments below it. */
   #freeChunks(t: Topic): void {
+    if (t.durable && t.tail > t.dropped) {
+      t.dropped = t.tail;
+      this.#storage.dropBelow(t.cfg.name, t.tail);
+    }
     const keep = Math.floor(t.tail / this.#size);
     const drop = Math.min(keep - t.base, t.chunks.length);
     if (drop > 0) {

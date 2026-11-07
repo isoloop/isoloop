@@ -1,6 +1,7 @@
 // Runs OpfsStorage scenarios in a dedicated worker, where sync access handles
 // exist (opfs.browser.test.ts). Each message names a scenario; the reply is
 // its result or the error it threw.
+import type { Retention } from '@isoloop/protocol';
 import { connect } from '../../test/memory-port';
 import { Broker } from '../broker';
 import { TsEngine } from '../engine/ts-engine';
@@ -21,16 +22,16 @@ async function root(name: string): Promise<FileSystemDirectoryHandle> {
   return origin.getDirectoryHandle(name, { create: true });
 }
 
-async function engineOn(dir: string, opts: Omit<OpfsStorageOptions, 'root'> = {}) {
+async function engineOn(
+  dir: string,
+  opts: Omit<OpfsStorageOptions, 'root'> = {},
+  retention: Retention = saved.retention,
+  now: () => number = Date.now,
+) {
   const storage = new OpfsStorage({ ...opts, root: await root(dir) });
   await storage.open();
-  const engine = new TsEngine({ storage });
-  engine.createTopic({
-    name: 'saved.v1',
-    retention: saved.retention,
-    requestable: false,
-    durability: 'persistent',
-  });
+  const engine = new TsEngine({ storage, now });
+  engine.createTopic({ name: 'saved.v1', retention, requestable: false, durability: 'persistent' });
   return { storage, engine };
 }
 
@@ -109,6 +110,51 @@ async function recover(dir: string) {
 }
 
 const scenarios: Record<string, (dir: string) => Promise<unknown>> = {
+  async 'retention on disk: last-n'(dir) {
+    const { storage, engine } = await engineOn(dir, {}, { kind: 'last-n', n: 1000 });
+    const note = 'x'.repeat(200);
+    for (let i = 0; i < 100_000; i++)
+      engine.append('saved.v1', { value: { i, note }, ts: 0, producer: 'p' });
+    await engine.flush();
+    const segments = await storage.segments('saved.v1');
+    const onDisk = await readAll(storage, 'saved.v1');
+    await storage.close();
+    const state = await reopen(dir);
+    return {
+      atMostTwoSegments: segments.length <= 2,
+      // The newest 1,000 are all still there; what's older is at most one segment's worth.
+      keepsTheLast1000: onDisk.slice(-1000).every((r, k) => r.offset === 99_000 + k),
+      fewerThanTwoSegments: onDisk.length < 2 * 20_000,
+      tailOnReopen: (state.topics[0]?.tail ?? 0) <= 99_000,
+    };
+  },
+
+  async 'retention on disk: time'(dir) {
+    let now = 0;
+    const { storage, engine } = await engineOn(
+      dir,
+      { segmentBytes: 64 * 1024 },
+      { kind: 'time', ms: 1000 },
+      () => now,
+    );
+    const note = 'y'.repeat(200);
+    for (let i = 0; i < 3000; i++)
+      engine.append('saved.v1', { value: { i, note }, ts: i, producer: 'p' });
+    await engine.flush();
+    const before = (await storage.segments('saved.v1')).length;
+    now = 2500; // records with ts < 1500 expire
+    engine.compact('saved.v1');
+    await engine.flush();
+    const after = await storage.segments('saved.v1');
+    const onDisk = await readAll(storage, 'saved.v1');
+    await storage.close();
+    return {
+      dropped: before > after.length,
+      keepsEveryLiveRecord: onDisk.filter((r) => r.ts >= 1500).length === 1500,
+      oldestOnDisk: (onDisk[0]?.ts ?? 0) > 1500 - 400,
+    };
+  },
+
   async 'recovery: a truncated last frame'(dir) {
     await hundred(dir);
     await edit(dir, '0000000000000000.seg', (h) => h.truncate(h.getSize() - 3));

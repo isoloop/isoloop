@@ -17,6 +17,8 @@ export class MemoryStorage implements LogStorage {
 
   saveOffsets(_offsets: Record<string, Record<string, number>>): void {}
 
+  dropBelow(_topic: string, _tail: number): void {}
+
   rewrite(_topic: string, _keep: (offset: number) => boolean): Promise<void> {
     return Promise.resolve();
   }

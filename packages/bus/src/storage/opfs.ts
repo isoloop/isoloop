@@ -120,6 +120,8 @@ export class OpfsStorage implements LogStorage {
   readonly #pending = new Map<string, Uint8Array[]>();
   /** Offsets to write at the next commit, per topic: the latest call wins. */
   readonly #offsets = new Map<string, Commits>();
+  /** Retention to apply after the next commit's writes, per topic. */
+  readonly #drops = new Map<string, number>();
   #count = 0;
   #timer: ReturnType<typeof setTimeout> | undefined;
   #waiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
@@ -220,7 +222,12 @@ export class OpfsStorage implements LogStorage {
 
   flush(): Promise<void> {
     if (this.#failed !== undefined) return Promise.reject(this.#failed);
-    if (this.#count === 0 && this.#offsets.size === 0) return Promise.resolve();
+    if (this.#count === 0 && this.#offsets.size === 0 && this.#drops.size === 0) {
+      // Nothing waiting, but a commit may still be writing: wait for it.
+      return this.#chain.then(() => {
+        if (this.#failed !== undefined) throw this.#failed;
+      });
+    }
     return new Promise((resolve, reject) => this.#waiters.push({ resolve, reject }));
   }
 
@@ -239,18 +246,21 @@ export class OpfsStorage implements LogStorage {
   #commit(): Promise<void> {
     const batch = [...this.#pending];
     const offsets = [...this.#offsets];
+    const drops = [...this.#drops];
     const waiters = this.#waiters;
     this.#pending.clear();
     this.#offsets.clear();
+    this.#drops.clear();
     this.#count = 0;
     this.#waiters = [];
-    this.#chain = this.#chain.then(() => this.#run(batch, offsets, waiters));
+    this.#chain = this.#chain.then(() => this.#run(batch, offsets, drops, waiters));
     return this.#chain;
   }
 
   async #run(
     batch: [string, Uint8Array[]][],
     offsets: [string, Commits][],
+    drops: [string, number][],
     waiters: { resolve: () => void; reject: (e: Error) => void }[],
   ): Promise<void> {
     try {
@@ -268,6 +278,12 @@ export class OpfsStorage implements LogStorage {
         const files = this.#topics.get(topic) ?? (await this.#files(topic));
         // oxlint-disable-next-line no-await-in-loop
         await this.#writeOffsets(files, commits);
+      }
+      for (const [topic, tail] of drops) {
+        // oxlint-disable-next-line no-await-in-loop
+        const files = this.#topics.get(topic) ?? (await this.#files(topic));
+        // oxlint-disable-next-line no-await-in-loop
+        await this.#drop(files, tail);
       }
       for (const w of waiters) w.resolve();
     } catch (e) {
@@ -348,6 +364,24 @@ export class OpfsStorage implements LogStorage {
     files.generation = generation;
   }
 
+  dropBelow(topic: string, tail: number): void {
+    // Applied at the next commit, after its writes: the segments to delete
+    // may not be written yet.
+    this.#drops.set(topic, Math.max(tail, this.#drops.get(topic) ?? 0));
+    this.#commitSoon(this.#opts.commitMs);
+  }
+
+  /** Deletes a topic's segments whose records all sit below `tail`. */
+  async #drop(files: TopicFiles, tail: number): Promise<void> {
+    // A segment's records all sit below the next segment's first offset.
+    let n = 0;
+    while (n + 1 < files.segments.length && (files.segments[n + 1] ?? 0) <= tail) n++;
+    for (const first of files.segments.splice(0, n)) {
+      // oxlint-disable-next-line no-await-in-loop -- one file at a time
+      await files.dir.removeEntry(segmentName(first));
+    }
+  }
+
   rewrite(_topic: string, _keep: (offset: number) => boolean): Promise<void> {
     // M2b tasks 9 and 10.
     return Promise.resolve();
@@ -391,7 +425,7 @@ export class OpfsStorage implements LogStorage {
       clearTimeout(this.#timer);
       this.#timer = undefined;
     }
-    if (this.#count > 0 || this.#offsets.size > 0) void this.#commit();
+    if (this.#count > 0 || this.#offsets.size > 0 || this.#drops.size > 0) void this.#commit();
     await this.#chain;
     for (const files of this.#topics.values()) {
       files.active?.handle.close();
