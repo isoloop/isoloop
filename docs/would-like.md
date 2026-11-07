@@ -18,7 +18,7 @@ Ideas we've consciously deferred or want to explore later. None of them is plann
 ## Storage
 
 - **IndexedDB storage when OPFS sync access is missing.** Today such a tab falls back to memory topics with `bus:durability-degraded` (`no-sync-access`). A second storage engine is worth it only if a major browser lacks sync access in normal browsing. ([ADR 0007](adr/0007-bus-worker-supervision.md), M2b task 15)
-- **`@isoloop/local` as a supported API,** for testing isolates without workers or as a fallback where workers aren't available. Published as internal for the single-thread comparison until users ask. (M3b task 15)
+- **A single-thread kernel (`@isoloop/local`),** for testing isolates without workers or as a fallback where workers aren't available. Drafted as ADR 0013 for the M3b comparison and withdrawn on 2026-11-07, since the comparison uses a native build; it would need its own ADR and semver promise if users ask.
 
 ## Multiple tabs
 
