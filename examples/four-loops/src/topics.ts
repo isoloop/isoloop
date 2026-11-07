@@ -14,3 +14,4 @@ export const count: typeof C.count = handle('count.v1');
 export const note: typeof C.note = handle('note.v1');
 export const primes: typeof C.primes = handle('primes.v1');
 export const store: typeof C.store = handle('store.v1');
+export const vote: typeof C.vote = handle('vote.v1');

@@ -1,5 +1,6 @@
 // From source, like the other workspace packages: Vite loads its config before
 // any condition applies, and nothing is built first. An app writes '@isoloop/vite'.
+import { frameworkPlugins } from '../../frameworks.config.ts';
 import { isoloop } from '../../packages/vite/src/index.ts';
 import { defaultClientConditions, defineConfig } from 'vite';
 
@@ -10,6 +11,8 @@ import { defaultClientConditions, defineConfig } from 'vite';
 // its exports kept.
 export default defineConfig({
   resolve: { conditions: ['@isoloop/source', ...defaultClientConditions] },
-  plugins: [isoloop()],
+  // P and R render with Preact 11 and React 19, the newest majors; `.tsx`
+  // defaults to React's JSX, and P's file asks for Preact's.
+  plugins: [...frameworkPlugins('preact', 11), ...frameworkPlugins('react', 19), isoloop()],
   base: './',
 });

@@ -356,6 +356,12 @@ importers:
       '@isoloop/host':
         specifier: workspace:*
         version: link:../../packages/host
+      '@isoloop/preact':
+        specifier: workspace:*
+        version: link:../../packages/preact
+      '@isoloop/react':
+        specifier: workspace:*
+        version: link:../../packages/react
       '@isoloop/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime

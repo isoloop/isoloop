@@ -8,6 +8,8 @@ import heavy from './isolates/heavy?isolate';
 import messages from './isolates/messages?isolate';
 import storeIsolate from './isolates/store?isolate';
 import ticker from './isolates/ticker?isolate';
+import votesPreact from './isolates/votes-preact?isolate';
+import votesReact from './isolates/votes-react?isolate';
 import './page.css';
 import surfaceCss from './surface.css?inline';
 
@@ -64,6 +66,19 @@ const isolates = [
     name: 'D · Messages',
     src: messages,
     grants: { publish: ['note.v1'], subscribe: ['count.v1', 'note.v1', 'primes.v1', 'store.v1'] },
+  },
+  // The adapters (M3a): Preact and React side by side, one topic between them.
+  {
+    id: 'P',
+    name: 'P · Preact',
+    src: votesPreact,
+    grants: { publish: ['vote.v1'], subscribe: ['vote.v1'] },
+  },
+  {
+    id: 'R',
+    name: 'R · React',
+    src: votesReact,
+    grants: { publish: ['vote.v1'], subscribe: ['vote.v1'] },
   },
 ];
 

@@ -12,6 +12,8 @@
   "dependencies": {
     "@isoloop/bus": "workspace:*",
     "@isoloop/host": "workspace:*",
+    "@isoloop/preact": "workspace:*",
+    "@isoloop/react": "workspace:*",
     "@isoloop/runtime": "workspace:*",
     "zod": "catalog:"
   },
