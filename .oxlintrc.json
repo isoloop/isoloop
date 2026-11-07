@@ -122,6 +122,22 @@
       }
     },
     {
+      "files": ["packages/preact/**", "packages/react/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/**", "!@isoloop/protocol", "!@isoloop/runtime"],
+                "message": "adapters may only import runtime and protocol, never dom or host (system design §2, ADR 0010)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["packages/host/**/*.test.ts"],
       "rules": {
         "no-restricted-imports": [

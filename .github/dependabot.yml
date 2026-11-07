@@ -8,7 +8,26 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
+    # Each framework major the adapters support is pinned on its own
+    # (pnpm-workspace.yaml) and grouped on its own, so its updates run its DOM
+    # usage check in their own PR (ADR 0010). A new major is a decision, not
+    # an update: Dependabot never moves a pin across majors.
+    ignore:
+      - dependency-name: preact10
+        update-types: [version-update:semver-major]
+      - dependency-name: preact11
+        update-types: [version-update:semver-major]
+      - dependency-name: react
+        update-types: [version-update:semver-major]
+      - dependency-name: react-dom
+        update-types: [version-update:semver-major]
     groups:
+      preact-10:
+        patterns: [preact10]
+      preact-11:
+        patterns: [preact11]
+      react:
+        patterns: [react, react-dom, '@types/react', '@types/react-dom']
       minor-and-patch:
         update-types: [minor, patch]
 

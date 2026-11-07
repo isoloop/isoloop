@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.lib.json",
+  "compilerOptions": {
+    // Isolate code runs in a worker, but renders through the DOM subset
+    // installed as `document`; React's types need the DOM's.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    // Types from @types/react (the newest major); each vitest project resolves
+    // its own React from packages/react/majors.
+    "types": ["react", "react-dom"]
+  },
+  "include": ["src"]
+}

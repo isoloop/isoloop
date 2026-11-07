@@ -1,0 +1,10 @@
+{
+  "name": "@isoloop/react-major-18",
+  "private": true,
+  "description": "React 18 for the react-18 test project and E2E fixture; see pnpm-workspace.yaml.",
+  "type": "module",
+  "dependencies": {
+    "react": "catalog:react18",
+    "react-dom": "catalog:react18"
+  }
+}
