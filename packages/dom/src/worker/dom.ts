@@ -600,6 +600,8 @@ export class WElement extends WParentNode {
   /** @internal */ isoStyle: WStyle | null = null;
   /** @internal */ isoClassList: WDOMTokenList | null = null;
   /** @internal */ isoDataset: Record<string, string | undefined> | null = null;
+  /** @internal The offsets the last `scroll` event brought (design §4.6). */
+  isoScroll = { top: 0, left: 0 };
 
   constructor(doc: WDocument, id: NodeId, localName: string, ns: Namespace) {
     super(doc, id);
@@ -658,6 +660,17 @@ export class WElement extends WParentNode {
   get dataset(): Record<string, string | undefined> {
     this.isoDataset ??= createDataset(this);
     return this.isoDataset;
+  }
+
+  /**
+   * Read only, and as of the last `scroll` event the element got: the host
+   * owns scrolling. 0 until the element is scrolled and listens for `scroll`.
+   */
+  get scrollTop(): number {
+    return this.isoScroll.top;
+  }
+  get scrollLeft(): number {
+    return this.isoScroll.left;
   }
 
   get id(): string {
@@ -1141,6 +1154,9 @@ export function createDom(opts: WorkerDomOptions): WorkerDom {
       if (control && event.value !== undefined) node.isoSetProp('value', event.value, false);
       if (node instanceof WHTMLInputElement && event.checked !== undefined)
         node.isoSetProp('checked', event.checked, false);
+      if (event.type === 'scroll' && node instanceof WElement) {
+        node.isoScroll = { top: event.scrollTop ?? 0, left: event.scrollLeft ?? 0 };
+      }
       node.dispatchEvent(toEvent(event));
     },
   };
@@ -1148,7 +1164,8 @@ export function createDom(opts: WorkerDomOptions): WorkerDom {
 
 /** A real `Event` with the fields frameworks read from mouse and keyboard events. */
 function toEvent(e: DomEvent): Event {
-  const ev = new Event(e.type, { bubbles: true, cancelable: true });
+  // `scroll` doesn't bubble, as in the DOM.
+  const ev = new Event(e.type, { bubbles: e.type !== 'scroll', cancelable: true });
   const mods: Record<string, boolean> = {
     Alt: e.mods.alt,
     Control: e.mods.ctrl,

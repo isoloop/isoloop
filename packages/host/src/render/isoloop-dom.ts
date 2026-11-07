@@ -33,6 +33,8 @@ function serialize(rec: DomEvent, type: EventType): SerializedEvent {
   if (rec.x !== undefined) event.x = rec.x;
   if (rec.y !== undefined) event.y = rec.y;
   if (rec.button !== undefined) event.button = rec.button;
+  if (rec.scrollTop !== undefined) event.scrollTop = rec.scrollTop;
+  if (rec.scrollLeft !== undefined) event.scrollLeft = rec.scrollLeft;
   return event;
 }
 

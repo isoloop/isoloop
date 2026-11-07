@@ -82,6 +82,21 @@ describe('EventBridge', () => {
     expect(frames).toHaveLength(2);
   });
 
+  it('catches scroll, which does not bubble, and sends one per frame per node', () => {
+    const { shadow, sent, frames } = setup();
+    const outer = document.createElement('div');
+    const inner = document.createElement('div');
+    outer.append(inner);
+    shadow.append(outer);
+    for (let i = 0; i < 3; i++) inner.dispatchEvent(new Event('scroll'));
+    expect(sent).toEqual([]);
+    expect(frames).toHaveLength(1);
+    frames[0]?.();
+    expect(sent.map((e) => e.type)).toEqual(['scroll']);
+    inner.dispatchEvent(new Event('scroll'));
+    expect(frames).toHaveLength(2);
+  });
+
   it('stops listening once aborted', () => {
     const { shadow, sent, abort } = setup();
     const button = document.createElement('button');

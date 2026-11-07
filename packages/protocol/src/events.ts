@@ -1,7 +1,11 @@
 /** Modifier keys held during an event. */
 export type Mods = { alt: boolean; ctrl: boolean; meta: boolean; shift: boolean };
 
-/** Event types the host forwards (design §4.6), plus `resize` for transferred canvases (§4.7). */
+/**
+ * Event types the host forwards (design §4.6), plus `resize` for transferred
+ * canvases (§4.7). `pointermove` and `scroll` are opt-in per node and come at
+ * most once a frame.
+ */
 export type EventType =
   | 'click'
   | 'dblclick'
@@ -15,6 +19,7 @@ export type EventType =
   | 'pointerdown'
   | 'pointerup'
   | 'pointermove'
+  | 'scroll'
   | 'resize';
 
 /** A DOM event as it reaches an isolate (design §4.6). Node ids are the isolate's own. */
@@ -34,4 +39,7 @@ export type SerializedEvent = {
   /** For `resize`. */
   width?: number;
   height?: number;
+  /** For `scroll`: the scrolled element's offsets (M3b). */
+  scrollTop?: number;
+  scrollLeft?: number;
 };

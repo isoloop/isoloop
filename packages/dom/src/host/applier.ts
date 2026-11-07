@@ -241,6 +241,10 @@ export function createApplier(container: Element, policy: SanitisePolicy): Appli
         out.key = e.key;
         out.code = e.code;
       }
+      if (e.type === 'scroll' && el instanceof Element) {
+        out.scrollTop = el.scrollTop;
+        out.scrollLeft = el.scrollLeft;
+      }
       if (e instanceof MouseEvent) {
         out.x = e.clientX;
         out.y = e.clientY;
