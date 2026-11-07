@@ -20,7 +20,7 @@ type Msg =
 
 type BusMsg =
   | { t: 'reset'; p: { topic: string } }
-  | { t: 'deliver'; p: { topic: string; records: { offset: number }[] } }
+  | { t: 'deliver'; p: { topic: string; records: { offset: number }[]; gap?: unknown } }
   | { t: 'result' };
 
 let port: MessagePort | undefined;
@@ -29,6 +29,8 @@ let topics: string[] = [];
 const resets: Record<string, number> = {};
 let ports = 0;
 let seen = 0;
+const offsets: Record<string, number[]> = {};
+let gaps = 0;
 let n = 0;
 
 const report = (): void => {
@@ -36,7 +38,10 @@ const report = (): void => {
     v: 1,
     t: 'publish',
     id: `r${++n}`,
-    p: { topic: 'report.v1', value: { id, resets: { ...resets }, ports, seen } },
+    p: {
+      topic: 'report.v1',
+      value: { id, resets: { ...resets }, ports, seen, offsets: structuredClone(offsets), gaps },
+    },
   });
 };
 
@@ -51,6 +56,9 @@ const use = (p: MessagePort): void => {
       report();
     } else if (m.t === 'deliver') {
       seen += m.p.records.length;
+      if (m.p.gap !== undefined) gaps++;
+      (offsets[m.p.topic] ??= []).push(...m.p.records.map((r) => r.offset));
+      if (m.p.topic !== 'report.v1') report();
       const last = m.p.records.at(-1);
       if (last) p.postMessage({ v: 1, t: 'commit', p: { topic: m.p.topic, offset: last.offset } });
     }

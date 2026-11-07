@@ -1,7 +1,7 @@
 import type { TopicConfig } from '@isoloop/protocol';
 import type { LogStorage, StoredState } from './types';
 
-/** Storage that keeps nothing (M2). Every topic behaves as `memory`. */
+/** Storage that keeps nothing. Every topic behaves as `memory`. */
 export class MemoryStorage implements LogStorage {
   readonly kind = 'memory' as const;
 
@@ -30,30 +30,16 @@ export class MemoryStorage implements LogStorage {
   }
 }
 
-let warned = false;
-
 /**
- * Engines call this from `createTopic`. Until OPFS storage lands (M2b), a
- * `persistent` topic on memory storage behaves as `memory`, with one console
- * warning per bus worker. Returns the durability the topic actually gets.
+ * Engines call this from `createTopic`: the durability a topic actually gets.
+ * A `persistent` topic on storage that keeps nothing (no OPFS, or another tab
+ * holds it) behaves as `memory`; the kernel reports that as
+ * `bus:durability-degraded` (ADR 0007, decision 6).
  */
 export function effectiveDurability(
   cfg: TopicConfig,
   storage: LogStorage,
-  warn: (message: string) => void = console.warn,
 ): 'memory' | 'persistent' {
   if (cfg.durability !== 'persistent') return 'memory';
-  if (storage.kind !== 'memory') return 'persistent';
-  if (!warned) {
-    warned = true;
-    warn(
-      `[isoloop] durability 'persistent' isn't available yet (M2b); ${cfg.name} and other persistent topics are kept in memory.`,
-    );
-  }
-  return 'memory';
-}
-
-/** Tests only: lets the one-time warning fire again. */
-export function resetDurabilityWarning(): void {
-  warned = false;
+  return storage.kind === 'memory' ? 'memory' : 'persistent';
 }

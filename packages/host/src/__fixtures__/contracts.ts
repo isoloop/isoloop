@@ -21,6 +21,7 @@ type Topic<T> = {
   name: string;
   schema: Schema<T>;
   retention: { kind: 'last-n'; n: number } | { kind: 'compacted' };
+  durability?: 'memory' | 'persistent';
 };
 
 export const count: Topic<number> = {
@@ -35,8 +36,24 @@ export const notes: Topic<string> = {
   retention: { kind: 'compacted' },
 };
 
+/** Kept in OPFS (ADR 0007): it survives a bus crash with no reset. */
+export const saved: Topic<number> = {
+  name: 'saved.v1',
+  schema: schema((v): v is number => typeof v === 'number'),
+  retention: { kind: 'last-n', n: 1000 },
+  durability: 'persistent',
+};
+
 /** What the test bootstrap reports about itself. */
-export type Report = { id: string; resets: Record<string, number>; ports: number; seen: number };
+export type Report = {
+  id: string;
+  resets: Record<string, number>;
+  ports: number;
+  seen: number;
+  /** Offsets delivered per topic, in order, and how many deliveries carried a gap. */
+  offsets: Record<string, number[]>;
+  gaps: number;
+};
 
 export const report: Topic<Report> = {
   name: 'report.v1',
@@ -51,7 +68,7 @@ export const small: Topic<number> = {
   retention: { kind: 'last-n', n: 3 },
 };
 
-const topics = [count, notes, report, small];
+const topics = [count, notes, report, small, saved];
 
 const list: {
   '~isoloop': 'contracts';
