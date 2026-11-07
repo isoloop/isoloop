@@ -96,6 +96,10 @@ export interface LogStorage {
   rewrite(topic: string, keep: (offset: number, key: string | undefined) => boolean): Promise<void>;
   /** Replay of evicted segments. */
   readSegment(topic: string, fromOffset: number): Promise<Uint8Array[]>;
+  /** Bytes a topic takes on disk; 0 for one the storage doesn't hold. */
+  bytes(topic: string): Promise<number>;
+  /** Deletes a topic's files. False when the storage doesn't hold it. */
+  deleteTopic(topic: string): Promise<boolean>;
   /** Safe mode: moves the newest segments aside and returns their names. */
   quarantineNewest(): Promise<string[]>;
 }

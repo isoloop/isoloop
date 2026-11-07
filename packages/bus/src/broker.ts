@@ -18,6 +18,8 @@ import type { LogEngine, NewRecord } from './engine/types';
 import { estimateSize } from './size';
 import {
   copySeed,
+  mapRecord,
+  SEED_REJECTED,
   SEED_REPORTS_PER_SEC,
   seedDone,
   seedOrder,
@@ -125,6 +127,8 @@ type Pending = {
   bytes: number;
   key: string | undefined;
   req: { from: Connection; id: string; timeoutMs: number } | undefined;
+  /** A record `follow` forwards keeps its source's `ts`; publishes get the time of append. */
+  ts?: number;
   done: boolean;
   result: Validated | undefined;
   settle: (r: CallResult) => void;
@@ -242,6 +246,12 @@ export class Broker {
   readonly #sleepers = new Map<string, Set<string>>();
   readonly #onWake: (isolateId: string, topic: string) => void;
   readonly #onSeed: (e: SeedEvent) => void;
+  /** Seed sources the contracts don't list: in the engine, so seeds can read them, but not open to isolates. */
+  readonly #sources = new Set<string>();
+  readonly #followReports = new Map<
+    string,
+    (offset: number, v: Extract<SeedVerdict, { ok: false }>) => void
+  >();
   #dropped = 0;
 
   constructor(opts: BrokerOptions) {
@@ -264,6 +274,12 @@ export class Broker {
         records: 0,
         bytes: 0,
       });
+    }
+    for (const def of opts.contracts.topics) {
+      const from = def.seed?.from;
+      if (!from || this.#topics.has(from.name) || this.#sources.has(from.name)) continue;
+      this.#engine.createTopic(topicConfig(from));
+      this.#sources.add(from.name);
     }
   }
 
@@ -405,6 +421,70 @@ export class Broker {
       runs.set(def.name, run);
     }
     return Promise.all(runs.values()).then(() => {});
+  }
+
+  /**
+   * `follow` (ADR 0003, decision 18): a record appended to a seed source goes
+   * on, through `map` and the topic's schema, to each topic that follows it
+   * and isn't seeding (a seed in progress copies it itself).
+   */
+  #follow(source: string, rec: BusRecord): void {
+    for (const topic of this.#topics.values()) {
+      const seed = topic.def.seed;
+      if (!seed?.follow || seed.from.name !== source || topic.seeding) continue;
+      const name = topic.def.name;
+      let report = this.#followReports.get(name);
+      if (!report) this.#followReports.set(name, (report = this.#seedReporter(name, source)));
+      const rejected = report;
+      const mapped = mapRecord(seed.map, rec);
+      if (!mapped.ok) {
+        rejected(rec.offset, mapped);
+        continue;
+      }
+      const pending: Pending = {
+        bytes: 0,
+        producer: rec.producer,
+        key: rec.key,
+        req: undefined,
+        ts: rec.ts,
+        done: false,
+        result: undefined,
+        settle: (r) => {
+          if (!r.ok) {
+            const issues = r.error.issues ?? [{ message: r.error.message, path: [] }];
+            rejected(rec.offset, { ok: false, code: r.error.code, issues });
+          }
+        },
+      };
+      this.#enqueue(name, topic, pending, validate(topic.def.schema, mapped.value));
+    }
+  }
+
+  /**
+   * Why `kernel.dropTopic(name)` may not delete `name`, if it may not (ADR
+   * 0003, decision 19): the contracts list it, a declared seed that reads it
+   * hasn't ended, or seed records rejected from it are recorded and `force`
+   * isn't set.
+   */
+  dropRefusal(name: string, force: boolean): CallResult | undefined {
+    if (this.#topics.has(name)) return fail('invalid', `${name} is in the contracts`);
+    for (const t of this.#topics.values()) {
+      if (t.def.seed?.from.name !== name) continue;
+      if (!seedDone(this.#engine, t.def.name))
+        return fail('seed_pending', `${t.def.name} still seeds from ${name}`);
+      if (!force && (this.#engine.committed(t.def.name, SEED_REJECTED) ?? 0) > 0) {
+        return fail(
+          'invalid',
+          `${t.def.name} has rejected seed records from ${name}; pass { force: true } to drop them`,
+        );
+      }
+    }
+    return undefined;
+  }
+
+  /** Persistent topics a declared seed reads that the contracts don't list. */
+  get seedSources(): readonly string[] {
+    return [...this.#sources];
   }
 
   /** Reports rejected seed records, at most `SEED_REPORTS_PER_SEC` a second. */
@@ -650,7 +730,16 @@ export class Broker {
       result: undefined,
       settle,
     };
-    const result = validate(topic.def.schema, value);
+    this.#enqueue(name, topic, pending, validate(topic.def.schema, value));
+  }
+
+  /** Appends `pending` once its validation is done and everything ahead of it on the topic is. */
+  #enqueue(
+    name: string,
+    topic: Topic,
+    pending: Pending,
+    result: Validated | Promise<Validated>,
+  ): void {
     if (!(result instanceof Promise) && topic.queue.length === 0 && !topic.seeding) {
       // Fast path: nothing ahead of this publish on the topic.
       pending.result = result;
@@ -684,7 +773,7 @@ export class Broker {
       p.settle(fail('quota_exceeded', `${name}: the origin's storage is full`));
       return;
     }
-    let rec: NewRecord = { value: checked.value, ts: this.#now(), producer: p.producer };
+    let rec: NewRecord = { value: checked.value, ts: p.ts ?? this.#now(), producer: p.producer };
     if (p.key !== undefined) rec = { ...rec, key: p.key };
     if (p.req) rec = { ...rec, req: { from: p.req.from.isolateId, id: p.req.id } };
     const offset = this.#engine.append(name, rec);
@@ -705,6 +794,7 @@ export class Broker {
     } else p.settle({ ok: true, value: { offset } });
     this.#fanOut(name);
     this.#wake(name);
+    this.#follow(name, { ...rec, offset });
   }
 
   /**

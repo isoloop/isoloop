@@ -52,6 +52,8 @@ describe('effective durability', () => {
       rewrite: async (t, k) => m.rewrite(t, k),
       readSegment: async (t, f) => m.readSegment(t, f),
       quarantineNewest: async () => m.quarantineNewest(),
+      bytes: async (t) => m.bytes(t),
+      deleteTopic: async (t) => m.deleteTopic(t),
     };
     expect(effectiveDurability(topic('a', 'persistent'), opfs)).toBe('persistent');
   });

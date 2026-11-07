@@ -278,6 +278,49 @@ describe('bus controller', () => {
     },
   );
 
+  it('a persistent topic the contracts dropped is reported as orphaned, and dropTopic deletes it (M2b)', async () => {
+    const first = setup();
+    const ready = first.log('bus:ready');
+    await vi.waitUntil(() => ready.length === 1);
+    await Promise.all([0, 1, 2].map((i) => first.kernel.publish(saved, { value: i })));
+    await expect(first.kernel.dropTopic(saved.name)).rejects.toMatchObject({ code: 'invalid' });
+    await first.kernel.destroy();
+
+    const withoutSaved = new URL('./__fixtures__/contracts-without-saved.ts', import.meta.url).href;
+    const { default: smaller } = await import('./__fixtures__/contracts-without-saved');
+    const next = () => setup({ contracts: { url: withoutSaved, list: smaller } });
+    // The destroyed kernel's bus may hold the files a moment longer.
+    let second = next();
+    let orphaned = second.log('bus:orphaned_topics');
+    let degraded = second.log('bus:durability-degraded');
+    let up = second.log('bus:ready');
+    await vi.waitUntil(() => up.length === 1);
+    while (degraded.length > 0) {
+      // oxlint-disable-next-line no-await-in-loop -- retry until the files are free
+      await second.kernel.destroy();
+      second = next();
+      orphaned = second.log('bus:orphaned_topics');
+      degraded = second.log('bus:durability-degraded');
+      up = second.log('bus:ready');
+      // oxlint-disable-next-line no-await-in-loop -- retry until the files are free
+      await vi.waitUntil(() => up.length === 1);
+    }
+    expect(orphaned).toHaveLength(1);
+    expect(orphaned[0]?.names).toEqual([saved.name]);
+    expect(orphaned[0]?.bytes).toBeGreaterThan(0);
+
+    await second.kernel.dropTopic(saved.name);
+    await expect(second.kernel.dropTopic(saved.name)).rejects.toMatchObject({
+      code: 'unknown_topic',
+    });
+    const topics = await (
+      await (await navigator.storage.getDirectory()).getDirectoryHandle('isoloop')
+    ).getDirectoryHandle('topics');
+    const names: string[] = [];
+    for await (const name of topics.keys()) names.push(name);
+    expect(names).not.toContain(saved.name);
+  });
+
   it('a contracts mismatch is fatal: bus:failed, isolates fail, spawn throws', async () => {
     const differ = { ...list, topics: list.topics.filter((t) => t.name !== 'notes.v1') };
     const { kernel, log } = setup({ contracts: { url: contractsUrl, list: differ } });

@@ -5,7 +5,7 @@ import { connect, flush } from '../test/memory-port';
 import { Broker } from './broker';
 import { TsEngine } from './engine/ts-engine';
 import type { SeedEvent } from '@isoloop/protocol';
-import { SEED_BATCH, SEED_DONE, SEED_FROM, SEED_HEAD } from './seed';
+import { SEED_BATCH, SEED_DONE, SEED_FROM, SEED_HEAD, SEED_REJECTED } from './seed';
 import { contracts, topic, topicConfig, unchecked, type AnyTopicDef } from './topic';
 
 const all: Grants = { publish: ['*'], subscribe: ['*'] };
@@ -207,13 +207,71 @@ describe('seeding: exactly once, rejects and progress', () => {
   });
 });
 
+describe('follow, unlisted sources and dropTopic', () => {
+  const following = topic('cart.items.v2', {
+    schema: z.object({ sku: z.string(), qty: z.number() }),
+    retention: { kind: 'last-n', n: 100 },
+    seed: { from: v1, follow: true, map: (v: { sku: string }) => ({ sku: v.sku, qty: 1 }) },
+  });
+
+  it('with follow, a v1 publish after the seed reaches v2, keeping its ts and producer', async () => {
+    const { broker, engine, events } = setup(2, [v1, following]);
+    await broker.seed();
+    const a = connect(broker, 'A', all);
+    await a.call('publish', { topic: v1.name, value: { sku: 'late' } });
+    await a.call('publish', { topic: v1.name, value: { sku: 7 } }); // v2 rejects it
+    await flush();
+    expect(engine.read(following.name, 0, 10).map((r) => [r.value, r.producer, r.ts])).toEqual([
+      [{ sku: 's0', qty: 1 }, 'old', 100],
+      [{ sku: 's1', qty: 1 }, 'old', 101],
+      [{ sku: 'late', qty: 1 }, 'A', 5],
+    ]);
+    expect(events.at(-1)).toMatchObject({ kind: 'rejected', topic: following.name, offset: 3 });
+  });
+
+  it('without a seed to run (memory topics), follow forwards from the start', async () => {
+    const { broker, engine } = setup(0, [v1, following]);
+    const a = connect(broker, 'A', all);
+    await a.call('publish', { topic: v1.name, value: { sku: 'x' } });
+    await flush();
+    expect(engine.read(following.name, 0, 10).map((r) => r.value)).toEqual([{ sku: 'x', qty: 1 }]);
+  });
+
+  it('seeds from a source the contracts no longer list; isolates can’t reach it', async () => {
+    const engine = new TsEngine();
+    const broker = new Broker({ contracts: contracts(v2), engine });
+    engine.append(v1.name, { value: { sku: 'old' }, ts: 1, producer: 'p' });
+    await broker.seed();
+    expect(engine.read(v2.name, 0, 10).map((r) => r.value)).toEqual([{ sku: 'old', qty: 1 }]);
+    const a = connect(broker, 'A', all);
+    expect(await a.call('publish', { topic: v1.name, value: { sku: 'x' } })).toMatchObject({
+      ok: false,
+      error: { code: 'unknown_topic' },
+    });
+    expect(broker.seedSources).toEqual([v1.name]);
+  });
+
+  it('dropTopic refuses a listed topic, one a pending seed reads, and rejected records unless forced', () => {
+    const engine = new TsEngine();
+    const broker = new Broker({ contracts: contracts(v2), engine });
+    expect(broker.dropRefusal(v2.name, false)).toMatchObject({ error: { code: 'invalid' } });
+    engine.commit(v2.name, SEED_FROM, 3);
+    expect(broker.dropRefusal(v1.name, false)).toMatchObject({ error: { code: 'seed_pending' } });
+    engine.commit(v2.name, SEED_DONE, 10);
+    expect(broker.dropRefusal(v1.name, false)).toBeUndefined();
+    engine.commit(v2.name, SEED_REJECTED, 2);
+    expect(broker.dropRefusal(v1.name, false)).toMatchObject({ error: { code: 'invalid' } });
+    expect(broker.dropRefusal(v1.name, true)).toBeUndefined();
+  });
+});
+
 describe('seed in the contracts', () => {
   it('goes into the boot config as the source name and follow flag', () => {
     expect(topicConfig(v2).seed).toEqual({ from: v1.name, follow: false });
   });
 
-  it('rejects a source the contracts don’t list, and cycles', () => {
-    expect(() => contracts(v2)).toThrow(/seeds from cart.items.v1/);
+  it('takes a source the contracts don’t list, and rejects cycles', () => {
+    expect(() => contracts(v2)).not.toThrow();
     let first: AnyTopicDef | undefined;
     const second = topic('b.v1', {
       schema: unchecked(),
