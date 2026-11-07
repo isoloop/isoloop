@@ -4,7 +4,7 @@
 
 **A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-Status: **M0–M2 done, pre-release.** The kernel (loader, supervisor, frame-batched compositor on our own render bridge) and the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension) run from the repo, with CI on Chromium, Firefox and WebKit; nothing is on npm yet. M3 (adapters, then the dashboard) and M2b (durable log) are next, in parallel; M2c and M5 come after 0.1. The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
+Status: **M0–M2, M2b and M3a done, pre-release.** The kernel (loader, supervisor, frame-batched compositor on our own render bridge), the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension, persistent topics in OPFS) and the Preact and React adapters run from the repo, with CI on Chromium, Firefox and WebKit; nothing is on npm yet. M3b (the dashboard) is next, then M4 (0.1); M2c and M5 come after 0.1. The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
 
 ## Run the demo
 

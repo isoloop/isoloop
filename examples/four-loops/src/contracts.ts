@@ -4,16 +4,23 @@
 import { contracts, topic } from '@isoloop/bus';
 import { z } from 'zod';
 
+// count.v1, note.v1 and store.v1 are persistent (M2b): they're in the origin's
+// OPFS, so a reload or a bus crash loses none of them. store.v1 is folded from
+// the other two, so they persist with it; primes.v1 and vote.v1 stay memory
+// topics, and start empty after a reload.
+
 /** A's counter value, each time it changes. */
 export const count = topic('count.v1', {
   schema: z.number().int().nonnegative(),
   retention: { kind: 'last-n', n: 100 },
+  durability: 'persistent',
 });
 
 /** A note D sends to A. */
 export const note = topic('note.v1', {
   schema: z.string().trim().min(1).max(200),
   retention: { kind: 'last-n', n: 50 },
+  durability: 'persistent',
 });
 
 /** C's prime sieve result. */
@@ -26,6 +33,7 @@ export const primes = topic('primes.v1', {
 export const store = topic('store.v1', {
   schema: z.object({ count: z.number().int(), notes: z.number().int() }),
   retention: { kind: 'compacted' },
+  durability: 'persistent',
 });
 
 /** A vote from P (Preact) or R (React): both tally every vote, from the log. */

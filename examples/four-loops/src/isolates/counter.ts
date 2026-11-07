@@ -2,7 +2,8 @@ import { defineIsolate } from '@isoloop/runtime';
 import { count, note as noteTopic } from '../topics';
 import { el } from './dom';
 
-// A · Counter
+// A · Counter. count.v1 is persistent, so A picks its value up from the log
+// after a reload or a restart: the highest count it finds, since it only goes up.
 export default defineIsolate<HTMLElement>({
   start(ctx) {
     const { root } = ctx;
@@ -16,6 +17,15 @@ export default defineIsolate<HTMLElement>({
       big.textContent = String(n);
       void ctx.bus.publish(count, { value: n });
     });
+    ctx.bus.subscribe(
+      count,
+      (r) => {
+        if (r.value <= n) return;
+        n = r.value;
+        big.textContent = String(n);
+      },
+      { from: 'earliest' },
+    );
     ctx.bus.subscribe(noteTopic, (r) => {
       note.textContent = `${r.producer} says: ${r.value}`;
     });
@@ -25,7 +35,11 @@ export default defineIsolate<HTMLElement>({
         { class: 'stack' },
         big,
         inc,
-        el('p', { class: 'muted' }, 'Publishes count.v1 on the bus.'),
+        el(
+          'p',
+          { class: 'muted' },
+          'Publishes count.v1 on the bus. It is persistent: reload the page.',
+        ),
         note,
       ),
     );

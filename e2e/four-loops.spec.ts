@@ -137,3 +137,44 @@ test('(g) P (Preact) and R (React) share vote.v1, and a crashed R replays the ta
   await pane(page, 'R').locator('.vote').click();
   await expect(tally('P')).toHaveText('1 : 3');
 });
+
+test('(h) the persistent topics outlive a bus crash and a reload; memory ones start over', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(
+    browserName === 'webkit',
+    "Playwright's WebKit has no OPFS: every topic runs in memory",
+  );
+  const inc = pane(page, 'A').getByRole('button', { name: 'Increment' });
+  const store = pane(page, 'D').locator('.store');
+  const tally = pane(page, 'P').locator('.tally');
+  // oxlint-disable-next-line no-await-in-loop -- clicks, one after another
+  for (let i = 0; i < 3; i++) await inc.click();
+  const input = pane(page, 'D').getByPlaceholder('Send a note to A');
+  await input.fill('kept');
+  await input.press('Enter');
+  await pane(page, 'P').locator('.vote').click();
+  await expect(store).toHaveText('store: count 3, notes 1');
+  await expect(tally).toHaveText('1 : 0');
+
+  // The bus dies: nothing on the persistent topics is lost, and no isolate restarts.
+  await page.getByRole('button', { name: 'Crash the bus' }).click();
+  await inc.click();
+  await expect(counter(page)).toHaveText('4');
+  await expect(store).toHaveText('store: count 4, notes 1');
+  await expect(pane(page, 'A').locator('.restarts')).toHaveText('');
+
+  // A reload: the old page's bus lets go of the files a moment later.
+  await page.reload();
+  await Promise.all(
+    ALL.map((id) => expect(status(page, id)).toContainText('loop ok', { timeout: 10_000 })),
+  );
+  await expect(counter(page)).toHaveText('4', { timeout: 10_000 });
+  await expect(store).toHaveText('store: count 4, notes 1');
+  await expect(pane(page, 'D').locator('.log')).toContainText('D note: kept');
+  // vote.v1 is a memory topic: it starts over.
+  await expect(tally).toHaveText('0 : 0');
+  await inc.click();
+  await expect(store).toHaveText('store: count 5, notes 1');
+});
