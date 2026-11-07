@@ -32,6 +32,13 @@ export interface LogEngine {
    * enough, so a record with an older `ts` behind it is kept until it reaches the tail.
    */
   compact(topic: string): void;
+  /**
+   * Whether appends to `topic` go to durable storage: a `persistent` topic on
+   * storage that keeps it (ADR 0007). The broker acks those after `flush`.
+   */
+  durable(topic: string): boolean;
+  /** Resolves once every append so far to a durable topic is on disk. */
+  flush(): Promise<void>;
 }
 
 /** Options every engine takes. */

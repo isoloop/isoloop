@@ -44,9 +44,10 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The bus worker's tests run in all three engines (M2b); the rest in Chromium.
       - uses: ./.github/actions/install-browsers
         with:
-          browsers: chromium
+          browsers: chromium firefox webkit
       - run: pnpm test:browser
 
   e2e:

@@ -535,7 +535,13 @@ export class Broker {
     topic.records++;
     topic.bytes += p.bytes;
     if (p.req) this.#openRequest(name, offset, p.req);
-    p.settle({ ok: true, value: { offset } });
+    if (this.#engine.durable(name)) {
+      // Acknowledged once its batch is on disk (ADR 0007, decision 2).
+      this.#engine.flush().then(
+        () => p.settle({ ok: true, value: { offset } }),
+        (e: unknown) => p.settle(fail('bus_unavailable', `${name}: write failed: ${String(e)}`)),
+      );
+    } else p.settle({ ok: true, value: { offset } });
     this.#fanOut(name);
     this.#wake(name);
   }

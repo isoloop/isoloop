@@ -18,7 +18,13 @@ const node = (name: string) => ({
   },
 });
 
-const browser = (name: string, include = `packages/${name}/src/**/*.test.ts`) => ({
+type Engine = 'chromium' | 'firefox' | 'webkit';
+
+const browser = (
+  name: string,
+  include = `packages/${name}/src/**/*.test.ts`,
+  engines: Engine[] = ['chromium'],
+) => ({
   test: {
     name,
     include: [include],
@@ -26,7 +32,7 @@ const browser = (name: string, include = `packages/${name}/src/**/*.test.ts`) =>
       enabled: true,
       headless: true,
       provider: playwright(),
-      instances: [{ browser: 'chromium' as const }],
+      instances: engines.map((engine) => ({ browser: engine })),
     },
   },
 });
@@ -93,7 +99,12 @@ export default defineConfig({
       node('protocol'),
       node('codec'),
       node('bus'),
-      browser('bus-browser', 'packages/bus/src/**/*.browser.test.ts'),
+      // OPFS differs by engine (M2b), so the bus worker's tests run in all three.
+      browser('bus-browser', 'packages/bus/src/**/*.browser.test.ts', [
+        'chromium',
+        'firefox',
+        'webkit',
+      ]),
       browser('dom'),
       browser('host'),
       browser('runtime'),

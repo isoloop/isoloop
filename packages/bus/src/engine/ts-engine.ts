@@ -1,4 +1,5 @@
 import type { BusRecord, TopicConfig } from '@isoloop/protocol';
+import { encodeFrame } from '../storage/frame';
 import { MemoryStorage, effectiveDurability } from './memory-storage';
 import type { EngineOptions, LogEngine, LogStorage, NewRecord } from './types';
 
@@ -34,6 +35,8 @@ type Topic = {
   keys: Map<string, number> | undefined;
   dirty: number;
   commits: Map<string, number>;
+  /** Appends also go to the storage (a persistent topic on real storage). */
+  durable: boolean;
 };
 
 /**
@@ -64,8 +67,9 @@ export class TsEngine implements LogEngine {
 
   createTopic(cfg: TopicConfig): void {
     if (this.#topics.has(cfg.name)) throw new Error(`topic ${cfg.name} exists`);
-    effectiveDurability(cfg, this.#storage);
+    const durable = effectiveDurability(cfg, this.#storage) === 'persistent';
     this.#topics.set(cfg.name, {
+      durable,
       cfg,
       base: 0,
       chunks: [],
@@ -80,7 +84,10 @@ export class TsEngine implements LogEngine {
 
   append(topic: string, rec: NewRecord): number {
     const t = this.#topic(topic);
+    // Encoded first: a value the codec refuses throws before anything changes.
+    const frame = t.durable ? encodeFrame({ ...rec, offset: t.head }) : undefined;
     const offset = t.head++;
+    if (frame) this.#storage.appendBatch(topic, [frame]);
     const ci = Math.floor(offset / this.#size);
     if (t.chunks.length === 0) t.base = ci;
     let chunk = t.chunks[ci - t.base];
@@ -139,6 +146,14 @@ export class TsEngine implements LogEngine {
 
   committed(topic: string, consumer: string): number | undefined {
     return this.#topic(topic).commits.get(consumer);
+  }
+
+  durable(topic: string): boolean {
+    return this.#topic(topic).durable;
+  }
+
+  flush(): Promise<void> {
+    return this.#storage.flush();
   }
 
   compact(topic: string): void {

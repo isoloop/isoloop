@@ -59,6 +59,14 @@ export class ReferenceEngine implements LogEngine {
     return this.#topic(topic).commits.get(consumer);
   }
 
+  durable(_topic: string): boolean {
+    return false;
+  }
+
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+
   compact(topic: string): void {
     const t = this.#topic(topic);
     const r = t.cfg.retention;
