@@ -10,7 +10,7 @@ M3 is an initiative with two epics. Each has its own done-when, demo and write-u
 | --- | --- | --- |
 | M3a Adapters | [m3a-adapters.md](m3a-adapters.md) | Both adapters pass the adapter conformance suite on every supported major (Preact 10 and 11, React 18 and 19) |
 | M3b Dashboard | [m3b-dashboard.md](m3b-dashboard.md) | The initiative's done-when above |
-| M3c Make the gain visible | [m3c-visible-gain.md](m3c-visible-gain.md) | At Normal size, native visibly stutters and Isoloop stays smooth |
+| M3c Dashboard sizes | [m3c-dashboard-sizes.md](m3c-dashboard-sizes.md) | Lite, Normal and Heavy on every build; the comparison across sizes recorded |
 
 M3a comes first; M3b's data pipeline (feeds, replay, aggregator, alerts) only needs the vanilla API and can start during M3a. [M2b](m2b-durable-log.md) runs in parallel with both, and M4 needs M3 and M2b.
 
@@ -23,4 +23,4 @@ M3a comes first; M3b's data pipeline (feeds, replay, aggregator, alerts) only ne
 
 - **React's bundle per isolate:** M3a task 17 measures memory per isolate. If React isolates are far over budget, the RFC's shared runtime-bundle cache comes in before the dashboard grows.
 - **The DOM subset meets real libraries in M3b.** Whatever the live dashboard still misses goes back into M3b's DOM tasks, not into a later milestone.
-- **The comparison must not be a straw man:** native is an idiomatic main-thread app sharing the core, charts and widgets with the Isoloop build, Isoloop's costs are reported beside its gains, and the code is published.
+- **The comparison must not be a straw man:** native is an idiomatic main-thread app sharing the core, charts and widgets with the Isoloop build, Isoloop's costs are reported beside its results, and the code is published.

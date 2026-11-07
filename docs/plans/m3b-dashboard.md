@@ -113,7 +113,7 @@
 ### 17. Metrics panel
 - Main-thread fps, long tasks (`PerformanceObserver`), input latency (Event Timing API), loop lag per worker (from heartbeats), memory (`measureUserAgentSpecificMemory` when cross-origin isolated) and bus throughput (`bus:metrics`).
 - **Files:** `apps/markets/src/metrics/`.
-- Both builds run the same panel; Isoloop-only figures (loop lag per worker, bus throughput) show "n/a" on native. It also reports Isoloop's costs next to its gains: bundle size, time to first data and memory.
+- Both builds run the same panel; Isoloop-only figures (loop lag per worker, bus throughput) show "n/a" on native. It also reports what Isoloop costs, next to what it measures: bundle size, time to first data and memory.
 - **Tests (E2E):** every metric shows a value within 2 s of start in both builds; memory shows "unavailable" without cross-origin isolation.
 
 ### 18. Recorded comparison
@@ -133,5 +133,5 @@
 
 - **The virtualized table** may need synchronous layout a worker can't give. If `measure` round trips aren't enough, it renders fixed-height rows.
 - **Exchange feeds** change formats, rate-limit or geo-block. Each stays behind its own feed isolate, and CI uses the replay source only.
-- **A fair comparison:** native is the idiomatic main-thread app (no hand-rolled workers, with error boundaries), both builds share the core, charts, widgets and page, Isoloop's costs are reported beside its gains, and the code for both is published.
+- **A fair comparison:** native is the idiomatic main-thread app (no hand-rolled workers, with error boundaries), both builds share the core, charts, widgets and page, Isoloop's costs are reported beside its results, and the code for both is published.
 - **Prerelease publishes before M4** put `0.0.0-next` versions on npm under the `isoloop` org. They're tagged `next`, never `latest`.
