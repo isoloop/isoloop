@@ -1,19 +1,28 @@
 /*
- * DOM usage logs (ADR 0010, M3a task 2): which members of the worker-side
- * subset a framework touches while it renders, and which it reaches for that
- * the subset doesn't have. The M1 spike did the same on Remote DOM's polyfill.
+ * `@isoloop/dom/testing/worker`: test tools that run inside a fixture worker
+ * (M3a tasks 2 and 3). Not in `@isoloop/dom/testing`, which imports Vitest: a
+ * worker can't.
  *
- * `trackUsage()` wraps every accessor and method on the subset's prototypes,
- * and puts a `Proxy` under the bottom of their chain, so a lookup that finds
- * nothing lands in its trap. Properties a framework writes onto nodes itself
- * (Preact's `l`, React's `__reactFiber$…`) are expandos, not missing members:
- * the trap sees their first write and leaves them out.
+ * - `serveFixture()` installs the subset as the worker's `document` and wires
+ *   it to `mountFixture()` on the page: batches out, host events in.
+ * - `trackUsage()` logs which members of the subset a framework touches while
+ *   it renders, and which it reaches for that the subset doesn't have. The M1
+ *   spike did the same on Remote DOM's polyfill. It wraps every accessor and
+ *   method on the subset's prototypes (calls the subset makes to itself
+ *   included), and puts a `Proxy` under the bottom of their chain, so a
+ *   lookup that finds nothing lands in its trap. Properties a framework
+ *   writes onto nodes itself (Preact's `l`, React's `__reactFiber$…`) are
+ *   expandos, not missing members: the trap sees their first write and
+ *   leaves them out. It patches classes for the whole realm, so it runs in a
+ *   worker of its own.
  *
- * It patches classes for the whole realm, so run it in a worker of its own.
- * Not in `@isoloop/dom/testing`, which imports Vitest: a worker can't.
+ * Messages to the page: `{ t: 'batch', batch }`, `{ t: 'usage', log }` and
+ * `{ t: 'error', error }`; from it: `{ t: 'event', event }`.
  */
 import { DOM_GLOBALS } from '../worker/install';
-import { WDocument, WElement, WEventTarget, type WorkerDom } from '../worker/dom';
+import type { DomBatch, DomEvent } from '../shared/records';
+import { createDom, WDocument, WElement, WEventTarget, type WorkerDom } from '../worker/dom';
+import { install } from '../worker/install';
 
 /** One framework major's log, as `packages/dom/usage/<project>.json` stores it. */
 export type UsageLog = {
@@ -50,9 +59,49 @@ const sorted = (xs: Iterable<string>): string[] => {
   return out;
 };
 
-const fail = (err: unknown): void => {
-  postMessage({ error: err instanceof Error ? (err.stack ?? err.message) : String(err) });
+/** What a fixture worker posts to the page. */
+export type FixtureMessage =
+  | { t: 'batch'; batch: DomBatch }
+  | { t: 'usage'; log: UsageLog }
+  | { t: 'error'; error: string };
+
+const post = (msg: FixtureMessage): void => {
+  postMessage(msg);
 };
+
+const fail = (err: unknown): void => {
+  post({ t: 'error', error: err instanceof Error ? (err.stack ?? err.message) : String(err) });
+};
+
+const isEventMessage = (x: unknown): x is { t: 'event'; event: DomEvent } =>
+  typeof x === 'object' && x !== null && Reflect.get(x, 't') === 'event';
+
+/**
+ * Installs the subset as this worker's `document`, posts every batch, and
+ * delivers the page's events. Import it before the framework: React decides
+ * at load time whether it has a DOM. Uncaught errors are posted with their
+ * stack, which a worker `error` event doesn't carry.
+ */
+export function serveFixture(): { dom: WorkerDom; container: Element } {
+  const dom = createDom({ onBatch: (batch) => post({ t: 'batch', batch }) });
+  install(dom, self);
+  addEventListener('message', (e: MessageEvent<unknown>) => {
+    if (isEventMessage(e.data)) dom.deliver(e.data.event);
+  });
+  // Frameworks commit from their own tasks, so errors come from anywhere.
+  addEventListener('error', (e) => {
+    e.preventDefault();
+    fail(e.error);
+  });
+  addEventListener('unhandledrejection', (e) => {
+    e.preventDefault();
+    fail(e.reason);
+  });
+  // `install()` made the subset's classes the worker's: the root is an `Element` now.
+  const container: unknown = dom.root;
+  if (!(container instanceof Element)) throw new Error('the subset is not installed');
+  return { dom, container };
+}
 
 /** Starts logging. Call before the framework renders; it can't be undone. */
 export function trackUsage(): UsageTracker {
@@ -187,24 +236,16 @@ export async function driveUsageFixture(
   }
 }
 
-/**
- * Runs the fixture, lets the framework settle, and posts the log, or
- * `{ error }` with the stack if it threw (a worker `error` event has none).
- */
+/** Runs the fixture, lets the framework settle, and posts the log (or the error). */
 export async function reportUsage(
   tracker: UsageTracker,
   framework: string,
   run: () => Promise<void>,
 ): Promise<void> {
-  // Frameworks commit from their own tasks, so errors can come from outside `run`.
-  addEventListener('error', (e) => {
-    e.preventDefault();
-    fail(e.error);
-  });
   try {
     await run();
     await new Promise((r) => setTimeout(r, 10));
-    postMessage(tracker.report(framework));
+    post({ t: 'usage', log: tracker.report(framework) });
   } catch (err) {
     fail(err);
   }

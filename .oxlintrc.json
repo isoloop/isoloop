@@ -156,7 +156,7 @@
                   "!@isoloop/runtime",
                   "!@isoloop/dom/worker",
                   "!@isoloop/dom/testing",
-                  "!@isoloop/dom/testing/usage"
+                  "!@isoloop/dom/testing/worker"
                 ],
                 "message": "adapter tests and fixtures may also use the DOM subset and its test tools (M3a task 2)."
               }

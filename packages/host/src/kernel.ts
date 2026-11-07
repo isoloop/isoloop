@@ -266,6 +266,8 @@ type Slot = {
   waking: boolean;
   queuedWake: boolean;
   warnedHold: boolean;
+  /** `dev`: already warned that this isolate renders into `document.head`. */
+  warnedHead: boolean;
   warnedTopics: Set<string>;
 };
 
@@ -299,6 +301,15 @@ function stylesOf(x: unknown): string[] | undefined {
   if (!Array.isArray(x)) return undefined;
   const texts = x.filter((t): t is string => typeof t === 'string').slice(0, 64);
   return texts.length > 0 ? texts : undefined;
+}
+
+/** Head tags from a patch: short tag names only, at most 8. */
+function headOf(x: unknown): string[] | undefined {
+  if (!Array.isArray(x)) return undefined;
+  const tags = x
+    .filter((t): t is string => typeof t === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(t))
+    .slice(0, 8);
+  return tags.length > 0 ? tags : undefined;
 }
 
 /** `scrollIntoView` options from an isolate, keeping only what the DOM accepts. */
@@ -646,6 +657,15 @@ export function createKernel(config: KernelConfig): Kernel {
           if (slot.fmt !== undefined && slot.fmt !== 'none' && msg.p.fmt === slot.fmt)
             compositor.enqueue(id, msg.p.batch, stylesOf(msg.p.styles));
           else slot.dropped++;
+          if (config.dev && !slot.warnedHead) {
+            const tags = headOf(msg.p.head);
+            if (tags) {
+              slot.warnedHead = true;
+              console.warn(
+                `[isoloop] "${id}" put ${tags.map((t) => `<${t}>`).join(', ')} into document.head; Isoloop doesn't render an isolate's head, so it stays in the worker (M3a).`,
+              );
+            }
+          }
           return;
         case 'error':
           feed(slot, {
@@ -1003,6 +1023,7 @@ export function createKernel(config: KernelConfig): Kernel {
         waking: false,
         queuedWake: false,
         warnedHold: false,
+        warnedHead: false,
         warnedTopics: new Set(),
       };
       slots.set(manifest.id, slot);

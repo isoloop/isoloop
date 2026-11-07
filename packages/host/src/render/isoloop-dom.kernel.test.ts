@@ -23,8 +23,8 @@ const waitFor = (ok: () => boolean, timeout = 4000) =>
     { timeout, interval: 10 },
   );
 
-function spawn(isolateBootstrap: string, src: string) {
-  const kernel = createKernel({ workers: { isolateBootstrap } });
+function spawn(isolateBootstrap: string, src: string, dev = false) {
+  const kernel = createKernel({ workers: { isolateBootstrap }, dev });
   kernels.push(kernel);
   const log = {
     state: [] as KernelEvents['isolate:state'][],
@@ -90,6 +90,20 @@ describe('isoloop-dom in the kernel', () => {
       expect(shadow()?.adoptedStyleSheets.length).toBe(3);
     } finally {
       document.body.style.removeProperty('--brand');
+    }
+  });
+
+  it('dev: warns once when an isolate puts elements into document.head, which isn’t rendered', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { shadow } = spawn(bootstrap, fixture('dom-head'), true);
+      await waitFor(() => shadow()?.querySelector('p')?.textContent === 'later');
+      await new Promise((r) => setTimeout(r, 50));
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0]?.[0]).toContain('"A" put <title> into document.head');
+      expect(shadow()?.querySelector('title')).toBe(null);
+    } finally {
+      warn.mockRestore();
     }
   });
 

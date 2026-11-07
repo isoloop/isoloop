@@ -7,7 +7,7 @@
  */
 import { expect } from 'vitest';
 import { commands } from 'vitest/browser';
-import type { UsageLog } from './usage';
+import type { FixtureMessage, UsageLog } from './worker';
 
 /**
  * Reads the subset doesn't serve, each with why that's fine. A read of an
@@ -18,6 +18,9 @@ export const TOLERATED_MISSING: Readonly<Record<string, string>> = {
     'Preact 11 uses it when present and falls back to insertBefore, which already keeps node identity on the host (a `move` record).',
   contentEditable:
     'React checks `=== "true"` when it saves and restores the selection around a commit; nothing in an isolate is editable, so undefined reads right.',
+  documentMode: 'React checks for old IE’s document mode; absent means a modern browser.',
+  createEvent:
+    'React 18 in development replays errors through a synthetic event when it can; without one it uses try/catch.',
   getRootNode:
     'React 19 uses it, when present, to find a shadow root to hoist into, and falls back to ownerDocument; the isolate tree has no shadow root of its own.',
   correspondingUseElement:
@@ -31,9 +34,9 @@ export async function checkDomUsage(
   write: boolean,
 ): Promise<UsageLog> {
   const log = await new Promise<UsageLog>((resolve, reject) => {
-    worker.addEventListener('message', (e: MessageEvent<UsageLog | { error: string }>) => {
-      if ('error' in e.data) reject(new Error(`usage fixture threw: ${e.data.error}`));
-      else resolve(e.data);
+    worker.addEventListener('message', (e: MessageEvent<FixtureMessage>) => {
+      if (e.data.t === 'error') reject(new Error(`usage fixture threw: ${e.data.error}`));
+      else if (e.data.t === 'usage') resolve(e.data.log);
     });
     worker.addEventListener('error', (e) => {
       e.preventDefault();

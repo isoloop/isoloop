@@ -39,22 +39,45 @@ export type Render = {
  */
 export function createRender(post: (msg: IsolateToHost) => void, scope?: object): Render {
   let pendingStyles: string[] = [];
-  let stylesScheduled = false;
+  let pendingHead: string[] = [];
+  /** Head tags already reported: each goes to the host once. */
+  const headSeen = new Set<string>();
+  let extrasScheduled = false;
   const postPatch = (batch: DomBatch): void => {
     const styles = pendingStyles;
+    const head = pendingHead;
     pendingStyles = [];
+    pendingHead = [];
     post({
       v: 1,
       t: 'patch',
-      p:
-        styles.length > 0
-          ? { fmt: ISOLOOP_DOM_FMT, batch, styles }
-          : { fmt: ISOLOOP_DOM_FMT, batch },
+      p: {
+        fmt: ISOLOOP_DOM_FMT,
+        batch,
+        ...(styles.length > 0 ? { styles } : {}),
+        ...(head.length > 0 ? { head } : {}),
+      },
+    });
+  };
+  /** Styles or head tags with no DOM change still need a patch to travel in. */
+  const scheduleExtras = (): void => {
+    if (extrasScheduled) return;
+    extrasScheduled = true;
+    queueMicrotask(() => {
+      extrasScheduled = false;
+      dom.flush();
+      if (pendingStyles.length > 0 || pendingHead.length > 0) postPatch([]);
     });
   };
   const dom = createDom({
     onBatch: postPatch,
     schedule: (flush) => queueMicrotask(flush),
+    onHead(tag) {
+      if (headSeen.has(tag)) return;
+      headSeen.add(tag);
+      pendingHead.push(tag);
+      scheduleExtras();
+    },
   });
   if (scope) install(dom, scope);
   return {
@@ -63,14 +86,7 @@ export function createRender(post: (msg: IsolateToHost) => void, scope?: object)
     dom,
     styles(css) {
       pendingStyles.push(...(typeof css === 'string' ? [css] : css));
-      if (stylesScheduled) return;
-      stylesScheduled = true;
-      queueMicrotask(() => {
-        stylesScheduled = false;
-        dom.flush();
-        // Styles with no DOM change still need a patch to travel in.
-        if (pendingStyles.length > 0) postPatch([]);
-      });
+      scheduleExtras();
     },
     idOf: (node) =>
       node instanceof WNode && node.isConnected ? String(dom.idOf(node)) : undefined,

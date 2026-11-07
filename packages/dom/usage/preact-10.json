@@ -21,8 +21,9 @@
     "Node.contains",
     "Node.nextSibling",
     "Node.parentNode",
+    "Text.data",
     "Text.textContent"
   ],
   "missing": [],
-  "probed": ["class", "data-key", "name", "onchange", "onclick", "oninput"]
+  "probed": ["class", "data-key", "name"]
 }
