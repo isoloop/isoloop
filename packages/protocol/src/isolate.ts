@@ -56,7 +56,16 @@ export type HostToIsolate =
 /** Isolate port: isolate → host. */
 export type IsolateToHost =
   /** The isolate's half of the handshake: what it actually runs. */
-  | Envelope<'ready', { runtime: string; adapter: string; renderFmt: string }>
+  | Envelope<
+      'ready',
+      {
+        runtime: string;
+        adapter: string;
+        renderFmt: string;
+        /** The Isoloop `major.minor` the isolate was built against, from `defineIsolate` (ADR 0012). */
+        requires?: string;
+      }
+    >
   /**
    * `styles`: stylesheets the isolate added since its last patch, applied
    * before `batch` (design §4.8). `head`: tags first inserted into the

@@ -150,6 +150,16 @@ describe('isolate bootstrap', () => {
     ]);
   });
 
+  it('reports the requires stamp of a defineIsolate() module in ready, and none for a plain one', async () => {
+    const stamped = spawn(fixture('stamped'));
+    await until(() => stamped.got.some((m) => m.t === 'ready'));
+    const ready = stamped.got.find((m) => m.t === 'ready');
+    expect(ready?.t === 'ready' ? ready.p.requires : undefined).toMatch(/^\d+\.\d+$/);
+    const plain = spawn(fixture('dom-hello'));
+    await until(() => plain.got.some((m) => m.t === 'ready'));
+    expect(plain.got.find((m) => m.t === 'ready')?.p).not.toHaveProperty('requires');
+  });
+
   it('installs the DOM subset before it imports the isolate module', async () => {
     const { got } = spawn(fixture('dom-at-load'));
     await until(() => patches(got).length === 1);

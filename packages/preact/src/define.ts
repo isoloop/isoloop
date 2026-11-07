@@ -4,7 +4,7 @@
  * context, and unmounts it on shutdown so effects clean up (unsubscribing,
  * among others).
  */
-import type { IsolateDefinition } from '@isoloop/runtime';
+import { REQUIRES, type IsolateDefinition } from '@isoloop/runtime';
 import { h, render, type ComponentType } from 'preact';
 import { IsolateCtx } from './context';
 
@@ -13,6 +13,8 @@ export type IsolateProps = { config: unknown };
 
 export function defineIsolate(Component: ComponentType<IsolateProps>): IsolateDefinition {
   return {
+    // The version this isolate was built against (ADR 0012), as runtime's `defineIsolate` stamps it.
+    requires: REQUIRES,
     start(ctx) {
       // In the worker, `Element` is the DOM subset's, which `ctx.root` is.
       const container: unknown = ctx.root;

@@ -9,3 +9,4 @@ export * from './control';
 export * from './system-topics';
 export * from './route';
 export * from './topics';
+export * from './version';
