@@ -217,3 +217,14 @@ describe.skipIf(skip)('seeding (M2b task 17)', () => {
     });
   });
 });
+
+describe.skipIf(skip)('seeding: exactly once (M2b task 18)', () => {
+  it('a seed killed halfway, with its last progress write torn, resumes without duplicates', async () => {
+    expect(await run('a seed killed halfway resumes without duplicates')).toEqual({
+      halfway: true,
+      recordsAheadOfProgress: true,
+      count: 3000,
+      exactlyOnceInOrder: true,
+    });
+  });
+});

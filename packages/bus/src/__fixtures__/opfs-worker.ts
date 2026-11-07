@@ -5,8 +5,9 @@ import type { Retention } from '@isoloop/protocol';
 import { connect } from '../../test/memory-port';
 import { Broker } from '../broker';
 import { TsEngine } from '../engine/ts-engine';
-import { decodeFrame } from '../storage/frame';
+import { decodeFrame, frameOffset, scanFrames } from '../storage/frame';
 import { type CompactionStep, OpfsStorage, type OpfsStorageOptions } from '../storage/opfs';
+import { SEED_DONE, SEED_FROM, SEED_HEAD } from '../seed';
 import { contracts, topic, topicConfig, unchecked } from '../topic';
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -623,6 +624,94 @@ const scenarios: Record<string, (dir: string) => Promise<unknown>> = {
       count: onDisk.length,
       inOrder: onDisk.slice(0, n).every((r, k) => isRecordWith(r.value, k) && r.ts === 10 + k),
       last: onDisk.at(-1)?.value,
+    };
+  },
+
+  async 'a seed killed halfway resumes without duplicates'(dir) {
+    const v1 = topic('cart.items.v1', {
+      schema: unchecked<{ i: number }>(),
+      retention: { kind: 'last-n', n: 1_000_000 },
+      durability: 'persistent',
+    });
+    // Once `paused`, the schema never answers: the seed stops where it is, as if killed.
+    let paused = false;
+    const v2 = topic('cart.items.v2', {
+      schema: {
+        '~standard': {
+          version: 1,
+          vendor: 'test',
+          validate: (value: unknown) => (paused ? new Promise<never>(() => {}) : { value }),
+        },
+      },
+      retention: { kind: 'last-n', n: 1_000_000 },
+      durability: 'persistent',
+      seed: { from: v1, map: (v: { i: number }) => ({ i: v.i, v: 2 as const }) },
+    });
+    const n = 3000;
+    const open = async () => {
+      const storage = new OpfsStorage({ root: await root(dir) });
+      const stored = await storage.open();
+      const engine = new TsEngine({ storage });
+      const broker = new Broker({ contracts: contracts(v1, v2), engine });
+      await engine.restore(stored);
+      return { storage, engine, broker };
+    };
+    {
+      const storage = new OpfsStorage({ root: await root(dir) });
+      await storage.open();
+      const engine = new TsEngine({ storage });
+      engine.createTopic(topicConfig(v1));
+      for (let i = 0; i < n; i++) engine.append(v1.name, { value: { i }, ts: i, producer: 'old' });
+      await engine.flush();
+      await storage.close();
+    }
+    // Start the seed, and stop the bus once a third of it is through.
+    {
+      const { storage, engine, broker } = await open();
+      void broker.seed().catch(() => {});
+      while ((engine.committed(v2.name, SEED_FROM) ?? -1) < n / 3)
+        // oxlint-disable-next-line no-await-in-loop -- polling the seed
+        await new Promise((r) => setTimeout(r, 0));
+      paused = true;
+      await new Promise((r) => setTimeout(r, 10));
+      await storage.close();
+      paused = false;
+    }
+    // The last offsets write tore: progress goes back one generation, while
+    // the records of that batch are on disk.
+    const v2Dir = await (await root(dir)).getDirectoryHandle(v2.name);
+    let newest: { slot: string; gen: number } | undefined;
+    for (const slot of ['offsets.0', 'offsets.1']) {
+      // oxlint-disable-next-line no-await-in-loop -- two files
+      const h = await (await v2Dir.getFileHandle(slot, { create: true })).createSyncAccessHandle();
+      const bytes = new Uint8Array(h.getSize());
+      h.read(bytes, { at: 0 });
+      h.close();
+      const last = scanFrames(bytes).frames.at(-1);
+      const gen = last ? frameOffset(last) : -1;
+      if (!newest || gen > newest.gen) newest = { slot, gen };
+    }
+    if (newest) {
+      // oxlint-disable-next-line no-await-in-loop -- one file
+      const h = await (await v2Dir.getFileHandle(newest.slot)).createSyncAccessHandle();
+      h.truncate(Math.floor(h.getSize() / 2));
+      h.close();
+    }
+    const { storage, engine, broker } = await open();
+    const ahead = engine.head(v2.name) - (engine.committed(v2.name, SEED_HEAD) ?? 0);
+    const halfway = engine.committed(v2.name, SEED_DONE) === undefined;
+    await broker.seed();
+    await engine.flush();
+    await storage.close();
+    const again = new OpfsStorage({ root: await root(dir) });
+    await again.open();
+    const onDisk = await readAll(again, v2.name);
+    await again.close();
+    return {
+      halfway,
+      recordsAheadOfProgress: ahead > 0,
+      count: onDisk.length,
+      exactlyOnceInOrder: onDisk.every((r, k) => isRecordWith(r.value, k)),
     };
   },
 };

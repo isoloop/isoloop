@@ -153,7 +153,8 @@ describe('seeding: exactly once, rejects and progress', () => {
         from: v1,
         map: (v: { sku: string }, r) => {
           if (r.offset === 1) throw new Error('boom');
-          if (r.offset === 2) return Promise.resolve(v) as unknown as { sku: string };
+          // A promise that also looks like the value: still `seed_async`.
+          if (r.offset === 2) return Object.assign(Promise.resolve(v), { sku: v.sku });
           return r.offset === 3 ? { sku: 'x' } : v;
         },
       },
