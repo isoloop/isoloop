@@ -57,7 +57,7 @@ flowchart LR
   protocol
   dom
   bus --> protocol
-  bus -. "M2b" .-> codec
+  bus --> codec
   host --> protocol
   host --> dom
   runtime --> protocol
@@ -72,8 +72,8 @@ flowchart LR
 | Package | Runs in | Depends on | Must not depend on |
 | --- | --- | --- | --- |
 | `@isoloop/protocol` | everywhere | nothing | anything |
-| `@isoloop/codec` (M2b) | bus worker, Node | nothing | DOM types |
-| `@isoloop/bus` | bus worker, Node | `protocol`, `codec` (M2b) | DOM types, `host`, `runtime` |
+| `@isoloop/codec` | bus worker, Node | nothing | DOM types |
+| `@isoloop/bus` | bus worker, Node | `protocol`, `codec` | DOM types, `host`, `runtime` |
 | `@isoloop/dom` | isolate worker (`/worker`), main thread (`/host`) | nothing at runtime (`/testing`: optional peer on Vitest) | any `@isoloop/*` package; DOM types in `/worker` |
 | `@isoloop/host` | main thread | `protocol`, `dom/host` | `runtime`, `bus` source (it loads their bundles by URL) |
 | `@isoloop/runtime` | isolate worker | `protocol`, `dom/worker` | `host`, `bus` |

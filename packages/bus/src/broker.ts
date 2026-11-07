@@ -1,3 +1,4 @@
+import { CodecError, encode } from '@isoloop/codec';
 import {
   SYSTEM_TOPICS,
   isIsolateToBus,
@@ -522,7 +523,7 @@ export class Broker {
   }
 
   #finish(name: string, topic: Topic, p: Pending): void {
-    const checked = this.#check(name, p.result);
+    const checked = this.#check(name, p.result, topic.def.durability === 'persistent');
     if (!checked.ok) {
       p.settle(checked);
       return;
@@ -539,8 +540,11 @@ export class Broker {
     this.#wake(name);
   }
 
-  /** Turns a schema result into the value to store, or the error to send. */
-  #check(name: string, r: Validated | undefined): CallResult {
+  /**
+   * Turns a schema result into the value to store, or the error to send. A
+   * persistent topic's value must also encode (ADR 0007, consequences).
+   */
+  #check(name: string, r: Validated | undefined, persistent = false): CallResult {
     if (!r || 'thrown' in r) {
       const thrown = r ? String(r.thrown) : 'no result';
       return fail('invalid', `schema threw: ${thrown}`, {
@@ -549,8 +553,14 @@ export class Broker {
     }
     if (r.issues)
       return fail('invalid', `invalid value for ${name}`, { issues: toIssues(r.issues) });
-    if (this.#dev) {
-      // M2b: persistent topics are checked by the codec instead (not_encodable).
+    if (persistent) {
+      try {
+        encode(r.value);
+      } catch (e) {
+        if (e instanceof CodecError) return fail('not_encodable', `${name}: ${e.message}`);
+        throw e;
+      }
+    } else if (this.#dev) {
       try {
         structuredClone(r.value);
       } catch (e) {

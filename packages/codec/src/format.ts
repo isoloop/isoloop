@@ -15,7 +15,15 @@
 //   0xc7       string, varint byte length, UTF-8
 //   0xc8       array, varint count
 //   0xc9       object, varint count
-//   0xca–0xdf  reserved for the other structured-clone types (codec task 4)
+//   0xca       bigint ≥ 0, varint byte count, magnitude little-endian
+//   0xcb       bigint < 0, the same for its magnitude
+//   0xcc       Date, float64 time value (NaN for an invalid date)
+//   0xcd       Map, varint count, key/value pairs
+//   0xce       Set, varint count, values
+//   0xcf       ArrayBuffer, varint byte length, bytes
+//   0xd0       typed array or DataView: kind byte (VIEW_KINDS), varint byte
+//              length, bytes (elements little-endian)
+//   0xd1–0xdf  reserved
 //   0xe0–0xff  integer -32..-1
 
 export const FIXSTR = 0x80;
@@ -31,7 +39,32 @@ export const FLOAT64 = 0xc6;
 export const STR = 0xc7;
 export const ARRAY = 0xc8;
 export const OBJECT = 0xc9;
+export const BIGINT = 0xca;
+export const NBIGINT = 0xcb;
+export const DATE = 0xcc;
+export const MAP = 0xcd;
+export const SET = 0xce;
+export const ARRAYBUFFER = 0xcf;
+export const VIEW = 0xd0;
 export const NEG_FIXINT = 0xe0;
+
+/** The kind byte after VIEW is the index in this list. Append only. */
+export const VIEW_KINDS = [
+  'Int8Array',
+  'Uint8Array',
+  'Uint8ClampedArray',
+  'Int16Array',
+  'Uint16Array',
+  'Int32Array',
+  'Uint32Array',
+  'Float32Array',
+  'Float64Array',
+  'BigInt64Array',
+  'BigUint64Array',
+  'DataView',
+] as const;
+
+export type ViewKind = (typeof VIEW_KINDS)[number];
 
 export const FIXSTR_MAX = 31;
 export const FIXARRAY_MAX = 15;

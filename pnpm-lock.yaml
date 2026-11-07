@@ -360,6 +360,9 @@ importers:
 
   packages/bus:
     dependencies:
+      '@isoloop/codec':
+        specifier: workspace:*
+        version: link:../codec
       '@isoloop/protocol':
         specifier: workspace:*
         version: link:../protocol

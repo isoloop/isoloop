@@ -20,6 +20,14 @@ const {
   NEG_FIXINT,
   FIXSTR_MAX,
   MAX_DEPTH,
+  BIGINT,
+  NBIGINT,
+  DATE,
+  MAP,
+  SET,
+  ARRAYBUFFER,
+  VIEW,
+  VIEW_KINDS,
 } = F;
 
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -82,6 +90,13 @@ function varint(): number {
   throw new CodecError('malformed', 'varint out of range');
 }
 
+function float64(): number {
+  if (pos + 8 > end) throw truncated();
+  for (let i = 0; i < 8; i++) f64b[i] = src[pos + i] ?? 0;
+  pos += 8;
+  return f64[0] ?? 0;
+}
+
 function read(depth: number): unknown {
   const tag = byte();
   if (tag < FIXSTR) return tag;
@@ -90,12 +105,8 @@ function read(depth: number): unknown {
   if (tag < UNDEFINED) return object(tag - FIXOBJECT, depth);
   if (tag >= NEG_FIXINT) return tag - 0x100;
   switch (tag) {
-    case FLOAT64: {
-      if (pos + 8 > end) throw truncated();
-      for (let i = 0; i < 8; i++) f64b[i] = src[pos + i] ?? 0;
-      pos += 8;
-      return f64[0];
-    }
+    case FLOAT64:
+      return float64();
     case UNDEFINED:
       return undefined;
     case NULL:
@@ -114,6 +125,20 @@ function read(depth: number): unknown {
       return array(varint(), depth);
     case OBJECT:
       return object(varint(), depth);
+    case BIGINT:
+      return bigint();
+    case NBIGINT:
+      return -bigint();
+    case DATE:
+      return new Date(float64());
+    case MAP:
+      return map(varint(), depth);
+    case SET:
+      return set(varint(), depth);
+    case ARRAYBUFFER:
+      return copy(varint());
+    case VIEW:
+      return typed();
     default:
       throw new CodecError('malformed', `unknown tag 0x${tag.toString(16)}`);
   }
@@ -220,4 +245,67 @@ function object(n: number, depth: number): Record<string, unknown> {
     } else o[k] = v;
   }
   return o;
+}
+
+/** n bytes, copied into their own ArrayBuffer. */
+function copy(n: number): ArrayBuffer {
+  if (pos + n > end) throw truncated();
+  const out = new ArrayBuffer(n);
+  new Uint8Array(out).set(src.subarray(pos, pos + n));
+  pos += n;
+  return out;
+}
+
+function bigint(): bigint {
+  const n = varint();
+  if (pos + n > end) throw truncated();
+  let v = 0n;
+  for (let i = pos + n - 1; i >= pos; i--) v = (v << 8n) | BigInt(src[i] ?? 0);
+  pos += n;
+  return v;
+}
+
+function map(n: number, depth: number): Map<unknown, unknown> {
+  const d = nest(depth);
+  if (pos + n * 2 > end) throw truncated();
+  const m = new Map<unknown, unknown>();
+  for (let i = 0; i < n; i++) {
+    const k = read(d);
+    m.set(k, read(d));
+  }
+  return m;
+}
+
+function set(n: number, depth: number): Set<unknown> {
+  const d = nest(depth);
+  if (pos + n > end) throw truncated();
+  const s = new Set<unknown>();
+  for (let i = 0; i < n; i++) s.add(read(d));
+  return s;
+}
+
+const VIEWS: Record<F.ViewKind, (b: ArrayBuffer) => ArrayBufferView> = {
+  Int8Array: (b) => new Int8Array(b),
+  Uint8Array: (b) => new Uint8Array(b),
+  Uint8ClampedArray: (b) => new Uint8ClampedArray(b),
+  Int16Array: (b) => new Int16Array(b),
+  Uint16Array: (b) => new Uint16Array(b),
+  Int32Array: (b) => new Int32Array(b),
+  Uint32Array: (b) => new Uint32Array(b),
+  Float32Array: (b) => new Float32Array(b),
+  Float64Array: (b) => new Float64Array(b),
+  BigInt64Array: (b) => new BigInt64Array(b),
+  BigUint64Array: (b) => new BigUint64Array(b),
+  DataView: (b) => new DataView(b),
+};
+
+function typed(): ArrayBufferView {
+  const kind = VIEW_KINDS[byte()];
+  if (kind === undefined) throw new CodecError('malformed', 'unknown typed array kind');
+  const b = copy(varint());
+  try {
+    return VIEWS[kind](b);
+  } catch {
+    throw new CodecError('malformed', `${kind} byte length ${b.byteLength}`);
+  }
 }

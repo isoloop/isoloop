@@ -21,6 +21,14 @@ const {
   FIXARRAY_MAX,
   FIXOBJECT_MAX,
   MAX_DEPTH,
+  BIGINT,
+  NBIGINT,
+  DATE,
+  MAP,
+  SET,
+  ARRAYBUFFER,
+  VIEW,
+  VIEW_KINDS,
 } = F;
 
 const utf8 = new TextEncoder();
@@ -169,8 +177,9 @@ function write(v: unknown, depth: number): void {
       }
       if (Array.isArray(v)) return array(v, depth + 1);
       if (isPlainObject(v)) return object(v, depth + 1);
-      throw new CodecError('not_encodable', `${describe(v)} can't be encoded`);
+      return special(v, depth + 1);
     case 'bigint':
+      return bigint(v);
     case 'function':
     case 'symbol':
       throw new CodecError('not_encodable', `${describe(v)} can't be encoded`);
@@ -268,4 +277,63 @@ function object(o: Record<string, unknown>, depth: number): void {
     string(k);
     item(o[k], depth);
   }
+}
+
+const viewKind = (v: ArrayBufferView): number => {
+  const name = Object.prototype.toString.call(v).slice(8, -1);
+  return (VIEW_KINDS as readonly string[]).indexOf(name);
+};
+
+/** The structured-clone types beyond plain data. */
+function special(v: object, depth: number): void {
+  if (v instanceof Date) {
+    buf[pos] = DATE;
+    view.setFloat64(pos + 1, v.getTime(), true);
+    pos += 9;
+    return;
+  }
+  if (v instanceof Map) {
+    head(MAP, -1, MAP, v.size);
+    for (const [k, x] of v) {
+      item(k, depth);
+      item(x, depth);
+    }
+    return;
+  }
+  if (v instanceof Set) {
+    head(SET, -1, SET, v.size);
+    for (const x of v) item(x, depth);
+    return;
+  }
+  // Resizable buffers come back fixed-length, as their current bytes.
+  if (v instanceof ArrayBuffer) return bytes(ARRAYBUFFER, -1, new Uint8Array(v));
+  if (ArrayBuffer.isView(v)) {
+    const kind = viewKind(v);
+    // A view on a SharedArrayBuffer isn't data to write down.
+    if (kind < 0 || !(v.buffer instanceof ArrayBuffer)) {
+      throw new CodecError('not_encodable', `${describe(v)} can't be encoded`);
+    }
+    return bytes(VIEW, kind, new Uint8Array(v.buffer, v.byteOffset, v.byteLength));
+  }
+  throw new CodecError('not_encodable', `${describe(v)} can't be encoded`);
+}
+
+/** A tag, an optional kind byte, a varint length and the bytes. */
+function bytes(tag: number, kind: number, b: Uint8Array): void {
+  room(b.length);
+  buf[pos++] = tag;
+  if (kind >= 0) buf[pos++] = kind;
+  varint(b.length);
+  buf.set(b, pos);
+  pos += b.length;
+}
+
+function bigint(v: bigint): void {
+  let m = v < 0n ? -v : v;
+  const out: number[] = [];
+  while (m > 0n) {
+    out.push(Number(m & 0xffn));
+    m >>= 8n;
+  }
+  bytes(v < 0n ? NBIGINT : BIGINT, -1, Uint8Array.from(out));
 }

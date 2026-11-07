@@ -49,6 +49,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@isoloop/codec": "workspace:*",
     "@isoloop/protocol": "workspace:*"
   },
   "devDependencies": {

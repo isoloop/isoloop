@@ -560,3 +560,65 @@ describe('wake for suspended isolates (ADR 0001)', () => {
     expect(woken).toEqual([['Y', 'notes.v1']]);
   });
 });
+
+const transformed = (
+  name: string,
+  durability: 'memory' | 'persistent',
+  out: (s: string) => unknown,
+) =>
+  topic(name, {
+    schema: z.string().transform(out),
+    retention: { kind: 'last-n', n: 10 },
+    durability,
+  });
+
+describe('not_encodable (ADR 0007, M2b task 4)', () => {
+  // Values cross a MessagePort before the broker sees them, so a class
+  // instance arrives as a plain object; only a schema's output can still be
+  // one, or a function.
+  class Point {
+    x = 1;
+  }
+  const point = transformed('point.v1', 'persistent', () => new Point());
+  const fn = transformed('fn.v1', 'persistent', (s) => () => s);
+  const memPoint = transformed('mem-point.v1', 'memory', () => new Point());
+  const rich = transformed('rich.v1', 'persistent', () => ({
+    at: new Date(0),
+    ids: new Set([1n]),
+    m: new Map([['k', new Uint8Array([1])]]),
+  }));
+
+  const open = (dev: boolean) => {
+    const broker = new Broker({
+      contracts: contracts(point, fn, memPoint, rich),
+      engine: new TsEngine(),
+      dev,
+    });
+    return connect(broker, 'A', all);
+  };
+
+  it.each([
+    ['a class instance', 'point.v1', true],
+    ['a function', 'fn.v1', true],
+    ['a function, outside dev mode too', 'fn.v1', false],
+  ])('a persistent topic rejects %s', async (_name, name, dev) => {
+    expect(await open(dev).call('publish', { topic: name, value: 'x' })).toMatchObject({
+      ok: false,
+      error: { code: 'not_encodable' },
+    });
+  });
+
+  it('a memory topic accepts a class instance', async () => {
+    expect(await open(true).call('publish', { topic: 'mem-point.v1', value: 'x' })).toEqual({
+      ok: true,
+      value: { offset: 0 },
+    });
+  });
+
+  it('a persistent topic accepts every structured-clone type the codec covers', async () => {
+    expect(await open(true).call('publish', { topic: 'rich.v1', value: 'x' })).toEqual({
+      ok: true,
+      value: { offset: 0 },
+    });
+  });
+});

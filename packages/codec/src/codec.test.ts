@@ -69,6 +69,91 @@ describe('round trip', () => {
   });
 });
 
+describe('the other structured-clone types', () => {
+  const everything = fc.anything({
+    withBigInt: true,
+    withDate: true,
+    withMap: true,
+    withSet: true,
+    withTypedArray: true,
+    withBoxedValues: false,
+    withNullPrototype: false,
+    withObjectString: false,
+    withSparseArray: false,
+    stringUnit: 'grapheme',
+  });
+
+  it('decode(encode(v)) equals v for generated values', () => {
+    fc.assert(
+      fc.property(everything, (v) => {
+        expect(decode(encode(v))).toStrictEqual(v);
+      }),
+      { numRuns: 2000 },
+    );
+  });
+
+  it.each<[string, unknown]>([
+    ['0n', 0n],
+    ['a large bigint', 2n ** 200n + 12_345n],
+    ['a negative bigint', -(2n ** 64n) - 1n],
+    ['a Date', new Date(1_762_500_000_000)],
+    ['an invalid Date', new Date(Number.NaN)],
+    [
+      'a Map with object keys',
+      new Map<unknown, unknown>([
+        [{ a: 1 }, 'x'],
+        [2n, [1, 2]],
+      ]),
+    ],
+    ['a Set', new Set([1, 'a', null, undefined])],
+    ['an ArrayBuffer', new Uint8Array([1, 2, 3]).buffer],
+    ['an empty ArrayBuffer', new ArrayBuffer(0)],
+    ['a Float64Array', new Float64Array([1.5, -0, Number.NaN])],
+    ['a BigInt64Array', new BigInt64Array([-1n, 2n ** 62n])],
+    ['a DataView', new DataView(new Uint8Array([9, 8, 7]).buffer)],
+    [
+      'nested',
+      { when: new Date(0), tags: new Set(['a']), by: new Map([['k', new Uint16Array([1, 2])]]) },
+    ],
+  ])('%s', (_name, v) => {
+    expect(decode(encode(v))).toStrictEqual(v);
+  });
+
+  it('a view writes only its own bytes, into a buffer of its own', () => {
+    const backing = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]);
+    const view = new Uint16Array(backing.buffer, 2, 2);
+    const back = decode(encode(view));
+    expect(back).toStrictEqual(new Uint16Array([0x0302, 0x0504]));
+    expect(back instanceof Uint16Array && back.buffer.byteLength).toBe(4);
+  });
+
+  it.each<[string, unknown, string]>([
+    ['0n', 0n, 'ca 00'],
+    ['255n', 255n, 'ca 01 ff'],
+    ['-256n', -256n, 'cb 02 00 01'],
+    ['Date(0)', new Date(0), 'cc 00 00 00 00 00 00 00 00'],
+    ['Map { 1 => 2 }', new Map([[1, 2]]), 'cd 01 01 02'],
+    ['Set { 1 }', new Set([1]), 'ce 01 01'],
+    ['ArrayBuffer [1, 2]', new Uint8Array([1, 2]).buffer, 'cf 02 01 02'],
+    ['Uint16Array [1]', new Uint16Array([1]), 'd0 04 02 01 00'],
+  ])('byte layout: %s', (_name, value, bytes) => {
+    expect(hex(encode(value))).toBe(bytes);
+  });
+
+  it('a view on a SharedArrayBuffer throws not_encodable', () => {
+    expect(() => encode(new Uint8Array(new SharedArrayBuffer(4)))).toThrow(/not_encodable/);
+  });
+
+  it.each<[string, Uint8Array]>([
+    ['unknown view kind', new Uint8Array([0xd0, 0x40, 0x00])],
+    ['view length not a multiple of its element', new Uint8Array([0xd0, 0x08, 0x03, 1, 2, 3])],
+    ['truncated bigint', new Uint8Array([0xca, 0x04, 1])],
+    ['truncated Date', new Uint8Array([0xcc, 0, 0])],
+  ])('malformed: %s', (_name, bytes) => {
+    expect(() => decode(bytes)).toThrow(/malformed/);
+  });
+});
+
 describe('shared chunks', () => {
   it('earlier results stay intact as later ones fill and outgrow the chunk', () => {
     const values = Array.from({ length: 5000 }, (_, i) => ({ i, s: 'x'.repeat(i % 300) }));
