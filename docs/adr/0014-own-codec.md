@@ -1,6 +1,6 @@
 # ADR 0014: Our own codec for persistent topics
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-07)
 - **Date:** 2026-11-07
 - **Fills in:** [ADR 0007](0007-bus-worker-supervision.md), decision 3 ("records are encoded to bytes with one binary codec")
 

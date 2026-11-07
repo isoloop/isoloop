@@ -20,7 +20,7 @@ Short records of decisions that shape Isoloop's design. Each has a status:
 | [0010](0010-own-render-bridge.md) | Our own render bridge, `isoloop-dom@1`: a worker-side DOM subset sized to what Preact and React use, plain id-based records with one-record moves, no dependency; supersedes 0006 | Accepted |
 | [0011](0011-dom-package.md) | `@isoloop/dom` holds the bridge: `/worker`, `/host` and `/testing` entries, each half type-checked with its own `lib`; no runtime dependencies; owns the `isoloop-dom@1` format; sanitising policy passed in; exact fmt match; published as internal; every `@isoloop/*` package in one `fixed` release group | Accepted |
 | [0012](0012-isolates-built-apart.md) | Isolates built apart from the host are supported: the seam (`ctx`, the DOM subset, adapter hooks) only grows, isolates are stamped with `requires`, and the host runs `[FLOOR, VERSION]` (`runtime-too-old`, `isolate-too-old`) | Accepted |
-| [0014](0014-own-codec.md) | Our own binary codec for persistent topics, `isoloop-codec@1`: no library was more than 2× faster (at most 1.42×), ours is smaller on the wire and in the bundle | Proposed |
+| [0014](0014-own-codec.md) | Our own binary codec for persistent topics, `isoloop-codec@1`: no library was more than 2× faster (at most 1.42×), ours is smaller on the wire and in the bundle | Accepted |
 
 Ideas an ADR deferred are collected in [would-like](../would-like.md).
 
