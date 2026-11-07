@@ -19,6 +19,19 @@ pnpm dev
 
 The source is in [`examples/four-loops`](examples/four-loops): each pane is an isolate module in `src/isolates/`, spawned by [`@isoloop/host`](packages/host) into a shadow-DOM surface; `store.ts` is the headless one, and `src/contracts.ts` defines the topics.
 
+## The comparison
+
+The [markets dashboard](https://github.com/isoloop/examples/tree/main/apps/markets), built twice from one source: as an ordinary main-thread app and on Isoloop, in React and in Preact. The same scripted scenario runs on each: live-like market data at 10×, typing into the alerts panel, then typing while one chart runs a 3 s busy loop and the trades table floods the bus. Recorded in CI ([results and method](https://github.com/isoloop/examples/tree/main/apps/markets/comparison), [side-by-side video](https://github.com/isoloop/examples/blob/main/apps/markets/comparison/side-by-side.webm)):
+
+| Build | Typing, calm (median) | Typing, one chart blocked (median) | (worst) | fps after | Long tasks (10 s) | First data | JS, gzipped |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Native · React | 11 ms | 2832 ms | 2844 ms | 27 | 3 | 168 ms | 100 KB |
+| Isoloop · React | 34 ms | 42 ms | 58 ms | 61 | 0 | 357 ms | 153 KB |
+| Native · Preact | 13 ms | 2832 ms | 2847 ms | 4 | 3 | 103 ms | 41 KB |
+| Isoloop · Preact | 35 ms | 40 ms | 86 ms | 61 | 0 | 277 ms | 94 KB |
+
+With one chart blocked, the native page waits the busy loop out; on Isoloop the other widgets keep answering at 60 fps. That costs about 25 ms per keystroke when nothing is blocked, slower first data and about 50 KB more JavaScript, and the numbers above show it.
+
 ## Why
 
 Today all the front-end code on a page shares one main thread, one heap and one event loop: every micro-frontend, every widget, and every headless engine such as a state store, a sync engine or a search index. One slow or broken piece makes the whole page janky or blank. Existing sandboxes (JS proxies, Shadow DOM) isolate globals and styles, not CPU time or crashes. A plain Web Worker isolates CPU time, but it leaves you to wire up how independent pieces share data.
