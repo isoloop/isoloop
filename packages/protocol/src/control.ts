@@ -40,7 +40,17 @@ export type HostToBus =
    */
   | Envelope<
       'boot',
-      { contractsUrl: string; topics: TopicConfig[]; heartbeatMs?: number; dev?: boolean }
+      {
+        contractsUrl: string;
+        topics: TopicConfig[];
+        heartbeatMs?: number;
+        dev?: boolean;
+        /**
+         * Safe mode (ADR 0007, decision 5): the bus crashed twice while
+         * loading, so it sets each persistent topic's newest segment aside.
+         */
+        safeMode?: boolean;
+      }
     >
   /**
    * `reattach`: the isolate was connected to a bus that has since restarted,
@@ -60,7 +70,13 @@ export type HostToBus =
 export type BusToHost =
   | Envelope<
       'ready',
-      { engine: string; storage: 'memory' | 'opfs'; restored: { topic: string; head: number }[] }
+      {
+        engine: string;
+        storage: 'memory' | 'opfs';
+        restored: { topic: string; head: number }[];
+        /** Safe mode only: the segments set aside, as `<topic>/<file>`. */
+        quarantined?: string[];
+      }
     >
   | Envelope<'beat', { lagMs: number }>
   /** A record arrived for a suspended isolate (ADR 0001). */

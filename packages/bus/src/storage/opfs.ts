@@ -1,6 +1,8 @@
 import type { LogStorage, StoredState } from '../engine/types';
 import { decodeFrame, frameOffset, pack, scanFrames, unpack } from './frame';
+import { syncHandle } from './handle';
 import { nextOffset, scanSegment } from './recover';
+import { quarantineNewest, quarantinedHead } from './safe-mode';
 
 /** Segment files roll over past this size (design §6.2). */
 export const SEGMENT_BYTES: number = 4 * 1024 * 1024;
@@ -39,6 +41,8 @@ type TopicFiles = {
   compactions: number;
   /** Retention waiting for a running compaction to finish. */
   deferredDrop: number | undefined;
+  /** The offset after every segment safe mode set aside; 0 when none is. */
+  quarantined: number;
 };
 
 // A segment is named after its first offset. A compaction's output also
@@ -64,6 +68,9 @@ const SLOTS = ['offsets.0', 'offsets.1'] as const;
 
 type Commits = Record<string, number>;
 
+/** The file isn't there. Any other error (one still held, I/O) is not the same as missing. */
+const notFound = (e: unknown): boolean => e instanceof DOMException && e.name === 'NotFoundError';
+
 /** Whether compaction keeps a record, from its offset and key. */
 type Keep = (offset: number, key: string | undefined) => boolean;
 
@@ -83,8 +90,9 @@ async function readOffsets(
     try {
       // oxlint-disable-next-line no-await-in-loop -- two small files
       bytes = await readFile(dir, slot);
-    } catch {
-      continue;
+    } catch (e) {
+      if (notFound(e)) continue;
+      throw e;
     }
     const frame = scanFrames(bytes).frames[0];
     if (!frame) continue;
@@ -105,8 +113,9 @@ async function readMarker(
   let bytes: Uint8Array;
   try {
     bytes = await readFile(dir, name);
-  } catch {
-    return undefined;
+  } catch (e) {
+    if (notFound(e)) return undefined;
+    throw e;
   }
   const frame = scanFrames(bytes).frames[0];
   if (!frame) return undefined;
@@ -122,7 +131,7 @@ async function writeFile(
   bytes: Uint8Array,
 ): Promise<void> {
   const file = await dir.getFileHandle(name, { create: true });
-  const handle = await file.createSyncAccessHandle();
+  const handle = await syncHandle(file);
   try {
     handle.write(bytes, { at: 0 });
     handle.truncate(bytes.length);
@@ -137,7 +146,7 @@ async function remove(dir: FileSystemDirectoryHandle, name: string): Promise<voi
   try {
     await dir.removeEntry(name);
   } catch (e) {
-    if (!(e instanceof DOMException && e.name === 'NotFoundError')) throw e;
+    if (!notFound(e)) throw e;
   }
 }
 
@@ -159,7 +168,7 @@ async function names(dir: FileSystemDirectoryHandle): Promise<string[]> {
 /** Reads a whole file through a sync access handle, closing it after. */
 async function readFile(dir: FileSystemDirectoryHandle, name: string): Promise<Uint8Array> {
   const file = await dir.getFileHandle(name);
-  const handle = await file.createSyncAccessHandle();
+  const handle = await syncHandle(file);
   try {
     return readAll(handle);
   } finally {
@@ -248,8 +257,12 @@ export class OpfsStorage implements LogStorage {
         if (Object.keys(saved.commits).length > 0) state.offsets[topic] = saved.commits;
         const first = files.segments[0];
         const last = files.segments.at(-1);
-        if (first === undefined || last === undefined) return undefined;
-        return { topic, tail: first.first, head: await this.#recoverNewest(files, last) };
+        // Offsets a quarantined segment used are skipped, never reused (I5).
+        const floor = files.quarantined;
+        if (first === undefined || last === undefined)
+          return floor > 0 ? { topic, tail: floor, head: floor } : undefined;
+        const head = Math.max(floor, await this.#recoverNewest(files, last));
+        return { topic, tail: first.first, head };
       }),
     );
     for (const t of found) if (t) state.topics.push(t);
@@ -259,7 +272,7 @@ export class OpfsStorage implements LogStorage {
 
   /** Truncates the newest segment after its last intact frame; returns the head. */
   async #recoverNewest(files: TopicFiles, seg: Seg): Promise<number> {
-    const handle = await (await files.dir.getFileHandle(seg.name)).createSyncAccessHandle();
+    const handle = await syncHandle(await files.dir.getFileHandle(seg.name));
     try {
       const bytes = readAll(handle);
       const scan = scanSegment(bytes);
@@ -280,7 +293,8 @@ export class OpfsStorage implements LogStorage {
     const dir = await root.getDirectoryHandle(dirName(topic), { create: true });
     const segments: Seg[] = [];
     let compactions = 0;
-    for (const name of await names(dir)) {
+    const all = await names(dir);
+    for (const name of all) {
       const m = SEGMENT.exec(name);
       if (m?.[1] === undefined) continue;
       segments.push({ first: Number(m[1]), name });
@@ -294,6 +308,7 @@ export class OpfsStorage implements LogStorage {
       active: undefined,
       compactions,
       deferredDrop: undefined,
+      quarantined: quarantinedHead(all),
     };
     this.#topics.set(topic, files);
     return files;
@@ -430,7 +445,7 @@ export class OpfsStorage implements LogStorage {
     }
     const name = segmentName(first);
     const file = await files.dir.getFileHandle(name, { create: true });
-    const handle = await file.createSyncAccessHandle();
+    const handle = await syncHandle(file);
     const active: Active = { name, handle, size: handle.getSize() };
     files.active = active;
     files.segments.push({ first, name });
@@ -574,7 +589,7 @@ export class OpfsStorage implements LogStorage {
               // oxlint-disable-next-line no-await-in-loop -- output files open one at a time
               const file = await files.dir.getFileHandle(seg.name, { create: true });
               // oxlint-disable-next-line no-await-in-loop
-              const handle = await file.createSyncAccessHandle();
+              const handle = await syncHandle(file);
               out = { name: seg.name, handle, size: 0 };
               outputs.push(seg);
             }
@@ -688,9 +703,10 @@ export class OpfsStorage implements LogStorage {
     return [];
   }
 
-  quarantineNewest(): Promise<string[]> {
-    // M2b task 12.
-    return Promise.resolve([]);
+  /** Safe mode: call before `open`. See safe-mode.ts. */
+  async quarantineNewest(): Promise<string[]> {
+    const root = (this.#root ??= this.#rootOption ?? (await defaultRoot()));
+    return quarantineNewest(root);
   }
 
   /** Segment files of a topic, oldest first. For tests and metrics. */

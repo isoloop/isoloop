@@ -41,6 +41,8 @@ export type BusFailure =
 
 export type BusControllerEvents = {
   ready(first: boolean): void;
+  /** Safe mode set these segments aside, as `<topic>/<file>` (ADR 0007, decision 5). */
+  recovered(quarantined: string[]): void;
   crash(reason: CrashReason, message: string): void;
   restart(restarts: number): void;
   failed(f: BusFailure): void;
@@ -123,6 +125,11 @@ function deadPort(): MessagePort {
 
 type Conn = { grants: Grants; gen: number };
 
+/** A crash this soon after `ready` still counts as one while loading (ADR 0007, decision 5). */
+export const SAFE_MODE_WINDOW_MS = 2000;
+/** Crashes while loading, in a row, before the next bus boots in safe mode. */
+const SAFE_MODE_AFTER = 2;
+
 type PendingPublish = { resolve: (r: CallResult) => void; sentTo: number | undefined };
 
 export function createBusController(o: BusControllerOptions): BusController {
@@ -133,6 +140,10 @@ export function createBusController(o: BusControllerOptions): BusController {
   /** Generation of the live bus worker, or of the next one while none runs. */
   let gen = 0;
   let everReady = false;
+  /** When the live bus worker sent `ready`; unset while it loads. */
+  let readyAt: number | undefined;
+  /** Crashes during or right after loading, in a row. */
+  let loadCrashes = 0;
   let fatal = false;
   let destroyed = false;
   let spawnTimer: ReturnType<typeof setTimeout> | undefined;
@@ -186,8 +197,10 @@ export function createBusController(o: BusControllerOptions): BusController {
       case 'ready': {
         const first = !everReady;
         everReady = true;
+        readyAt = performance.now();
         feed({ k: 'ready' });
         o.events.ready(first);
+        if (msg.p.quarantined) o.events.recovered(msg.p.quarantined);
         return;
       }
       case 'beat':
@@ -250,10 +263,20 @@ export function createBusController(o: BusControllerOptions): BusController {
       if (worker === w)
         feed({ k: 'workerError', at: performance.now(), message: e.message || 'Unknown error' });
     });
+    // A persisted record is the likely cause of crashing while loading, again.
+    const safeMode = loadCrashes >= SAFE_MODE_AFTER;
+    if (safeMode) loadCrashes = 0;
+    readyAt = undefined;
     w.postMessage({
       v: 1,
       t: 'boot',
-      p: { contractsUrl: o.contracts.url, topics, heartbeatMs: o.heartbeatMs, dev: o.dev },
+      p: {
+        contractsUrl: o.contracts.url,
+        topics,
+        heartbeatMs: o.heartbeatMs,
+        dev: o.dev,
+        ...(safeMode ? { safeMode: true } : {}),
+      },
     } satisfies HostToBus);
     for (const q of queue.splice(0)) w.postMessage(q.msg, q.transfer);
     for (const p of results.values()) p.sentTo ??= mine;
@@ -283,8 +306,12 @@ export function createBusController(o: BusControllerOptions): BusController {
           }, fx.afterMs);
           break;
         case 'emit':
-          if (fx.event === 'isolate:crash') o.events.crash(fx.data.reason, fx.data.message);
-          else if (fx.event === 'isolate:failed')
+          if (fx.event === 'isolate:crash') {
+            const loading =
+              readyAt === undefined || performance.now() - readyAt < SAFE_MODE_WINDOW_MS;
+            loadCrashes = loading ? loadCrashes + 1 : 0;
+            o.events.crash(fx.data.reason, fx.data.message);
+          } else if (fx.event === 'isolate:failed')
             failForGood({ reason: fx.data.reason, message: fx.data.message });
           break;
         case 'shutdown':

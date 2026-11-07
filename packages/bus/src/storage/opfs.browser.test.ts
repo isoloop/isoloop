@@ -193,3 +193,15 @@ describe.skipIf(skip)('eviction and replay from disk (M2b task 11)', () => {
     );
   }, 60_000);
 });
+
+describe.skipIf(skip)('safe mode (M2b task 12)', () => {
+  it('sets each topic’s newest segment aside, keeps the rest, and keeps the head', async () => {
+    expect(await run('safe mode: the newest segment is set aside')).toEqual({
+      quarantined: true,
+      oneFewer: true,
+      keptInOrder: true,
+      head: 50,
+      setAside: true,
+    });
+  });
+});
