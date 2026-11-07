@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApplier, type SanitisePolicy } from '../host/applier';
 import type { DomBatch } from '../shared/records';
-import { createDom, WElement, type WNode } from '../worker/dom';
+import { createDom, WElement, WHTMLInputElement, type WNode } from '../worker/dom';
 import { runBridgeConformance, type ConformanceEvent, type ConformanceHost } from './conformance';
 import { createIsoloopDomDriver } from './driver';
 
@@ -214,6 +214,35 @@ describe('applier', () => {
     container.addEventListener('keydown', (e) => (none = applier.eventFor(e)), { once: true });
     span.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
     expect(none).toBeNull();
+  });
+
+  it("a checkbox reports `checked` only when the worker doesn't know it yet", () => {
+    const { container, applier, dom, doc, sync } = pair();
+    const input = doc.createElement('input');
+    if (!(input instanceof WHTMLInputElement)) throw new Error('no worker input');
+    input.setAttribute('type', 'checkbox');
+    input.checked = true;
+    for (const t of ['click', 'input', 'change']) input.addEventListener(t, () => {});
+    dom.root.appendChild(input);
+    sync();
+    const real = container.querySelector('input');
+    if (!real) throw new Error('no input');
+    const seen: unknown[] = [];
+    for (const t of ['click', 'input', 'change'])
+      container.addEventListener(t, (e) => seen.push(applier.eventFor(e)?.checked));
+    // One click fires click, input and change with the same state: only the
+    // first reports it, so the later ones can't undo what the worker set since.
+    real.click();
+    expect(seen.splice(0)).toEqual([false, undefined, undefined]);
+    // The worker sets it back and then forward again, as React does with a
+    // controlled checkbox whose state arrives later: the next click reports.
+    input.checked = true;
+    sync();
+    input.checked = false;
+    sync();
+    expect(real.checked).toBe(false);
+    real.click();
+    expect(seen.splice(0)).toEqual([true, undefined, undefined]);
   });
 
   it('clear() empties the container and forgets ids', () => {
