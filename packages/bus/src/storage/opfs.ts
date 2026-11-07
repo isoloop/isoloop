@@ -1,6 +1,7 @@
 import type { LogStorage, StoredState } from '../engine/types';
 import { decodeFrame, frameOffset, pack, scanFrames, unpack } from './frame';
 import { nextOffset, scanSegment } from './recover';
+import { quarantineNewest, quarantinedHead } from './safe-mode';
 
 /** Segment files roll over past this size (design §6.2). */
 export const SEGMENT_BYTES: number = 4 * 1024 * 1024;
@@ -39,6 +40,8 @@ type TopicFiles = {
   compactions: number;
   /** Retention waiting for a running compaction to finish. */
   deferredDrop: number | undefined;
+  /** The offset after every segment safe mode set aside; 0 when none is. */
+  quarantined: number;
 };
 
 // A segment is named after its first offset. A compaction's output also
@@ -248,8 +251,12 @@ export class OpfsStorage implements LogStorage {
         if (Object.keys(saved.commits).length > 0) state.offsets[topic] = saved.commits;
         const first = files.segments[0];
         const last = files.segments.at(-1);
-        if (first === undefined || last === undefined) return undefined;
-        return { topic, tail: first.first, head: await this.#recoverNewest(files, last) };
+        // Offsets a quarantined segment used are skipped, never reused (I5).
+        const floor = files.quarantined;
+        if (first === undefined || last === undefined)
+          return floor > 0 ? { topic, tail: floor, head: floor } : undefined;
+        const head = Math.max(floor, await this.#recoverNewest(files, last));
+        return { topic, tail: first.first, head };
       }),
     );
     for (const t of found) if (t) state.topics.push(t);
@@ -280,7 +287,8 @@ export class OpfsStorage implements LogStorage {
     const dir = await root.getDirectoryHandle(dirName(topic), { create: true });
     const segments: Seg[] = [];
     let compactions = 0;
-    for (const name of await names(dir)) {
+    const all = await names(dir);
+    for (const name of all) {
       const m = SEGMENT.exec(name);
       if (m?.[1] === undefined) continue;
       segments.push({ first: Number(m[1]), name });
@@ -294,6 +302,7 @@ export class OpfsStorage implements LogStorage {
       active: undefined,
       compactions,
       deferredDrop: undefined,
+      quarantined: quarantinedHead(all),
     };
     this.#topics.set(topic, files);
     return files;
@@ -688,9 +697,10 @@ export class OpfsStorage implements LogStorage {
     return [];
   }
 
-  quarantineNewest(): Promise<string[]> {
-    // M2b task 12.
-    return Promise.resolve([]);
+  /** Safe mode: call before `open`. See safe-mode.ts. */
+  async quarantineNewest(): Promise<string[]> {
+    const root = (this.#root ??= this.#rootOption ?? (await defaultRoot()));
+    return quarantineNewest(root);
   }
 
   /** Segment files of a topic, oldest first. For tests and metrics. */

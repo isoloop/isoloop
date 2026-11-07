@@ -179,6 +179,12 @@ export type KernelEvents = {
   /** The bus worker loaded its contracts. `first` is false after a restart. */
   'bus:ready': { first: boolean };
   'bus:crash': { reason: CrashReason; message: string };
+  /**
+   * The bus crashed twice while loading, so it started in safe mode: each
+   * persistent topic's newest segment was set aside, renamed and kept
+   * (ADR 0007, decision 5). `quarantined` lists them as `<topic>/<file>`.
+   */
+  'bus:recovered': { quarantined: string[] };
   /** A new bus worker is starting; running isolates get a new bus port (ADR 0007). */
   'bus:restart': { restarts: number };
   /**
@@ -407,6 +413,7 @@ export function createKernel(config: KernelConfig): Kernel {
     'workers:budget': new Set(),
     'bus:ready': new Set(),
     'bus:crash': new Set(),
+    'bus:recovered': new Set(),
     'bus:restart': new Set(),
     'bus:failed': new Set(),
     'bus:metrics': new Set(),
@@ -852,6 +859,7 @@ export function createKernel(config: KernelConfig): Kernel {
                   if (!slot.manifest.surface) feed(slot, { k: 'wake' });
             },
             crash: (reason, message) => emit('bus:crash', { reason, message }),
+            recovered: (quarantined) => emit('bus:recovered', { quarantined }),
             restart: (restarts) => emit('bus:restart', { restarts }),
             metrics: (m) => {
               warnLossyTopics(m.subscriptions);

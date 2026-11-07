@@ -22,7 +22,7 @@ import {
 import { Broker, type BrokerStats, type BusPort } from './broker';
 import { MemoryStorage } from './engine/memory-storage';
 import { TsEngine } from './engine/ts-engine';
-import type { LogStorage } from './engine/types';
+import type { LogStorage, StoredState } from './engine/types';
 import { OpfsStorage } from './storage/opfs';
 import { isContracts, topicConfig, type Contracts } from './topic';
 
@@ -305,13 +305,13 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
     }, METRICS_MS);
   };
 
-  /** An engine and broker on `storage`, with persistent topics restored from it. */
+  /** An engine and broker on `storage`, with persistent topics restored from `stored`. */
   const build = async (
     list: Contracts,
     storage: LogStorage,
+    stored: StoredState,
     dev: boolean,
   ): Promise<{ b: Broker; restored: { topic: string; head: number }[] }> => {
-    const stored = await storage.open();
     const engine = new TsEngine({ storage });
     const b = new Broker({
       contracts: list,
@@ -338,19 +338,41 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
     const dev = p.dev ?? false;
     let storage =
       opts.storage?.() ?? (OpfsStorage.available() ? new OpfsStorage() : new MemoryStorage());
-    let built: Awaited<ReturnType<typeof build>>;
+    let quarantined: string[] | undefined;
+    let stored: StoredState;
     try {
-      // Persistent topics come back from disk before anything is let in.
-      built = await build(list, storage, dev);
+      if (p.safeMode) quarantined = await storage.quarantineNewest();
+      stored = await storage.open();
     } catch (e) {
       // The files couldn't be opened: run in memory rather than not at all.
       console.warn('[isoloop] persistent topics are in memory: storage failed to open', e);
       storage = new MemoryStorage();
-      built = await build(list, storage, dev);
+      stored = await storage.open();
+    }
+    let built: Awaited<ReturnType<typeof build>>;
+    try {
+      // Persistent topics come back from disk before anything is let in.
+      built = await build(list, storage, stored, dev);
+    } catch (e) {
+      // A stored record broke the restore: a crash while loading. The host
+      // restarts the bus, and after a second one boots it in safe mode.
+      post({
+        v: 1,
+        t: 'error',
+        p: {
+          message: `Restoring persistent topics failed: ${e instanceof Error ? e.message : String(e)}`,
+          fatal: true,
+        },
+      });
+      return;
     }
     const { b, restored } = built;
     broker = b;
-    post({ v: 1, t: 'ready', p: { engine: 'ts', storage: storage.kind, restored } });
+    post({
+      v: 1,
+      t: 'ready',
+      p: { engine: 'ts', storage: storage.kind, restored, ...(quarantined ? { quarantined } : {}) },
+    });
     for (const msg of early.splice(0)) control(msg, b);
     startMetrics(b);
   };

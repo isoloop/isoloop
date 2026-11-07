@@ -50,6 +50,27 @@ function setup(extra: Partial<KernelConfig> = {}) {
   return { kernel, log, reports, latest };
 }
 
+/** CRC-32 (IEEE), as the bus's frames use. */
+function crc32(bytes: Uint8Array): number {
+  let c = 0xffff_ffff;
+  for (const b of bytes) {
+    c ^= b;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb8_8320 ^ (c >>> 1) : c >>> 1;
+  }
+  return (c ^ 0xffff_ffff) >>> 0;
+}
+
+/** A segment frame at `offset` whose body is a codec tag that doesn't exist. */
+function poisonFrame(offset: number): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(8 + 8 + 1);
+  const view = new DataView(out.buffer);
+  view.setUint32(0, 9, true);
+  view.setFloat64(8, offset, true);
+  out[16] = 0xd1;
+  view.setUint32(4, crc32(out.subarray(8)), true);
+  return out;
+}
+
 describe('bus controller', () => {
   it('starts the bus, wires isolates to it, and carries kernel.publish / kernel.subscribe', async () => {
     const { kernel, log, latest } = setup();
@@ -148,6 +169,48 @@ describe('bus controller', () => {
     kernel.subscribe(saved, (r) => got.push(r.value), { from: 'earliest' });
     await vi.waitUntil(() => got.length === 25);
     expect(got).toEqual(Array.from({ length: 25 }, (_, i) => i));
+  });
+
+  it('safe mode: a stored record that crashes the bus twice while loading is set aside (M2b)', async () => {
+    const first = setup();
+    const ready = first.log('bus:ready');
+    await vi.waitUntil(() => ready.length === 1);
+    await Promise.all([0, 1, 2].map((i) => first.kernel.publish(saved, { value: i })));
+    await first.kernel.destroy();
+
+    // A record the codec can't read, with a valid CRC, after the three: the
+    // restore throws on it every time.
+    const dir = await (
+      await (await navigator.storage.getDirectory()).getDirectoryHandle('isoloop')
+    )
+      .getDirectoryHandle('topics')
+      .then((d) => d.getDirectoryHandle('saved.v1'));
+    const segment = await dir.getFileHandle('0000000000000000.seg');
+    const writable = await vi.waitUntil(() =>
+      segment.createWritable({ keepExistingData: true }).catch(() => undefined),
+    );
+    await writable.seek((await segment.getFile()).size);
+    await writable.write(poisonFrame(3));
+    await writable.close();
+
+    const second = setup();
+    const crashes = second.log('bus:crash');
+    const recovered = second.log('bus:recovered');
+    const ready2 = second.log('bus:ready');
+    await vi.waitUntil(() => recovered.length === 1, { timeout: 10_000 });
+    expect(recovered[0]).toEqual({ quarantined: ['saved.v1/0000000000000000.seg'] });
+    expect(crashes.length).toBe(2);
+    await vi.waitUntil(() => ready2.length === 1);
+
+    // Set aside, not deleted; and its offsets aren't handed out again (I5).
+    const names: string[] = [];
+    for await (const name of dir.keys()) names.push(name);
+    expect(names).toContain('0000000000000000.seg.to-0000000000000004.quarantined');
+    await second.kernel.publish(saved, { value: 9 });
+    const got: BusRecord[] = [];
+    second.kernel.subscribe(saved, (r) => got.push(r), { from: 'earliest' });
+    await vi.waitUntil(() => got.length === 1);
+    expect(got.map((r) => [r.offset, r.value])).toEqual([[4, 9]]);
   });
 
   it('a contracts mismatch is fatal: bus:failed, isolates fail, spawn throws', async () => {

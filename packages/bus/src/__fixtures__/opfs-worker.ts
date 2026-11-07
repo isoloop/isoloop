@@ -541,6 +541,34 @@ const scenarios: Record<string, (dir: string) => Promise<unknown>> = {
       ),
     };
   },
+
+  async 'safe mode: the newest segment is set aside'(dir) {
+    const { storage, engine } = await engineOn(dir, { segmentBytes: 4 * 1024 });
+    const note = 's'.repeat(200);
+    for (let i = 0; i < 50; i++)
+      engine.append('saved.v1', { value: { i, note }, ts: 0, producer: 'p' });
+    await engine.flush();
+    const before = await storage.segments('saved.v1');
+    await storage.close();
+    const again = new OpfsStorage({ root: await root(dir), segmentBytes: 4 * 1024 });
+    const quarantined = await again.quarantineNewest();
+    const state = await again.open();
+    const after = await again.segments('saved.v1');
+    const kept = await readAll(again, 'saved.v1');
+    await again.close();
+    const topicDir = await (await root(dir)).getDirectoryHandle('saved.v1');
+    const files: string[] = [];
+    for await (const name of topicDir.keys()) files.push(name);
+    return {
+      quarantined: quarantined[0] === `saved.v1/${before.at(-1) ?? ''}`,
+      oneFewer: after.length === before.length - 1,
+      keptInOrder: kept.every((r, k) => r.offset === k),
+      head: state.topics[0]?.head,
+      setAside: files.some(
+        (f) => f.startsWith(before.at(-1) ?? '?') && f.endsWith('.to-0000000000000050.quarantined'),
+      ),
+    };
+  },
 };
 
 self.addEventListener(

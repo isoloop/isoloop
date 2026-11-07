@@ -208,7 +208,7 @@ interface Kernel {
   resume(id: string): Promise<void>;                   // wake a suspended isolate (ADR 0001); no-op unless suspended
   publish<In>(topic: TopicRef<In>, rec: { key?: string; value: In }): Promise<void>;   // rejects with a BusError
   subscribe<Out>(topic: TopicRef<unknown, Out>, fn: (r: TypedRecord<Out>) => void, opts?: { from?: StartPosition }): () => void;   // from 'latest' by default
-  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:ready, bus:crash, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
+  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:ready, bus:crash, bus:recovered, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
   isolates(): IsolateSnapshot[];                                      // used by devtools
   syncRoute(): void;                                   // host router changed the URL; republish isoloop.route.v1 if href/state differ (ADR 0002)
   dropTopic(name: string, o?: { force?: boolean }): Promise<void>;   // M2b: delete an orphaned persistent topic; seed_pending / force rules (ADR 0003)
@@ -604,7 +604,7 @@ sequenceDiagram
   I->>B2: publish (buffered records)
 ```
 
-An isolate with `bus: { onReset: 'restart' }` is restarted instead of receiving `reset`. After the new bus is `ready`, the kernel republishes the route topic and wakes every suspended headless isolate (§4.3). In M2b, if the new bus crashes again while loading, safe mode sets the newest segments aside and the kernel emits `bus:recovered`.
+An isolate with `bus: { onReset: 'restart' }` is restarted instead of receiving `reset`. After the new bus is `ready`, the kernel republishes the route topic and wakes every suspended headless isolate (§4.3). A crash while the bus loads, or within 2 s of its `ready`, counts as a crash while loading. After two in a row, the next bus boots in safe mode: it sets each persistent topic's newest segment aside (copied to `<segment>.quarantined`, never deleted) and starts from the one before, and the kernel emits `bus:recovered { quarantined }`. A stored record the restore can't read is such a crash.
 
 ## 8. Invariants
 
