@@ -1,0 +1,35 @@
+# Publishes every public @isoloop/* package as 0.0.0-next.<sha> under the npm
+# `next` dist-tag (M3b task 1), a stopgap until M4's Changesets pipeline.
+# npm trusts this workflow file for each package (trusted publishing), so there
+# is no token: the job's OIDC token authenticates, and provenance is automatic.
+name: Prerelease
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: prerelease
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: |
+          node -e "const [a,b,c]=process.argv[1].split('.').map(Number); if (a<11||(a===11&&(b<5||(b===5&&c<1)))) { console.error('npm '+process.argv[1]+' is older than 11.5.1'); process.exit(1) }" "$(npm --version)"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node scripts/prerelease.ts
