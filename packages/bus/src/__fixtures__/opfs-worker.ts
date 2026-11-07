@@ -49,7 +49,50 @@ async function readAll(storage: OpfsStorage, name: string) {
   return out;
 }
 
+async function reopen(dir: string) {
+  const storage = new OpfsStorage({ root: await root(dir) });
+  const state = await storage.open();
+  await storage.close();
+  return state;
+}
+
 const scenarios: Record<string, (dir: string) => Promise<unknown>> = {
+  async 'offsets survive a reopen'(dir) {
+    const { storage, engine } = await engineOn(dir);
+    engine.append('saved.v1', { value: 1, ts: 0, producer: 'p' });
+    engine.commit('saved.v1', 'c1', 41);
+    engine.commit('saved.v1', 'c2', 7);
+    engine.commit('saved.v1', 'c1', 42);
+    await engine.flush();
+    await storage.close();
+    return (await reopen(dir)).offsets;
+  },
+
+  async 'a torn offsets write leaves the previous offsets'(dir) {
+    const { storage, engine } = await engineOn(dir);
+    engine.append('saved.v1', { value: 1, ts: 0, producer: 'p' });
+    engine.commit('saved.v1', 'c1', 5);
+    await engine.flush();
+    engine.commit('saved.v1', 'c1', 9);
+    engine.commit('saved.v1', 'c2', 3);
+    await engine.flush();
+    await storage.close();
+    const before = (await reopen(dir)).offsets;
+    // Kill the newest write halfway: generation 2 went to the slot offsets.0.
+    const topicDir = await (await root(dir)).getDirectoryHandle('saved.v1');
+    const handle = await (await topicDir.getFileHandle('offsets.0')).createSyncAccessHandle();
+    handle.truncate(Math.floor(handle.getSize() / 2));
+    handle.close();
+    const after = (await reopen(dir)).offsets;
+    // The next write still lands, on the slot that was torn.
+    const s2 = new OpfsStorage({ root: await root(dir) });
+    await s2.open();
+    s2.saveOffsets({ 'saved.v1': { c1: 11 } });
+    await s2.flush();
+    await s2.close();
+    return { before, after, next: (await reopen(dir)).offsets };
+  },
+
   async 'write and read back'(dir) {
     const { storage, engine } = await engineOn(dir);
     for (let i = 0; i < 10_000; i++) {

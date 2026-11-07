@@ -141,7 +141,9 @@ export class TsEngine implements LogEngine {
   }
 
   commit(topic: string, consumer: string, offset: number): void {
-    this.#topic(topic).commits.set(consumer, offset);
+    const t = this.#topic(topic);
+    t.commits.set(consumer, offset);
+    if (t.durable) this.#storage.saveOffsets({ [topic]: Object.fromEntries(t.commits) });
   }
 
   committed(topic: string, consumer: string): number | undefined {

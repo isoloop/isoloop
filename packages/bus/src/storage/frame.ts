@@ -11,6 +11,9 @@ import type { BusRecord } from '@isoloop/protocol';
 //
 // Little-endian throughout. A torn write leaves a frame whose length runs past
 // the file's end or whose CRC doesn't match; recovery truncates there.
+//
+// A topic's committed offsets use the same frame (`pack`), with a generation
+// number in place of the offset (opfs.ts).
 
 export const HEADER = 8;
 const OFFSET = 8;
@@ -38,18 +41,28 @@ export function crc32(bytes: Uint8Array, start = 0, end: number = bytes.length):
   return (c ^ 0xffff_ffff) >>> 0;
 }
 
+/** A frame: `number` in the header, `value` encoded after it. */
+export function pack(number: number, value: unknown): Uint8Array {
+  const body = encode(value);
+  const out = new Uint8Array(HEADER + OFFSET + body.length);
+  const view = new DataView(out.buffer);
+  view.setUint32(0, OFFSET + body.length, true);
+  view.setFloat64(HEADER, number, true);
+  out.set(body, HEADER + OFFSET);
+  view.setUint32(4, crc32(out, HEADER), true);
+  return out;
+}
+
+/** The value of a frame written by `pack`. */
+export function unpack(frame: Uint8Array): unknown {
+  return decode(frame.subarray(HEADER + OFFSET));
+}
+
 /** Encodes a record as one frame. Throws the codec's `not_encodable`. */
 export function encodeFrame(rec: StoredRecord): Uint8Array {
   const fields: unknown[] = [rec.ts, rec.producer, rec.value, rec.key, rec.req, rec.epoch, rec.seq];
   while (fields.length > 3 && fields.at(-1) === undefined) fields.pop();
-  const body = encode(fields);
-  const out = new Uint8Array(HEADER + OFFSET + body.length);
-  const view = new DataView(out.buffer);
-  view.setUint32(0, OFFSET + body.length, true);
-  view.setFloat64(HEADER, rec.offset, true);
-  out.set(body, HEADER + OFFSET);
-  view.setUint32(4, crc32(out, HEADER), true);
-  return out;
+  return pack(rec.offset, fields);
 }
 
 /** The offset in a frame's header. */
@@ -91,7 +104,7 @@ const isReq = (x: unknown): x is NonNullable<BusRecord['req']> =>
 /** Decodes one frame written by `encodeFrame`. */
 export function decodeFrame(frame: Uint8Array): StoredRecord {
   const offset = frameOffset(frame);
-  const fields = decode(frame.subarray(HEADER + OFFSET));
+  const fields = unpack(frame);
   const list = isList(fields) ? fields : [];
   const [ts, producer, value, key, req, epoch, seq] = list;
   if (typeof ts !== 'number' || typeof producer !== 'string') {

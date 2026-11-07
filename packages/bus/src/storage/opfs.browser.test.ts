@@ -72,3 +72,17 @@ describe.skipIf(skip)('OpfsStorage: segments and group commit', () => {
     });
   });
 });
+
+describe.skipIf(skip)('OpfsStorage: committed offsets', () => {
+  it('survive a reopen', async () => {
+    expect(await run('offsets survive a reopen')).toEqual({ 'saved.v1': { c1: 42, c2: 7 } });
+  });
+
+  it('a write killed halfway leaves the previous offsets', async () => {
+    expect(await run('a torn offsets write leaves the previous offsets')).toEqual({
+      before: { 'saved.v1': { c1: 9, c2: 3 } },
+      after: { 'saved.v1': { c1: 5 } },
+      next: { 'saved.v1': { c1: 11 } },
+    });
+  });
+});
