@@ -94,7 +94,12 @@ export type HostToBus =
    * batch now (ADR 0001, what the browser still controls). With `id` set, the
    * bus replies with `result` once it is on disk.
    */
-  | Envelope<'flush', Record<string, never>>;
+  | Envelope<'flush', Record<string, never>>
+  /**
+   * `kernel.dropTopic`: deletes a persistent topic the contracts no longer
+   * list (ADR 0003, decision 19). The bus replies with `result`.
+   */
+  | Envelope<'drop', { topic: string; force: boolean }>;
 
 /** Control port: bus worker → host. */
 export type BusToHost =
@@ -112,6 +117,11 @@ export type BusToHost =
          * the files failed to open.
          */
         degraded?: DurabilityDegraded;
+        /**
+         * Persistent topics on disk that the contracts no longer list: kept,
+         * not opened (ADR 0003, decision 19). `bytes` is their total size.
+         */
+        orphaned?: { names: string[]; bytes: number };
       }
     >
   | Envelope<'beat', { lagMs: number }>
@@ -130,6 +140,7 @@ export const HOST_TO_BUS: MessageTypes<HostToBus> = {
   detach: true,
   publish: true,
   flush: true,
+  drop: true,
 };
 
 export const BUS_TO_HOST: MessageTypes<BusToHost> = {

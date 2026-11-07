@@ -218,6 +218,12 @@ export type KernelEvents = {
   };
   /** A seed ended and the topic opened: `copied` records, `rejected` skipped. */
   'bus:seeded': { topic: string; copied: number; rejected: number };
+  /**
+   * Persistent topics on disk that the contracts no longer list, and their
+   * total size (ADR 0003, decision 19). They are kept, not opened; nothing is
+   * deleted until `kernel.dropTopic`.
+   */
+  'bus:orphaned_topics': { names: string[]; bytes: number };
   /** A new bus worker is starting; running isolates get a new bus port (ADR 0007). */
   'bus:restart': { restarts: number };
   /**
@@ -254,6 +260,15 @@ export interface Kernel {
    * `isoloop.*` topics, or the broker's code (`invalid`, `bus_unavailable`, …).
    */
   publish<In>(topic: TopicRef<In, any, any, any>, rec: { key?: string; value: In }): Promise<void>;
+  /**
+   * Deletes a persistent topic the contracts no longer list (ADR 0003,
+   * decision 19; see `bus:orphaned_topics`). Rejects with a `BusError`:
+   * `seed_pending` while a declared seed that reads it hasn't ended on this
+   * device, `invalid` for a topic the contracts list, or one whose rejected
+   * seed records are recorded unless `force` is set, `unknown_topic` when
+   * nothing is stored under the name.
+   */
+  dropTopic(name: string, opts?: { force?: boolean }): Promise<void>;
   /** Subscribes from the host, from `latest` by default. Records cross the main thread only here. */
   subscribe<Out>(
     topic: TopicRef<any, Out, any, any>,
@@ -451,6 +466,7 @@ export function createKernel(config: KernelConfig): Kernel {
     'bus:quota': new Set(),
     'bus:seed_rejected': new Set(),
     'bus:seeded': new Set(),
+    'bus:orphaned_topics': new Set(),
     'bus:restart': new Set(),
     'bus:failed': new Set(),
     'bus:metrics': new Set(),
@@ -898,6 +914,7 @@ export function createKernel(config: KernelConfig): Kernel {
             crash: (reason, message) => emit('bus:crash', { reason, message }),
             recovered: (quarantined) => emit('bus:recovered', { quarantined }),
             degraded: (reason) => emit('bus:durability-degraded', { reason }),
+            orphaned: (names, bytes) => emit('bus:orphaned_topics', { names, bytes }),
             seed: (e) => {
               if (e.kind === 'seeded') {
                 emit('bus:seeded', { topic: e.topic, copied: e.copied, rejected: e.rejected });
@@ -1215,6 +1232,16 @@ export function createKernel(config: KernelConfig): Kernel {
           message: 'No bus worker: KernelConfig.contracts is not set',
         });
       const r = await controller.publish(topic.name, rec.key, rec.value);
+      if (!r.ok) throw new BusError(r.error);
+    },
+
+    async dropTopic(name, opts) {
+      if (!controller)
+        throw new BusError({
+          code: 'bus_unavailable',
+          message: 'No bus worker: KernelConfig.contracts is not set',
+        });
+      const r = await controller.drop(name, opts?.force ?? false);
       if (!r.ok) throw new BusError(r.error);
     },
 

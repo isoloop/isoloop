@@ -187,15 +187,8 @@ export function contracts(...topics: AnyTopicDef[]): Contracts {
       names,
     );
   }
-  for (const t of topics) {
-    if (t.seed && !byName.has(t.seed.from.name)) {
-      throw new ContractsError(
-        'contracts_invalid',
-        `topic ${t.name} seeds from ${t.seed.from.name}, which the contracts don't list`,
-        [t.name],
-      );
-    }
-  }
+  // A seed may read a topic the contracts no longer list: the bus keeps it on
+  // disk for the seed, but doesn't open it to isolates (ADR 0003, decision 19).
   const cycle = seedCycle(byName);
   if (cycle) {
     throw new ContractsError(
@@ -215,12 +208,12 @@ export function contracts(...topics: AnyTopicDef[]): Contracts {
 function seedCycle(byName: Map<string, AnyTopicDef>): string[] | undefined {
   for (const start of byName.values()) {
     const path = [start.name];
-    let at = start.seed?.from.name;
+    let at = start.seed?.from;
     while (at !== undefined) {
-      if (at === start.name) return [...path, at];
-      if (path.includes(at)) break;
-      path.push(at);
-      at = byName.get(at)?.seed?.from.name;
+      if (at.name === start.name) return [...path, at.name];
+      if (path.includes(at.name)) break;
+      path.push(at.name);
+      at = (byName.get(at.name) ?? at).seed?.from;
     }
   }
   return undefined;

@@ -206,6 +206,8 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
   let booted = false;
   let failed = false;
   let broker: Broker | undefined;
+  /** The storage the broker's engine writes to, once booted. */
+  let currentStorage: LogStorage | undefined;
   /** Control messages that arrived before the broker, replayed in order. */
   const early: HostToBus[] = [];
   /** Ports attached before the broker: they buffer what their isolate sends. */
@@ -264,6 +266,31 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         );
         return;
       }
+      case 'drop': {
+        const { id } = msg;
+        const answer = (p: CallResult): void => {
+          if (id !== undefined) post({ v: 1, t: 'result', re: id, p });
+        };
+        const refusal = b.dropRefusal(msg.p.topic, msg.p.force);
+        if (refusal) return answer(refusal);
+        void currentStorage?.deleteTopic(msg.p.topic).then(
+          (deleted) =>
+            answer(
+              deleted
+                ? { ok: true, value: null }
+                : {
+                    ok: false,
+                    error: { code: 'unknown_topic', message: `no stored topic ${msg.p.topic}` },
+                  },
+            ),
+          (e: unknown) =>
+            answer({
+              ok: false,
+              error: { code: 'bus_unavailable', message: `drop ${msg.p.topic}: ${String(e)}` },
+            }),
+        );
+        return;
+      }
       default: {
         const never: never = msg;
         return never;
@@ -295,6 +322,9 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         }
         earlyPublishes++;
         break;
+      case 'drop':
+        early.push(msg);
+        return;
       case 'flush':
         // Nothing is written before the broker exists.
         if (msg.id !== undefined)
@@ -440,6 +470,23 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
     }
     const { b, restored } = built;
     broker = b;
+    currentStorage = storage;
+    // On disk but no longer in the contracts, nor read by a seed: kept, not opened.
+    const opened = new Set([...list.topics.map((t) => t.name), ...b.seedSources]);
+    const orphanNames =
+      storage.kind === 'opfs'
+        ? stored.topics.map((t) => t.topic).filter((n) => !opened.has(n))
+        : [];
+    const orphaned =
+      orphanNames.length > 0
+        ? {
+            names: orphanNames,
+            bytes: (await Promise.all(orphanNames.map((n) => storage.bytes(n)))).reduce(
+              (a, n) => a + n,
+              0,
+            ),
+          }
+        : undefined;
     // Seeds run where the files are (ADR 0003, decision 18). They mark their
     // topics before any port is attached; other topics don't wait.
     if (storage.kind === 'opfs') void b.seed();
@@ -452,6 +499,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         restored,
         ...(quarantined ? { quarantined } : {}),
         ...(degraded && persistent ? { degraded } : {}),
+        ...(orphaned ? { orphaned } : {}),
       },
     });
     for (const msg of early.splice(0)) control(msg, b);

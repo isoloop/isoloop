@@ -717,6 +717,30 @@ export class OpfsStorage implements LogStorage {
   }
 
   /** Writes what's pending, then releases every file handle. */
+  async bytes(topic: string): Promise<number> {
+    const files = this.#topics.get(topic);
+    if (!files) return 0;
+    let total = 0;
+    for (const seg of files.segments) {
+      if (files.active?.name === seg.name) total += files.active.handle.getSize();
+      // oxlint-disable-next-line no-await-in-loop -- one file at a time
+      else total += (await (await files.dir.getFileHandle(seg.name)).getFile()).size;
+    }
+    return total;
+  }
+
+  /** Orphaned topics only: nothing may be pending for it (ADR 0003, decision 19). */
+  async deleteTopic(topic: string): Promise<boolean> {
+    const files = this.#topics.get(topic);
+    const root = this.#root;
+    if (!files || !root) return false;
+    files.active?.handle.close();
+    files.active = undefined;
+    this.#topics.delete(topic);
+    await root.removeEntry(dirName(topic), { recursive: true });
+    return true;
+  }
+
   async close(): Promise<void> {
     // A running compaction stops at its next step and is undone.
     this.#closing = true;

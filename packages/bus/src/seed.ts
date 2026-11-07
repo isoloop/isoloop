@@ -75,10 +75,13 @@ export function seedOrder(topics: readonly AnyTopicDef[]): AnyTopicDef[] {
 const issue = (message: string): Issue[] => [{ message, path: [] }];
 
 /** Runs `map`; a throw or a returned promise rejects the record. */
-function mapOne(c: SeedCopy, rec: BusRecord): SeedVerdict {
+export function mapRecord(
+  map: (value: unknown, record: BusRecord) => unknown,
+  rec: BusRecord,
+): SeedVerdict {
   let mapped: unknown;
   try {
-    mapped = c.map(rec.value, rec);
+    mapped = map(rec.value, rec);
   } catch (e) {
     return { ok: false, code: 'invalid', issues: issue(`map threw: ${String(e)}`) };
   }
@@ -115,7 +118,7 @@ export async function copySeed(c: SeedCopy): Promise<SeedResult> {
     const end = batch.at(-1);
     if (!end) break;
     for (const rec of batch) {
-      const mapped = mapOne(c, rec);
+      const mapped = mapRecord(c.map, rec);
       // oxlint-disable-next-line no-await-in-loop -- records are copied in order
       const verdict = mapped.ok ? await c.accept(mapped.value) : mapped;
       if (!verdict.ok) {

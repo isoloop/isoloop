@@ -61,6 +61,8 @@ export type BusControllerEvents = {
   wake(isolateId: string, topic: string): void;
   /** Seeding news (ADR 0003, decision 18). */
   seed(e: SeedEvent): void;
+  /** Persistent topics on disk the contracts no longer list (ADR 0003, decision 19). */
+  orphaned(names: string[], bytes: number): void;
 };
 
 export type BusControllerOptions = {
@@ -93,6 +95,8 @@ export interface BusController {
   /** Forgets a suspended isolate the bus may still be watching for (stopped while asleep). */
   forget(isolateId: string): void;
   publish(topic: string, key: string | undefined, value: unknown): Promise<CallResult>;
+  /** Deletes an orphaned persistent topic (`kernel.dropTopic`). */
+  drop(topic: string, force: boolean): Promise<CallResult>;
   subscribe(sub: HostSubscription): () => void;
   /** Supervisor clock and page visibility, fed by the kernel. */
   feed(input: Extract<SupervisorInput, { k: 'tick' | 'hidden' | 'visible' }>): void;
@@ -213,6 +217,7 @@ export function createBusController(o: BusControllerOptions): BusController {
         o.events.ready(first);
         if (msg.p.quarantined) o.events.recovered(msg.p.quarantined);
         if (msg.p.degraded) o.events.degraded(msg.p.degraded);
+        if (msg.p.orphaned) o.events.orphaned(msg.p.orphaned.names, msg.p.orphaned.bytes);
         return;
       }
       case 'beat':
@@ -418,6 +423,15 @@ export function createBusController(o: BusControllerOptions): BusController {
         results.set(id, { resolve, sentTo: worker ? gen : undefined });
         const p = key === undefined ? { topic, value } : { topic, key, value };
         send({ v: 1, t: 'publish', id, p });
+      });
+    },
+
+    drop(topic, force) {
+      if (down()) return Promise.resolve(unavailable('The bus is down'));
+      const id = `h${++nextId}`;
+      return new Promise((resolve) => {
+        results.set(id, { resolve, sentTo: worker ? gen : undefined });
+        send({ v: 1, t: 'drop', id, p: { topic, force } });
       });
     },
 

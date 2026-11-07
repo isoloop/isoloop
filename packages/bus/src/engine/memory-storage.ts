@@ -30,6 +30,14 @@ export class MemoryStorage implements LogStorage {
     return Promise.resolve([]);
   }
 
+  bytes(_topic: string): Promise<number> {
+    return Promise.resolve(0);
+  }
+
+  deleteTopic(_topic: string): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
   quarantineNewest(): Promise<string[]> {
     return Promise.resolve([]);
   }
