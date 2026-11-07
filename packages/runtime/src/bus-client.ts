@@ -9,6 +9,8 @@
  *   the record and those after it are redelivered on the next start.
  * - On `reattach` (a bus restart) it swaps the port, sends every subscription
  *   again and re-sends every publish the old bus never answered, in order.
+ *   Each publish and request carries `(epoch, seq)`, so a persistent topic
+ *   doesn't append a re-send the old bus already wrote (ADR 0007, step 5).
  */
 import {
   BusError,
@@ -73,7 +75,12 @@ export type BusClientOptions = {
    */
   wake?: boolean;
   now?: () => number;
+  /** This instance's `epoch` for publish ids. Default: random, new per client. */
+  epoch?: number;
 };
+
+/** A random epoch: a new isolate instance, so a new one per client. */
+const randomEpoch = (): number => crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
 
 const check = (r: CallResult): void => {
   if (!r.ok) throw new BusError(r.error);
@@ -112,6 +119,9 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
   let lastDelivery = now();
   let port = first;
   let nextId = 0;
+  const epoch = o.epoch ?? randomEpoch();
+  /** Publishes and requests sent by this instance: the `seq` of publish ids. */
+  let seq = 0;
   const pending = new Map<string, Pending>();
   const subs = new Map<string, Sub>();
   /** Which topic a delivered record came from, for `reply` and `commit`. */
@@ -227,6 +237,8 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
       const p: Extract<IsolateToBus, { t: 'publish' }>['p'] = {
         topic: topic.name,
         value: rec.value,
+        epoch,
+        seq: ++seq,
       };
       if (rec.key !== undefined) p.key = rec.key;
       check(await call({ v: 1, t: 'publish', p }));
@@ -258,6 +270,8 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
         topic: topic.name,
         value,
         timeoutMs,
+        epoch,
+        seq: ++seq,
       };
       if (opts.key !== undefined) p.key = opts.key;
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -307,7 +321,8 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
         p.settle({ ok: true, value: null });
       }
       // Subscriptions first, then everything the old bus never answered, in
-      // the order it was sent. Its memory log is gone, so nothing duplicates.
+      // the order it was sent. Its memory log is gone, so nothing duplicates
+      // there; a persistent topic answers what it already holds by its id.
       for (const sub of subs.values()) {
         sub.queue.length = 0;
         sendSubscribe(sub);

@@ -14,7 +14,7 @@ import {
   type SeedEvent,
   type StartPosition,
 } from '@isoloop/protocol';
-import type { LogEngine, NewRecord } from './engine/types';
+import type { AppendId, LogEngine, NewRecord } from './engine/types';
 import { estimateSize } from './size';
 import {
   copySeed,
@@ -129,6 +129,8 @@ type Pending = {
   req: { from: Connection; id: string; timeoutMs: number } | undefined;
   /** A record `follow` forwards keeps its source's `ts`; publishes get the time of append. */
   ts?: number;
+  /** The publisher's `(epoch, seq)`, for deduplicating re-sends on persistent topics. */
+  id?: AppendId;
   done: boolean;
   result: Validated | undefined;
   settle: (r: CallResult) => void;
@@ -212,6 +214,12 @@ function hash(s: string): number {
 }
 
 const reqKey = (topic: string, offset: number): string => `${topic}\u0000${offset}`;
+
+/** A message's `(epoch, seq)`, when it carries both as numbers. */
+export function publishId(p: { epoch?: unknown; seq?: unknown }): AppendId | undefined {
+  const { epoch, seq } = p;
+  return typeof epoch === 'number' && typeof seq === 'number' ? { epoch, seq } : undefined;
+}
 
 /** Producer id for records the host publishes through `kernel.publish`. */
 export const HOST_PRODUCER = 'host';
@@ -581,8 +589,9 @@ export class Broker {
     topic: string,
     key: string | undefined,
     value: unknown,
+    id?: AppendId,
   ): Promise<CallResult> {
-    return new Promise((resolve) => this.#publish(from, topic, key, value, undefined, resolve));
+    return new Promise((resolve) => this.#publish(from, topic, key, value, undefined, resolve, id));
   }
 
   #receive(conn: Connection, msg: unknown): void {
@@ -605,7 +614,7 @@ export class Broker {
           reply(fail('invalid', 'key must be a string'));
           return;
         }
-        this.#publish(self, msg.p.topic, key, msg.p.value, undefined, reply);
+        this.#publish(self, msg.p.topic, key, msg.p.value, undefined, reply, publishId(msg.p));
         return;
       }
       case 'request': {
@@ -633,6 +642,7 @@ export class Broker {
           msg.p.value,
           { from: conn, id, timeoutMs: ms },
           onFail,
+          publishId(msg.p),
         );
         return;
       }
@@ -684,6 +694,7 @@ export class Broker {
     value: unknown,
     req: Pending['req'],
     done: (r: CallResult) => void,
+    id?: AppendId,
   ): void {
     const settle = (r: CallResult): void => {
       if (!r.ok) this.#rejected[r.error.code] = (this.#rejected[r.error.code] ?? 0) + 1;
@@ -726,6 +737,7 @@ export class Broker {
             : KERNEL_PRODUCER,
       key,
       req,
+      ...(id ? { id } : {}),
       done: false,
       result: undefined,
       settle,
@@ -764,6 +776,16 @@ export class Broker {
   }
 
   #finish(name: string, topic: Topic, p: Pending): void {
+    if (p.id && this.#engine.durable(name)) {
+      // A re-send after a bus crash of a publish already on disk (ADR 0007,
+      // step 5): answered with the original offset, not appended again.
+      const prior = this.#engine.appended(name, p.producer, p.id);
+      if (prior !== undefined) {
+        if (p.req) this.#openRequest(name, prior, p.req);
+        this.#ackDurable(name, prior, p);
+        return;
+      }
+    }
     const checked = this.#check(name, p.result, topic.def.durability === 'persistent');
     if (!checked.ok) {
       p.settle(checked);
@@ -776,22 +798,12 @@ export class Broker {
     let rec: NewRecord = { value: checked.value, ts: p.ts ?? this.#now(), producer: p.producer };
     if (p.key !== undefined) rec = { ...rec, key: p.key };
     if (p.req) rec = { ...rec, req: { from: p.req.from.isolateId, id: p.req.id } };
-    const offset = this.#engine.append(name, rec);
+    const offset = this.#engine.append(name, rec, p.id);
     topic.records++;
     topic.bytes += p.bytes;
     if (p.req) this.#openRequest(name, offset, p.req);
-    if (this.#engine.durable(name)) {
-      // Acknowledged once its batch is on disk (ADR 0007, decision 2).
-      this.#engine.flush().then(
-        () => p.settle({ ok: true, value: { offset } }),
-        (e: unknown) =>
-          p.settle(
-            e instanceof DOMException && e.name === 'QuotaExceededError'
-              ? fail('quota_exceeded', `${name}: the origin's storage is full`)
-              : fail('bus_unavailable', `${name}: write failed: ${String(e)}`),
-          ),
-      );
-    } else p.settle({ ok: true, value: { offset } });
+    if (this.#engine.durable(name)) this.#ackDurable(name, offset, p);
+    else p.settle({ ok: true, value: { offset } });
     this.#fanOut(name);
     this.#wake(name);
     this.#follow(name, { ...rec, offset });
@@ -828,6 +840,19 @@ export class Broker {
   }
 
   // Request/response (design §6.3, ADR 0003 decisions 15–16).
+
+  /** Acknowledged once its batch is on disk (ADR 0007, decision 2). */
+  #ackDurable(name: string, offset: number, p: Pending): void {
+    this.#engine.flush().then(
+      () => p.settle({ ok: true, value: { offset } }),
+      (e: unknown) =>
+        p.settle(
+          e instanceof DOMException && e.name === 'QuotaExceededError'
+            ? fail('quota_exceeded', `${name}: the origin's storage is full`)
+            : fail('bus_unavailable', `${name}: write failed: ${String(e)}`),
+        ),
+    );
+  }
 
   #openRequest(topic: string, offset: number, req: NonNullable<Pending['req']>): void {
     const key = reqKey(topic, offset);

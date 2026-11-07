@@ -17,13 +17,22 @@ export type BusRecord = {
   req?: { from: string; id: string };
 };
 
+/**
+ * Identifies a publish so a re-send after a bus crash isn't appended twice to
+ * a persistent topic (ADR 0007, step 5): `epoch` names the publisher's
+ * instance (new after an isolate restart or a page load), `seq` counts its
+ * publishes and requests. The bus answers a re-send it already holds with the
+ * original offset. Memory topics ignore it.
+ */
+export type PublishId = { epoch?: number; seq?: number };
+
 /** Where a new subscription starts reading. */
 export type StartPosition = 'latest' | 'earliest' | 'committed';
 
 /** Bus port: isolate → bus worker. */
 export type IsolateToBus =
   /** With `id` set, the broker replies with `result`. */
-  | Envelope<'publish', { topic: string; key?: string; value: unknown }>
+  | Envelope<'publish', { topic: string; key?: string; value: unknown } & PublishId>
   | Envelope<'subscribe', { topic: string; from: StartPosition; group?: string }>
   | Envelope<'unsubscribe', { topic: string }>
   | Envelope<'commit', { topic: string; offset: number }>
@@ -32,7 +41,10 @@ export type IsolateToBus =
    * is required; the reply (or `reply_invalid`) comes back as `result { re: id }`.
    * The broker forgets the request after `timeoutMs`; the caller raises the timeout.
    */
-  | Envelope<'request', { topic: string; key?: string; value: unknown; timeoutMs: number }>
+  | Envelope<
+      'request',
+      { topic: string; key?: string; value: unknown; timeoutMs: number } & PublishId
+    >
   /** Answers the request record at `offset`. With `id` set, the responder gets `result`. */
   | Envelope<'reply', { topic: string; offset: number; value: unknown }>;
 

@@ -3,6 +3,9 @@ import type { BusRecord, TopicConfig } from '@isoloop/protocol';
 /** A record before the engine gives it an offset. */
 export type NewRecord = Omit<BusRecord, 'offset'>;
 
+/** A publish's instance and counter, for deduplicating re-sends (ADR 0007, step 5). */
+export type AppendId = { epoch: number; seq: number };
+
 /**
  * Where the bus keeps its logs (design §6.2). The TS engine implements it now,
  * the Rust/WASM engine in M5; both must pass `runEngineConformance`.
@@ -15,8 +18,19 @@ export type NewRecord = Omit<BusRecord, 'offset'>;
 export interface LogEngine {
   /** Throws if the topic exists. */
   createTopic(cfg: TopicConfig): void;
-  /** Appends and returns the record's offset. Throws on an unknown topic. */
-  append(topic: string, rec: NewRecord): number;
+  /**
+   * Appends and returns the record's offset. Throws on an unknown topic. On a
+   * durable topic, `id` is stored with the record (never delivered) and
+   * remembered for `appended`; other topics ignore it.
+   */
+  append(topic: string, rec: NewRecord, id?: AppendId): number;
+  /**
+   * The offset of the record `producer` appended to a durable topic as `id`,
+   * including records restored from disk; undefined when the engine doesn't
+   * know it. At least the producer's last 1,000 appends per topic are kept
+   * (the `BusClient`'s inbox limit), for its current epoch only.
+   */
+  appended(topic: string, producer: string, id: AppendId): number | undefined;
   /** Up to `max` retained records with `offset >= fromOffset`, ascending. Skips dropped offsets. */
   read(topic: string, fromOffset: number, max: number): BusRecord[];
   /** Next offset to be written. */

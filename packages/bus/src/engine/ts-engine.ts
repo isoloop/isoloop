@@ -1,7 +1,14 @@
 import type { BusRecord, TopicConfig } from '@isoloop/protocol';
 import { decodeFrame, encodeFrame, frameOffset } from '../storage/frame';
 import { MemoryStorage, effectiveDurability } from './memory-storage';
-import type { EngineOptions, LogEngine, LogStorage, NewRecord, StoredState } from './types';
+import type {
+  AppendId,
+  EngineOptions,
+  LogEngine,
+  LogStorage,
+  NewRecord,
+  StoredState,
+} from './types';
 
 /** Default records per chunk. Chunk `i` holds offsets `[i * size, (i + 1) * size)`. */
 export const CHUNK = 4096;
@@ -32,6 +39,12 @@ const DIRTY_RATIO = 0.5;
 /** …and at least this many are. */
 const DIRTY_MIN = 1024;
 
+/** Appends `appended` remembers per producer and topic: the `BusClient`'s inbox limit. */
+export const APPENDED_WINDOW = 1000;
+
+/** A producer's recent appends to a durable topic: its epoch, and `seq` → offset. */
+type Appended = { epoch: number; seqs: Map<number, number> };
+
 /** `null`: every slot in the chunk was dropped. Slots are `undefined` where a record was dropped. */
 type Chunk = (BusRecord | undefined)[] | null;
 
@@ -57,6 +70,8 @@ type Topic = {
   diskDirty: number;
   /** Offsets below this were evicted: on disk, not in memory. `base * size` once any are. */
   evictedTo: number;
+  /** Durable topics: recent appends per producer, for deduplicating re-sends (ADR 0007, step 5). */
+  appended: Map<string, Appended>;
   /** Encoded bytes per chunk, parallel to `chunks` (durable topics). */
   chunkBytes: number[];
   residentBytes: number;
@@ -107,6 +122,7 @@ export class TsEngine implements LogEngine {
       chunkBytes: [],
       residentBytes: 0,
       evicted: [],
+      appended: new Map(),
       cfg,
       base: 0,
       chunks: [],
@@ -119,12 +135,18 @@ export class TsEngine implements LogEngine {
     });
   }
 
-  append(topic: string, rec: NewRecord): number {
+  append(topic: string, rec: NewRecord, id?: AppendId): number {
     const t = this.#topic(topic);
     // Encoded first: a value the codec refuses throws before anything changes.
-    const frame = t.durable ? encodeFrame({ ...rec, offset: t.head }) : undefined;
+    const frame = t.durable ? encodeFrame({ ...rec, ...id, offset: t.head }) : undefined;
     if (frame) this.#storage.appendBatch(topic, [frame]);
+    if (t.durable && id) remember(t, rec.producer, id, t.head);
     return this.#place(t, rec, t.head, frame?.length ?? 0);
+  }
+
+  appended(topic: string, producer: string, id: AppendId): number | undefined {
+    const a = this.#topics.get(topic)?.appended.get(producer);
+    return a?.epoch === id.epoch ? a.seqs.get(id.seq) : undefined;
   }
 
   /**
@@ -166,7 +188,9 @@ export class TsEngine implements LogEngine {
         const frames = await this.#storage.readSegment(topic, from);
         if (frames.length === 0) break;
         for (const f of frames) {
-          const { offset, epoch: _e, seq: _s, ...rec } = decodeFrame(f);
+          const { offset, epoch, seq, ...rec } = decodeFrame(f);
+          if (epoch !== undefined && seq !== undefined)
+            remember(t, rec.producer, { epoch, seq }, offset);
           this.#place(t, rec, offset, f.length);
           from = offset + 1;
         }
@@ -516,5 +540,19 @@ export class TsEngine implements LogEngine {
   /** Chunks held for a topic, for tests and metrics. */
   chunkCount(topic: string): number {
     return this.#topic(topic).chunks.length;
+  }
+}
+
+/** Notes that `producer` appended `id` at `offset`; a new epoch forgets the old one's. */
+function remember(t: Topic, producer: string, id: AppendId, offset: number): void {
+  let a = t.appended.get(producer);
+  if (a?.epoch !== id.epoch) {
+    a = { epoch: id.epoch, seqs: new Map() };
+    t.appended.set(producer, a);
+  }
+  a.seqs.set(id.seq, offset);
+  if (a.seqs.size > APPENDED_WINDOW) {
+    const oldest = a.seqs.keys().next();
+    if (!oldest.done) a.seqs.delete(oldest.value);
   }
 }

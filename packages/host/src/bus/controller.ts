@@ -145,7 +145,15 @@ export const SAFE_MODE_WINDOW_MS = 2000;
 /** Crashes while loading, in a row, before the next bus boots in safe mode. */
 const SAFE_MODE_AFTER = 2;
 
-type PendingPublish = { resolve: (r: CallResult) => void; sentTo: number | undefined };
+type PendingPublish = {
+  resolve: (r: CallResult) => void;
+  sentTo: number | undefined;
+  /** A `kernel.publish`, sent again if the bus dies before answering it (ADR 0007, step 6). */
+  resend?: HostToBus;
+};
+
+/** A random epoch for the host's publish ids: one per page load (controller). */
+const randomEpoch = (): number => crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
 
 export function createBusController(o: BusControllerOptions): BusController {
   const limit = o.inboxLimit ?? 1000;
@@ -167,6 +175,9 @@ export function createBusController(o: BusControllerOptions): BusController {
   const conns = new Map<string, Conn>();
   const results = new Map<string, PendingPublish>();
   let nextId = 0;
+  /** The host's publish ids (ADR 0007, step 6): its instance, and a counter. */
+  const epoch = randomEpoch();
+  let seq = 0;
   /** The host's own subscriptions, each on its own connection. */
   const hostSubs = new Map<string, { sub: HostSubscription; port: MessagePort | null }>();
 
@@ -182,10 +193,17 @@ export function createBusController(o: BusControllerOptions): BusController {
     worker.terminate();
     worker = null;
     gen++;
-    // Publishes the dead worker never answered: it may or may not have
-    // appended them, and its memory log is gone either way.
+    // Calls the dead worker never answered. Publishes go to the next bus, in
+    // order: a persistent topic answers one it already wrote by its id, and a
+    // memory topic's log is gone, so nothing duplicates (ADR 0007, step 6).
+    // Anything else (a drop) may or may not have happened, so it rejects.
     for (const [id, p] of results) {
       if (p.sentTo === undefined) continue;
+      if (p.resend) {
+        p.sentTo = undefined;
+        queue.push({ msg: p.resend, transfer: [] });
+        continue;
+      }
       results.delete(id);
       p.resolve(unavailable('The bus restarted before answering'));
     }
@@ -420,9 +438,10 @@ export function createBusController(o: BusControllerOptions): BusController {
         return Promise.resolve(unavailable('The bus is restarting and its buffer is full'));
       const id = `h${++nextId}`;
       return new Promise((resolve) => {
-        results.set(id, { resolve, sentTo: worker ? gen : undefined });
         const p = key === undefined ? { topic, value } : { topic, key, value };
-        send({ v: 1, t: 'publish', id, p });
+        const msg: HostToBus = { v: 1, t: 'publish', id, p: { ...p, epoch, seq: ++seq } };
+        results.set(id, { resolve, sentTo: worker ? gen : undefined, resend: msg });
+        send(msg);
       });
     },
 

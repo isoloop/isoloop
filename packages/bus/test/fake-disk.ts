@@ -17,8 +17,16 @@ export class FakeDisk implements LogStorage {
     this.#perSegment = perSegment;
   }
 
+  /** What a restarted bus finds: every topic written so far, from its oldest frame to its newest. */
   open(): Promise<StoredState> {
-    return Promise.resolve({ topics: [], offsets: {} });
+    const topics: StoredState['topics'] = [];
+    for (const [topic, segs] of this.#segments) {
+      const first = segs[0]?.[0];
+      const last = segs.at(-1)?.at(-1);
+      if (first && last)
+        topics.push({ topic, tail: frameOffset(first), head: frameOffset(last) + 1 });
+    }
+    return Promise.resolve({ topics, offsets: {} });
   }
 
   appendBatch(topic: string, encoded: Uint8Array[]): void {

@@ -1,6 +1,7 @@
 import { checks, systemSchema, systemTopic, type Grants } from '@isoloop/protocol';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { FakeDisk } from '../test/fake-disk';
 import { connect, fakeIsolate, flush } from '../test/memory-port';
 import { Broker, type BrokerOptions } from './broker';
 import { TsEngine } from './engine/ts-engine';
@@ -620,5 +621,127 @@ describe('not_encodable (ADR 0007, M2b task 4)', () => {
       ok: true,
       value: { offset: 0 },
     });
+  });
+});
+
+describe('re-sent publishes after a bus crash (ADR 0007 step 5, M2b task 20)', () => {
+  const saved = topic('saved.v1', {
+    schema: unchecked<number>(),
+    retention: { kind: 'last-n', n: 100 },
+    durability: 'persistent',
+  });
+  const mem = topic('mem.v1', {
+    schema: unchecked<number>(),
+    retention: { kind: 'last-n', n: 100 },
+  });
+  const ask = topic('ask.v1', {
+    schema: unchecked<number>(),
+    reply: unchecked<number>(),
+    retention: { kind: 'last-n', n: 100 },
+    durability: 'persistent',
+  });
+  const list = contracts(saved, mem, ask);
+
+  /** A bus on `disk`, restored from what the last one wrote, as after a crash. */
+  async function boot(disk: FakeDisk) {
+    const engine = new TsEngine({ storage: disk });
+    const broker = new Broker({ contracts: list, engine });
+    await engine.restore(await disk.open());
+    return broker;
+  }
+
+  it('a publish the old bus wrote but never answered is answered with its offset, not appended again', async () => {
+    const disk = new FakeDisk();
+    const before = await boot(disk);
+    const a = connect(before, 'A', all);
+    // Written and flushed; then the bus dies before the isolate reads the answer.
+    await a.call('publish', { topic: 'saved.v1', value: 1, epoch: 9, seq: 1 });
+    await a.call('publish', { topic: 'saved.v1', value: 2, epoch: 9, seq: 2 });
+
+    const after = await boot(disk);
+    const again = fakeIsolate('A');
+    after.attach('A', all, again.port, { reattach: true });
+    expect(await again.call('publish', { topic: 'saved.v1', value: 2, epoch: 9, seq: 2 })).toEqual({
+      ok: true,
+      value: { offset: 1 },
+    });
+    // A publish it hadn't written yet is appended.
+    expect(await again.call('publish', { topic: 'saved.v1', value: 3, epoch: 9, seq: 3 })).toEqual({
+      ok: true,
+      value: { offset: 2 },
+    });
+    const reader = connect(after, 'R', all);
+    await reader.call('subscribe', { topic: 'saved.v1', from: 'earliest' });
+    expect(reader.values('saved.v1')).toEqual([1, 2, 3]);
+  });
+
+  it('the same seq from another producer, or a new epoch, is a new record', async () => {
+    const disk = new FakeDisk();
+    const broker = await boot(disk);
+    const a = connect(broker, 'A', all);
+    const b = connect(broker, 'B', all);
+    await a.call('publish', { topic: 'saved.v1', value: 1, epoch: 1, seq: 1 });
+    expect(await b.call('publish', { topic: 'saved.v1', value: 1, epoch: 1, seq: 1 })).toEqual({
+      ok: true,
+      value: { offset: 1 },
+    });
+    expect(await a.call('publish', { topic: 'saved.v1', value: 1, epoch: 2, seq: 1 })).toEqual({
+      ok: true,
+      value: { offset: 2 },
+    });
+  });
+
+  it('host publishes are deduplicated the same way, with the host as producer', async () => {
+    const disk = new FakeDisk();
+    await (
+      await boot(disk)
+    ).publish({ kind: 'host' }, 'saved.v1', undefined, 5, { epoch: 4, seq: 1 });
+    const after = await boot(disk);
+    expect(
+      await after.publish({ kind: 'host' }, 'saved.v1', undefined, 5, { epoch: 4, seq: 1 }),
+    ).toEqual({ ok: true, value: { offset: 0 } });
+    const reader = connect(after, 'R', all);
+    await reader.call('subscribe', { topic: 'saved.v1', from: 'earliest' });
+    expect(reader.values('saved.v1')).toEqual([5]);
+  });
+
+  it('memory topics skip the check: their log is gone after a crash anyway', async () => {
+    const broker = await boot(new FakeDisk());
+    const a = connect(broker, 'A', all);
+    await a.call('publish', { topic: 'mem.v1', value: 1, epoch: 1, seq: 1 });
+    expect(await a.call('publish', { topic: 'mem.v1', value: 1, epoch: 1, seq: 1 })).toEqual({
+      ok: true,
+      value: { offset: 1 },
+    });
+  });
+
+  it('a re-sent request already on disk gets the reply to the original record', async () => {
+    const disk = new FakeDisk();
+    const before = await boot(disk);
+    const asker = connect(before, 'A', all);
+    asker.send({
+      v: 1,
+      t: 'request',
+      id: 'r1',
+      p: { topic: 'ask.v1', value: 2, timeoutMs: 5000, epoch: 1, seq: 1 },
+    });
+    await disk.flush();
+    await flush();
+
+    const after = await boot(disk);
+    const again = fakeIsolate('A');
+    after.attach('A', all, again.port, { reattach: true });
+    const answer = again.call('request', {
+      topic: 'ask.v1',
+      value: 2,
+      timeoutMs: 5000,
+      epoch: 1,
+      seq: 1,
+    });
+    const responder = connect(after, 'S', all);
+    await responder.call('subscribe', { topic: 'ask.v1', from: 'earliest' });
+    expect(responder.records('ask.v1').map((r) => r.offset)).toEqual([0]);
+    await responder.call('reply', { topic: 'ask.v1', offset: 0, value: 4 });
+    expect(await answer).toEqual({ ok: true, value: 4 });
   });
 });

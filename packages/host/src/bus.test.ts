@@ -171,6 +171,35 @@ describe('bus controller', () => {
     expect(got).toEqual(Array.from({ length: 25 }, (_, i) => i));
   });
 
+  it('host publishes in flight when the bus dies are sent again and land exactly once (M2b)', async () => {
+    const { kernel, log } = setup();
+    const ready = log('bus:ready');
+    await vi.waitUntil(() => ready.length === 1);
+    const n = 600;
+    const sent: Promise<void>[] = [];
+    let i = 0;
+    // A steady stream, so the bus dies with publishes written and unanswered,
+    // others not yet seen, and more made while it restarts.
+    const pumping = (async () => {
+      while (i < n) {
+        for (let k = 0; k < 20 && i < n; k++) sent.push(kernel.publish(saved, { value: i++ }));
+        // oxlint-disable-next-line no-await-in-loop -- paced on purpose
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    })();
+    await vi.waitUntil(() => i >= 100);
+    kernel.debug.crashBus();
+    await pumping;
+    // Every publish resolves: none rejects with bus_unavailable any more.
+    await expect(Promise.all(sent)).resolves.toHaveLength(n);
+    await vi.waitUntil(() => ready.length === 2);
+    const got: number[] = [];
+    kernel.subscribe(saved, (r) => got.push(r.value), { from: 'earliest' });
+    await vi.waitUntil(() => got.length >= n);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(got).toEqual(Array.from({ length: n }, (_, v) => v));
+  });
+
   it('safe mode: a stored record that crashes the bus twice while loading is set aside (M2b)', async () => {
     const first = setup();
     const ready = first.log('bus:ready');
