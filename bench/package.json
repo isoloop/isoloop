@@ -8,11 +8,17 @@
   },
   "dependencies": {
     "@isoloop/bus": "workspace:*",
+    "@isoloop/codec": "workspace:*",
     "@isoloop/protocol": "workspace:*"
   },
   "devDependencies": {
+    "@msgpack/msgpack": "catalog:",
     "@types/node": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "cbor-x": "catalog:",
+    "msgpackr": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }

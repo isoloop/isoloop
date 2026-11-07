@@ -17,6 +17,7 @@
     "e2e": "playwright test",
     "dom:usage": "ISOLOOP_DOM_USAGE=write vitest run --project preact-10 --project preact-11 --project react-18 --project react-19 dom-usage && oxfmt packages/dom/usage",
     "bench": "vitest run --config bench/vitest.config.ts",
+    "bench:codec": "vitest run --config bench/codec/vitest.config.ts",
     "bench:click-to-paint": "playwright test --config bench/click-to-paint/playwright.config.ts",
     "bench:throughput": "playwright test --config bench/throughput/playwright.config.ts",
     "test:install-browsers": "playwright install chromium firefox webkit",
