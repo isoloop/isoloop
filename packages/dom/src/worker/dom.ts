@@ -158,15 +158,19 @@ export class WEventTarget {
 export abstract class WNode extends WEventTarget {
   static readonly ELEMENT_NODE = 1;
   static readonly TEXT_NODE = 3;
+  static readonly COMMENT_NODE = 8;
   static readonly DOCUMENT_NODE = 9;
+  static readonly DOCUMENT_FRAGMENT_NODE = 11;
   readonly ELEMENT_NODE = 1;
   readonly TEXT_NODE = 3;
+  readonly COMMENT_NODE = 8;
+  readonly DOCUMENT_FRAGMENT_NODE = 11;
 
   abstract readonly nodeType: number;
   abstract readonly nodeName: string;
   readonly ownerDocument: WDocument;
   /** @internal */ readonly isoId: NodeId;
-  /** @internal */ isoParent: WElement | null = null;
+  /** @internal */ isoParent: WParentNode | null = null;
   /** @internal */ isoPrev: WNode | null = null;
   /** @internal */ isoNext: WNode | null = null;
   /** @internal Whether the host knows this node (it's in the tree under the root). */
@@ -186,11 +190,11 @@ export abstract class WNode extends WEventTarget {
     if (this.isoKnown) this.ownerDocument.isoCore.record(['listen', this.isoId, type, on]);
   }
 
-  get parentNode(): WElement | null {
+  get parentNode(): WParentNode | null {
     return this.isoParent;
   }
   get parentElement(): WElement | null {
-    return this.isoParent;
+    return this.isoParent instanceof WElement ? this.isoParent : null;
   }
   get nextSibling(): WNode | null {
     return this.isoNext;
@@ -229,9 +233,8 @@ export abstract class WNode extends WEventTarget {
   }
 }
 
-export class WText extends WNode {
-  readonly nodeType = 3;
-  readonly nodeName = '#text';
+/** What text and comment nodes share: `data`, changed with a `text` record. */
+export abstract class WCharacterData extends WNode {
   /** @internal */ isoData: string;
 
   constructor(doc: WDocument, id: NodeId, data: string) {
@@ -263,6 +266,17 @@ export class WText extends WNode {
   set nodeValue(v: string | null) {
     this.data = v ?? '';
   }
+}
+
+export class WText extends WCharacterData {
+  readonly nodeType = 3;
+  readonly nodeName = '#text';
+}
+
+/** A comment node (DOM group 1, ADR 0010): rendered on the host, inert there. */
+export class WComment extends WCharacterData {
+  readonly nodeType = 8;
+  readonly nodeName = '#comment';
 }
 
 /** What `element.style` offers: declarations by property name, plus the methods frameworks call. */
@@ -438,33 +452,15 @@ function createDataset(el: WElement): Record<string, string | undefined> {
   );
 }
 
-export class WElement extends WNode {
-  readonly nodeType = 1;
-  readonly localName: string;
-  readonly namespaceURI: string;
-  /** @internal */ readonly isoNs: Namespace;
+/**
+ * What elements and fragments share: an ordered child list. Changes under a
+ * known parent become records; a fragment is never known.
+ */
+export abstract class WParentNode extends WNode {
   /** @internal */ isoFirst: WNode | null = null;
   /** @internal */ isoLast: WNode | null = null;
-  /** @internal */ isoAttrs: Map<string, string> = new Map();
-  /** @internal */ isoProps: Map<SyncedProp, string | boolean> = new Map();
   /** @internal */ isoChildCache: WNode[] | null = null;
-  /** @internal */ isoStyle: WStyle | null = null;
-  /** @internal */ isoClassList: WDOMTokenList | null = null;
-  /** @internal */ isoDataset: Record<string, string | undefined> | null = null;
 
-  constructor(doc: WDocument, id: NodeId, localName: string, ns: Namespace) {
-    super(doc, id);
-    this.localName = localName;
-    this.isoNs = ns;
-    this.namespaceURI = ns === 'svg' ? SVG_NS : HTML_NS;
-  }
-
-  get tagName(): string {
-    return this.isoNs === 'html' ? this.localName.toUpperCase() : this.localName;
-  }
-  get nodeName(): string {
-    return this.tagName;
-  }
   override get firstChild(): WNode | null {
     return this.isoFirst;
   }
@@ -486,72 +482,15 @@ export class WElement extends WNode {
     return this.children[0] ?? null;
   }
 
+  /** Text of the subtree; comments don't count, as in the DOM. */
   get textContent(): string {
     let out = '';
-    for (let n = this.isoFirst; n; n = n.isoNext) out += n.textContent;
+    for (let n = this.isoFirst; n; n = n.isoNext)
+      if (!(n instanceof WComment)) out += n.textContent;
     return out;
   }
   set textContent(v: string | null) {
     this.replaceChildren(...(v ? [this.ownerDocument.createTextNode(v)] : []));
-  }
-  get nodeValue(): string | null {
-    return null;
-  }
-  set nodeValue(_v: string | null) {}
-
-  get attributes(): readonly { name: string; value: string }[] {
-    return [...this.isoAttrs].map(([name, value]) => ({ name, value }));
-  }
-  getAttribute(name: string): string | null {
-    return this.isoAttrs.get(this.isoAttrName(name)) ?? null;
-  }
-  hasAttribute(name: string): boolean {
-    return this.isoAttrs.has(this.isoAttrName(name));
-  }
-  setAttribute(name: string, value: unknown): void {
-    const n = this.isoAttrName(name);
-    const v = str(value);
-    if (this.isoAttrs.get(n) === v) return;
-    this.isoAttrs.set(n, v);
-    if (this.isoKnown) this.ownerDocument.isoCore.record(['attr', this.isoId, n, v]);
-  }
-  removeAttribute(name: string): void {
-    const n = this.isoAttrName(name);
-    if (!this.isoAttrs.delete(n)) return;
-    if (this.isoKnown) this.ownerDocument.isoCore.record(['attr', this.isoId, n, null]);
-  }
-  /** @internal HTML attribute names are case-insensitive; SVG ones aren't. */
-  isoAttrName(name: string): string {
-    return this.isoNs === 'html' ? name.toLowerCase() : name;
-  }
-
-  get style(): WStyle {
-    this.isoStyle ??= createStyle(this);
-    return this.isoStyle;
-  }
-
-  get classList(): WDOMTokenList {
-    this.isoClassList ??= new WDOMTokenList(this);
-    return this.isoClassList;
-  }
-
-  get dataset(): Record<string, string | undefined> {
-    this.isoDataset ??= createDataset(this);
-    return this.isoDataset;
-  }
-
-  get id(): string {
-    return this.getAttribute('id') ?? '';
-  }
-  set id(v: string) {
-    this.setAttribute('id', v);
-  }
-
-  /** @internal */ isoSetProp(name: SyncedProp, value: string | boolean, record: boolean): void {
-    if (this.isoProps.get(name) === value) return;
-    this.isoProps.set(name, value);
-    if (record && this.isoKnown)
-      this.ownerDocument.isoCore.record(['prop', this.isoId, name, value]);
   }
 
   appendChild<T extends WNode>(child: T): T {
@@ -567,7 +506,13 @@ export class WElement extends WNode {
       throw domError('HierarchyRequestError', 'insertBefore: would create a cycle');
     }
     if (ref === child) ref = child.isoNext;
-    if (this === this.ownerDocument.head && child instanceof WElement) {
+    // A fragment's children move in, in order, and leave it empty (DOM group 1).
+    if (child instanceof WDocumentFragment) {
+      // `childNodes` is a snapshot: moving a child builds a new one.
+      for (const c of child.childNodes) this.insertBefore(c, ref);
+      return child;
+    }
+    if (this.ownerDocument.head === (this as WParentNode) && child instanceof WElement) {
       this.ownerDocument.isoCore.onHead(child.localName);
     }
     const wasKnown = child.isoKnown;
@@ -628,6 +573,105 @@ export class WElement extends WNode {
     if (ref) ref.isoPrev = child;
     else this.isoLast = child;
     this.isoChildCache = null;
+  }
+}
+
+/**
+ * `DocumentFragment` (DOM group 1, ADR 0010): a detached holder. Inserting
+ * it inserts its children, in order, and empties it; it never reaches the
+ * host itself.
+ */
+export class WDocumentFragment extends WParentNode {
+  readonly nodeType = 11;
+  readonly nodeName = '#document-fragment';
+  get nodeValue(): string | null {
+    return null;
+  }
+  set nodeValue(_v: string | null) {}
+}
+
+export class WElement extends WParentNode {
+  readonly nodeType = 1;
+  readonly localName: string;
+  readonly namespaceURI: string;
+  /** @internal */ readonly isoNs: Namespace;
+  /** @internal */ isoAttrs: Map<string, string> = new Map();
+  /** @internal */ isoProps: Map<SyncedProp, string | boolean> = new Map();
+  /** @internal */ isoStyle: WStyle | null = null;
+  /** @internal */ isoClassList: WDOMTokenList | null = null;
+  /** @internal */ isoDataset: Record<string, string | undefined> | null = null;
+
+  constructor(doc: WDocument, id: NodeId, localName: string, ns: Namespace) {
+    super(doc, id);
+    this.localName = localName;
+    this.isoNs = ns;
+    this.namespaceURI = ns === 'svg' ? SVG_NS : HTML_NS;
+  }
+
+  get tagName(): string {
+    return this.isoNs === 'html' ? this.localName.toUpperCase() : this.localName;
+  }
+  get nodeName(): string {
+    return this.tagName;
+  }
+  get nodeValue(): string | null {
+    return null;
+  }
+  set nodeValue(_v: string | null) {}
+
+  get attributes(): readonly { name: string; value: string }[] {
+    return [...this.isoAttrs].map(([name, value]) => ({ name, value }));
+  }
+  getAttribute(name: string): string | null {
+    return this.isoAttrs.get(this.isoAttrName(name)) ?? null;
+  }
+  hasAttribute(name: string): boolean {
+    return this.isoAttrs.has(this.isoAttrName(name));
+  }
+  setAttribute(name: string, value: unknown): void {
+    const n = this.isoAttrName(name);
+    const v = str(value);
+    if (this.isoAttrs.get(n) === v) return;
+    this.isoAttrs.set(n, v);
+    if (this.isoKnown) this.ownerDocument.isoCore.record(['attr', this.isoId, n, v]);
+  }
+  removeAttribute(name: string): void {
+    const n = this.isoAttrName(name);
+    if (!this.isoAttrs.delete(n)) return;
+    if (this.isoKnown) this.ownerDocument.isoCore.record(['attr', this.isoId, n, null]);
+  }
+  /** @internal HTML attribute names are case-insensitive; SVG ones aren't. */
+  isoAttrName(name: string): string {
+    return this.isoNs === 'html' ? name.toLowerCase() : name;
+  }
+
+  get style(): WStyle {
+    this.isoStyle ??= createStyle(this);
+    return this.isoStyle;
+  }
+
+  get classList(): WDOMTokenList {
+    this.isoClassList ??= new WDOMTokenList(this);
+    return this.isoClassList;
+  }
+
+  get dataset(): Record<string, string | undefined> {
+    this.isoDataset ??= createDataset(this);
+    return this.isoDataset;
+  }
+
+  get id(): string {
+    return this.getAttribute('id') ?? '';
+  }
+  set id(v: string) {
+    this.setAttribute('id', v);
+  }
+
+  /** @internal */ isoSetProp(name: SyncedProp, value: string | boolean, record: boolean): void {
+    if (this.isoProps.get(name) === value) return;
+    this.isoProps.set(name, value);
+    if (record && this.isoKnown)
+      this.ownerDocument.isoCore.record(['prop', this.isoId, name, value]);
   }
 }
 
@@ -912,6 +956,15 @@ export class WDocument extends WEventTarget {
     return new WText(this, this.isoCore.nextId++, data);
   }
 
+  createComment(data: string): WComment {
+    return new WComment(this, this.isoCore.nextId++, str(data));
+  }
+
+  /** Fragments never reach the host, so they take no id from the shared counter. */
+  createDocumentFragment(): WDocumentFragment {
+    return new WDocumentFragment(this, -3);
+  }
+
   /**
    * The first element in tree order with this `id` (DOM group 1, ADR 0010):
    * under the render root, then the detached head. Nodes not yet inserted
@@ -944,7 +997,7 @@ export class WDocument extends WEventTarget {
       let n: WElement | null = el;
       for (let i = steps.length - 1; i >= 0; i--) {
         if (!n || n.localName !== steps[i]) return false;
-        n = i > 0 ? n.isoParent : null;
+        n = i > 0 ? n.parentElement : null;
       }
       return true;
     };
@@ -970,6 +1023,7 @@ defineHandlers(WDocument.prototype);
 /** The subtree as `insert` sends it. */
 function serialize(n: WNode): SerializedNode {
   if (n instanceof WText) return { k: 'text', id: n.isoId, data: n.isoData };
+  if (n instanceof WComment) return { k: 'comment', id: n.isoId, data: n.isoData };
   if (!(n instanceof WElement)) throw new TypeError('serialize: unknown node');
   return {
     k: 'el',

@@ -13,7 +13,9 @@ export {
 } from '../shared/records';
 export {
   createDom,
+  WComment,
   WDocument,
+  WDocumentFragment,
   WElement,
   WNode,
   WText,

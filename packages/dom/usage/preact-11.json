@@ -1,17 +1,14 @@
 {
   "framework": "preact@11.1.1",
   "used": [
+    "CharacterData.data",
+    "CharacterData.textContent",
     "Document.createElement",
     "Document.createElementNS",
     "Document.createTextNode",
-    "Element.childNodes",
-    "Element.firstChild",
     "Element.getAttribute",
-    "Element.insertBefore",
-    "Element.removeChild",
     "Element.setAttribute",
     "Element.style",
-    "Element.textContent",
     "EventTarget.addEventListener",
     "EventTarget.dispatchEvent",
     "HTMLInputElement.value",
@@ -22,8 +19,11 @@
     "Node.nextSibling",
     "Node.parentNode",
     "Node.remove",
-    "Text.data",
-    "Text.textContent"
+    "ParentNode.childNodes",
+    "ParentNode.firstChild",
+    "ParentNode.insertBefore",
+    "ParentNode.removeChild",
+    "ParentNode.textContent"
   ],
   "missing": ["moveBefore"],
   "probed": ["class", "data-key", "name"]
