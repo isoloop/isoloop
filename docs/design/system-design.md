@@ -608,7 +608,7 @@ An isolate with `bus: { onReset: 'restart' }` is restarted instead of receiving 
 
 ## 8. Invariants
 
-Each invariant has at least one automated test (unit **U**, browser **B**, Playwright **E2E**). The column lists what exists today; I12 waits for M2b.
+Each invariant has at least one automated test (unit **U**, browser **B**, Playwright **E2E**). The column lists what exists today.
 
 | # | Invariant | Test |
 | --- | --- | --- |
@@ -623,7 +623,7 @@ Each invariant has at least one automated test (unit **U**, browser **B**, Playw
 | I9 | Unknown tags render as `div`; `script`/`iframe`/`on*` never appear | U (registry); E2E: a hostile isolate (`e2e/sanitising.spec.ts`) sends scripts, frames, handlers and script URLs through the DOM subset and as hand-made patches, and none reach the page |
 | I10 | Protocol mismatch fails at `init` with a clear error, never mid-render | U |
 | I11 | A bus restart never restarts an isolate (unless it opted in); every subscription to a memory topic gets exactly one `reset` | B + E2E (M2) |
-| I12 | A persistent topic loses no acknowledged record across a bus crash or a page reload | U (storage fault injection) + E2E (M2b) |
+| I12 | A persistent topic loses no acknowledged record across a bus crash or a page reload | U: storage fault injection (torn tails, corrupt frames, crashes between flush and answer); B: `host/bus.test.ts` (crash mid-stream, every acked record once); E2E: `e2e/durable.spec.ts` kills the bus worker mid-stream of 1,000 publishes and reloads the page after 500, and every acknowledged record is there once, in order (Chromium and Firefox; Playwright's WebKit has no OPFS) |
 | I13 | An isolate is suspended only if `suspend` is set and it is idle (including no `keepAwake` hold); on resume it sees every retained record since its committed offset, and any loss arrives as `gap` or `reset`, never silently | B |
 | I14 | Hiding or freezing the tab for longer than `killAfterMs` never restarts an isolate or the bus once the tab is visible again | B |
 
