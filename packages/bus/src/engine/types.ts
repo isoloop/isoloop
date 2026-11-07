@@ -69,7 +69,12 @@ export interface LogStorage {
   /** Resolves when the batch is durable; a persistent publish is acked after it. */
   flush(): Promise<void>;
   saveOffsets(offsets: Record<string, Record<string, number>>): void;
-  /** Retention/compaction on disk. */
+  /**
+   * Retention on disk (last-n, time): deletes the segments whose records are
+   * all below `tail`. Never the newest segment.
+   */
+  dropBelow(topic: string, tail: number): void;
+  /** Compaction on disk. */
   rewrite(topic: string, keep: (offset: number) => boolean): Promise<void>;
   /** Replay of evicted segments. */
   readSegment(topic: string, fromOffset: number): Promise<Uint8Array[]>;

@@ -127,3 +127,22 @@ describe.skipIf(skip)('recovery (M2b task 7)', () => {
     });
   });
 });
+
+describe.skipIf(skip)('retention on disk (M2b task 9)', () => {
+  it('a last-n: 1000 topic written with 100,000 records keeps only the segments it needs', async () => {
+    expect(await run('retention on disk: last-n')).toEqual({
+      atMostTwoSegments: true,
+      keepsTheLast1000: true,
+      fewerThanTwoSegments: true,
+      tailOnReopen: true,
+    });
+  });
+
+  it('a time topic drops the segments that fell out of retention', async () => {
+    expect(await run('retention on disk: time')).toEqual({
+      dropped: true,
+      keepsEveryLiveRecord: true,
+      oldestOnDisk: true,
+    });
+  });
+});
