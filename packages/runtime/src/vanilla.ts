@@ -6,6 +6,7 @@
  */
 import {
   isHostToIsolate,
+  majorMinor,
   type IdleReport,
   type InitPayload,
   type IsolateToHost,
@@ -16,6 +17,7 @@ import { createHostCalls, type HostApi } from './host-calls';
 import { createKeepAwake } from './keep-awake';
 import { WNode } from '@isoloop/dom/worker';
 import { createRender } from './render';
+import { version } from '../package.json';
 
 /**
  * What a render root offers, structurally, so DOM-typed isolate code can pass
@@ -61,13 +63,25 @@ export type IsolateContext<Root = IsolateRoot> = {
 
 export type IsolateDefinition<Root = IsolateRoot> = {
   start(ctx: IsolateContext<Root>): void | Promise<void>;
+  /**
+   * The Isoloop `major.minor` it was built against, stamped by
+   * `defineIsolate` (ADR 0012). The host fails an isolate outside its
+   * `[FLOOR, VERSION]`; a definition without one isn't checked.
+   */
+  requires?: string;
 };
 
-/** Types an isolate module's default export. `Root` defaults to the structural `IsolateRoot`. */
+/** This build's stamp: `major.minor` of the package version, inlined when tsdown bundles it. */
+export const REQUIRES: string = majorMinor(version) ?? '0.0';
+
+/**
+ * Types an isolate module's default export and stamps it with the version
+ * it was built against. `Root` defaults to the structural `IsolateRoot`.
+ */
 export function defineIsolate<Root = IsolateRoot>(
   def: IsolateDefinition<Root>,
 ): IsolateDefinition<Root> {
-  return def;
+  return { requires: REQUIRES, ...def };
 }
 
 type Post = (msg: IsolateToHost) => void;

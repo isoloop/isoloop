@@ -86,7 +86,12 @@ async function boot(init: InitPayload): Promise<void> {
   if (typeof main === 'object' && main !== null && 'start' in main) {
     const start: unknown = main.start;
     if (typeof start === 'function') {
-      await startIsolate(runtime, (ctx) => Reflect.apply(start, main, [ctx]));
+      const requires: unknown = 'requires' in main ? main.requires : undefined;
+      await startIsolate(
+        runtime,
+        (ctx) => Reflect.apply(start, main, [ctx]),
+        typeof requires === 'string' ? requires : undefined,
+      );
       return;
     }
   }
@@ -99,6 +104,8 @@ let shutdownHook: ((reason: ShutdownReason) => Promise<void>) | null = null;
 async function startIsolate(
   runtime: VanillaRuntime,
   start: (ctx: unknown) => unknown,
+  /** The definition's `requires` stamp (ADR 0012), reported in `ready` for the host to check. */
+  requires: string | undefined,
 ): Promise<void> {
   self.addEventListener('message', (e: MessageEvent<unknown>) => {
     runtime.receive(e.data);
@@ -108,7 +115,12 @@ async function startIsolate(
   post({
     v: 1,
     t: 'ready',
-    p: { runtime: '@isoloop/runtime', adapter: 'vanilla', renderFmt: runtime.renderFmt },
+    p: {
+      runtime: '@isoloop/runtime',
+      adapter: 'vanilla',
+      renderFmt: runtime.renderFmt,
+      ...(requires === undefined ? {} : { requires }),
+    },
   });
   try {
     await start(runtime.ctx);

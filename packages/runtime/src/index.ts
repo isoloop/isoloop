@@ -1,5 +1,6 @@
 export {
   defineIsolate,
+  REQUIRES,
   type IsolateContext,
   type IsolateDefinition,
   type IsolateRoot,
