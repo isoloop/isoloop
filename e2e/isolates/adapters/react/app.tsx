@@ -4,7 +4,7 @@
  */
 import type { TopicRef } from '@isoloop/protocol';
 import { defineIsolate, useHost, usePublish, useRoute, useTopic } from '@isoloop/react';
-import { useState, version } from 'react';
+import { useRef, useState, version } from 'react';
 
 const notes: TopicRef<string> = { name: 'notes.v1', schema: { '~standard': {} } };
 
@@ -15,11 +15,19 @@ function App() {
   const host = useHost();
   const [text, setText] = useState('');
   const count = Number(last ?? '0');
+  // The next value counts from what this isolate already sent, not only from
+  // what it has rendered: two clicks before the first record comes back from
+  // the bus would otherwise both publish count + 1.
+  const sent = useRef(0);
+  const inc = () => {
+    sent.current = Math.max(sent.current, count) + 1;
+    void publish(String(sent.current));
+  };
   return (
     <div>
       <p className="fw">{`react ${version}`}</p>
       <p className="count">{count}</p>
-      <button className="inc" onClick={() => void publish(String(count + 1))}>
+      <button className="inc" onClick={inc}>
         +1
       </button>
       <input className="field" value={text} onChange={(e) => setText(e.currentTarget.value)} />
