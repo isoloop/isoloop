@@ -1,0 +1,47 @@
+{
+  "name": "@isoloop/preact",
+  "version": "0.0.0",
+  "description": "Preact adapter for Isoloop isolates: defineIsolate(Component) and bus and host hooks.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isoloop/isoloop.git",
+    "directory": "packages/preact"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "@isoloop/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "preact": "^10 || ^11"
+  },
+  "dependencies": {
+    "@isoloop/protocol": "workspace:*",
+    "@isoloop/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "preact10": "catalog:",
+    "preact11": "catalog:",
+    "typescript": "catalog:"
+  }
+}

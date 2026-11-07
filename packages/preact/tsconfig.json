@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.lib.json",
+  "compilerOptions": {
+    // Isolate code runs in a worker, but renders through the DOM subset
+    // installed as `document`; Preact's types need the DOM's.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    // Both majors are installed under aliases (pnpm-workspace.yaml); types
+    // come from the newest. Each vitest project resolves its own.
+    "paths": {
+      "preact": ["./node_modules/preact11"],
+      "preact/*": ["./node_modules/preact11/*"]
+    }
+  },
+  "include": ["src"]
+}

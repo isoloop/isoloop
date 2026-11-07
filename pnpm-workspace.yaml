@@ -1,5 +1,6 @@
 packages:
   - packages/*
+  - packages/react/majors/*
   - examples/*
   - bench
   - e2e/harness
@@ -21,6 +22,24 @@ catalog:
   vite: 8.3.5
   vitest: 5.0.5
   zod: 4.6.7
+  # Framework majors the adapters support (ADR 0010), one exact version per
+  # major. Preact has no peers, so both majors sit in packages/preact under
+  # npm: aliases. `@types/react*` follow the newest React major.
+  '@types/react': 19.3.0
+  '@types/react-dom': 19.3.0
+  preact10: npm:preact@10.29.8
+  preact11: npm:preact@11.1.1
+
+# React's majors can't be aliases in one package: react-dom takes `react` as a
+# peer, and one importer has one `react`. Each major gets a private package
+# under packages/react/majors that installs it under its real names.
+catalogs:
+  react18:
+    react: 18.3.1
+    react-dom: 18.3.1
+  react19:
+    react: 19.3.1
+    react-dom: 19.3.1
 
 # Supply chain (ADR 0009, rule 9).
 minimumReleaseAge: 4320 # minutes: refuse versions younger than 3 days

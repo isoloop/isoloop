@@ -1,0 +1,10 @@
+{
+  "name": "@isoloop/react-major-19",
+  "private": true,
+  "description": "React 19 for the react-19 test project and E2E fixture; see pnpm-workspace.yaml.",
+  "type": "module",
+  "dependencies": {
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19"
+  }
+}
