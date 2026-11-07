@@ -1,5 +1,5 @@
 import type { BusRecord, TopicConfig } from '@isoloop/protocol';
-import type { LogEngine, NewRecord } from '../src/engine/types';
+import type { AppendId, LogEngine, NewRecord } from '../src/engine/types';
 
 type Topic = { cfg: TopicConfig; records: BusRecord[]; head: number; commits: Map<string, number> };
 
@@ -61,6 +61,10 @@ export class ReferenceEngine implements LogEngine {
 
   durable(_topic: string): boolean {
     return false;
+  }
+
+  appended(_topic: string, _producer: string, _id: AppendId): number | undefined {
+    return undefined;
   }
 
   flush(): Promise<void> {

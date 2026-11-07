@@ -7,7 +7,7 @@ import { connect, flush } from '../../test/memory-port';
 import { ReferenceEngine } from '../../test/reference-engine';
 import { Broker } from '../broker';
 import { contracts, topic, unchecked } from '../topic';
-import { TsEngine } from './ts-engine';
+import { APPENDED_WINDOW, TsEngine } from './ts-engine';
 
 runEngineConformance('ts', (opts) => new TsEngine(opts));
 // Tiny chunks, so the suite crosses chunk boundaries all the time.
@@ -223,5 +223,61 @@ describe('TsEngine: eviction and replay from disk (M2b task 11)', () => {
       if (last) await s.call('commit', { topic: 'big.v1', offset: last.offset });
     }
     expect(s.values('big.v1')).toEqual(Array.from({ length: 2000 }, (_, i) => i));
+  });
+});
+
+const id = (seq: number, epoch = 1) => ({ epoch, seq });
+const fresh = (disk = new FakeDisk(4)) => {
+  const e = new TsEngine({ storage: disk });
+  e.createTopic(durable({ kind: 'last-n', n: 1000 }));
+  return { e, disk };
+};
+
+describe('TsEngine: publish ids on durable topics (M2b task 20)', () => {
+  it('remembers each append’s offset by producer, epoch and seq, and never delivers the id', () => {
+    const { e } = fresh();
+    e.append('t', rec(0), id(1));
+    e.append('t', { value: 1, ts: 0, producer: 'q' }, id(1));
+    e.append('t', rec(2), id(2));
+    expect(e.appended('t', 'p', id(1))).toBe(0);
+    expect(e.appended('t', 'q', id(1))).toBe(1);
+    expect(e.appended('t', 'p', id(2))).toBe(2);
+    expect(e.appended('t', 'p', id(3))).toBeUndefined();
+    expect(e.appended('t', 'p', id(1, 2))).toBeUndefined();
+    expect(e.read('t', 0, 10)).toEqual([
+      { offset: 0, value: 0, ts: 0, producer: 'p' },
+      { offset: 1, value: 1, ts: 0, producer: 'q' },
+      { offset: 2, value: 2, ts: 0, producer: 'p' },
+    ]);
+  });
+
+  it('rebuilds them from disk after a restart', async () => {
+    const { e, disk } = fresh();
+    for (let i = 0; i < 10; i++) e.append('t', rec(i), id(100 + i));
+    e.append('t', rec(10)); // no id: the kernel or a seed
+    const after = new TsEngine({ storage: disk });
+    after.createTopic(durable({ kind: 'last-n', n: 1000 }));
+    await after.restore(await disk.open());
+    expect(after.appended('t', 'p', id(100))).toBe(0);
+    expect(after.appended('t', 'p', id(109))).toBe(9);
+    expect(await readAll(after)).toEqual(
+      Array.from({ length: 11 }, (_, i) => ({ offset: i, value: i, ts: 0, producer: 'p' })),
+    );
+  });
+
+  it('forgets an old epoch once the producer appends with a new one', () => {
+    const { e } = fresh();
+    e.append('t', rec(0), id(1, 1));
+    e.append('t', rec(1), id(1, 2));
+    expect(e.appended('t', 'p', id(1, 1))).toBeUndefined();
+    expect(e.appended('t', 'p', id(1, 2))).toBe(1);
+  });
+
+  it(`keeps the producer’s last ${APPENDED_WINDOW} appends per topic`, () => {
+    const { e } = fresh(new FakeDisk(256));
+    for (let i = 0; i <= APPENDED_WINDOW; i++) e.append('t', rec(i), id(i));
+    expect(e.appended('t', 'p', id(0))).toBeUndefined();
+    expect(e.appended('t', 'p', id(1))).toBe(1);
+    expect(e.appended('t', 'p', id(APPENDED_WINDOW))).toBe(APPENDED_WINDOW);
   });
 });

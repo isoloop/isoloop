@@ -1,5 +1,6 @@
 import { envelopeGuard, type Envelope, type MessageTypes } from './envelope';
 import type { CallResult, ErrorCode, ErrorPayload, Issue } from './errors';
+import type { PublishId } from './bus';
 import type { Grants } from './grants';
 
 export type Retention =
@@ -87,8 +88,11 @@ export type HostToBus =
    * on one of them (for a group, only when it was the last member).
    */
   | Envelope<'detach', { isolateId: string; keepOffsets: boolean; wake?: boolean }>
-  /** `kernel.publish`. With `id` set, the bus replies with `result`. */
-  | Envelope<'publish', { topic: string; key?: string; value: unknown }>
+  /**
+   * `kernel.publish`. With `id` set, the bus replies with `result`. The host
+   * is the producer for `epoch` and `seq` (ADR 0007, step 6).
+   */
+  | Envelope<'publish', { topic: string; key?: string; value: unknown } & PublishId>
   /**
    * The page is freezing or going away: write persistent topics' pending
    * batch now (ADR 0001, what the browser still controls). With `id` set, the

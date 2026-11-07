@@ -20,7 +20,7 @@ import {
   type HostToBus,
   type TopicConfig,
 } from '@isoloop/protocol';
-import { Broker, type BrokerStats, type BusPort } from './broker';
+import { Broker, publishId, type BrokerStats, type BusPort } from './broker';
 import { MemoryStorage } from './engine/memory-storage';
 import { TsEngine } from './engine/ts-engine';
 import type { LogStorage, StoredState } from './engine/types';
@@ -242,7 +242,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         const from = isSystemTopic(msg.p.topic)
           ? ({ kind: 'kernel' } as const)
           : ({ kind: 'host' } as const);
-        void b.publish(from, msg.p.topic, msg.p.key, msg.p.value).then((r) => {
+        void b.publish(from, msg.p.topic, msg.p.key, msg.p.value, publishId(msg.p)).then((r) => {
           if (id !== undefined) post({ v: 1, t: 'result', re: id, p: r });
         });
         return;

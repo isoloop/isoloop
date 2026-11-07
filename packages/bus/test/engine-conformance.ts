@@ -76,6 +76,14 @@ export function runEngineConformance(name: string, makeEngine: MakeEngine): void
         expect([engine.head('a'), engine.head('b')]).toEqual([2, 1]);
       });
 
+      it('keeps a publish id off memory topics: not delivered, not remembered', () => {
+        const { engine } = setup();
+        engine.createTopic(cfg('t', { kind: 'last-n', n: 10 }));
+        const offset = engine.append('t', rec('a'), { epoch: 7, seq: 1 });
+        expect(engine.read('t', 0, ALL)).toEqual([{ offset, value: 'a', ts: 0, producer: 'p' }]);
+        expect(engine.appended('t', 'p', { epoch: 7, seq: 1 })).toBeUndefined();
+      });
+
       it('throws on an unknown topic and on creating a topic twice', () => {
         const { engine } = setup();
         engine.createTopic(cfg('t', { kind: 'last-n', n: 10 }));

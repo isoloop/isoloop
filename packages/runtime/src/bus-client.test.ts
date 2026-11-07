@@ -22,10 +22,10 @@ const rec = (offset: number) => ({ offset, value: offset * 10, ts: 0, producer: 
 describe('createBusClient', () => {
   it('publish resolves on ok and rejects with a BusError on failure', async () => {
     const bus = fakeBus();
-    const { client } = createBusClient(bus.port);
+    const { client } = createBusClient(bus.port, { epoch: 7 });
     const ok = client.publish(nums, { key: 'k', value: 1 });
     const sent = await bus.next('publish');
-    expect(sent.p).toEqual({ topic: 'nums.v1', key: 'k', value: 1 });
+    expect(sent.p).toEqual({ topic: 'nums.v1', key: 'k', value: 1, epoch: 7, seq: 1 });
     bus.send({ v: 1, t: 'result', re: sent.id ?? '', p: { ok: true, value: { offset: 0 } } });
     await expect(ok).resolves.toBeUndefined();
 
@@ -117,7 +117,7 @@ describe('createBusClient', () => {
 
   it('on reattach, subscribes again and re-sends unanswered publishes in order', async () => {
     const old = fakeBus();
-    const handle = createBusClient(old.port);
+    const handle = createBusClient(old.port, { epoch: 3 });
     handle.client.subscribe(nums, () => {}, { from: 'earliest' });
     const a = handle.client.publish(nums, { value: 1 });
     const b = handle.client.publish(nums, { value: 2 });
@@ -128,12 +128,36 @@ describe('createBusClient', () => {
     await vi.waitUntil(() => fresh.got.length === 3);
     expect(fresh.got.map((m) => [m.t, m.p])).toEqual([
       ['subscribe', { topic: 'nums.v1', from: 'earliest' }],
-      ['publish', { topic: 'nums.v1', value: 1 }],
-      ['publish', { topic: 'nums.v1', value: 2 }],
+      // The same ids as before, so a persistent topic can tell re-sends apart.
+      ['publish', { topic: 'nums.v1', value: 1, epoch: 3, seq: 1 }],
+      ['publish', { topic: 'nums.v1', value: 2, epoch: 3, seq: 2 }],
     ]);
     for (const m of fresh.got)
       if (m.t === 'publish')
         fresh.send({ v: 1, t: 'result', re: m.id ?? '', p: { ok: true, value: null } });
     await expect(Promise.all([a, b])).resolves.toEqual([undefined, undefined]);
+  });
+
+  it('numbers publishes and requests in one sequence, under an epoch new per client', async () => {
+    const bus = fakeBus();
+    const { client } = createBusClient(bus.port);
+    void client.publish(nums, { value: 1 });
+    void client.request(nums, 2).catch(() => {});
+    void client.publish(nums, { value: 3 });
+    await vi.waitUntil(() => bus.got.length === 3);
+    const ids = bus.got.map((m) => ('seq' in m.p ? [m.p.epoch, m.p.seq] : []));
+    const epoch = ids[0]?.[0];
+    expect(typeof epoch).toBe('number');
+    expect(ids).toEqual([
+      [epoch, 1],
+      [epoch, 2],
+      [epoch, 3],
+    ]);
+
+    const other = fakeBus();
+    const second = createBusClient(other.port);
+    void second.client.publish(nums, { value: 1 });
+    const sent = await other.next('publish');
+    expect(sent.p.epoch).not.toBe(epoch);
   });
 });
