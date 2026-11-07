@@ -1,0 +1,16 @@
+{
+  // Type-checks the fixture against the newest Preact; the build pins each major.
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "paths": {
+      "preact": ["../../../../packages/preact/node_modules/preact11"],
+      "preact/*": ["../../../../packages/preact/node_modules/preact11/*"],
+      "@isoloop/preact": ["../../../../packages/preact/src/index.ts"],
+      "@isoloop/protocol": ["../../../../packages/protocol/src/index.ts"]
+    }
+  },
+  "include": ["."]
+}

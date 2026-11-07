@@ -5,7 +5,9 @@
   "compilerOptions": {
     "lib": ["ES2022"],
     // All of it runs in Node: configs, and the Playwright test runner.
-    "types": ["node"]
+    "types": ["node"],
+    // Scripts Node runs directly (e2e/build-adapters.ts) import with `.ts`.
+    "allowImportingTsExtensions": true
   },
   "include": [
     "*.config.ts",
@@ -15,6 +17,6 @@
     "e2e",
     "bench/click-to-paint"
   ],
-  // The harness page has its own DOM tsconfig.
-  "exclude": ["e2e/harness/src"]
+  // The harness page and the adapter fixtures have their own DOM tsconfigs.
+  "exclude": ["e2e/harness/src", "e2e/isolates/adapters"]
 }

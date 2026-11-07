@@ -10,7 +10,7 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "lint": "oxlint --type-aware",
-    "typecheck": "pnpm -r typecheck && tsc --noEmit",
+    "typecheck": "pnpm -r typecheck && tsc --noEmit && tsc --noEmit -p e2e/isolates/adapters/preact && tsc --noEmit -p e2e/isolates/adapters/react",
     "test": "vitest run",
     "test:node": "vitest run --project protocol --project codec --project bus",
     "test:browser": "vitest run --project bus-browser --project dom --project host --project runtime --project preact-10 --project preact-11 --project react-18 --project react-19",
