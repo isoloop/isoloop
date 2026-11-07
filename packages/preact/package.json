@@ -40,6 +40,7 @@
     "@isoloop/runtime": "workspace:*"
   },
   "devDependencies": {
+    "@isoloop/dom": "workspace:*",
     "preact10": "catalog:",
     "preact11": "catalog:",
     "typescript": "catalog:"

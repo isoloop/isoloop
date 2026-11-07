@@ -4,6 +4,8 @@ import {
   createDom,
   WElement,
   WHTMLInputElement,
+  WHTMLOptionElement,
+  WHTMLSelectElement,
   WHTMLTextAreaElement,
   WSVGElement,
   type WNode,
@@ -202,6 +204,53 @@ describe('the subset', () => {
     expect(scope['window']).toBe(scope);
     expect(scope['HTMLIFrameElement']).toBeTypeOf('function');
     expect(dom.document.defaultView).toBe(scope);
+  });
+});
+
+describe('what the usage logs asked for (M3a task 2)', () => {
+  it('select.options walks options and optgroups; option members reflect attributes', () => {
+    const { dom: d, doc, root, records } = setup();
+    const dom = (n: WNode) => d.idOf(n);
+    const select = doc.createElement('select');
+    if (!(select instanceof WHTMLSelectElement)) throw new Error('not a select');
+    const a = doc.createElement('option');
+    a.textContent = 'A';
+    const group = doc.createElement('optgroup');
+    const b = doc.createElement('option');
+    b.setAttribute('value', 'bee');
+    group.append(b);
+    select.append(a, group);
+    root.append(select);
+    records();
+    expect(select.options).toEqual([a, b]);
+    if (!(a instanceof WHTMLOptionElement) || !(b instanceof WHTMLOptionElement)) {
+      throw new Error('not options');
+    }
+    expect([a.value, b.value]).toEqual(['A', 'bee']);
+    a.value = 'ay';
+    a.defaultSelected = true;
+    b.disabled = true;
+    select.multiple = true;
+    expect(records()).toEqual([
+      ['attr', dom(a), 'value', 'ay'],
+      ['attr', dom(a), 'selected', ''],
+      ['attr', dom(b), 'disabled', ''],
+      ['attr', dom(select), 'multiple', ''],
+    ]);
+    expect([a.defaultSelected, b.disabled, select.multiple]).toEqual([true, true, true]);
+  });
+
+  it('document.head is detached, and querySelector finds `head > title` in it', () => {
+    const { doc, records } = setup();
+    expect(doc.ownerDocument).toBe(null);
+    expect(doc.querySelector('head > title')).toBe(null);
+    const title = doc.createElement('title');
+    doc.head.insertBefore(title, null);
+    expect(doc.querySelector('head > title')).toBe(title);
+    expect(doc.querySelector('title')).toBe(title);
+    expect(doc.querySelector('body > title')).toBe(null);
+    expect(records()).toEqual([]);
+    expect(() => doc.querySelector('.cls')).toThrow(/isn't supported/);
   });
 });
 

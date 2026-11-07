@@ -567,6 +567,25 @@ export class WHTMLTextAreaElement extends WHTMLElement {
 }
 
 export class WHTMLSelectElement extends WHTMLElement {
+  /** The `<option>`s under the select, `<optgroup>`s included, in tree order. React walks it. */
+  get options(): readonly WHTMLOptionElement[] {
+    const out: WHTMLOptionElement[] = [];
+    const walk = (el: WElement) => {
+      for (const c of el.children) {
+        if (c instanceof WHTMLOptionElement) out.push(c);
+        else if (c.localName === 'optgroup') walk(c);
+      }
+    };
+    walk(this);
+    return out;
+  }
+  get multiple(): boolean {
+    return this.hasAttribute('multiple');
+  }
+  set multiple(v: unknown) {
+    if (v) this.setAttribute('multiple', '');
+    else this.removeAttribute('multiple');
+  }
   get value(): string {
     const v = this.isoProps.get('value');
     return typeof v === 'string' ? v : '';
@@ -583,12 +602,33 @@ export class WHTMLSelectElement extends WHTMLElement {
 }
 
 export class WHTMLOptionElement extends WHTMLElement {
+  /** The `value` attribute, or the text when there's none, as in the DOM. */
+  get value(): string {
+    return this.getAttribute('value') ?? this.textContent;
+  }
+  set value(v: unknown) {
+    this.setAttribute('value', v);
+  }
   get selected(): boolean {
     const v = this.isoProps.get('selected');
     return typeof v === 'boolean' ? v : this.hasAttribute('selected');
   }
   set selected(v: unknown) {
     this.isoSetProp('selected', Boolean(v), true);
+  }
+  get defaultSelected(): boolean {
+    return this.hasAttribute('selected');
+  }
+  set defaultSelected(v: unknown) {
+    if (v) this.setAttribute('selected', '');
+    else this.removeAttribute('selected');
+  }
+  get disabled(): boolean {
+    return this.hasAttribute('disabled');
+  }
+  set disabled(v: unknown) {
+    if (v) this.setAttribute('disabled', '');
+    else this.removeAttribute('disabled');
   }
 }
 
@@ -610,13 +650,21 @@ export class WDocument extends WEventTarget {
   /** Set by `install()`: the worker global. */
   defaultView: unknown = null;
   readonly activeElement = null;
+  /** `null`, as for every document. */
+  readonly ownerDocument = null;
   /** A detached body, for code that falls back to `document.body`. */
   readonly body: WHTMLElement;
+  /**
+   * A detached head: React 19 hoists `<title>`, `<meta>` and `<link>` into
+   * it. The bridge doesn't render it (M3a task 3).
+   */
+  readonly head: WHTMLElement;
 
   constructor(core: Core) {
     super();
     this.isoCore = core;
     this.body = new WHTMLElement(this, -1, 'body', 'html');
+    this.head = new WHTMLElement(this, -2, 'head', 'html');
   }
 
   createElement(tag: string): WElement {
@@ -633,6 +681,40 @@ export class WDocument extends WEventTarget {
 
   createTextNode(data: string): WText {
     return new WText(this, this.isoCore.nextId++, data);
+  }
+
+  /**
+   * Type selectors only, alone or as a `head > title` child chain: what React
+   * 19 asks when it hoists a `<title>`. Queries in general are DOM group 2
+   * (ADR 0010), built when a library needs them; anything else throws.
+   */
+  querySelector(selector: string): WElement | null {
+    const steps = selector.split('>').map((t) => t.trim().toLowerCase());
+    if (!steps.every((t) => /^[a-z][a-z0-9-]*$/.test(t))) {
+      throw domError('NotSupportedError', `querySelector: "${selector}" isn't supported yet`);
+    }
+    const matches = (el: WElement): boolean => {
+      let n: WElement | null = el;
+      for (let i = steps.length - 1; i >= 0; i--) {
+        if (!n || n.localName !== steps[i]) return false;
+        n = i > 0 ? n.isoParent : null;
+      }
+      return true;
+    };
+    const walk = (el: WElement): WElement | null => {
+      for (const c of el.children) {
+        if (matches(c)) return c;
+        const deeper = walk(c);
+        if (deeper) return deeper;
+      }
+      return null;
+    };
+    for (const top of [this.head, this.body]) {
+      if (matches(top)) return top;
+      const hit = walk(top);
+      if (hit) return hit;
+    }
+    return null;
   }
 }
 

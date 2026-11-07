@@ -15,6 +15,7 @@
     "test:node": "vitest run --project protocol --project bus",
     "test:browser": "vitest run --project bus-browser --project dom --project host --project runtime --project preact-10 --project preact-11 --project react-18 --project react-19",
     "e2e": "playwright test",
+    "dom:usage": "ISOLOOP_DOM_USAGE=write vitest run --project preact-10 --project preact-11 --project react-18 --project react-19 dom-usage && oxfmt packages/dom/usage",
     "bench": "vitest run --config bench/vitest.config.ts",
     "bench:click-to-paint": "playwright test --config bench/click-to-paint/playwright.config.ts",
     "bench:throughput": "playwright test --config bench/throughput/playwright.config.ts",

@@ -384,6 +384,9 @@ importers:
         specifier: ^10 || ^11
         version: 11.1.1
     devDependencies:
+      '@isoloop/dom':
+        specifier: workspace:*
+        version: link:../dom
       preact10:
         specifier: 'catalog:'
         version: preact@10.29.8
@@ -415,6 +418,9 @@ importers:
         specifier: ^18 || ^19
         version: 19.3.1(react@19.3.1)
     devDependencies:
+      '@isoloop/dom':
+        specifier: workspace:*
+        version: link:../dom
       '@isoloop/react-major-18':
         specifier: workspace:*
         version: link:majors/18

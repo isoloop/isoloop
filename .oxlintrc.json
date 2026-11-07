@@ -138,6 +138,34 @@
       }
     },
     {
+      "files": [
+        "packages/preact/src/**/*.test.*",
+        "packages/react/src/**/*.test.*",
+        "packages/preact/src/__fixtures__/**",
+        "packages/react/src/__fixtures__/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@isoloop/**",
+                  "!@isoloop/protocol",
+                  "!@isoloop/runtime",
+                  "!@isoloop/dom/worker",
+                  "!@isoloop/dom/testing",
+                  "!@isoloop/dom/testing/usage"
+                ],
+                "message": "adapter tests and fixtures may also use the DOM subset and its test tools (M3a task 2)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["packages/host/**/*.test.ts"],
       "rules": {
         "no-restricted-imports": [

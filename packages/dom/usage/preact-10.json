@@ -1,0 +1,28 @@
+{
+  "framework": "preact@10.29.8",
+  "used": [
+    "Document.createElement",
+    "Document.createElementNS",
+    "Document.createTextNode",
+    "Element.childNodes",
+    "Element.firstChild",
+    "Element.getAttribute",
+    "Element.insertBefore",
+    "Element.removeChild",
+    "Element.setAttribute",
+    "Element.style",
+    "Element.textContent",
+    "EventTarget.addEventListener",
+    "EventTarget.dispatchEvent",
+    "HTMLInputElement.value",
+    "HTMLOptionElement.value",
+    "HTMLSelectElement.value",
+    "Node.childNodes",
+    "Node.contains",
+    "Node.nextSibling",
+    "Node.parentNode",
+    "Text.textContent"
+  ],
+  "missing": [],
+  "probed": ["class", "data-key", "name", "onchange", "onclick", "oninput"]
+}

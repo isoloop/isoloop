@@ -41,6 +41,7 @@
     "@isoloop/runtime": "workspace:*"
   },
   "devDependencies": {
+    "@isoloop/dom": "workspace:*",
     "@isoloop/react-major-18": "workspace:*",
     "@isoloop/react-major-19": "workspace:*",
     "@types/react": "catalog:",

@@ -1,6 +1,5 @@
 import { playwright } from '@vitest/browser-playwright';
-import { defaultClientConditions, defaultServerConditions } from 'vite';
-import { realpathSync } from 'node:fs';
+import { defaultClientConditions, defaultServerConditions, type Plugin } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
@@ -36,31 +35,52 @@ const browser = (name: string, include = `packages/${name}/src/**/*.test.ts`) =>
 // Each project resolves the framework to that major: Preact through its npm:
 // alias in packages/preact, React through its packages/react/majors package.
 // `major` is provided to the tests, so a wrong alias fails CI.
-const pkgDir = (from: string, name: string) =>
-  realpathSync(fileURLToPath(new URL(`${from}/node_modules/${name}`, import.meta.url)));
+// `pnpm dom:usage` sets ISOLOOP_DOM_USAGE=write: the DOM usage checks rewrite
+// packages/dom/usage instead of comparing with it (M3a task 2).
+const writeUsage = process.env.ISOLOOP_DOM_USAGE === 'write';
+
+/**
+ * Resolves `name` and its subpaths as `as` from the package at `dir`, for
+ * every importer, the framework's own files included, so there's one copy.
+ * Resolving through the package (not an alias to a path) keeps `exports`.
+ */
+const frameworkFrom = (dir: string, name: string, as = name): Plugin => {
+  const match = new RegExp(`^${name}(?=/|$)`);
+  const from = fileURLToPath(new URL(`${dir}/package.json`, import.meta.url));
+  return {
+    name: `isoloop:${as}`,
+    enforce: 'pre',
+    resolveId(id, _importer, opts) {
+      if (!match.test(id)) return null;
+      return this.resolve(id.replace(match, as), from, { ...opts, skipSelf: true });
+    },
+  };
+};
 
 const preact = (major: 10 | 11) => ({
+  plugins: [frameworkFrom('./packages/preact', 'preact', `preact${major}`)],
+  // Served as is (it's ESM): discovered mid-run, Vite would re-optimize and
+  // reload, and a worker that already loaded the old copy got a second Preact.
+  optimizeDeps: { exclude: [`preact${major}`] },
   oxc: { jsx: { runtime: 'automatic' as const, importSource: 'preact' } },
-  resolve: { alias: [{ find: /^preact(?=\/|$)/, replacement: `preact${major}` }] },
   test: {
     ...browser(`preact-${major}`, 'packages/preact/src/**/*.test.{ts,tsx}').test,
-    provide: { major },
+    provide: { major, writeUsage },
   },
 });
 
 const react = (major: 18 | 19) => {
   const from = `./packages/react/majors/${major}`;
   return {
+    plugins: [frameworkFrom(from, 'react-dom'), frameworkFrom(from, 'react')],
+    // React is CommonJS, so it has to be optimized; listed up front, because
+    // discovered mid-run Vite re-optimizes and reloads, and a worker that
+    // already loaded the old copy gets a second React.
+    optimizeDeps: { entries: ['packages/react/src/**/*.{ts,tsx}'] },
     oxc: { jsx: { runtime: 'automatic' as const, importSource: 'react' } },
-    resolve: {
-      alias: [
-        { find: /^react-dom(?=\/|$)/, replacement: pkgDir(from, 'react-dom') },
-        { find: /^react(?=\/|$)/, replacement: pkgDir(from, 'react') },
-      ],
-    },
     test: {
       ...browser(`react-${major}`, 'packages/react/src/**/*.test.{ts,tsx}').test,
-      provide: { major },
+      provide: { major, writeUsage },
     },
   };
 };
