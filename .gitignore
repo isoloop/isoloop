@@ -25,3 +25,6 @@ bench-results/
 
 # archify diagrams (local)
 /.archify/
+
+# Adapter E2E fixtures, built by e2e/build-adapters.ts
+/e2e/isolates/adapter-*.js

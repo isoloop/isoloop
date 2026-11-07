@@ -952,12 +952,13 @@ export class WDocument extends WEventTarget {
     throw domError('NotSupportedError', `createElementNS: namespace ${ns} isn't supported`);
   }
 
-  createTextNode(data: string): WText {
-    return new WText(this, this.isoCore.nextId++, data);
+  /** `data` is converted with `String()`, as in the DOM: Preact passes numbers. */
+  createTextNode(data: unknown): WText {
+    return new WText(this, this.isoCore.nextId++, String(data));
   }
 
-  createComment(data: string): WComment {
-    return new WComment(this, this.isoCore.nextId++, str(data));
+  createComment(data: unknown): WComment {
+    return new WComment(this, this.isoCore.nextId++, String(data));
   }
 
   /** Fragments never reach the host, so they take no id from the shared counter. */

@@ -272,6 +272,16 @@ describe('what the usage logs asked for (M3a task 2)', () => {
   });
 });
 
+describe('text data', () => {
+  it('createTextNode converts its data to a string, as the DOM does (Preact passes numbers)', () => {
+    const { doc, root, records } = setup();
+    root.append(doc.createTextNode(0), doc.createTextNode(null));
+    const [first, second] = records();
+    expect(first).toMatchObject(['insert', ROOT_ID, { k: 'text', data: '0' }, null]);
+    expect(second).toMatchObject(['insert', ROOT_ID, { k: 'text', data: 'null' }, null]);
+  });
+});
+
 describe('setValue (M3a task 6)', () => {
   it('records a forced value as a prop record with force, even when the worker holds it', () => {
     const { dom: d, doc, root, records } = setup();

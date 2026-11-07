@@ -39,7 +39,8 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: 'node e2e/isolate-server.ts 4795 --cors',
+      // The adapter fixtures are built first (M3a task 13); the server serves them.
+      command: 'node e2e/build-adapters.ts && node e2e/isolate-server.ts 4795 --cors',
       url: ISOLATES_CORS,
       reuseExistingServer: !ci,
     },
