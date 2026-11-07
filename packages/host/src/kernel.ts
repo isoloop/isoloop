@@ -30,6 +30,7 @@ import { missingFeatures } from './features';
 import { load, type LoadedWorker } from './loader';
 import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from './render/isoloop-dom';
 import { createRouter, type OnNavigate, type Router } from './router';
+import { checkRequires } from './version';
 import { createRegistry, type ComponentRegistry, type HostComponent } from './render/registry';
 import {
   DEFAULT_BACKOFF,
@@ -632,6 +633,16 @@ export function createKernel(config: KernelConfig): Kernel {
               k: 'renderFmtMismatch',
               at: performance.now(),
               message: `The isolate renders ${JSON.stringify(fmt)}; this host speaks ${speaks}`,
+            });
+            return;
+          }
+          const verdict = checkRequires(msg.p.requires);
+          if (!verdict.ok) {
+            feed(slot, {
+              k: 'versionMismatch',
+              at: performance.now(),
+              reason: verdict.reason,
+              message: `"${id}" was ${verdict.message} (ADR 0012)`,
             });
             return;
           }
