@@ -42,6 +42,89 @@ function publishAndRead(page: Page, n: number): Promise<unknown[]> {
   );
 }
 
+/** Every value on the persistent topic, from the start. */
+function readAll(page: Page): Promise<unknown[]> {
+  return page.evaluate(async (topic) => {
+    const kernel = window.durable?.kernel;
+    if (!kernel) throw new Error('no kernel');
+    const values: unknown[] = [];
+    const off = kernel.subscribe(topic, (r) => values.push(r.value), { from: 'earliest' });
+    await new Promise((r) => setTimeout(r, 500));
+    off();
+    return values;
+  }, saved);
+}
+
+/**
+ * Publishes 0…n-1 to the persistent topic as a steady stream, killing the
+ * bus worker once `killAt` were sent. Resolves with the acknowledged values,
+ * and with any that rejected.
+ */
+function streamThroughCrash(
+  page: Page,
+  n: number,
+  killAt: number,
+): Promise<{ acked: number[]; rejected: string[] }> {
+  return page.evaluate(
+    async ({ topic, total, kill }) => {
+      const kernel = window.durable?.kernel;
+      if (!kernel) throw new Error('no kernel');
+      const restarted = new Promise<void>((resolve) => kernel.on('bus:ready', () => resolve()));
+      const acked: number[] = [];
+      const rejected: string[] = [];
+      const sent: Promise<void>[] = [];
+      for (let i = 0; i < total; i++) {
+        sent.push(
+          kernel.publish(topic, { value: i }).then(
+            () => void acked.push(i),
+            (e: unknown) => void rejected.push(String(e)),
+          ),
+        );
+        if (i === kill) kernel.debug.crashBus();
+        // oxlint-disable-next-line no-await-in-loop -- a stream, not one burst
+        if (i % 25 === 0) await new Promise((r) => setTimeout(r, 0));
+      }
+      await Promise.all(sent);
+      await restarted;
+      return { acked, rejected };
+    },
+    { topic: saved, total: n, kill: killAt },
+  );
+}
+
+test('I12: a persistent topic loses no acknowledged record when the bus worker is killed mid-stream', async ({
+  page,
+}) => {
+  const first = await boot(page);
+  test.skip(first.includes('open-failed'), 'no OPFS in this browser build');
+  const n = 1000;
+  const { acked, rejected } = await streamThroughCrash(page, n, 300);
+  expect(rejected).toEqual([]);
+  expect(acked.length).toBe(n);
+  // Every acknowledged record, once each, in publish order: the ones the
+  // dead bus never answered were sent again and not appended twice.
+  expect(await readAll(page)).toEqual(Array.from({ length: n }, (_, i) => i));
+});
+
+test('I12: a persistent topic loses no acknowledged record when the page is reloaded', async ({
+  page,
+}) => {
+  const first = await boot(page);
+  test.skip(first.includes('open-failed'), 'no OPFS in this browser build');
+  await page.evaluate(async (topic) => {
+    const kernel = window.durable?.kernel;
+    if (!kernel) throw new Error('no kernel');
+    await Promise.all(Array.from({ length: 500 }, (_, i) => kernel.publish(topic, { value: i })));
+  }, saved);
+  // Reloading drops the old page; its bus worker lets go of the lock a moment later.
+  await expect(async () => {
+    expect(await boot(page)).toEqual([]);
+  }).toPass({ timeout: 10_000 });
+  expect(await readAll(page)).toEqual(Array.from({ length: 500 }, (_, i) => i));
+  // And it keeps appending after what it restored.
+  expect(await publishAndRead(page, 500)).toEqual(Array.from({ length: 501 }, (_, i) => i));
+});
+
 test('a second tab runs in memory with bus:durability-degraded; after the first closes, a reload takes the files', async ({
   context,
   page,
