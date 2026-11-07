@@ -65,6 +65,14 @@ If the bus crashes again during or right after loading from OPFS, a persisted re
 
 Sync access handles are exclusive, so the first tab takes a Web Lock (`isoloop-bus`) and uses OPFS. Other tabs on the same origin fall back to `memory` for all topics and emit `bus:durability-degraded`. Sharing a bus across tabs is out of scope for v1.
 
+**Without OPFS (amended 2026-11-07, M2b task 15).** A browser without sync access handles gets the same fallback, not IndexedDB. Its persistent topics behave as memory topics, and the bus reports `ready.storage: 'memory'`. `bus:durability-degraded` carries a `reason`:
+
+- `another-tab`: the lock is held elsewhere;
+- `no-sync-access`: `createSyncAccessHandle` is missing;
+- `open-failed`: `getDirectory()` or opening the files throws, as in Firefox's and Safari's private windows.
+
+Every major browser has had sync access handles in normal browsing since 2022 or 2023, so a second storage engine would serve only private windows and old browsers ([investigation](../investigations/opfs-support.md)). IndexedDB storage moves to [would-like](../would-like.md). It comes back if a major browser turns out to lack sync access in normal browsing.
+
 ## Consequences
 
 - A bus crash is a brief pause, not a full reload, and with M2b persistent topics also survive page reloads.
@@ -77,5 +85,5 @@ Sync access handles are exclusive, so the first tab takes a Web Lock (`isoloop-b
 
 - **Replicated bus workers:** see Context; same failure domain, correlated failures, double the cost.
 - **Mirror the log on the main thread:** puts every record back on the main thread, against ADR 0005.
-- **IndexedDB** (the RFC's plan): transactional and widely available, but slower for append-heavy logs and asynchronous only. OPFS with sync handles fits a log better. IndexedDB stays the fallback if OPFS sync handles are unavailable.
+- **IndexedDB** (the RFC's plan): transactional and widely available, but slower for append-heavy logs and asynchronous only. OPFS with sync handles fits a log better. It was the fallback where sync handles are missing until the 2026-11-07 amendment to decision 6, which uses memory instead.
 - **Periodic snapshots instead of a write-ahead log:** cheaper writes, but records since the last snapshot are lost. That could come later as an extra `durability: 'snapshot'` mode.
