@@ -17,19 +17,21 @@ The bus runs in its own worker, which the kernel starts before any isolate ([ADR
 
 Give both or neither. One without the other makes `createKernel` throw `invalid_config`. With neither there is no bus: isolates still run, but `kernel.publish` rejects with `bus_unavailable`.
 
-In [four-loops](../../examples/four-loops/src/main.ts) with Vite, both bundles come in as `?worker&url`, and the contracts module comes in through the example's `?isolate` plugin, so it's emitted as its own chunk:
+With Vite, `@isoloop/vite` provides both URLs as `virtual:isoloop/workers`, as in [four-loops](../../examples/four-loops/src/main.ts). The contracts module comes in through the example's `?isolate` plugin, so it's emitted as its own chunk:
 
 ```ts
-import busWorker from '@isoloop/bus/worker?worker&url';
-import bootstrap from '@isoloop/runtime/bootstrap?worker&url';
+// vite.config.ts: plugins: [isoloop()]
+import workers from 'virtual:isoloop/workers'; // types: /// <reference types="@isoloop/vite/client" />
 import list from './contracts';
 import contractsUrl from './contracts?isolate';
 
 const kernel = createKernel({
   contracts: { url: contractsUrl, list },
-  workers: { isolateBootstrap: bootstrap, bus: busWorker },
+  workers,
 });
 ```
+
+`isoloop()` also sends the Content-Security-Policy below on every dev and preview response, with Vite's HMR socket and injected styles allowed. Pass `isolateOrigins` for isolates on other origins, `csp` for a policy of your own (`false` for none), and `crossOriginIsolated: true` for COOP and COEP. Production responses come from your own server, which has to send the headers itself. Without Vite, `?worker&url` or your bundler's equivalent gives the two URLs.
 
 If the contracts module fails to load or is invalid (`contracts_failed`, `contracts_invalid`, `contracts_mismatch`, `reserved_topic`), it isn't retried. The kernel emits `bus:failed { code }`, every isolate fails with reason `bus-failed`, and later `spawn` calls throw `bus_failed`.
 

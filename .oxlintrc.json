@@ -183,6 +183,22 @@
       }
     },
     {
+      "files": ["packages/vite/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/**"],
+                "message": "the Vite plugin imports no Isoloop package; it names the worker entries for Vite to resolve in the app (M3a task 15)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["packages/host/**/*.test.ts"],
       "rules": {
         "no-restricted-imports": [

@@ -16,6 +16,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@isoloop/vite": "workspace:*",
     "typescript": "catalog:",
     "vite": "catalog:"
   }

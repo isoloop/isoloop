@@ -79,6 +79,7 @@ export default defineConfig({
       node('protocol'),
       node('codec'),
       node('bus'),
+      node('vite'),
       // OPFS differs by engine (M2b), so the bus worker's tests run in all three.
       browser('bus-browser', 'packages/bus/src/**/*.browser.test.ts', [
         'chromium',

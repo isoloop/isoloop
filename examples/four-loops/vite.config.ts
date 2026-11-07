@@ -1,3 +1,6 @@
+// From source, like the other workspace packages: Vite loads its config before
+// any condition applies, and nothing is built first. An app writes '@isoloop/vite'.
+import { isoloop } from '../../packages/vite/src/index.ts';
 import { defaultClientConditions, defineConfig, type Plugin } from 'vite';
 
 const QUERY = '?isolate';
@@ -40,11 +43,10 @@ function isolateUrl(): Plugin {
 }
 
 // Workspace packages resolve to their src (ADR 0009, rule 3), so the demo
-// runs without building them first. The bootstrap is a plain worker entry,
-// imported with `?worker&url`.
+// runs without building them first. `@isoloop/vite` gives the worker URLs
+// (`virtual:isoloop/workers`) and the dev headers.
 export default defineConfig({
   resolve: { conditions: ['@isoloop/source', ...defaultClientConditions] },
-  worker: { format: 'es' },
-  plugins: [isolateUrl()],
+  plugins: [isoloop(), isolateUrl()],
   base: './',
 });
