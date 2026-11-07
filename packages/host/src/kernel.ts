@@ -168,6 +168,9 @@ export type IsolateSnapshot = {
   holds?: { ageMs: number; stack?: string }[];
 };
 
+/** `bus:quota` fires once storage use reaches this share of the quota. */
+const QUOTA_WARN = 0.8;
+
 export type KernelEvents = {
   'isolate:state': { id: string; state: IsolateState; prev: IsolateState };
   'isolate:ready': { id: string };
@@ -193,6 +196,12 @@ export type KernelEvents = {
    * `open-failed`: the files couldn't be opened.
    */
   'bus:durability-degraded': { reason: DurabilityDegraded };
+  /**
+   * The origin's storage is 80 % used, once per crossing (M2b task 14). At
+   * 100 % persistent publishes reject with `quota_exceeded`; memory topics
+   * carry on.
+   */
+  'bus:quota': { usage: number; quota: number };
   /** A new bus worker is starting; running isolates get a new bus port (ADR 0007). */
   'bus:restart': { restarts: number };
   /**
@@ -423,6 +432,7 @@ export function createKernel(config: KernelConfig): Kernel {
     'bus:crash': new Set(),
     'bus:recovered': new Set(),
     'bus:durability-degraded': new Set(),
+    'bus:quota': new Set(),
     'bus:restart': new Set(),
     'bus:failed': new Set(),
     'bus:metrics': new Set(),
@@ -873,6 +883,11 @@ export function createKernel(config: KernelConfig): Kernel {
             restart: (restarts) => emit('bus:restart', { restarts }),
             metrics: (m) => {
               warnLossyTopics(m.subscriptions);
+              if (m.storage && m.storage.quota > 0) {
+                const high = m.storage.usage >= m.storage.quota * QUOTA_WARN;
+                if (high && !quotaWarned) emit('bus:quota', m.storage);
+                quotaWarned = high;
+              }
               routeWatched = m.subscriptions.some(
                 (x) =>
                   x.topic === routeTopic.name && !x.consumer.startsWith(HOST_CONNECTION_PREFIX),
@@ -914,6 +929,8 @@ export function createKernel(config: KernelConfig): Kernel {
 
   /** From the last metrics: an isolate subscribes to the route topic (for the basePath warning). */
   let routeWatched = false;
+  /** `bus:quota` was emitted and storage use hasn't dropped below the mark since. */
+  let quotaWarned = false;
   const router: Router | undefined =
     config.routing === false
       ? undefined

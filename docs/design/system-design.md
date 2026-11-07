@@ -208,7 +208,7 @@ interface Kernel {
   resume(id: string): Promise<void>;                   // wake a suspended isolate (ADR 0001); no-op unless suspended
   publish<In>(topic: TopicRef<In>, rec: { key?: string; value: In }): Promise<void>;   // rejects with a BusError
   subscribe<Out>(topic: TopicRef<unknown, Out>, fn: (r: TypedRecord<Out>) => void, opts?: { from?: StartPosition }): () => void;   // from 'latest' by default
-  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:ready, bus:crash, bus:recovered, bus:durability-degraded, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
+  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:ready, bus:crash, bus:recovered, bus:durability-degraded, bus:quota, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
   isolates(): IsolateSnapshot[];                                      // used by devtools
   syncRoute(): void;                                   // host router changed the URL; republish isoloop.route.v1 if href/state differ (ADR 0002)
   dropTopic(name: string, o?: { force?: boolean }): Promise<void>;   // M2b: delete an orphaned persistent topic; seed_pending / force rules (ADR 0003)
@@ -470,7 +470,7 @@ Responsibilities, in order, for a `publish`:
 
 **Request/response.** `bus.request(topic, value)` sends `request { timeoutMs }`, which goes through the publish pipeline and is appended with `req: { from, id }` (the caller's isolate id and request id) on the record. Responders call `reply(record, value)` (`reply { topic, offset, value }`), which the broker validates against the topic's `reply` schema and sends straight to the caller's port as `result { re }`, not through a log. Only an isolate the request record was delivered to may reply; the first valid reply wins and later ones reject with `already_replied`. An invalid reply rejects the responder with `invalid` and sends the caller `reply_invalid` at once. `request` on a topic without `reply` rejects with `not_requestable`. Timeout errors are raised on the caller side; the broker forgets the request after `timeoutMs` (a later reply gets `timeout`), and a reply to a caller that has gone is dropped.
 
-**Metrics** (sampled every 1 s on the control port): records/s per topic, bytes/s, per-subscription lag (`head − cursor`) and credit, rejected publishes by reason.
+**Metrics** (sampled every 1 s on the control port): records/s per topic, bytes/s, per-subscription lag (`head − cursor`) and credit, rejected publishes by reason, and, while the bus keeps files, the origin's storage use (`navigator.storage.estimate()`). The kernel emits `bus:quota` once use reaches 80 % of the quota; at 100 %, persistent publishes reject with `quota_exceeded` and memory topics carry on.
 
 ## 7. Key sequences
 

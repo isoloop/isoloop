@@ -239,6 +239,24 @@ describe('bus controller', () => {
     expect(aDegraded).toEqual([]);
   });
 
+  it('quota: bus:quota once past 80 %; when full, persistent publishes reject and memory topics carry on (M2b)', async () => {
+    const { kernel, log } = setup({
+      workers: { isolateBootstrap: bootstrap, bus: worker('./__fixtures__/quota-bus.ts') },
+    });
+    const quota = log('bus:quota');
+    const metrics = log('bus:metrics');
+    await vi.waitUntil(() => metrics.length >= 1, { timeout: 3000 });
+    await kernel.publish(saved, { value: 1 });
+    expect(quota).toEqual([{ usage: 81, quota: 100 }]);
+    // The stub reports full from its third read on.
+    await vi.waitUntil(() => metrics.some((m) => m.storage?.usage === 100), { timeout: 5000 });
+    await expect(kernel.publish(saved, { value: 2 })).rejects.toMatchObject({
+      code: 'quota_exceeded',
+    });
+    await kernel.publish(count, { value: 1 });
+    expect(quota).toHaveLength(1);
+  });
+
   it('a contracts mismatch is fatal: bus:failed, isolates fail, spawn throws', async () => {
     const differ = { ...list, topics: list.topics.filter((t) => t.name !== 'notes.v1') };
     const { kernel, log } = setup({ contracts: { url: contractsUrl, list: differ } });

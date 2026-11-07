@@ -19,6 +19,8 @@ export const ERROR_CODES = [
   'too_large',
   'invalid',
   'not_encodable',
+  /** The origin's storage is full: persistent publishes reject, memory topics carry on (M2b). */
+  'quota_exceeded',
   'bus_unavailable',
   'not_requestable',
   'already_replied',

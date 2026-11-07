@@ -33,6 +33,8 @@ export type BusMetrics = {
   /** `lag` is `head − cursor`. */
   subscriptions: { consumer: string; topic: string; lag: number; credit: number }[];
   rejected: Partial<Record<ErrorCode, number>>;
+  /** The origin's storage use, from `navigator.storage.estimate()`, while the bus keeps files. */
+  storage?: { usage: number; quota: number };
 };
 
 /** Control port: host → bus worker. */
