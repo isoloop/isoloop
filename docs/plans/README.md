@@ -7,7 +7,7 @@ One plan per milestone of [RFC 0001](../rfcs/0001-threaded-runtime.md#mvp-roadma
 | M0 Foundations | [m0-foundations.md](m0-foundations.md) | Full | Done | The four-loops demo runs from the repo and CI is green |
 | M1 Kernel | [m1-kernel.md](m1-kernel.md) | Full | Done | A blocked or crashed isolate never affects the others, proven by Playwright tests |
 | M2 Bus | [m2-bus.md](m2-bus.md) | Full | Done | A restarted isolate rebuilds its state from the log in a test |
-| M2b Durable log | [m2b-durable-log.md](m2b-durable-log.md) | Full | Not started | A persistent topic loses no acknowledged record across a bus crash or a page reload |
+| M2b Durable log | [m2b-durable-log.md](m2b-durable-log.md) | Full | Done | A persistent topic loses no acknowledged record across a bus crash or a page reload |
 | M2c Worker pools | [m2c-worker-pools.md](m2c-worker-pools.md) | Outline | Not started | Pooled and own-worker isolates run side by side; a pool crash restarts only that pool |
 | M3 Adapters + dashboard (initiative) | [m3-adapters-dashboard.md](m3-adapters-dashboard.md) | Overview | Not started | Dashboard live on a public URL; recorded comparison in the README |
 | ↳ M3a Adapters (epic) | [m3a-adapters.md](m3a-adapters.md) | Full | Done | Both adapters pass the adapter conformance suite on every supported major |
@@ -16,7 +16,7 @@ One plan per milestone of [RFC 0001](../rfcs/0001-threaded-runtime.md#mvp-roadma
 | M5 Shared-memory engine | [m5-shared-memory-engine.md](m5-shared-memory-engine.md) | Outline | Not started | Benchmark results published, whichever engine wins |
 | M5b Delivery batching (spike) | [m5b-delivery-batching.md](m5b-delivery-batching.md) | Outline | Not started | Findings written up; ADR amending §6.3 or a recalibrated §9 budget accepted |
 
-An outline gets its full task list when it's next to start, so the list reflects what was learned. Next: M3 and M2b in parallel, then M4 (0.1). M2c, M5 and M5b come after 0.1.
+An outline gets its full task list when it's next to start, so the list reflects what was learned. Next: M3b (the dashboard), then M4 (0.1). M2c, M5 and M5b come after 0.1.
 
 ```mermaid
 flowchart LR

@@ -14,6 +14,20 @@ export default defineIsolate<HTMLElement>({
     const log = el('ul', { class: 'log' }, el('li', {}, 'Waiting for bus messages…'));
     const stats = el('p', { class: 'muted mono replayed' }, '0 records read');
     const snapshot = el('p', { class: 'muted mono store' }, 'store: -');
+    // Delivery is at least once: after a bus crash, a persistent topic's
+    // records after the last commit on disk come again. Each topic skips the
+    // offsets it already showed; a reset (a memory topic lost in the crash)
+    // starts that topic over.
+    const seen = new Map<string, number>();
+    const fresh = (topic: string, offset: number): boolean => {
+      if (offset <= (seen.get(topic) ?? -1)) return false;
+      seen.set(topic, offset);
+      return true;
+    };
+    const once = (topic: string) => ({
+      from: 'earliest' as const,
+      onReset: () => seen.delete(topic),
+    });
     const push = (line: string) => {
       replayed++;
       stats.textContent = `${replayed} records read`;
@@ -21,14 +35,27 @@ export default defineIsolate<HTMLElement>({
       lines.length = Math.min(lines.length, 5);
       log.replaceChildren(...lines.map((l) => el('li', {}, l)));
     };
-    ctx.bus.subscribe(count, (r) => push(`${r.producer} count = ${r.value}`), { from: 'earliest' });
-    ctx.bus.subscribe(note, (r) => push(`${r.producer} note: ${r.value}`), { from: 'earliest' });
+    ctx.bus.subscribe(
+      count,
+      (r) => {
+        if (fresh(count.name, r.offset)) push(`${r.producer} count = ${r.value}`);
+      },
+      once(count.name),
+    );
+    ctx.bus.subscribe(
+      note,
+      (r) => {
+        if (fresh(note.name, r.offset)) push(`${r.producer} note: ${r.value}`);
+      },
+      once(note.name),
+    );
     ctx.bus.subscribe(
       primes,
-      (r) => push(`${r.producer} primes = ${r.value.count} (${r.value.ms} ms)`),
-      {
-        from: 'earliest',
+      (r) => {
+        if (fresh(primes.name, r.offset))
+          push(`${r.producer} primes = ${r.value.count} (${r.value.ms} ms)`);
       },
+      once(primes.name),
     );
     ctx.bus.subscribe(
       store,

@@ -52,7 +52,7 @@ const isolates = [
     id: 'A',
     name: 'A · Counter',
     src: counter,
-    grants: { publish: ['count.v1'], subscribe: ['note.v1'] },
+    grants: { publish: ['count.v1'], subscribe: ['count.v1', 'note.v1'] },
   },
   { id: 'B', name: 'B · Ticker', src: ticker, grants: { publish: [], subscribe: [] } },
   {
@@ -100,6 +100,10 @@ setInterval(() => {
   const byId = new Map(kernel.isolates().map((s) => [s.id, s]));
   for (const pane of panes) pane.paint(byId.get(pane.id));
 }, 100);
+
+// Kills the bus worker as a crash would: persistent topics lose nothing, and
+// memory topics (primes.v1, vote.v1) are reset (ADR 0007).
+$('crash-bus').addEventListener('click', () => kernel.debug.crashBus());
 
 const buslog = $('buslog');
 // The host's own subscriptions: the only records that cross the main thread.

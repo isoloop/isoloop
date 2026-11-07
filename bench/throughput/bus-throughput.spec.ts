@@ -14,6 +14,9 @@
  * delivery), records/s published, p50/p95/p99 delivery latency, and how long
  * the bus took to load its contracts. Report only: it sets the budget
  * (≥ 50k records/s delivered) and is the baseline for the M5 engine.
+ *
+ * Run twice: on a `memory` topic, and on a `persistent` one (M2b task 22),
+ * where each publish is acknowledged once its group commit is in OPFS.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
@@ -25,12 +28,12 @@ const RECORDS = 20_000;
 const WINDOW = 500;
 
 /** The contracts, as module source: a schema that only checks the shape. */
-const CONTRACTS = `
+const contractsFor = (durability: Durability) => `
 const schema = { '~standard': { version: 1, vendor: 'bench', validate: (value) =>
   typeof value === 'object' && value !== null ? { value } : { issues: [{ message: 'object', path: [] }] } } };
 const any = { '~standard': { version: 1, vendor: 'bench', validate: (value) => ({ value }) } };
 const topics = [
-  { name: 'tp.v1', schema, retention: { kind: 'last-n', n: 50000 } },
+  { name: 'tp.v1', schema, retention: { kind: 'last-n', n: 50000 }, durability: '${durability}' },
   { name: 'tp.ctl.v1', schema: any, retention: { kind: 'last-n', n: 1000 } },
 ];
 export default { '~isoloop': 'contracts', topics, get: (n) => topics.find((t) => t.name === n) };
@@ -95,6 +98,8 @@ export default {
 };
 `;
 
+type Durability = 'memory' | 'persistent';
+
 const round = (x: number): number => Math.round(x * 100) / 100;
 
 const percentiles = (xs: number[]) => {
@@ -112,98 +117,115 @@ const percentiles = (xs: number[]) => {
 type Done = { done: string; firstSent: number; lastRecv: number; latencies: number[] };
 type Published = { published: number; ms: number };
 
-test('bus throughput: 1 publisher, 10 subscribers, 200-byte records', async ({ page }, info) => {
-  test.setTimeout(180_000);
-  await page.goto(HARNESS);
-  await expect(page.locator('body[data-ready]')).toBeAttached();
-  const out: unknown = await page.evaluate(
-    async ({ contracts, publisher, subscriber, subscribers, records, window: win }) => {
-      // oxlint-disable-next-line unicorn/consistent-function-scoping -- runs in the page
-      const blob = (code: string) =>
-        URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
-      const t0 = performance.now();
-      const kernel = await window.harness.createBusKernel(blob(contracts));
-      let busReadyMs = -1;
-      kernel.on('bus:ready', () => {
-        busReadyMs = performance.now() - t0;
-      });
-      const ctl = { name: 'tp.ctl.v1' };
-      const ready = new Set<string>();
-      const done: unknown[] = [];
-      let published: unknown;
-      const all = new Promise<void>((resolve) => {
-        kernel.subscribe(ctl, (r) => {
-          const v = r.value;
-          if (typeof v !== 'object' || v === null) return;
-          if ('ready' in v) {
-            ready.add(String(v.ready));
-            if (ready.size === subscribers) void kernel.publish(ctl, { value: { go: true } });
-          }
-          if ('done' in v) done.push(v);
-          if ('published' in v) published = v;
-          if (done.length === subscribers && published) resolve();
+for (const durability of ['memory', 'persistent'] as const) {
+  test(`bus throughput, ${durability}: 1 publisher, 10 subscribers, 200-byte records`, async ({
+    page,
+  }, info) => {
+    test.setTimeout(180_000);
+    await page.goto(HARNESS);
+    await expect(page.locator('body[data-ready]')).toBeAttached();
+    const out: unknown = await page.evaluate(
+      async ({ contracts, publisher, subscriber, subscribers, records, window: win }) => {
+        // oxlint-disable-next-line unicorn/consistent-function-scoping -- runs in the page
+        const blob = (code: string) =>
+          URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+        const t0 = performance.now();
+        const kernel = await window.harness.createBusKernel(blob(contracts));
+        let busReadyMs = -1;
+        kernel.on('bus:ready', () => {
+          busReadyMs = performance.now() - t0;
         });
-      });
-      const grants = { publish: ['tp.v1', 'tp.ctl.v1'], subscribe: ['tp.v1', 'tp.ctl.v1'] };
-      const sub = blob(subscriber);
-      for (let i = 0; i < subscribers; i++)
-        kernel.spawn({ id: `S${i}`, src: sub, grants, config: { records } });
-      kernel.spawn({ id: 'P', src: blob(publisher), grants, config: { records, window: win } });
-      await all;
-      const messages = kernel.debug.messages();
-      await kernel.destroy();
-      return { done, published, busReadyMs, messages };
-    },
-    {
-      contracts: CONTRACTS,
-      publisher: PUBLISHER,
-      subscriber: SUBSCRIBER,
+        let degraded: string | undefined;
+        kernel.on('bus:durability-degraded', ({ reason }) => {
+          degraded = reason;
+        });
+        const ctl = { name: 'tp.ctl.v1' };
+        const ready = new Set<string>();
+        const done: unknown[] = [];
+        let published: unknown;
+        const all = new Promise<void>((resolve) => {
+          kernel.subscribe(ctl, (r) => {
+            const v = r.value;
+            if (typeof v !== 'object' || v === null) return;
+            if ('ready' in v) {
+              ready.add(String(v.ready));
+              if (ready.size === subscribers) void kernel.publish(ctl, { value: { go: true } });
+            }
+            if ('done' in v) done.push(v);
+            if ('published' in v) published = v;
+            if (done.length === subscribers && published) resolve();
+          });
+        });
+        const grants = { publish: ['tp.v1', 'tp.ctl.v1'], subscribe: ['tp.v1', 'tp.ctl.v1'] };
+        const sub = blob(subscriber);
+        for (let i = 0; i < subscribers; i++)
+          kernel.spawn({ id: `S${i}`, src: sub, grants, config: { records } });
+        kernel.spawn({ id: 'P', src: blob(publisher), grants, config: { records, window: win } });
+        await all;
+        const messages = kernel.debug.messages();
+        await kernel.destroy();
+        return { done, published, busReadyMs, messages, degraded };
+      },
+      {
+        contracts: contractsFor(durability),
+        publisher: PUBLISHER,
+        subscriber: SUBSCRIBER,
+        subscribers: SUBSCRIBERS,
+        records: RECORDS,
+        window: WINDOW,
+      },
+    );
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the shape page.evaluate returned above
+    const result = out as {
+      done: Done[];
+      published: Published;
+      busReadyMs: number;
+      messages: Record<string, number>;
+      degraded?: string;
+    };
+    const first = Math.min(...result.done.map((d) => d.firstSent));
+    const last = Math.max(...result.done.map((d) => d.lastRecv));
+    const delivered = result.done.reduce((n, d) => n + d.latencies.length, 0);
+    const seconds = (last - first) / 1000;
+    const report = {
+      bench: 'bus-throughput',
+      browser: info.project.name,
+      durability,
+      /** Where the topic lived: OPFS, or memory (a memory topic, or a degraded persistent one). */
+      storage:
+        durability === 'memory'
+          ? 'memory'
+          : result.degraded === undefined
+            ? 'opfs'
+            : `memory (${result.degraded})`,
       subscribers: SUBSCRIBERS,
       records: RECORDS,
       window: WINDOW,
-    },
-  );
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the shape page.evaluate returned above
-  const result = out as {
-    done: Done[];
-    published: Published;
-    busReadyMs: number;
-    messages: Record<string, number>;
-  };
-  const first = Math.min(...result.done.map((d) => d.firstSent));
-  const last = Math.max(...result.done.map((d) => d.lastRecv));
-  const delivered = result.done.reduce((n, d) => n + d.latencies.length, 0);
-  const seconds = (last - first) / 1000;
-  const report = {
-    bench: 'bus-throughput',
-    browser: info.project.name,
-    subscribers: SUBSCRIBERS,
-    records: RECORDS,
-    window: WINDOW,
-    recordBytes: '≈200 (as the bus estimates them)',
-    deliveredPerSec: Math.round(delivered / seconds),
-    publishedPerSec: Math.round(result.published.published / (result.published.ms / 1000)),
-    latencyMs: percentiles(result.done.flatMap((d) => d.latencies)),
-    contractsLoadMs: round(result.busReadyMs),
-    /** Design §9: ≥ 50k records/s delivered. Report only. */
-    budget: { deliveredPerSec: 50_000, enforced: false },
-    /** I7: what the main thread saw, by message type. */
-    mainThreadMessages: result.messages,
-  };
-  console.log(
-    `bus throughput: ${report.deliveredPerSec} records/s delivered, ${report.publishedPerSec} published, ` +
-      `latency p50 ${report.latencyMs.p50} / p95 ${report.latencyMs.p95} ms, contracts ${report.contractsLoadMs} ms`,
-  );
-  console.log(JSON.stringify(report, null, 2));
-  await info.attach('bus-throughput.json', {
-    body: JSON.stringify(report, null, 2),
-    contentType: 'application/json',
+      recordBytes: '≈200 (as the bus estimates them)',
+      deliveredPerSec: Math.round(delivered / seconds),
+      publishedPerSec: Math.round(result.published.published / (result.published.ms / 1000)),
+      latencyMs: percentiles(result.done.flatMap((d) => d.latencies)),
+      contractsLoadMs: round(result.busReadyMs),
+      /** Design §9: ≥ 50k records/s delivered. Report only. */
+      budget: { deliveredPerSec: 50_000, enforced: false },
+      /** I7: what the main thread saw, by message type. */
+      mainThreadMessages: result.messages,
+    };
+    console.log(
+      `bus throughput, ${durability} on ${report.storage}: ${report.deliveredPerSec} records/s delivered, ${report.publishedPerSec} published, ` +
+        `latency p50 ${report.latencyMs.p50} / p95 ${report.latencyMs.p95} ms, contracts ${report.contractsLoadMs} ms`,
+    );
+    console.log(JSON.stringify(report, null, 2));
+    await info.attach(`bus-throughput-${durability}.json`, {
+      body: JSON.stringify(report, null, 2),
+      contentType: 'application/json',
+    });
+    await mkdir('bench-results', { recursive: true });
+    await writeFile(
+      `bench-results/bus-throughput-${durability}-${info.project.name}.json`,
+      `${JSON.stringify(report, null, 2)}\n`,
+    );
+    expect(delivered).toBe(SUBSCRIBERS * RECORDS);
+    expect(result.messages['deliver'] ?? 0).toBe(0);
   });
-  await mkdir('bench-results', { recursive: true });
-  await writeFile(
-    `bench-results/bus-throughput-${info.project.name}.json`,
-    `${JSON.stringify(report, null, 2)}\n`,
-  );
-  expect(delivered).toBe(SUBSCRIBERS * RECORDS);
-  expect(result.messages['deliver'] ?? 0).toBe(0);
-});
+}
