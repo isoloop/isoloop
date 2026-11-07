@@ -74,14 +74,16 @@ export default defineIsolate<HTMLElement>({
     const send = async () => {
       const draft = input.value;
       if (!draft.trim()) return;
+      // The host owns a focused input's value (design §4.6): `force` clears it
+      // while the user is still in it, caret and focus kept. Cleared before
+      // the publish: a persistent one is answered after its write, and by then
+      // the user may be typing the next note.
+      ctx.setValue(input, '', { force: true });
       try {
         await ctx.bus.publish(note, { value: draft });
       } catch (e) {
         push(`note rejected: ${e instanceof Error ? e.message : String(e)}`);
       }
-      // The host owns a focused input's value (design §4.6): `force` clears it
-      // while the user is still in it, caret and focus kept.
-      ctx.setValue(input, '', { force: true });
     };
     sendButton.addEventListener('click', () => void send());
     input.addEventListener('keydown', (e) => {
