@@ -31,6 +31,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test:node
       - run: pnpm build
+      - run: node scripts/check-exports.ts
 
   browser:
     needs: check
