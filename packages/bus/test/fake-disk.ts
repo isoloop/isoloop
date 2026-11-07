@@ -9,6 +9,7 @@ import { frameOffset } from '../src/storage/frame';
 export class FakeDisk implements LogStorage {
   readonly kind = 'opfs' as const;
   readonly #segments = new Map<string, Uint8Array[][]>();
+  readonly #offsets: Record<string, Record<string, number>> = {};
   readonly #perSegment: number;
   /** How many `readSegment` calls were made. */
   reads = 0;
@@ -17,7 +18,7 @@ export class FakeDisk implements LogStorage {
     this.#perSegment = perSegment;
   }
 
-  /** What a restarted bus finds: every topic written so far, from its oldest frame to its newest. */
+  /** What a restarted bus finds: every topic written so far, from its oldest frame to its newest, and the commits. */
   open(): Promise<StoredState> {
     const topics: StoredState['topics'] = [];
     for (const [topic, segs] of this.#segments) {
@@ -26,7 +27,7 @@ export class FakeDisk implements LogStorage {
       if (first && last)
         topics.push({ topic, tail: frameOffset(first), head: frameOffset(last) + 1 });
     }
-    return Promise.resolve({ topics, offsets: {} });
+    return Promise.resolve({ topics, offsets: structuredClone(this.#offsets) });
   }
 
   appendBatch(topic: string, encoded: Uint8Array[]): void {
@@ -49,7 +50,10 @@ export class FakeDisk implements LogStorage {
     return Promise.resolve();
   }
 
-  saveOffsets(_offsets: Record<string, Record<string, number>>): void {}
+  saveOffsets(offsets: Record<string, Record<string, number>>): void {
+    for (const [topic, byConsumer] of Object.entries(offsets))
+      this.#offsets[topic] = { ...this.#offsets[topic], ...byConsumer };
+  }
 
   dropBelow(topic: string, tail: number): void {
     const segs = this.#segments.get(topic) ?? [];

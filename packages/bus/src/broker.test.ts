@@ -745,3 +745,55 @@ describe('re-sent publishes after a bus crash (ADR 0007 step 5, M2b task 20)', (
     expect(await answer).toEqual({ ok: true, value: 4 });
   });
 });
+
+describe('a reattached subscription to a persistent topic (ADR 0007 step 3)', () => {
+  const saved = topic('saved.v1', {
+    schema: unchecked<number>(),
+    retention: { kind: 'last-n', n: 100 },
+    durability: 'persistent',
+  });
+
+  async function boot(disk: FakeDisk) {
+    const engine = new TsEngine({ storage: disk });
+    const broker = new Broker({ contracts: contracts(saved), engine });
+    await engine.restore(await disk.open());
+    return broker;
+  }
+
+  /** A bus that holds 0, 1, 2 on saved.v1, where A read them all and committed `committed`. */
+  async function crashed(committed: number | undefined, group?: string) {
+    const disk = new FakeDisk();
+    const before = await boot(disk);
+    const a = connect(before, 'A', all);
+    await a.call('subscribe', { topic: 'saved.v1', from: 'earliest', group });
+    // oxlint-disable-next-line no-await-in-loop -- in order, so offsets follow the values
+    for (const value of [0, 1, 2]) await a.call('publish', { topic: 'saved.v1', value });
+    if (committed !== undefined) await a.call('commit', { topic: 'saved.v1', offset: committed });
+    return boot(disk);
+  }
+
+  it.each([undefined, 'g'])(
+    'resumes after the committed offset, not at its `from` again (group %s)',
+    async (group) => {
+      const after = await crashed(1, group);
+      const again = fakeIsolate('A');
+      after.attach('A', all, again.port, { reattach: true });
+      await again.call('subscribe', { topic: 'saved.v1', from: 'earliest', group });
+      expect(again.values('saved.v1')).toEqual([2]);
+      expect(again.inbox.some((m) => m.t === 'reset')).toBe(false);
+    },
+  );
+
+  it('starts at its `from` when it never committed, or on a first attach', async () => {
+    const after = await crashed(undefined);
+    const again = fakeIsolate('A');
+    after.attach('A', all, again.port, { reattach: true });
+    await again.call('subscribe', { topic: 'saved.v1', from: 'earliest' });
+    expect(again.values('saved.v1')).toEqual([0, 1, 2]);
+
+    const later = await crashed(1);
+    const fresh = connect(later, 'A', all);
+    await fresh.call('subscribe', { topic: 'saved.v1', from: 'earliest' });
+    expect(fresh.values('saved.v1')).toEqual([0, 1, 2]);
+  });
+});

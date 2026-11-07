@@ -943,6 +943,14 @@ export class Broker {
       conn.reset.add(name);
       conn.port.post({ v: 1, t: 'reset', p: { topic: name, reason: 'bus_restart' } });
     }
+    // A reattached subscription to a persistent topic resumes after what it
+    // committed on the old bus (ADR 0007, step 3), not at its `from` again:
+    // its handlers already saw the records before that.
+    const consumer = group === undefined ? conn.isolateId : `group:${group}`;
+    const start: StartPosition =
+      conn.reset && this.#durable(name) && this.#committed(name, consumer) !== undefined
+        ? 'committed'
+        : from;
     const old = conn.subs.get(name);
     if (old) this.#leave(old);
     const sub: Subscription = {
@@ -956,11 +964,11 @@ export class Broker {
     };
     conn.subs.set(name, sub);
     if (group === undefined) {
-      sub.cursor = this.#start(name, conn.isolateId, from);
+      sub.cursor = this.#start(name, conn.isolateId, start);
       this.#schedule(sub);
       return { ok: true, value: { from: sub.cursor } };
     }
-    const g = this.#join(sub, group, from);
+    const g = this.#join(sub, group, start);
     return { ok: true, value: { from: g.cursor, group } };
   }
 
