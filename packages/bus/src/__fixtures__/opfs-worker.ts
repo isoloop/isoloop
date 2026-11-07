@@ -692,7 +692,6 @@ const scenarios: Record<string, (dir: string) => Promise<unknown>> = {
       if (!newest || gen > newest.gen) newest = { slot, gen };
     }
     if (newest) {
-      // oxlint-disable-next-line no-await-in-loop -- one file
       const h = await (await v2Dir.getFileHandle(newest.slot)).createSyncAccessHandle();
       h.truncate(Math.floor(h.getSize() / 2));
       h.close();
