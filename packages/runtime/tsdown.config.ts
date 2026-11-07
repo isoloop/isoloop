@@ -2,7 +2,7 @@ import { defineConfig } from 'tsdown';
 
 export default defineConfig([
   // The package API, for isolate code and adapters. Dependencies stay imports.
-  { entry: ['src/index.ts'], platform: 'browser', dts: true },
+  { entry: ['src/index.ts', 'src/testing.ts'], platform: 'browser', dts: true },
   // The isolate worker entry, loaded by URL: one self-contained file.
   {
     entry: ['src/bootstrap.ts'],

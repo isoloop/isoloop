@@ -170,6 +170,7 @@
                   "@isoloop/**",
                   "!@isoloop/protocol",
                   "!@isoloop/runtime",
+                  "!@isoloop/runtime/testing",
                   "!@isoloop/dom/worker",
                   "!@isoloop/dom/testing",
                   "!@isoloop/dom/testing/worker"
