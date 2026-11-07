@@ -29,8 +29,10 @@ export type TopicDef<In, Out = In, RIn = never, ROut = RIn> = {
   /** Rough structured size limit per record. Default 256 KiB. */
   readonly maxRecordBytes?: number;
   /**
-   * Default `memory`. `persistent` keeps the topic in OPFS (ADR 0007, M2b);
-   * until then it is accepted and behaves as `memory`, with a console warning.
+   * Default `memory`. `persistent` keeps the topic in OPFS (ADR 0007): it
+   * survives a bus crash and a reload. Where OPFS isn't available, or another
+   * tab holds it, it behaves as `memory` and the kernel emits
+   * `bus:durability-degraded`.
    */
   readonly durability?: 'memory' | 'persistent';
 };

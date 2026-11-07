@@ -2,7 +2,7 @@
 // Isolates run a test bootstrap that speaks the bus protocol directly.
 import type { BusRecord } from '@isoloop/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list, { count, notes, report, type Report } from './__fixtures__/contracts';
+import list, { count, notes, report, saved, type Report } from './__fixtures__/contracts';
 import { BusError, createKernel, type Kernel, type KernelConfig, type KernelEvents } from './index';
 
 const worker = (path: string): string =>
@@ -17,6 +17,15 @@ const ALL = { publish: ['*'], subscribe: ['*'] };
 const kernels: Kernel[] = [];
 afterEach(async () => {
   await Promise.all(kernels.splice(0).map((k) => k.destroy()));
+  // Persistent topics live in this origin's OPFS: start every test empty. A
+  // terminated bus worker may hold its files a moment longer.
+  const origin = await navigator.storage.getDirectory();
+  await vi.waitUntil(() =>
+    origin.removeEntry('isoloop', { recursive: true }).then(
+      () => true,
+      (e: unknown) => e instanceof DOMException && e.name === 'NotFoundError',
+    ),
+  );
 });
 
 function setup(extra: Partial<KernelConfig> = {}) {
@@ -111,6 +120,34 @@ describe('bus controller', () => {
     kernel.subscribe(count, (r) => got.push(r.value), { from: 'earliest' });
     await kernel.publish(count, { value: 7 });
     await vi.waitUntil(() => got.includes(7));
+  });
+
+  it('a persistent topic survives a bus crash: no reset, no gap, every acked record (M2b)', async () => {
+    const { kernel, log, latest } = setup();
+    const ready = log('bus:ready');
+    kernel.spawn({ id: 'X', src, grants: ALL, config: { topics: ['saved.v1', 'count.v1'] } });
+    await vi.waitUntil(() => latest('X') && ready.length === 1);
+    // Sent in order on one port, so offsets follow i.
+    await Promise.all(Array.from({ length: 20 }, (_, i) => kernel.publish(saved, { value: i })));
+    await kernel.publish(count, { value: 1 });
+    await vi.waitUntil(() => latest('X')?.offsets['saved.v1']?.length === 20);
+
+    kernel.debug.crashBus();
+    await vi.waitUntil(() => ready.length === 2, { timeout: 3000 });
+    // The memory topic is reset once; the persistent one resumes where X committed.
+    await vi.waitUntil(() => latest('X')?.ports === 2 && latest('X')?.resets['count.v1'] === 1);
+    await Promise.all([20, 21, 22, 23, 24].map((i) => kernel.publish(saved, { value: i })));
+    await vi.waitUntil(() => latest('X')?.offsets['saved.v1']?.length === 25);
+    const x = latest('X');
+    expect(x?.resets['saved.v1']).toBeUndefined();
+    expect(x?.gaps).toBe(0);
+    expect(x?.offsets['saved.v1']).toEqual(Array.from({ length: 25 }, (_, i) => i));
+
+    // And the host reads the whole log back from the new bus.
+    const got: number[] = [];
+    kernel.subscribe(saved, (r) => got.push(r.value), { from: 'earliest' });
+    await vi.waitUntil(() => got.length === 25);
+    expect(got).toEqual(Array.from({ length: 25 }, (_, i) => i));
   });
 
   it('a contracts mismatch is fatal: bus:failed, isolates fail, spawn throws', async () => {

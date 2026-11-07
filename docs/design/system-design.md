@@ -398,7 +398,7 @@ type TopicDef<In, Out = In, RIn = never, ROut = RIn> = {
   seed?: { from: TopicDef<any, any>; map: (value: unknown, rec: BusRecord) => In; follow?: boolean };   // M2b, ADR 0003
   retention: { kind: 'last-n'; n: number } | { kind: 'time'; ms: number } | { kind: 'compacted' };
   maxRecordBytes?: number;                       // default 256 KiB, rough estimate by structured size
-  durability?: 'memory' | 'persistent';          // default 'memory'; 'persistent' = OPFS (ADR 0007, M2b); until M2b it behaves as 'memory', with one console warning
+  durability?: 'memory' | 'persistent';          // default 'memory'; 'persistent' = OPFS (ADR 0007); memory where OPFS isn't available
 };
 function topic<In, Out, RIn, ROut>(name: string, def: Omit<TopicDef<In, Out, RIn, ROut>, 'name'>): TopicDef<In, Out, RIn, ROut>;
 function contracts(...topics: TopicDef<any, any, any, any>[]): Contracts;   // default export of the contracts module; rejects duplicate names

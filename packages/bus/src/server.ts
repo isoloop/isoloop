@@ -23,6 +23,7 @@ import { Broker, type BrokerStats, type BusPort } from './broker';
 import { MemoryStorage } from './engine/memory-storage';
 import { TsEngine } from './engine/ts-engine';
 import type { LogStorage } from './engine/types';
+import { OpfsStorage } from './storage/opfs';
 import { isContracts, topicConfig, type Contracts } from './topic';
 
 /** The part of a worker scope the bus uses. */
@@ -38,6 +39,11 @@ export type ServeOptions = {
   importModule?: (url: string) => Promise<unknown>;
   /** Default `performance.now`. */
   now?: () => number;
+  /**
+   * Storage for persistent topics. Default `OpfsStorage` where sync access
+   * handles exist (a dedicated worker), else `MemoryStorage`.
+   */
+  storage?: () => LogStorage;
 };
 
 /** How often metrics are sampled and retention runs (design §6.2, §6.3). */
@@ -299,25 +305,28 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
     }, METRICS_MS);
   };
 
+  /** An engine and broker on `storage`, with persistent topics restored from it. */
+  const build = async (
+    list: Contracts,
+    storage: LogStorage,
+    dev: boolean,
+  ): Promise<{ b: Broker; restored: { topic: string; head: number }[] }> => {
+    const stored = await storage.open();
+    const engine = new TsEngine({ storage });
+    const b = new Broker({
+      contracts: list,
+      engine,
+      dev,
+      onWake: (isolateId, topic) => post({ v: 1, t: 'wake', p: { isolateId, topic } }),
+    });
+    return { b, restored: await engine.restore(stored) };
+  };
+
   const boot = async (p: Extract<HostToBus, { t: 'boot' }>['p']): Promise<void> => {
     startBeat(p.heartbeatMs ?? 100);
     let list: Contracts;
-    let b: Broker;
-    let storage: LogStorage;
-    let restored: { topic: string; head: number }[];
     try {
       list = await loadContracts(p.contractsUrl, p.topics, importModule);
-      storage = new MemoryStorage();
-      const stored = await storage.open();
-      const engine = new TsEngine({ storage });
-      b = new Broker({
-        contracts: list,
-        engine,
-        dev: p.dev ?? false,
-        onWake: (isolateId, topic) => post({ v: 1, t: 'wake', p: { isolateId, topic } }),
-      });
-      // Persistent topics come back from disk before anything is let in.
-      restored = await engine.restore(stored);
     } catch (e) {
       fatal(
         e instanceof BootError
@@ -326,6 +335,20 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
       );
       return;
     }
+    const dev = p.dev ?? false;
+    let storage =
+      opts.storage?.() ?? (OpfsStorage.available() ? new OpfsStorage() : new MemoryStorage());
+    let built: Awaited<ReturnType<typeof build>>;
+    try {
+      // Persistent topics come back from disk before anything is let in.
+      built = await build(list, storage, dev);
+    } catch (e) {
+      // The files couldn't be opened: run in memory rather than not at all.
+      console.warn('[isoloop] persistent topics are in memory: storage failed to open', e);
+      storage = new MemoryStorage();
+      built = await build(list, storage, dev);
+    }
+    const { b, restored } = built;
     broker = b;
     post({ v: 1, t: 'ready', p: { engine: 'ts', storage: storage.kind, restored } });
     for (const msg of early.splice(0)) control(msg, b);

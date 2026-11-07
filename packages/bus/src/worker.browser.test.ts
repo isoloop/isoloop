@@ -77,7 +77,12 @@ describe('bus worker', () => {
   it('boots with a contracts module, then publishes and delivers between two isolates', async () => {
     const bus = startBus();
     const ready = await bus.first('ready');
-    expect(ready.p).toEqual({ engine: 'ts', storage: 'memory', restored: [] });
+    // OPFS where the engine has it (Playwright's WebKit doesn't), memory otherwise.
+    const opfs = await navigator.storage.getDirectory().then(
+      () => true,
+      () => false,
+    );
+    expect(ready.p).toEqual({ engine: 'ts', storage: opfs ? 'opfs' : 'memory', restored: [] });
 
     const a = bus.attach('A');
     const d = bus.attach('D');

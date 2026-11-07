@@ -56,9 +56,9 @@ export type BrokerOptions = {
   /** Default `setTimeout`. Used to forget requests after their timeout. */
   timers?: Timers;
   /**
-   * True for topics whose log survived a bus restart. Default: none, since
-   * every topic is in memory until OPFS storage (M2b). A reattached isolate
-   * subscribing to any other topic gets `reset` first (ADR 0007).
+   * True for topics whose log survived a bus restart. Default: the engine's
+   * `durable`, persistent topics on storage that keeps them. A reattached
+   * isolate subscribing to any other topic gets `reset` first (ADR 0007).
    */
   durable?: (topic: string) => boolean;
   /**
@@ -225,7 +225,7 @@ export class Broker {
     this.#batch = opts.batchSize ?? 64;
     this.#inboxLimit = opts.inboxLimit ?? 1000;
     this.#timers = opts.timers ?? { set: (fn, ms) => void setTimeout(fn, ms) };
-    this.#durable = opts.durable ?? (() => false);
+    this.#durable = opts.durable ?? ((topic) => this.#engine.durable(topic));
     this.#onWake = opts.onWake ?? (() => {});
     for (const def of [...(opts.systemTopics ?? SYSTEM_TOPICS), ...opts.contracts.topics]) {
       this.#engine.createTopic(topicConfig(def));

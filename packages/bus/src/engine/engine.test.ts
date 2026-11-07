@@ -2,7 +2,7 @@ import type { TopicConfig } from '@isoloop/protocol';
 import { describe, expect, it, vi } from 'vitest';
 import { runEngineConformance } from '../../test/engine-conformance';
 import { ReferenceEngine } from '../../test/reference-engine';
-import { MemoryStorage, effectiveDurability, resetDurabilityWarning } from './memory-storage';
+import { MemoryStorage, effectiveDurability } from './memory-storage';
 import type { LogStorage } from './types';
 
 // The suite checks itself against the simplest correct engine first.
@@ -29,18 +29,15 @@ const topic = (name: string, durability?: 'memory' | 'persistent'): TopicConfig 
   ...(durability ? { durability } : {}),
 });
 
-describe('durability until M2b', () => {
-  it("accepts 'persistent' but keeps it in memory, warning once", () => {
-    resetDurabilityWarning();
-    const warn = vi.fn();
+describe('effective durability', () => {
+  it("keeps 'persistent' in memory on memory storage, without a warning", () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const storage = new MemoryStorage();
-    expect(effectiveDurability(topic('a'), storage, warn)).toBe('memory');
-    expect(effectiveDurability(topic('b', 'memory'), storage, warn)).toBe('memory');
+    expect(effectiveDurability(topic('a'), storage)).toBe('memory');
+    expect(effectiveDurability(topic('b', 'memory'), storage)).toBe('memory');
+    expect(effectiveDurability(topic('c', 'persistent'), storage)).toBe('memory');
     expect(warn).not.toHaveBeenCalled();
-    expect(effectiveDurability(topic('c', 'persistent'), storage, warn)).toBe('memory');
-    expect(effectiveDurability(topic('d', 'persistent'), storage, warn)).toBe('memory');
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0]?.[0]).toContain('c');
+    warn.mockRestore();
   });
 
   it("stays 'persistent' on a storage that keeps data", () => {
