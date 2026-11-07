@@ -35,6 +35,12 @@ export interface IsolateDriver {
   readonly root: Handle;
   el(tag: string): Handle;
   text(data: string): Handle;
+  /** `document.createComment(data)`. */
+  comment(data: string): Handle;
+  /** `document.createDocumentFragment()`; `insert` takes it as a parent or a child. */
+  fragment(): Handle;
+  /** How many children `parent` has, on the isolate side. */
+  childCount(parent: Handle): number;
   /** Inserts `child` into `parent` before `before`, or at the end. Moves it if it's already in the tree. */
   insert(parent: Handle, child: Handle, before?: Handle | null): void;
   remove(child: Handle): void;
@@ -98,6 +104,8 @@ export const CASES = {
   dataset: 'dataset reads and writes data-* attributes',
   getElementById: 'getElementById finds rendered elements by id',
   contains: 'contains walks the isolate tree',
+  fragment: 'inserting a fragment inserts its children in order and empties it',
+  comment: 'comment nodes round-trip, and their data updates',
 } as const;
 
 export type CaseName = keyof typeof CASES;
@@ -404,6 +412,42 @@ export function runBridgeConformance(
       expect(d.contains(top, null)).toBe(false);
     });
 
+    test('fragment', () => {
+      const { isolate: d, sync, html } = setup();
+      const last = build(d, 'p', ['end']);
+      d.insert(d.root, last);
+      sync();
+      const frag = d.fragment();
+      for (const t of ['a', 'b', 'c']) d.insert(frag, build(d, 'span', [t]));
+      expect(d.childCount(frag)).toBe(3);
+      d.insert(d.root, frag, last);
+      expect(d.childCount(frag)).toBe(0);
+      sync();
+      expect(html()).toBe('<span>a</span><span>b</span><span>c</span><p>end</p>');
+      // An emptied fragment inserts nothing, and can be filled again.
+      d.insert(d.root, frag);
+      d.insert(frag, build(d, 'strong', ['again']));
+      d.insert(d.root, frag);
+      sync();
+      expect(html()).toBe(
+        '<span>a</span><span>b</span><span>c</span><p>end</p><strong>again</strong>',
+      );
+    });
+
+    test('comment', () => {
+      const { isolate: d, sync, html } = setup();
+      const c = d.comment('marker');
+      d.insert(d.root, build(d, 'p', [c, 'text']));
+      sync();
+      expect(html()).toBe('<p><!--marker-->text</p>');
+      d.setText(c, 'moved');
+      sync();
+      expect(html()).toBe('<p><!--moved-->text</p>');
+      d.remove(c);
+      sync();
+      expect(html()).toBe('<p>text</p>');
+    });
+
     test('malformed', () => {
       const { host, isolate: d, sync, html } = setup();
       d.insert(d.root, build(d, 'p', ['ok']));
@@ -428,6 +472,7 @@ function serialize(el: Element, internal: (name: string) => boolean): string {
   let out = '';
   for (const n of el.childNodes) {
     if (n instanceof Text) out += escape(n.data);
+    else if (n instanceof Comment) out += `<!--${n.data}-->`;
     else if (n instanceof Element) {
       const attrs = [...n.attributes]
         .filter((a) => !internal(a.name))

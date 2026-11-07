@@ -1,4 +1,6 @@
 import {
+  WComment,
+  WDocumentFragment,
   WDOMTokenList,
   WElement,
   WHTMLElement,
@@ -20,6 +22,8 @@ export const DOM_GLOBALS: Readonly<Record<string, unknown>> = {
   HTMLElement: WHTMLElement,
   SVGElement: WSVGElement,
   Text: WText,
+  Comment: WComment,
+  DocumentFragment: WDocumentFragment,
   HTMLInputElement: WHTMLInputElement,
   HTMLTextAreaElement: WHTMLTextAreaElement,
   HTMLSelectElement: WHTMLSelectElement,

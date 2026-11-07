@@ -21,7 +21,15 @@
  */
 import { DOM_GLOBALS } from '../worker/install';
 import type { DomBatch, DomEvent } from '../shared/records';
-import { createDom, WDocument, WElement, WEventTarget, type WorkerDom } from '../worker/dom';
+import {
+  createDom,
+  WCharacterData,
+  WDocument,
+  WElement,
+  WEventTarget,
+  WParentNode,
+  type WorkerDom,
+} from '../worker/dom';
 import { install } from '../worker/install';
 
 /** One framework major's log, as `packages/dom/usage/<project>.json` stores it. */
@@ -44,6 +52,9 @@ export type UsageTracker = {
 /** Everything a framework sees: the classes `install()` exposes, and `document`. */
 const CLASSES: [string, { prototype: object }][] = [
   ['EventTarget', WEventTarget],
+  // Not globals, but where the shared members live.
+  ['ParentNode', WParentNode],
+  ['CharacterData', WCharacterData],
   ...Object.entries(DOM_GLOBALS).flatMap(([name, C]): [string, { prototype: object }][] =>
     typeof C === 'function' ? [[name, C as { prototype: object }]] : [],
   ),

@@ -1,17 +1,14 @@
 {
   "framework": "preact@10.29.8",
   "used": [
+    "CharacterData.data",
+    "CharacterData.textContent",
     "Document.createElement",
     "Document.createElementNS",
     "Document.createTextNode",
-    "Element.childNodes",
-    "Element.firstChild",
     "Element.getAttribute",
-    "Element.insertBefore",
-    "Element.removeChild",
     "Element.setAttribute",
     "Element.style",
-    "Element.textContent",
     "EventTarget.addEventListener",
     "EventTarget.dispatchEvent",
     "HTMLInputElement.value",
@@ -21,8 +18,11 @@
     "Node.contains",
     "Node.nextSibling",
     "Node.parentNode",
-    "Text.data",
-    "Text.textContent"
+    "ParentNode.childNodes",
+    "ParentNode.firstChild",
+    "ParentNode.insertBefore",
+    "ParentNode.removeChild",
+    "ParentNode.textContent"
   ],
   "missing": [],
   "probed": ["class", "data-key", "name"]

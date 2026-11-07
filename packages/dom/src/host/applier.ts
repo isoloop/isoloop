@@ -85,6 +85,7 @@ export function createApplier(container: Element, policy: SanitisePolicy): Appli
   const build = (s: SerializedNode): Node => {
     let node: Node;
     if (s.k === 'text') node = document.createTextNode(s.data);
+    else if (s.k === 'comment') node = document.createComment(s.data);
     else {
       const { tag, ns } = policy.element(s.tag, s.ns);
       const el = document.createElementNS(ns === 'svg' ? SVG_NS : HTML_NS, tag);

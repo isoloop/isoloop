@@ -1,5 +1,12 @@
 import type { DomBatch } from '../shared/records';
-import { createDom, WElement, WNode, WText, type WorkerDom } from '../worker/dom';
+import {
+  createDom,
+  WCharacterData,
+  WElement,
+  WNode,
+  WParentNode,
+  type WorkerDom,
+} from '../worker/dom';
 import type { Handle, IsolateDriver } from './conformance';
 
 const noop = (): void => {};
@@ -41,8 +48,13 @@ export function createIsoloopDomDriver(): IsolateDriver & { dom: WorkerDom } {
     root: wrap(cfRoot),
     el: (tag) => wrap(dom.document.createElement(tag)),
     text: (data) => wrap(dom.document.createTextNode(data)),
+    comment: (data) => wrap(dom.document.createComment(data)),
+    fragment: () => wrap(dom.document.createDocumentFragment()),
+    childCount: (h) => node(h).childNodes.length,
     insert(parent, child, before) {
-      el(parent).insertBefore(node(child), before ? node(before) : null);
+      const p = node(parent);
+      if (!(p instanceof WParentNode)) throw new Error('not a parent');
+      p.insertBefore(node(child), before ? node(before) : null);
     },
     remove: (child) => node(child).remove(),
     setAttr(h, name, value) {
@@ -51,7 +63,7 @@ export function createIsoloopDomDriver(): IsolateDriver & { dom: WorkerDom } {
     },
     setText(h, data) {
       const n = node(h);
-      if (!(n instanceof WText)) throw new Error('not a text node');
+      if (!(n instanceof WCharacterData)) throw new Error('not a text or comment node');
       n.data = data;
     },
     setValue(h, value) {

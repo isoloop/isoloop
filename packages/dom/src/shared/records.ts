@@ -30,7 +30,9 @@ export type SerializedNode =
       listen: string[];
       children: SerializedNode[];
     }
-  | { k: 'text'; id: NodeId; data: string };
+  | { k: 'text'; id: NodeId; data: string }
+  /** A comment (ADR 0010 amendment, M3a): inert on the host. */
+  | { k: 'comment'; id: NodeId; data: string };
 
 export type DomRecord =
   /** A new subtree under `parent`, before `before` or at the end. */
@@ -39,6 +41,7 @@ export type DomRecord =
   | ['move', parent: NodeId, node: NodeId, before: NodeId | null]
   /** A node and its subtree leave the tree. */
   | ['remove', node: NodeId]
+  /** New data for a text or comment node. */
   | ['text', node: NodeId, data: string]
   /** `null` removes the attribute. */
   | ['attr', node: NodeId, name: string, value: string | null]
@@ -80,7 +83,7 @@ const isPair = (x: unknown, value: (v: unknown) => boolean): boolean =>
 function isSerializedNode(x: unknown, depth: number): x is SerializedNode {
   if (depth > 512 || typeof x !== 'object' || x === null) return false;
   const k = field(x, 'k');
-  if (k === 'text') return isId(field(x, 'id')) && isStr(field(x, 'data'));
+  if (k === 'text' || k === 'comment') return isId(field(x, 'id')) && isStr(field(x, 'data'));
   if (k !== 'el') return false;
   const [id, tag, ns, attrs, props, listen, children] = [
     'id',
