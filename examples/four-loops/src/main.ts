@@ -1,6 +1,5 @@
-import busWorker from '@isoloop/bus/worker?worker&url';
 import { createKernel, type Kernel } from '@isoloop/host';
-import bootstrap from '@isoloop/runtime/bootstrap?worker&url';
+import workers from 'virtual:isoloop/workers';
 import { blockMain, busLogText, createPane, startFps } from './chrome';
 import list, { count, note, primes } from './contracts';
 import contractsUrl from './contracts?isolate';
@@ -29,7 +28,7 @@ const kernel = createKernel({
   // The bus worker imports the contracts by URL; the host imports the same
   // module for its list (ADR 0003, decision 4).
   contracts: { url: contractsUrl, list },
-  workers: { isolateBootstrap: bootstrap, bus: busWorker },
+  workers,
   styles: [sheet],
   ...(killAfterMs ? { heartbeat: { killAfterMs } } : {}),
 });

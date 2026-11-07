@@ -1,0 +1,52 @@
+{
+  "name": "@isoloop/vite",
+  "version": "0.0.0",
+  "description": "Vite plugin for Isoloop apps: the bootstrap and bus worker URLs, dev headers, and isolate builds.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isoloop/isoloop.git",
+    "directory": "packages/vite"
+  },
+  "files": [
+    "dist",
+    "client.d.ts"
+  ],
+  "exports": {
+    ".": {
+      "@isoloop/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./client.d.ts"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./client": {
+        "types": "./client.d.ts"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown --platform node --dts",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "vite": "^8"
+  },
+  "devDependencies": {
+    "@isoloop/bus": "workspace:*",
+    "@isoloop/runtime": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

@@ -1,0 +1,20 @@
+/*
+ * `@isoloop/vite` (design §2, M3a tasks 15 and 16): `isoloop()` gives an app
+ * the bootstrap and bus worker URLs as `virtual:isoloop/workers`, sends the
+ * hosting guide's headers in dev and preview, and builds isolate modules.
+ *
+ * ```ts
+ * import workers from 'virtual:isoloop/workers';
+ * createKernel({ workers, contracts });
+ * ```
+ */
+import type { Plugin } from 'vite';
+import { devPlugin, type HeaderOptions, type WorkersOptions } from './dev';
+
+export { devCsp, headersFor, WORKERS_ID, type HeaderOptions, type WorkersOptions } from './dev';
+
+export type IsoloopOptions = HeaderOptions & WorkersOptions;
+
+export function isoloop(o: IsoloopOptions = {}): Plugin[] {
+  return [devPlugin(o)];
+}

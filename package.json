@@ -12,7 +12,7 @@
     "lint": "oxlint --type-aware",
     "typecheck": "pnpm -r typecheck && tsc --noEmit && tsc --noEmit -p e2e/isolates/adapters/preact && tsc --noEmit -p e2e/isolates/adapters/react",
     "test": "vitest run",
-    "test:node": "vitest run --project protocol --project codec --project bus",
+    "test:node": "vitest run --project protocol --project codec --project bus --project vite",
     "test:browser": "vitest run --project bus-browser --project dom --project host --project runtime --project preact-10 --project preact-11 --project react-18 --project react-19",
     "e2e": "playwright test",
     "dom:usage": "ISOLOOP_DOM_USAGE=write vitest run --project preact-10 --project preact-11 --project react-18 --project react-19 dom-usage && oxfmt packages/dom/usage",
