@@ -1,0 +1,74 @@
+// OpfsStorage in a real dedicated worker (M2b task 5): sync access handles
+// exist only there. The scenarios live in __fixtures__/opfs-worker.ts.
+import { afterAll, describe, expect, it } from 'vitest';
+import { server } from 'vitest/browser';
+
+// Playwright's WebKit build has no OPFS (`getDirectory()` throws UnknownError),
+// though Safari does; there the bus falls back to memory (M2b task 15). Every
+// other engine must have it, so only WebKit may skip.
+const opfs = await navigator.storage.getDirectory().then(
+  () => true,
+  () => false,
+);
+const skip = !opfs && server.browser === 'webkit';
+
+const worker = new Worker(new URL('../__fixtures__/opfs-worker.ts', import.meta.url), {
+  type: 'module',
+});
+let ids = 0;
+const dirs: string[] = [];
+
+function run(scenario: string): Promise<unknown> {
+  const id = ++ids;
+  const dir = `isoloop-test-${Date.now()}-${id}`;
+  dirs.push(dir);
+  return new Promise((resolve, reject) => {
+    const onMessage = (e: MessageEvent<{ id: number; value?: unknown; error?: string }>): void => {
+      if (e.data.id !== id) return;
+      worker.removeEventListener('message', onMessage);
+      if (e.data.error !== undefined) reject(new Error(e.data.error));
+      else resolve(e.data.value);
+    };
+    worker.addEventListener('message', onMessage);
+    worker.postMessage({ id, scenario, dir });
+  });
+}
+
+afterAll(async () => {
+  worker.terminate();
+  if (!opfs) return;
+  const origin = await navigator.storage.getDirectory();
+  await Promise.all(dirs.map((d) => origin.removeEntry(d, { recursive: true }).catch(() => {})));
+});
+
+describe.skipIf(skip)('OpfsStorage: segments and group commit', () => {
+  it('writes 10,000 records and reads them back', async () => {
+    expect(await run('write and read back')).toEqual({
+      count: 10_000,
+      offsetsInOrder: true,
+      valuesMatch: true,
+      keys: [null, 'k1', null, 'k3'],
+      state: [{ topic: 'saved.v1', tail: 0, head: 10_000 }],
+    });
+  });
+
+  it('rolls a segment over at 4 MiB', async () => {
+    expect(await run('segments roll over at 4 MiB')).toEqual({
+      count: 500,
+      first: '0000000000000000.seg',
+      segments: 2,
+      // As full as a 10 KB record allows, and no fuller.
+      firstFull: true,
+    });
+  });
+
+  it('acknowledges a publish only after its batch is written', async () => {
+    expect(await run('a publish resolves only after its flush')).toEqual({
+      ackedEarly: false,
+      onDiskBeforeAck: 0,
+      result: { ok: true, value: { offset: 0 } },
+      onDiskAfterAck: ['hello'],
+      waitedForCommit: true,
+    });
+  });
+});

@@ -35,7 +35,7 @@ Tools are only called through these root scripts, never as binaries ([ADR 0009](
 | `pnpm format` / `pnpm format:check` | oxfmt. Markdown isn't formatted. |
 | `pnpm lint` | oxlint, type-aware. Every rule is an error or off. |
 | `pnpm typecheck` | TypeScript 7, `tsc --noEmit` in every package and for the root config and e2e files. |
-| `pnpm test` | Vitest: `protocol` and `bus` in Node; `dom`, `host`, `runtime` and the bus worker (`*.browser.test.ts`) in Chromium. `test:node` and `test:browser` run each half. |
+| `pnpm test` | Vitest: `protocol` and `bus` in Node; `dom`, `host` and `runtime` in Chromium; the bus worker and its storage (`*.browser.test.ts`) in Chromium, Firefox and WebKit. `test:node` and `test:browser` run each half. |
 | `pnpm e2e` | Playwright against the built demo in all three engines. `pnpm e2e --project=webkit` runs one. |
 | `pnpm bench` | Node micro-benches (`bench/**/*.bench.ts`, e.g. the log engine), kept out of `pnpm test`. |
 | `pnpm bench:click-to-paint` / `pnpm bench:throughput` | Playwright benches in the browser: click-to-paint latency in all three engines, and bus throughput in Chromium. Report only; results go to `bench-results/`. |
@@ -52,7 +52,7 @@ There are no git hooks. CI is the only gate.
 
 - **`check`:** format check, lint, typecheck, `test:node` and build.
 - **After `check` passes, in parallel:**
-  - **`browser`:** `test:browser` in Chromium.
+  - **`browser`:** `test:browser`, in Chromium, plus Firefox and WebKit for the bus.
   - **`e2e`:** `pnpm e2e` once per engine (Chromium, Firefox, WebKit).
   - **`bench`:** both Playwright benches and the codec bench. Report only, with no threshold; the numbers are in the job log and the `bench-results` artifact.
 
