@@ -39,6 +39,7 @@ Tools are only called through these root scripts, never as binaries ([ADR 0009](
 | `pnpm e2e` | Playwright against the built demo in all three engines. `pnpm e2e --project=webkit` runs one. |
 | `pnpm bench` | Node micro-benches (`bench/**/*.bench.ts`, e.g. the log engine), kept out of `pnpm test`. |
 | `pnpm bench:click-to-paint` / `pnpm bench:throughput` | Playwright benches in the browser: click-to-paint latency in all three engines, and bus throughput in Chromium. Report only; results go to `bench-results/`. |
+| `pnpm bench:codec` | The codec evaluation (`bench/codec`, [investigation](docs/investigations/codec.md)) in all three engines: our codec against MessagePack, CBOR and JSON. Report only, in the log. `pnpm bench` runs its Node half, with bundle sizes. |
 | `pnpm test:install-browsers` | Installs Chromium, Firefox and WebKit for Playwright. |
 | `pnpm build` | tsdown for the packages, Vite for the demo. |
 | `pnpm dev` | The four-loops demo with Vite's dev server. |
@@ -53,7 +54,7 @@ There are no git hooks. CI is the only gate.
 - **After `check` passes, in parallel:**
   - **`browser`:** `test:browser` in Chromium.
   - **`e2e`:** `pnpm e2e` once per engine (Chromium, Firefox, WebKit).
-  - **`bench`:** both Playwright benches. Report only, with no threshold; the numbers are in the job log and the `bench-results` artifact.
+  - **`bench`:** both Playwright benches and the codec bench. Report only, with no threshold; the numbers are in the job log and the `bench-results` artifact.
 
 The jobs that need browsers install them through `.github/actions/install-browsers`. It retries a stalled install (each attempt has a 5-minute limit) and caches the browser binaries per Playwright version. Each of those jobs has a 30-minute limit. If a job still hangs, cancel the run and re-run the failed jobs.
 
