@@ -73,6 +73,9 @@ export type DomEvent = {
   x?: number;
   y?: number;
   button?: number;
+  /** For `resize` on a transferred canvas: its new CSS size (design §4.7). */
+  width?: number;
+  height?: number;
 };
 
 const isSyncedProp = (x: unknown): x is SyncedProp =>

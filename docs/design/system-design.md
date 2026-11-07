@@ -328,14 +328,14 @@ interface HostRenderBridge {
 
 ### 4.7 Host calls
 
-`call` → `result`, with a 5 s default timeout on the isolate side (`timeout`). The isolate flushes its pending patches before it posts a call, and the host runs DOM calls through the compositor after every batch queued before them. A node id that names no rendered node fails with `not_found`; a method that isn't built yet (`requestCanvas` until M3) with `unsupported`; DOM calls from a headless isolate with `no_surface`.
+`call` → `result`, with a 5 s default timeout on the isolate side (`timeout`). The isolate flushes its pending patches before it posts a call, and the host runs DOM calls through the compositor after every batch queued before them. A node id that names no rendered node fails with `not_found`; a method the host doesn't know with `unsupported`; DOM calls and `requestCanvas` from a headless isolate with `no_surface`.
 
 | Method | Behaviour |
 | --- | --- |
 | `measure(nodeId)` | `getBoundingClientRect` relative to the surface, read in the next rAF after pending patches apply |
 | `focus(nodeId)` / `scrollIntoView(nodeId, opts)` | Applied after pending patches |
 | `navigate({ href, replace, state })` | Needs `grants.navigate`, else `forbidden`; `routing_disabled` when routing is off. `/x` resolves against `basePath`, other hrefs against the document URL; cross-origin rejects with `cross_origin`. Otherwise goes through `onNavigate` with `from` set to the isolate id; result is `true` (accepted) / `false` (refused), a throw rejects with `navigate_failed`. After `true` the kernel runs `syncRoute()` and, if it published, replies after the bus commit (at once if the bus is down). Available to headless isolates |
-| `requestCanvas(nodeId, { width, height })` | Host takes a `<canvas>` it rendered for that node, calls `transferControlToOffscreen()`, and returns the `OffscreenCanvas` as a transferable. Resizes arrive later as `event { type: 'resize' }` |
+| `requestCanvas(nodeId, { width, height })` | Host takes the `<canvas>` it rendered for that node (anything else is `not_found`), sets `width` and `height` if given, calls `transferControlToOffscreen()`, and returns the `OffscreenCanvas` as a transferable. A `ResizeObserver` then sends `event { type: 'resize', width, height }` (CSS pixels) to the canvas node, the first at once. Each canvas goes once; a second request is `invalid`. Built in M3a |
 
 ### 4.8 Styles
 
@@ -358,8 +358,9 @@ interface IsolateContext<Root = IsolateRoot> {
   bus: BusClient;
   host: { measure(node): Promise<Rect>; focus(node): Promise<void>;
           scrollIntoView(node, opts?): Promise<void>;
-          navigate(href: string, o?: { replace?: boolean; state?: unknown }): Promise<boolean> };
-          // takes worker-side nodes; requestCanvas(el, size) arrives in M3
+          navigate(href: string, o?: { replace?: boolean; state?: unknown }): Promise<boolean>;
+          requestCanvas(node, size?: { width?: number; height?: number }): Promise<OffscreenCanvas> };
+          // takes worker-side nodes
   styles(css: string | string[]): void;
   onShutdown(fn: (reason: ShutdownReason) => void | Promise<void>): void;   // reason includes 'suspend'
   keepAwake(): () => void;                         // hold against suspension; call the result to release (ADR 0001)

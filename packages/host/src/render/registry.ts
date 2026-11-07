@@ -79,6 +79,8 @@ const HTML_TAGS = new Set([
   'output',
   'progress',
   'meter',
+  // canvas isolates draw on it after `requestCanvas` (design §4.7)
+  'canvas',
 ]);
 
 /** SVG for icons and charts: shapes, text, gradients, clipping and same-document `use`. */
@@ -176,6 +178,7 @@ const HTML_ATTRS: Record<string, readonly string[]> = {
   output: ['for', 'name'],
   progress: ['value', 'max'],
   meter: ['value', 'min', 'max', 'low', 'high', 'optimum'],
+  canvas: ['width', 'height'],
 };
 
 const SVG_ATTRS = new Set([

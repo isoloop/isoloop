@@ -8,7 +8,7 @@ export const ERROR_CODES = [
   'forbidden',
   /** The node id names no rendered node (it was removed, or never existed). */
   'not_found',
-  /** The method isn't available yet in this release (`requestCanvas` until M3). */
+  /** The method isn't one this host knows. */
   'unsupported',
   // Routing (ADR 0002)
   'cross_origin',
