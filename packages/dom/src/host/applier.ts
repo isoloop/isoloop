@@ -27,8 +27,11 @@ export interface SanitisePolicy {
   element(tag: string, ns: Namespace): { tag: string; ns: Namespace };
   /** The attribute value to write on a host element, or `null` to drop it. */
   attribute(hostTag: string, ns: Namespace, name: string, value: string): string | null;
-  /** Whether to set a synced property on this element now (allow-list and host-owned input rules). */
-  property(el: Element, name: SyncedProp, value: string | boolean): boolean;
+  /**
+   * Whether to set a synced property on this element now (allow-list and
+   * host-owned input rules). `force` asks to override a focused input.
+   */
+  property(el: Element, name: SyncedProp, value: string | boolean, force: boolean): boolean;
 }
 
 export interface Applier {
@@ -41,6 +44,11 @@ export interface Applier {
   /** Removes everything the isolate rendered and forgets every id. */
   clear(): void;
 }
+
+const isActive = (el: Element): boolean => {
+  const root = el.getRootNode();
+  return (root instanceof ShadowRoot || root instanceof Document) && root.activeElement === el;
+};
 
 const nsOf = (el: Element): Namespace => (el.namespaceURI === SVG_NS ? 'svg' : 'html');
 
@@ -61,8 +69,8 @@ export function createApplier(container: Element, policy: SanitisePolicy): Appli
     }
   };
 
-  const setProp = (el: Element, name: SyncedProp, value: string | boolean): void => {
-    if (!policy.property(el, name, value)) return;
+  const setProp = (el: Element, name: SyncedProp, value: string | boolean, force = false): void => {
+    if (!policy.property(el, name, value, force)) return;
     if (name === 'checked' && el instanceof HTMLInputElement) el.checked = Boolean(value);
     else if (name === 'selected' && el instanceof HTMLOptionElement) el.selected = Boolean(value);
     else if (
@@ -70,8 +78,17 @@ export function createApplier(container: Element, policy: SanitisePolicy): Appli
       (el instanceof HTMLInputElement ||
         el instanceof HTMLTextAreaElement ||
         el instanceof HTMLSelectElement)
-    )
+    ) {
       el.value = String(value);
+      // A forced value replaces what the user is typing: the caret goes to its end.
+      if (force && !(el instanceof HTMLSelectElement) && isActive(el)) {
+        try {
+          el.setSelectionRange(el.value.length, el.value.length);
+        } catch {
+          // Input types without a selection (number, email…).
+        }
+      }
+    }
   };
 
   const listen = (id: NodeId, type: string, on: boolean): void => {
@@ -169,7 +186,7 @@ export function createApplier(container: Element, policy: SanitisePolicy): Appli
       }
       case 'prop': {
         const el = nodes.get(r[1]);
-        if (el instanceof Element) setProp(el, r[2], r[3]);
+        if (el instanceof Element) setProp(el, r[2], r[3], r[4] === true);
         return;
       }
       case 'listen':

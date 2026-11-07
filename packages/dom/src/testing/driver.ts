@@ -66,8 +66,9 @@ export function createIsoloopDomDriver(): IsolateDriver & { dom: WorkerDom } {
       if (!(n instanceof WCharacterData)) throw new Error('not a text or comment node');
       n.data = data;
     },
-    setValue(h, value) {
-      Object.assign(el(h), { value });
+    setValue(h, value, force) {
+      if (force) dom.setValue(el(h), value, { force: true });
+      else Object.assign(el(h), { value });
     },
     listen: (h, type) => el(h).addEventListener(type, noop),
     classList(h, op, token, force) {

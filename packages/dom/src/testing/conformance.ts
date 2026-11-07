@@ -47,8 +47,8 @@ export interface IsolateDriver {
   /** `null` removes the attribute. */
   setAttr(el: Handle, name: string, value: string | null): void;
   setText(text: Handle, data: string): void;
-  /** Sets the `value` property, as a framework does on a controlled input. */
-  setValue(el: Handle, value: string): void;
+  /** Sets the `value` property, as a framework does on a controlled input; `force` overrides a focused host input. */
+  setValue(el: Handle, value: string, force?: boolean): void;
   listen(el: Handle, type: string): void;
   /** `el.classList`: `add`, `remove`, `toggle` (with `force`) or `contains`; returns whether `el` has the token after. */
   classList(
@@ -106,6 +106,7 @@ export const CASES = {
   contains: 'contains walks the isolate tree',
   fragment: 'inserting a fragment inserts its children in order and empties it',
   comment: 'comment nodes round-trip, and their data updates',
+  forced: 'a forced value replaces a focused input’s value, caret at the end',
 } as const;
 
 export type CaseName = keyof typeof CASES;
@@ -446,6 +447,27 @@ export function runBridgeConformance(
       d.remove(c);
       sync();
       expect(html()).toBe('<p>text</p>');
+    });
+
+    test('forced', () => {
+      const { isolate: d, sync, find } = setup();
+      const input = d.el('input');
+      d.listen(input, 'input');
+      d.insert(d.root, input);
+      sync();
+      const el = find('input');
+      if (!(el instanceof HTMLInputElement)) throw new Error('no input');
+      el.focus();
+      el.value = 'hello';
+      el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+      d.setValue(input, 'stale');
+      sync();
+      expect(el.value).toBe('hello');
+      d.setValue(input, 'done', true);
+      sync();
+      expect(el.value).toBe('done');
+      expect([el.selectionStart, el.selectionEnd]).toEqual([4, 4]);
+      expect(el.matches(':focus')).toBe(true);
     });
 
     test('malformed', () => {

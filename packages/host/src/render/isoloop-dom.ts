@@ -44,9 +44,10 @@ const isFocused = (el: Element): boolean => {
 /**
  * Host-owned inputs (design §4.6): a value or checked state from the isolate
  * is applied only if it differs from the live one and the element isn't
- * focused, so typing never loses characters or jumps the caret.
+ * focused, so typing never loses characters or jumps the caret. A forced
+ * value (`ctx.setValue(node, v, { force: true })`) skips the focus rule.
  */
-function hostOwned(el: Element, name: string, value: string | boolean): boolean {
+function hostOwned(el: Element, name: string, value: string | boolean, force: boolean): boolean {
   if (name === 'value') {
     const live =
       el instanceof HTMLInputElement ||
@@ -54,7 +55,7 @@ function hostOwned(el: Element, name: string, value: string | boolean): boolean 
       el instanceof HTMLSelectElement
         ? el.value
         : undefined;
-    return live !== value && !isFocused(el);
+    return live !== value && (force || !isFocused(el));
   }
   if (name === 'checked') {
     return !(el instanceof HTMLInputElement) || el.checked !== value;
@@ -79,8 +80,8 @@ export function policyFrom(registry: ComponentRegistry, o: BridgeOptions = {}): 
         ? rewrite(v)
         : v;
     },
-    property: (el, name, value) =>
-      registry.property(el.localName, name) && hostOwned(el, name, value),
+    property: (el, name, value, force) =>
+      registry.property(el.localName, name) && hostOwned(el, name, value, force),
   };
 }
 

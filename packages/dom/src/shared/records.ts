@@ -45,7 +45,11 @@ export type DomRecord =
   | ['text', node: NodeId, data: string]
   /** `null` removes the attribute. */
   | ['attr', node: NodeId, name: string, value: string | null]
-  | ['prop', node: NodeId, name: SyncedProp, value: string | boolean]
+  /**
+   * `force` (ADR 0010 amendment, M3a): apply even to a host-owned input the
+   * user is focused on, e.g. to clear a chat box after sending.
+   */
+  | ['prop', node: NodeId, name: SyncedProp, value: string | boolean, force?: true]
   /** The first listener of `type` was added (`true`) or the last removed (`false`). */
   | ['listen', node: NodeId, type: string, on: boolean];
 
@@ -129,7 +133,12 @@ function isRecord(x: unknown): x is DomRecord {
     case 'attr':
       return x.length === 4 && isId(a) && isStr(b) && (c === null || isStr(c));
     case 'prop':
-      return x.length === 4 && isId(a) && isSyncedProp(b) && (isStr(c) || typeof c === 'boolean');
+      return (
+        (x.length === 4 || (x.length === 5 && x[4] === true)) &&
+        isId(a) &&
+        isSyncedProp(b) &&
+        (isStr(c) || typeof c === 'boolean')
+      );
     case 'listen':
       return x.length === 4 && isId(a) && isStr(b) && typeof c === 'boolean';
     default:

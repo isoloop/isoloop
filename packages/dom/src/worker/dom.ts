@@ -1072,6 +1072,13 @@ export interface WorkerDom {
   deliver(event: DomEvent): void;
   /** The id of a node, for tests and host calls. */
   idOf(node: WNode): NodeId;
+  /**
+   * Sets an input's, textarea's or select's `value`. With `force`, the host
+   * applies it even while the user is focused on a host-owned input, and
+   * keeps the caret at its end; it's recorded even if the worker already
+   * holds that value, since what the user typed may differ (M3a task 6).
+   */
+  setValue(node: WNode, value: string, opts?: { force?: boolean }): void;
 }
 
 export function createDom(opts: WorkerDomOptions): WorkerDom {
@@ -1109,6 +1116,19 @@ export function createDom(opts: WorkerDomOptions): WorkerDom {
     root,
     flush,
     idOf: (node) => node.isoId,
+    setValue(node, value, o = {}) {
+      const control =
+        node instanceof WHTMLInputElement ||
+        node instanceof WHTMLTextAreaElement ||
+        node instanceof WHTMLSelectElement;
+      if (!control) throw new TypeError('setValue: not an input, textarea or select');
+      if (!o.force) {
+        node.value = value;
+        return;
+      }
+      node.isoSetProp('value', value, false);
+      if (node.isoKnown) core.record(['prop', node.isoId, 'value', value, true]);
+    },
     deliver(event) {
       const node = core.known.get(event.target);
       if (!node) return;
