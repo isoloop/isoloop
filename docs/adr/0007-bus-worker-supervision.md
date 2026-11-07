@@ -45,17 +45,17 @@ The `LogEngine` stays the broker's only interface. Durability is a `LogStorage` 
 1. The supervisor starts a new bus worker, which loads persistent topics and their offsets from OPFS.
 2. The kernel gives every running isolate a new bus port via `reattach`. **Isolates keep running.**
 3. Each isolate's `BusClient` re-sends its subscriptions:
-   - **persistent topics** resume from the committed offset, with no gap;
+   - **persistent topics** resume after the committed offset, with no gap, whatever `from` the subscription asked for; one that never committed starts at its `from` (made explicit 2026-11-07, M2b: a reattached `from: 'earliest'` subscription first replayed the whole log);
    - **memory topics** answer with `reset { topic, reason: 'bus_restart' }`. Adapters clear their topic state and replay from `earliest` (for example, `useTopic` empties and refills). Plain `subscribe` callers get an `onReset` callback.
 4. An isolate that can't handle a reset declares `bus: { onReset: 'restart' }` in its manifest, and the supervisor restarts it.
 5. Publishes made during the restart are buffered by the `BusClient` (up to its inbox limit of 1,000 unanswered calls), then sent; past the limit they reject with `bus_unavailable`. Publishes the old bus never answered are sent again on the new port, after the subscriptions. On a memory topic the old log is gone, so nothing is duplicated. On a persistent topic the old bus may have flushed the record before it crashed, so the bus **deduplicates** (amended 2026-11-07, M2b):
    - every publish carries `(producer, epoch, seq)`: the isolate id, its instance (a new one after an isolate restart), and a counter per instance;
-   - each record frame on disk stores the triple, and the bus keeps the last `seq` per producer and topic, rebuilt from each segment's tail when it loads;
-   - a re-send whose `seq` the bus already has is answered with the record's original offset and not appended again.
+   - each record frame on disk stores the triple, and the bus keeps the producer's last 1,000 `seq`s per topic, for its current epoch, rebuilt from the records it reads when it loads (1,000 is the `BusClient`'s inbox limit, so no re-send is older);
+   - a re-send whose `seq` the bus already has is answered with the record's original offset and not appended again. Requests carry the triple too; a re-sent request is answered by the reply to the original record.
    Rejecting instead wouldn't prevent the duplicate: an app that retries after `bus_unavailable` writes the record again. Memory topics skip the check.
 6. On the host, `kernel.publish` calls the old bus never answered are sent again on the new bus, the same as an isolate's, with the host as the producer. Calls made while no bus is running wait for the new one, up to the same limit of 1,000. (Until M2b the host rejected them with `bus_unavailable`, because it couldn't tell whether they were appended; deduplication makes the re-send safe.)
 
-Until M2b ships, every topic is `memory`, so step 3 turns every subscription into a reset. That is still better than restarting every isolate, and the code path is the same.
+Since M2b, persistent topics resume as step 3 says. Memory topics, and persistent ones running in memory because of a fallback in decision 6, still get the reset: better than restarting every isolate, and the same code path.
 
 ### 5. Safe mode against crash loops
 
