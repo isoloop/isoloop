@@ -1,0 +1,169 @@
+import fc from 'fast-check';
+import { describe, expect, it } from 'vitest';
+import { CodecError, decode, encode } from './index';
+
+const hex = (b: Uint8Array): string =>
+  Array.from(b, (x) => x.toString(16).padStart(2, '0')).join(' ');
+
+/** The structured-clone values of codec task 3: plain data, no class instances. */
+const plain = fc.anything({
+  withBigInt: false,
+  withBoxedValues: false,
+  withDate: false,
+  withMap: false,
+  withSet: false,
+  withNullPrototype: false,
+  withObjectString: false,
+  withTypedArray: false,
+  withSparseArray: false,
+  stringUnit: 'grapheme',
+});
+
+describe('round trip', () => {
+  it('decode(encode(v)) equals v for generated values', () => {
+    fc.assert(
+      fc.property(plain, (v) => {
+        expect(decode(encode(v))).toStrictEqual(v);
+      }),
+      { numRuns: 2000 },
+    );
+  });
+
+  it('keeps every number exactly', () => {
+    fc.assert(
+      fc.property(fc.oneof(fc.double(), fc.integer(), fc.maxSafeInteger()), (n) => {
+        expect(Object.is(decode(encode(n)), n)).toBe(true);
+      }),
+      { numRuns: 5000 },
+    );
+  });
+
+  it('keeps every string exactly, lone surrogates aside', () => {
+    fc.assert(
+      fc.property(fc.string({ unit: 'grapheme', maxLength: 200 }), (s) => {
+        expect(decode(encode(s))).toBe(s);
+      }),
+    );
+  });
+
+  it('keeps an own __proto__ key as a key', () => {
+    const v: unknown = JSON.parse('{"__proto__": {"x": 1}, "a": 2}');
+    const back = decode(encode(v));
+    expect(Object.getPrototypeOf(back)).toBe(Object.prototype);
+    expect(Object.keys(back ?? {})).toEqual(['__proto__', 'a']);
+    expect(back).toStrictEqual(v);
+  });
+
+  it('reads an array hole as undefined', () => {
+    // oxlint-disable-next-line no-sparse-arrays -- the hole is the point
+    expect(decode(encode([1, , 3]))).toStrictEqual([1, undefined, 3]);
+  });
+
+  it('round-trips long strings and large containers', () => {
+    const v = {
+      long: 'x'.repeat(100_000),
+      wide: 'é'.repeat(5000),
+      items: Array.from({ length: 1000 }, (_, i) => ({ i, s: `item-${i}` })),
+    };
+    expect(decode(encode(v))).toStrictEqual(v);
+  });
+});
+
+describe('byte layout (isoloop-codec@1)', () => {
+  // Changing any of these changes the on-disk format: that needs a new version.
+  it.each<[string, unknown, string]>([
+    ['0', 0, '00'],
+    ['127', 127, '7f'],
+    ['128', 128, 'c4 80 01'],
+    ['300', 300, 'c4 ac 02'],
+    ['2^53 - 1', Number.MAX_SAFE_INTEGER, 'c4 ff ff ff ff ff ff ff 0f'],
+    ['-1', -1, 'ff'],
+    ['-32', -32, 'e0'],
+    ['-33', -33, 'c5 20'],
+    ['-0', -0, 'c6 00 00 00 00 00 00 00 80'],
+    ['1.5', 1.5, 'c6 00 00 00 00 00 00 f8 3f'],
+    ['NaN', Number.NaN, 'c6 00 00 00 00 00 00 f8 7f'],
+    ['undefined', undefined, 'c0'],
+    ['null', null, 'c1'],
+    ['false', false, 'c2'],
+    ['true', true, 'c3'],
+    ['""', '', '80'],
+    ['"ab"', 'ab', '82 61 62'],
+    ['"é"', 'é', '82 c3 a9'],
+    ['32 chars', 'a'.repeat(32), `c7 20 ${'61 '.repeat(32).trim()}`],
+    ['[]', [], 'a0'],
+    ['[1, "a"]', [1, 'a'], 'a2 01 81 61'],
+    ['16 items', Array.from({ length: 16 }, () => 0), `c8 10 ${'00 '.repeat(16).trim()}`],
+    ['{}', {}, 'b0'],
+    ['{ a: 1 }', { a: 1 }, 'b1 81 61 01'],
+    [
+      'a trade',
+      { sym: 'BTC-USD', px: 67250.5, qty: 3 },
+      'b3 83 73 79 6d 87 42 54 43 2d 55 53 44 82 70 78 c6 00 00 00 00 28 6b f0 40 83 71 74 79 03',
+    ],
+  ])('%s', (_name, value, bytes) => {
+    expect(hex(encode(value))).toBe(bytes);
+  });
+});
+
+describe('not encodable', () => {
+  class Point {
+    x = 1;
+  }
+  it.each<[string, unknown]>([
+    ['a function', () => 1],
+    ['a symbol', Symbol('s')],
+    ['a class instance', new Point()],
+    ['a nested function', { a: [{ f: () => 1 }] }],
+  ])('%s throws not_encodable', (_name, value) => {
+    expect(() => encode(value)).toThrow(
+      expect.objectContaining({ name: 'CodecError', code: 'not_encodable' }),
+    );
+  });
+
+  it('a cycle throws not_encodable', () => {
+    const a: Record<string, unknown> = {};
+    a.self = a;
+    expect(() => encode(a)).toThrow(/not_encodable/);
+  });
+
+  it('still encodes after a failure', () => {
+    expect(() => encode({ f: () => 1 })).toThrow();
+    expect(decode(encode({ ok: true }))).toEqual({ ok: true });
+  });
+});
+
+describe('malformed', () => {
+  it.each<[string, Uint8Array]>([
+    ['empty', new Uint8Array([])],
+    ['truncated string', new Uint8Array([0x83, 0x61])],
+    ['truncated float', new Uint8Array([0xc6, 0, 0])],
+    ['unknown tag', new Uint8Array([0xd0])],
+    ['trailing bytes', new Uint8Array([0x01, 0x02])],
+    ['non-string key', new Uint8Array([0xb1, 0x01, 0x01])],
+    ['huge count', new Uint8Array([0xc8, 0xff, 0xff, 0xff, 0x0f])],
+    ['invalid UTF-8', new Uint8Array([0x82, 0xc3, 0x28])],
+  ])('%s throws malformed', (_name, bytes) => {
+    expect(() => decode(bytes)).toThrow(/malformed/);
+  });
+
+  it('never throws anything but a CodecError on random bytes', () => {
+    fc.assert(
+      fc.property(fc.uint8Array({ maxLength: 64 }), (bytes) => {
+        try {
+          decode(bytes);
+        } catch (e) {
+          expect(e).toBeInstanceOf(CodecError);
+        }
+      }),
+      { numRuns: 5000 },
+    );
+  });
+
+  it('decodes from a view with an offset', () => {
+    const inner = encode({ a: [1, 2.5, 'x'] });
+    const outer = new Uint8Array(inner.length + 7);
+    outer.set(inner, 7);
+    expect(decode(outer.subarray(7))).toEqual({ a: [1, 2.5, 'x'] });
+  });
+});

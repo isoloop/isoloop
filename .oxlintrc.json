@@ -58,6 +58,22 @@
       }
     },
     {
+      "files": ["packages/codec/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/**"],
+                "message": "codec depends on nothing (system design §2)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["packages/bus/**"],
       "rules": {
         "no-restricted-imports": [
