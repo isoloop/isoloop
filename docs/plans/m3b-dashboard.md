@@ -1,6 +1,8 @@
 # M3b: Dashboard
 
-**Status:** not started. Second epic of the [M3 initiative](m3-adapters-dashboard.md).
+**Status:** done, 2026-11-07, except the first public deploy, which ships with the first `markets-v*` tag (write-up: [A backend-less markets dashboard on Isoloop](../posts/m3b-markets-dashboard.md)). Second epic of the [M3 initiative](m3-adapters-dashboard.md).
+
+*As built:* tasks 3–5 weren't needed (task 2 found no DOM group 2 member to add). The comparison's numbers are in [`isoloop/examples`](https://github.com/isoloop/examples/tree/main/apps/markets/comparison) and the README. The deploy target is GitHub Pages (`https://isoloop.github.io/examples/markets/`), so the memory metric shows "unavailable" there; Cloudflare Pages would need an account. The table test checks no empty viewport for more than two frames, not one. On CI's WebKit, Isoloop's input latency under load sometimes measures 230–240 ms against the 200 ms budget.
 
 **Goal:** the flagship markets dashboard: backend-less, on a static host, as an idiomatic native app or on Isoloop at the flip of a toggle, beside live metrics. It also grows the DOM subset to what its libraries need.
 
