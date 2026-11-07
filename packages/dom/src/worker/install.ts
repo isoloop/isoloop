@@ -1,4 +1,5 @@
 import {
+  WDOMTokenList,
   WElement,
   WHTMLElement,
   WHTMLIFrameElement,
@@ -24,6 +25,7 @@ export const DOM_GLOBALS: Readonly<Record<string, unknown>> = {
   HTMLSelectElement: WHTMLSelectElement,
   HTMLOptionElement: WHTMLOptionElement,
   HTMLIFrameElement: WHTMLIFrameElement,
+  DOMTokenList: WDOMTokenList,
 };
 
 /**
