@@ -42,6 +42,8 @@ const domError = (name: string, message: string): Error => {
 
 /** Shared state of one document: ids, the recorder, known nodes. */
 type Core = {
+  /** The render root, set by `createDom()`. */
+  root: WElement | null;
   nextId: number;
   known: Map<NodeId, WNode>;
   record(r: DomRecord): void;
@@ -328,6 +330,114 @@ function createStyle(el: WElement): WStyle {
   });
 }
 
+/**
+ * `element.classList` (DOM group 1, ADR 0010): a view of the `class`
+ * attribute, so every write travels as an `attr` record.
+ */
+export class WDOMTokenList {
+  /** @internal */ readonly isoEl: WElement;
+
+  constructor(el: WElement) {
+    this.isoEl = el;
+  }
+
+  /** @internal */ isoTokens(): string[] {
+    const tokens: string[] = [];
+    for (const t of (this.isoEl.getAttribute('class') ?? '').split(/[\t\n\f\r ]+/)) {
+      if (t !== '' && !tokens.includes(t)) tokens.push(t);
+    }
+    return tokens;
+  }
+
+  /** @internal */ isoWrite(tokens: string[]): void {
+    this.isoEl.setAttribute('class', tokens.join(' '));
+  }
+
+  get length(): number {
+    return this.isoTokens().length;
+  }
+  get value(): string {
+    return this.isoEl.getAttribute('class') ?? '';
+  }
+  set value(v: string) {
+    this.isoEl.setAttribute('class', v);
+  }
+  item(i: number): string | null {
+    return this.isoTokens()[i] ?? null;
+  }
+  contains(token: string): boolean {
+    return this.isoTokens().includes(token);
+  }
+  add(...tokens: string[]): void {
+    const list = this.isoTokens();
+    for (const t of tokens) if (!list.includes(t)) list.push(t);
+    this.isoWrite(list);
+  }
+  remove(...tokens: string[]): void {
+    this.isoWrite(this.isoTokens().filter((t) => !tokens.includes(t)));
+  }
+  toggle(token: string, force?: boolean): boolean {
+    const has = this.contains(token);
+    const on = force ?? !has;
+    if (on && !has) this.add(token);
+    else if (!on && has) this.remove(token);
+    return on;
+  }
+  replace(token: string, next: string): boolean {
+    const list = this.isoTokens();
+    const i = list.indexOf(token);
+    if (i < 0) return false;
+    list[i] = next;
+    this.isoWrite(list.filter((t, j) => list.indexOf(t) === j));
+    return true;
+  }
+  toString(): string {
+    return this.value;
+  }
+  [Symbol.iterator](): IterableIterator<string> {
+    return this.isoTokens()[Symbol.iterator]();
+  }
+}
+
+const dataAttr = (key: string): string =>
+  `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+const dataKey = (attr: string): string =>
+  attr.slice(5).replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
+
+/**
+ * `element.dataset` (DOM group 1, ADR 0010): camelCase keys over the
+ * `data-*` attributes, so every write travels as an `attr` record.
+ */
+function createDataset(el: WElement): Record<string, string | undefined> {
+  return new Proxy(
+    {},
+    {
+      get: (_t, key) =>
+        typeof key === 'string' ? (el.getAttribute(dataAttr(key)) ?? undefined) : undefined,
+      set(_t, key, value) {
+        if (typeof key !== 'string') return false;
+        el.setAttribute(dataAttr(key), value);
+        return true;
+      },
+      deleteProperty(_t, key) {
+        if (typeof key === 'string') el.removeAttribute(dataAttr(key));
+        return true;
+      },
+      has: (_t, key) => typeof key === 'string' && el.hasAttribute(dataAttr(key)),
+      ownKeys: () => [...el.isoAttrs.keys()].filter((n) => n.startsWith('data-')).map(dataKey),
+      getOwnPropertyDescriptor(_t, key) {
+        if (typeof key !== 'string' || !el.hasAttribute(dataAttr(key))) return undefined;
+        return {
+          value: el.getAttribute(dataAttr(key)),
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        };
+      },
+    },
+  );
+}
+
 export class WElement extends WNode {
   readonly nodeType = 1;
   readonly localName: string;
@@ -339,6 +449,8 @@ export class WElement extends WNode {
   /** @internal */ isoProps: Map<SyncedProp, string | boolean> = new Map();
   /** @internal */ isoChildCache: WNode[] | null = null;
   /** @internal */ isoStyle: WStyle | null = null;
+  /** @internal */ isoClassList: WDOMTokenList | null = null;
+  /** @internal */ isoDataset: Record<string, string | undefined> | null = null;
 
   constructor(doc: WDocument, id: NodeId, localName: string, ns: Namespace) {
     super(doc, id);
@@ -416,6 +528,23 @@ export class WElement extends WNode {
   get style(): WStyle {
     this.isoStyle ??= createStyle(this);
     return this.isoStyle;
+  }
+
+  get classList(): WDOMTokenList {
+    this.isoClassList ??= new WDOMTokenList(this);
+    return this.isoClassList;
+  }
+
+  get dataset(): Record<string, string | undefined> {
+    this.isoDataset ??= createDataset(this);
+    return this.isoDataset;
+  }
+
+  get id(): string {
+    return this.getAttribute('id') ?? '';
+  }
+  set id(v: string) {
+    this.setAttribute('id', v);
   }
 
   /** @internal */ isoSetProp(name: SyncedProp, value: string | boolean, record: boolean): void {
@@ -784,6 +913,24 @@ export class WDocument extends WEventTarget {
   }
 
   /**
+   * The first element in tree order with this `id` (DOM group 1, ADR 0010):
+   * under the render root, then the detached head. Nodes not yet inserted
+   * aren't in the document, so they aren't found.
+   */
+  getElementById(id: string): WElement | null {
+    const walk = (el: WElement): WElement | null => {
+      for (const c of el.children) {
+        if (c.getAttribute('id') === id) return c;
+        const deeper = walk(c);
+        if (deeper) return deeper;
+      }
+      return null;
+    };
+    const root = this.isoCore.root;
+    return (root ? walk(root) : null) ?? walk(this.head);
+  }
+
+  /**
    * Type selectors only, alone or as a `head > title` child chain: what React
    * 19 asks when it hoists a `<title>`. Queries in general are DOM group 2
    * (ADR 0010), built when a library needs them; anything else throws.
@@ -885,6 +1032,7 @@ export function createDom(opts: WorkerDomOptions): WorkerDom {
     opts.onBatch(batch);
   };
   const core: Core = {
+    root: null,
     nextId: ROOT_ID + 1,
     known: new Map(),
     onHead: opts.onHead ?? (() => {}),
@@ -900,6 +1048,7 @@ export function createDom(opts: WorkerDomOptions): WorkerDom {
   const root = new WHTMLElement(document, ROOT_ID, 'iso-root', 'html');
   root.isoKnown = true;
   core.known.set(ROOT_ID, root);
+  core.root = root;
 
   return {
     document,

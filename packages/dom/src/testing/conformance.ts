@@ -44,6 +44,19 @@ export interface IsolateDriver {
   /** Sets the `value` property, as a framework does on a controlled input. */
   setValue(el: Handle, value: string): void;
   listen(el: Handle, type: string): void;
+  /** `el.classList`: `add`, `remove`, `toggle` (with `force`) or `contains`; returns whether `el` has the token after. */
+  classList(
+    el: Handle,
+    op: 'add' | 'remove' | 'toggle' | 'contains',
+    token: string,
+    force?: boolean,
+  ): boolean;
+  /** `el.dataset[key] = value`, or `delete el.dataset[key]` for `null`; returns `el.dataset[key]` after. */
+  dataset(el: Handle, key: string, value?: string | null): string | undefined;
+  /** `document.getElementById(id)`. */
+  byId(id: string): Handle | null;
+  /** `a.contains(b)`. */
+  contains(a: Handle, b: Handle | null): boolean;
   /** The batches produced since the last flush, in order. */
   flush(): unknown[];
   /** The node id the isolate side uses for `h`, for bridges that expose ids. */
@@ -81,6 +94,10 @@ export const CASES = {
   inputs: 'host-owned inputs keep the live value while focused',
   styles: 'applies inline styles',
   malformed: 'rejects a malformed batch and keeps the tree',
+  classList: 'classList reads and writes the class attribute',
+  dataset: 'dataset reads and writes data-* attributes',
+  getElementById: 'getElementById finds rendered elements by id',
+  contains: 'contains walks the isolate tree',
 } as const;
 
 export type CaseName = keyof typeof CASES;
@@ -319,6 +336,72 @@ export function runBridgeConformance(
       const el = find('p');
       if (!(el instanceof HTMLElement)) throw new Error('no p');
       expect(el.style.color).toBe('red');
+    });
+
+    test('classList', () => {
+      const { isolate: d, sync, find } = setup();
+      const p = build(d, 'p', ['x']);
+      d.setAttr(p, 'class', 'a  b');
+      d.insert(d.root, p);
+      sync();
+      expect(d.classList(p, 'contains', 'b')).toBe(true);
+      d.classList(p, 'add', 'c');
+      d.classList(p, 'add', 'a');
+      d.classList(p, 'remove', 'b');
+      expect(d.classList(p, 'toggle', 'on')).toBe(true);
+      expect(d.classList(p, 'toggle', 'a')).toBe(false);
+      expect(d.classList(p, 'toggle', 'c', true)).toBe(true);
+      sync();
+      expect(find('p').getAttribute('class')).toBe('c on');
+      d.classList(p, 'toggle', 'on');
+      d.classList(p, 'remove', 'c');
+      sync();
+      expect(find('p').getAttribute('class')).toBe('');
+    });
+
+    test('dataset', () => {
+      const { isolate: d, sync, find } = setup();
+      const p = build(d, 'p', ['x']);
+      d.setAttr(p, 'data-user-id', '7');
+      d.insert(d.root, p);
+      sync();
+      expect(d.dataset(p, 'userId')).toBe('7');
+      expect(d.dataset(p, 'rowIndex', '3')).toBe('3');
+      expect(d.dataset(p, 'userId', null)).toBeUndefined();
+      sync();
+      const el = find('p');
+      expect(el.getAttribute('data-row-index')).toBe('3');
+      expect(el.hasAttribute('data-user-id')).toBe(false);
+    });
+
+    test('getElementById', () => {
+      const { isolate: d, sync } = setup();
+      const inner = build(d, 'span', ['in']);
+      d.setAttr(inner, 'id', 'target');
+      const outer = build(d, 'div', [build(d, 'p', [inner])]);
+      d.insert(d.root, outer);
+      const detached = d.el('span');
+      d.setAttr(detached, 'id', 'loose');
+      sync();
+      expect(d.byId('target')).toBe(inner);
+      expect(d.byId('loose')).toBeNull();
+      expect(d.byId('none')).toBeNull();
+      d.remove(outer);
+      expect(d.byId('target')).toBeNull();
+    });
+
+    test('contains', () => {
+      const { isolate: d } = setup();
+      const leaf = d.text('leaf');
+      const mid = build(d, 'p', [leaf]);
+      const top = build(d, 'div', [mid]);
+      const other = d.el('div');
+      d.insert(d.root, top);
+      expect(d.contains(top, leaf)).toBe(true);
+      expect(d.contains(top, top)).toBe(true);
+      expect(d.contains(mid, top)).toBe(false);
+      expect(d.contains(top, other)).toBe(false);
+      expect(d.contains(top, null)).toBe(false);
     });
 
     test('malformed', () => {

@@ -14,9 +14,11 @@ export function createIsoloopDomDriver(): IsolateDriver & { dom: WorkerDom } {
   const dom = createDom({ onBatch: (b) => batches.push(b), schedule: () => {} });
   const handles = new WeakMap<Handle, WNode>();
   const byId = new Map<string, Handle>();
+  const handleOf = new WeakMap<WNode, Handle>();
   const wrap = (n: WNode): Handle => {
     const h: Handle = { __handle: true };
     handles.set(h, n);
+    handleOf.set(n, h);
     byId.set(String(dom.idOf(n)), h);
     return h;
   };
@@ -56,6 +58,25 @@ export function createIsoloopDomDriver(): IsolateDriver & { dom: WorkerDom } {
       Object.assign(el(h), { value });
     },
     listen: (h, type) => el(h).addEventListener(type, noop),
+    classList(h, op, token, force) {
+      const list = el(h).classList;
+      if (op === 'toggle')
+        return force === undefined ? list.toggle(token) : list.toggle(token, force);
+      if (op === 'contains') return list.contains(token);
+      list[op](token);
+      return list.contains(token);
+    },
+    dataset(h, key, value) {
+      const data = el(h).dataset;
+      if (value === null) delete data[key];
+      else if (value !== undefined) data[key] = value;
+      return data[key];
+    },
+    byId(id) {
+      const n = dom.document.getElementById(id);
+      return n ? (handleOf.get(n) ?? null) : null;
+    },
+    contains: (a, b) => node(a).contains(b ? node(b) : null),
     flush() {
       dom.flush();
       return batches.splice(0);
