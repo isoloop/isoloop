@@ -35,6 +35,14 @@ const kernel = createKernel({
 
 If the contracts module fails to load or is invalid (`contracts_failed`, `contracts_invalid`, `contracts_mismatch`, `reserved_topic`), it isn't retried. The kernel emits `bus:failed { code }`, every isolate fails with reason `bus-failed`, and later `spawn` calls throw `bus_failed`.
 
+## Persistent topics and a discarded tab
+
+Topics with `durability: 'persistent'` live in the origin's private file system, so they survive a reload, a closed tab and a bus worker crash ([ADR 0007](../adr/0007-bus-worker-supervision.md)). A publish to one is acknowledged once its batch is on disk; batches are written every 5 ms. When the page freezes or goes away (the Page Lifecycle `freeze` event, or `pagehide`), the kernel asks the bus to write what it has pending at once.
+
+Memory topics don't survive a discarded tab. A browser may freeze a hidden tab and later discard it to save memory ([ADR 0001](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls)); when the user comes back, the page loads afresh, and only persistent topics still hold their records. Make a topic persistent if losing it on a discard would be a problem.
+
+Only one tab's bus owns the files. In a second tab, and where the browser has no sync access handles or the files can't be opened (some private windows), persistent topics run in memory and the kernel emits `bus:durability-degraded { reason }`.
+
 ## Content Security Policy
 
 | Directive | Needs | Why |

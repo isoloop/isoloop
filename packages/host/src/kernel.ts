@@ -1076,8 +1076,13 @@ export function createKernel(config: KernelConfig): Kernel {
     controller?.feed({ k: 'visible', at });
     for (const slot of slots.values()) feed(slot, { k: 'visible', at });
   };
+  // Persistent topics are written at once when the page may be discarded or
+  // go away (ADR 0001, what the browser still controls).
+  const flush = (): void => controller?.flush();
   document.addEventListener('visibilitychange', visibility);
   document.addEventListener('resume', resumed);
+  document.addEventListener('freeze', flush);
+  window.addEventListener('pagehide', flush);
 
   const get = (id: string): Slot => {
     const slot = slots.get(id);
@@ -1229,6 +1234,8 @@ export function createKernel(config: KernelConfig): Kernel {
       observer?.disconnect();
       document.removeEventListener('visibilitychange', visibility);
       document.removeEventListener('resume', resumed);
+      document.removeEventListener('freeze', flush);
+      window.removeEventListener('pagehide', flush);
       await Promise.all([...slots.keys()].map((id) => kernel.stop(id)));
       router?.destroy();
       controller?.destroy();

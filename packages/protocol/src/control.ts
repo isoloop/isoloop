@@ -71,7 +71,13 @@ export type HostToBus =
    */
   | Envelope<'detach', { isolateId: string; keepOffsets: boolean; wake?: boolean }>
   /** `kernel.publish`. With `id` set, the bus replies with `result`. */
-  | Envelope<'publish', { topic: string; key?: string; value: unknown }>;
+  | Envelope<'publish', { topic: string; key?: string; value: unknown }>
+  /**
+   * The page is freezing or going away: write persistent topics' pending
+   * batch now (ADR 0001, what the browser still controls). With `id` set, the
+   * bus replies with `result` once it is on disk.
+   */
+  | Envelope<'flush', Record<string, never>>;
 
 /** Control port: bus worker → host. */
 export type BusToHost =
@@ -105,6 +111,7 @@ export const HOST_TO_BUS: MessageTypes<HostToBus> = {
   attach: true,
   detach: true,
   publish: true,
+  flush: true,
 };
 
 export const BUS_TO_HOST: MessageTypes<BusToHost> = {

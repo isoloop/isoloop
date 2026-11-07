@@ -373,8 +373,8 @@ export class TsEngine implements LogEngine {
     return this.#topic(topic).durable;
   }
 
-  flush(): Promise<void> {
-    return this.#storage.flush();
+  flush(o?: { now?: boolean }): Promise<void> {
+    return this.#storage.flush(o);
   }
 
   compact(topic: string): void {

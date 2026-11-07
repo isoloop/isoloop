@@ -326,8 +326,10 @@ export class OpfsStorage implements LogStorage {
     else this.#commitSoon(this.#opts.commitMs);
   }
 
-  flush(): Promise<void> {
+  flush(o: { now?: boolean } = {}): Promise<void> {
     if (this.#failed !== undefined) return Promise.reject(this.#failed);
+    if (o.now && (this.#count > 0 || this.#offsets.size > 0 || this.#drops.size > 0))
+      this.#commitSoon(0);
     if (this.#count === 0 && this.#offsets.size === 0 && this.#drops.size === 0) {
       // Nothing waiting, but a commit may still be writing: wait for it.
       return this.#chain.then(() => {
