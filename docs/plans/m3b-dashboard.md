@@ -14,7 +14,7 @@
 
 **Depends on:** [M3a](m3a-adapters.md) for the adapters, `requestCanvas` and `@isoloop/vite`. Tasks 1–3 and 6–10 need only the vanilla API and can start during M3a.
 
-**Order:** 1 and 2 first. DOM tasks 3–5 follow task 2, only for what it finds. The data pipeline (6–10) runs in parallel with the UI (11–14) once 6 exists. 15–16 need the UI; 17–20 close the epic.
+**Order:** 1 and 2 first. DOM tasks 3–5 follow task 2, only for what it finds. The data pipeline (6–10) runs in parallel with the UI (11–14) once 6 exists. 15–16b need the UI; 17–20 close the epic.
 
 **Shared code (2026-11-07):** tasks 6–13 put the logic in `src/core/`, the chart drawing in `src/charts/` and the widgets in `src/widgets/`, with no Isoloop imports, so the native build (task 15) reuses them. Isolates and widget containers stay thin wiring.
 
@@ -101,6 +101,13 @@
 - **Files:** `apps/markets/src/page.tsx`, the deploy layout.
 - **Tests (E2E):** the toggle lands on the other build with the same filters and replay position.
 
+### 16b. Preact builds and the mixed showcase
+- **Decided (2026-11-07):** five builds of one source. React native and React on Isoloop are the headline; a Preact pair, `/native-preact` and `/isoloop-preact`, measured the same way, answers "does the gain hold with a leaner framework?"; and `/mixed` is an Isoloop build with React and Preact widgets side by side, one framework per isolate, as a showcase rather than a measurement.
+- Widgets are written once with the React API, inside what `preact/compat` supports. The Preact builds alias `react` and `react-dom` to `preact/compat`, and `data.isoloop.ts` picks `@isoloop/preact` instead of `@isoloop/react` the same way. `/mixed` maps each slot to an adapter (for example charts and the table on React, the alerts panel and filters on Preact). Every native bundle contains no `@isoloop/*` code; the Preact bundles contain no `react-dom`.
+- The toggle (task 16) lists all five. CI builds all five on every PR; the full comparison runs on demand.
+- **Files:** `apps/markets/vite.config.ts` (five builds), `src/slots.mixed.ts`.
+- **Tests (E2E):** each build renders the same data from the replay source; on `/mixed`, a crashed Preact widget leaves the React ones drawing, and the other way round.
+
 ### 17. Metrics panel
 - Main-thread fps, long tasks (`PerformanceObserver`), input latency (Event Timing API), loop lag per worker (from heartbeats), memory (`measureUserAgentSpecificMemory` when cross-origin isolated) and bus throughput (`bus:metrics`).
 - **Files:** `apps/markets/src/metrics/`.
@@ -108,7 +115,7 @@
 - **Tests (E2E):** every metric shows a value within 2 s of start in both builds; memory shows "unavailable" without cross-origin isolation.
 
 ### 18. Recorded comparison
-- A scripted scenario on the replay source at N× with stress, run on both builds; Playwright records both, and a script puts the numbers and the side-by-side video into the README.
+- A scripted scenario on the replay source at N× with stress, run on the React pair (the side-by-side video) and the Preact pair (a second table, no video); a script puts the numbers and the video into the README. `/mixed` isn't measured.
 - **Files:** `apps/markets/e2e/comparison.spec.ts`, `scripts/compare.ts`; README section in the main repo.
 - **Tests:** the scenario runs in CI and uploads its numbers.
 
