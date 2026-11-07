@@ -86,3 +86,44 @@ describe.skipIf(skip)('OpfsStorage: committed offsets', () => {
     });
   });
 });
+
+describe.skipIf(skip)('recovery (M2b task 7)', () => {
+  it('truncates a torn last frame and keeps the rest', async () => {
+    expect(await run('recovery: a truncated last frame')).toEqual({
+      state: [{ topic: 'saved.v1', tail: 0, head: 99 }],
+      restored: [{ topic: 'saved.v1', head: 99 }],
+      count: 99,
+      missing: [99],
+      committed: 60,
+      next: 99,
+      onDiskTail: [98, 'next'],
+      onDiskCount: 100,
+    });
+  });
+
+  it('skips a frame with a flipped byte and keeps every one after it', async () => {
+    expect(await run('recovery: a flipped byte')).toEqual({
+      state: [{ topic: 'saved.v1', tail: 0, head: 100 }],
+      restored: [{ topic: 'saved.v1', head: 100 }],
+      count: 99,
+      missing: [50],
+      committed: 60,
+      next: 100,
+      onDiskTail: [99, 'next'],
+      onDiskCount: 100,
+    });
+  });
+
+  it('opens with an empty newest segment', async () => {
+    expect(await run('recovery: an empty segment')).toEqual({
+      state: [{ topic: 'saved.v1', tail: 0, head: 100 }],
+      restored: [{ topic: 'saved.v1', head: 100 }],
+      count: 100,
+      missing: [],
+      committed: 60,
+      next: 100,
+      onDiskTail: [99, 'next'],
+      onDiskCount: 101,
+    });
+  });
+});

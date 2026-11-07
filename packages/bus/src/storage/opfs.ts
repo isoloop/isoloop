@@ -1,5 +1,6 @@
 import type { LogStorage, StoredState } from '../engine/types';
 import { frameOffset, pack, scanFrames, unpack } from './frame';
+import { nextOffset, scanSegment } from './recover';
 
 /** Segment files roll over past this size (design §6.2). */
 export const SEGMENT_BYTES: number = 4 * 1024 * 1024;
@@ -146,6 +147,11 @@ export class OpfsStorage implements LogStorage {
     );
   }
 
+  /**
+   * Recovery (M2b task 7): finds every topic on disk, truncates a torn tail
+   * off each topic's newest segment, and restores committed offsets. A frame
+   * corrupted inside a segment is skipped on every read (recover.ts).
+   */
   async open(): Promise<StoredState> {
     const root = (this.#root ??= this.#rootOption ?? (await defaultRoot()));
     const state: StoredState = { topics: [], offsets: {} };
@@ -159,14 +165,29 @@ export class OpfsStorage implements LogStorage {
         const first = files.segments[0];
         const last = files.segments.at(-1);
         if (first === undefined || last === undefined) return undefined;
-        const { frames } = scanFrames(await readFile(files.dir, segmentName(last)));
-        const lastFrame = frames.at(-1);
-        const head = lastFrame ? frameOffset(lastFrame) + 1 : last;
-        return { topic, tail: first, head };
+        return { topic, tail: first, head: await this.#recoverNewest(files, last) };
       }),
     );
     for (const t of found) if (t) state.topics.push(t);
+    state.topics.sort((a, b) => (a.topic < b.topic ? -1 : 1));
     return state;
+  }
+
+  /** Truncates the newest segment after its last intact frame; returns the head. */
+  async #recoverNewest(files: TopicFiles, first: number): Promise<number> {
+    const name = segmentName(first);
+    const handle = await (await files.dir.getFileHandle(name)).createSyncAccessHandle();
+    try {
+      const bytes = readAll(handle);
+      const scan = scanSegment(bytes);
+      if (scan.valid < bytes.length) {
+        handle.truncate(scan.valid);
+        handle.flush();
+      }
+      return nextOffset(scan, first);
+    } finally {
+      handle.close();
+    }
   }
 
   async #files(topic: string): Promise<TopicFiles> {
@@ -332,17 +353,26 @@ export class OpfsStorage implements LogStorage {
     return Promise.resolve();
   }
 
-  /** The frames of the segment holding `fromOffset`, from that offset on. */
+  /**
+   * The frames of the segment holding `fromOffset`, from that offset on. When
+   * that segment has none left (its tail was corrupt), the next one's. Empty
+   * past the newest record.
+   */
   async readSegment(topic: string, fromOffset: number): Promise<Uint8Array[]> {
     const files = await this.#files(topic);
-    let first: number | undefined;
-    for (const s of files.segments) if (s <= fromOffset) first = s;
-    if (first === undefined) first = files.segments[0];
-    if (first === undefined) return [];
-    const name = segmentName(first);
-    const bytes =
-      files.active?.name === name ? readAll(files.active.handle) : await readFile(files.dir, name);
-    return scanFrames(bytes).frames.filter((f) => frameOffset(f) >= fromOffset);
+    let i = 0;
+    while (i + 1 < files.segments.length && (files.segments[i + 1] ?? 0) <= fromOffset) i++;
+    for (; i < files.segments.length; i++) {
+      const name = segmentName(files.segments[i] ?? 0);
+      const bytes =
+        files.active?.name === name
+          ? readAll(files.active.handle)
+          : // oxlint-disable-next-line no-await-in-loop -- usually the first segment answers
+            await readFile(files.dir, name);
+      const frames = scanSegment(bytes).frames.filter((f) => frameOffset(f) >= fromOffset);
+      if (frames.length > 0) return frames;
+    }
+    return [];
   }
 
   quarantineNewest(): Promise<string[]> {
