@@ -66,6 +66,26 @@ export function listenEvents(
     );
   }
 
+  // `scroll` doesn't bubble, so it's caught on the way down; one per frame
+  // per scrolled node, with its latest offsets.
+  const pendingScroll = new Map<string, SerializedEvent>();
+  root.addEventListener(
+    'scroll',
+    (e) => {
+      const event = toEvent(e, 'scroll');
+      if (!event) return;
+      const first = pendingScroll.size === 0;
+      pendingScroll.set(event.target, event);
+      if (!first) return;
+      requestFrame(() => {
+        const all = [...pendingScroll.values()];
+        pendingScroll.clear();
+        if (!signal.aborted) for (const s of all) send(s);
+      });
+    },
+    { signal, capture: true },
+  );
+
   let pendingMove: SerializedEvent | null = null;
   root.addEventListener(
     'pointermove',

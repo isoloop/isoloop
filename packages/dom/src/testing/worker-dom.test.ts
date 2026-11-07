@@ -332,6 +332,29 @@ describe('deliver', () => {
     expect(records()).toEqual([]);
   });
 
+  it('mirrors scroll offsets on the element, and scroll does not bubble', () => {
+    const { doc, root, dom } = setup();
+    const box = el(doc.createElement('div'));
+    root.appendChild(box);
+    const seen: string[] = [];
+    box.addEventListener('scroll', (e) => {
+      const t = e.currentTarget;
+      seen.push(`box ${t instanceof WElement ? t.scrollTop : '?'}`);
+    });
+    root.addEventListener('scroll', () => seen.push('root'));
+    expect(box.scrollTop).toBe(0);
+    dom.deliver({
+      type: 'scroll',
+      target: dom.idOf(box),
+      currentTargets: [dom.idOf(box)],
+      scrollTop: 440,
+      scrollLeft: 3,
+      mods: { alt: false, ctrl: false, meta: false, shift: false },
+    });
+    expect(seen).toEqual(['box 440']);
+    expect([box.scrollTop, box.scrollLeft]).toEqual([440, 3]);
+  });
+
   it('stopPropagation stops the bubble', () => {
     const { doc, root, dom } = setup();
     const b = doc.createElement('button');

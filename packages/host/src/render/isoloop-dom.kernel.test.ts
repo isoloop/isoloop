@@ -70,6 +70,17 @@ describe('isoloop-dom in the kernel', () => {
     await waitFor(() => shadow()?.activeElement === shadow()?.querySelector('input'));
   });
 
+  it('scroll: the isolate gets scroll events with the offset, mirrored on the element', async () => {
+    const { shadow } = spawn(bootstrap, fixture('dom-scroll'));
+    await waitFor(() => shadow()?.querySelector('.box') !== null);
+    const box = shadow()?.querySelector<HTMLElement>('.box');
+    if (!box) throw new Error('no box');
+    box.scrollTop = 120;
+    await waitFor(() => shadow()?.querySelector('.out')?.textContent === '120');
+    box.scrollTop = 300;
+    await waitFor(() => shadow()?.querySelector('.out')?.textContent === '300');
+  });
+
   it('styles: isolate CSS stays in its surface, host design tokens reach in', async () => {
     const page = document.createElement('p');
     page.textContent = 'host p';

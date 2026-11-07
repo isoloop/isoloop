@@ -76,6 +76,9 @@ export type DomEvent = {
   /** For `resize` on a transferred canvas: its new CSS size (design §4.7). */
   width?: number;
   height?: number;
+  /** For `scroll`: the scrolled element's offsets, mirrored on the worker node. */
+  scrollTop?: number;
+  scrollLeft?: number;
 };
 
 const isSyncedProp = (x: unknown): x is SyncedProp =>
