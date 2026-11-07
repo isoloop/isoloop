@@ -7,5 +7,6 @@
 | `@isoloop/dom/worker` | isolate worker | The DOM subset Preact and React use, recorded as batches of plain records; `deliver()` dispatches host events with capture and bubble. |
 | `@isoloop/dom/host` | main thread | The applier: applies batches through a required sanitising policy, maps node ids both ways, and turns DOM events into event records. |
 | `@isoloop/dom/testing` | tests | The bridge conformance suite, `runBridgeConformance()`. It needs Vitest, an optional peer. |
+| `@isoloop/dom/testing/usage` | tests | `trackUsage()`, the DOM usage logger (M3a task 2). Patches the subset for the whole realm, so it runs in a worker of its own. |
 
 There's no root entry. The package has no runtime dependencies.

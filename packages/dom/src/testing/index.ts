@@ -12,3 +12,5 @@ export {
   type NodeIds,
 } from './conformance';
 export { createIsoloopDomDriver } from './driver';
+export { checkDomUsage, TOLERATED_MISSING } from './check-usage';
+export type { UsageLog } from './usage';

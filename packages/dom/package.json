@@ -28,6 +28,11 @@
       "@isoloop/source": "./src/testing/index.ts",
       "types": "./dist/testing.d.ts",
       "import": "./dist/testing.js"
+    },
+    "./testing/usage": {
+      "@isoloop/source": "./src/testing/usage.ts",
+      "types": "./dist/testing-usage.d.ts",
+      "import": "./dist/testing-usage.js"
     }
   },
   "publishConfig": {
@@ -43,6 +48,10 @@
       "./testing": {
         "types": "./dist/testing.d.ts",
         "import": "./dist/testing.js"
+      },
+      "./testing/usage": {
+        "types": "./dist/testing-usage.d.ts",
+        "import": "./dist/testing-usage.js"
       }
     }
   },

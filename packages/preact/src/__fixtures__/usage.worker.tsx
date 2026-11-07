@@ -1,0 +1,67 @@
+/*
+ * The DOM usage fixture for Preact (M3a task 2): renders into the subset with
+ * every member access logged, drives it through host events, and posts the
+ * log. What it renders is what the adapters will meet.
+ */
+import { driveUsageFixture, reportUsage, trackUsage } from '@isoloop/dom/testing/usage';
+import { createDom, install } from '@isoloop/dom/worker';
+import { render } from 'preact';
+import { useState } from 'preact/hooks';
+import pkg from 'preact/package.json';
+
+const tracker = trackUsage();
+const dom = createDom({ onBatch: () => {} });
+install(dom, self);
+// `install()` made the subset's classes the worker's: the root is an `Element` now.
+const container = dom.root;
+if (!(container instanceof Element)) throw new Error('the subset is not installed');
+
+const reversed = (xs: string[]): string[] => {
+  const out = [...xs];
+  out.reverse();
+  return out;
+};
+
+function App() {
+  const [items, setItems] = useState(['a', 'b', 'c', 'd']);
+  const [text, setText] = useState('');
+  const [pick, setPick] = useState('a');
+  const [shown, setShown] = useState(true);
+  return (
+    <div class="app" style={{ color: shown ? 'red' : 'blue' }}>
+      <button name="toggle" onClick={() => setShown((s) => !s)}>
+        toggle
+      </button>
+      <button name="reorder" onClick={() => setItems(reversed)}>
+        reorder
+      </button>
+      <ul>
+        {items.map((i) => (
+          <li key={i} data-key={i}>
+            {i}
+          </li>
+        ))}
+      </ul>
+      <input value={text} onInput={(e) => setText(e.currentTarget.value)} />
+      <select value={pick} onChange={(e) => setPick(e.currentTarget.value)}>
+        <option value="a">A</option>
+        <option value="b">B</option>
+      </select>
+      <svg viewBox="0 0 10 10">
+        <circle cx="5" cy="5" r={shown ? 4 : 2} />
+      </svg>
+      {shown ? <p>shown</p> : null}
+      <>
+        <span>one</span>
+        <span>{text}</span>
+      </>
+    </div>
+  );
+}
+
+const settle = () => new Promise<void>((r) => setTimeout(r, 10));
+await reportUsage(tracker, `preact@${pkg.version}`, async () => {
+  render(<App />, container);
+  await driveUsageFixture(dom, settle);
+  render(null, container);
+});

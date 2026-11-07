@@ -4,6 +4,7 @@ import { expect, inject, test } from 'vitest';
 declare module 'vitest' {
   export interface ProvidedContext {
     major: number;
+    writeUsage: boolean;
   }
 }
 

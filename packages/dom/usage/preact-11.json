@@ -1,0 +1,30 @@
+{
+  "framework": "preact@11.1.1",
+  "used": [
+    "Document.createElement",
+    "Document.createElementNS",
+    "Document.createTextNode",
+    "Element.childNodes",
+    "Element.firstChild",
+    "Element.getAttribute",
+    "Element.insertBefore",
+    "Element.removeChild",
+    "Element.setAttribute",
+    "Element.style",
+    "Element.textContent",
+    "EventTarget.addEventListener",
+    "EventTarget.dispatchEvent",
+    "HTMLInputElement.value",
+    "HTMLOptionElement.value",
+    "HTMLSelectElement.value",
+    "Node.childNodes",
+    "Node.contains",
+    "Node.nextSibling",
+    "Node.parentNode",
+    "Node.remove",
+    "Text.data",
+    "Text.textContent"
+  ],
+  "missing": ["moveBefore"],
+  "probed": ["class", "data-key", "name"]
+}
