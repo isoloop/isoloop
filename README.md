@@ -147,7 +147,7 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 3. **M2 Bus** (done; write-up: [A Kafka-shaped bus in a Web Worker](docs/posts/m2-bus-in-a-worker.md)): topics, schemas, retention, offsets, replay, backpressure; bus worker with the TS log engine; opt-in suspension of idle isolates.
 4. **M2b Durable log:** persistent topics in OPFS that survive a bus crash or a page reload. Required for 0.1.
 5. **M2c Worker pools** (after 0.1): opt-in named pools for small headless isolates, if a benchmark shows they pay off.
-6. **M3 Adapters and dashboard sandbox**, in two epics: **M3a** Preact and React adapters (Preact 10 and 11, React 18 and 19); **M3b** a markets dashboard (live public exchange feeds, cross-market aggregates and alerts) that runs single-threaded or on Isoloop at the flip of a toggle, with live metrics (main-thread fps, long tasks, input latency, loop lag per worker, memory, bus throughput).
+6. **M3 Adapters and dashboard sandbox**, in two epics: **M3a** Preact and React adapters (Preact 10 and 11, React 18 and 19); **M3b** a markets dashboard (live public exchange feeds, cross-market aggregates and alerts) that runs as an idiomatic native app or on Isoloop at the flip of a toggle, with live metrics (main-thread fps, long tasks, input latency, loop lag per worker, memory, bus throughput).
 7. **M4 Devtools and 0.1:** health and bus overlay, docs site, npm release.
 8. **M5 Shared-memory engine** (after 0.1): opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
 9. **M5b Delivery batching (spike):** whether batching bus traffic across tasks gets the TS engine from 45.5k to its 50k records/s budget.

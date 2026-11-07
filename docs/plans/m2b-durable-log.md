@@ -26,7 +26,7 @@
 - Benchmark a MessagePack and a CBOR library against `JSON` and structured clone on realistic records (the dashboard's trades and book updates, the four-loops topics): encode and decode speed, size, bundle size. **Decided (2026-11-06):** our own codec, covering exactly the structured-clone types topics allow, unless a library is more than 2× faster on these records; then it comes in wrapped behind our interface, with conformance tests. The ADR records the numbers and the outcome.
 - **Files:** `bench/codec/`, `docs/investigations/codec.md`.
 - **Tests:** the bench runs and reports.
-- *As built:* Written up as [ADR 0014](../adr/0014-own-codec.md) (0013 is reserved for `@isoloop/local`). No library was more than 2× faster: at most 1.42×. Task 3 merged before this one, so the evaluation could bench our own codec.
+- *As built:* Written up as [ADR 0014](../adr/0014-own-codec.md) (0013 was reserved for `@isoloop/local`, later withdrawn). No library was more than 2× faster: at most 1.42×. Task 3 merged before this one, so the evaluation could bench our own codec.
 
 ### 3. Codec: core types
 - **Files:** `packages/codec/src/{encode,decode,index}.ts`. Objects, arrays, strings, numbers, booleans, `null`, `undefined`.
