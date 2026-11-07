@@ -1,5 +1,5 @@
 import { envelopeGuard, type Envelope, type MessageTypes } from './envelope';
-import type { CallResult, ErrorCode, ErrorPayload } from './errors';
+import type { CallResult, ErrorCode, ErrorPayload, Issue } from './errors';
 import type { Grants } from './grants';
 
 export type Retention =
@@ -26,6 +26,23 @@ export type TopicConfig = {
 
 /** Why persistent topics run in memory (`bus:durability-degraded`). */
 export type DurabilityDegraded = 'another-tab' | 'no-sync-access' | 'open-failed';
+
+/**
+ * Seeding news (ADR 0003, decision 18). `rejected`: a source record `map`
+ * threw on, returned a promise for (`seed_async`), or the topic's schema
+ * rejected; it was skipped and stays in `from`. `seeded`: the seed ended and
+ * the topic opened.
+ */
+export type SeedEvent =
+  | {
+      kind: 'rejected';
+      topic: string;
+      from: string;
+      offset: number;
+      code: ErrorCode;
+      issues: Issue[];
+    }
+  | { kind: 'seeded'; topic: string; copied: number; rejected: number };
 
 /** Sampled every second on the control port (design §6.3). */
 export type BusMetrics = {
@@ -103,6 +120,7 @@ export type BusToHost =
   | Envelope<'metrics', BusMetrics>
   /** Answers a host `publish` sent with an `id`. */
   | Envelope<'result', CallResult>
+  | Envelope<'seed', SeedEvent>
   /** `fatal` with a contracts `code` means the bus can't start; the host doesn't retry it (ADR 0003). */
   | Envelope<'error', ErrorPayload>;
 
@@ -120,6 +138,7 @@ export const BUS_TO_HOST: MessageTypes<BusToHost> = {
   wake: true,
   metrics: true,
   result: true,
+  seed: true,
   error: true,
 };
 

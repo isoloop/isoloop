@@ -11,11 +11,19 @@ import {
   type ErrorCode,
   type Grants,
   type IsolateToBus,
+  type SeedEvent,
   type StartPosition,
 } from '@isoloop/protocol';
 import type { LogEngine, NewRecord } from './engine/types';
 import { estimateSize } from './size';
-import { copySeed, seedOrder, type SeedVerdict } from './seed';
+import {
+  copySeed,
+  SEED_REPORTS_PER_SEC,
+  seedDone,
+  seedOrder,
+  seedPending,
+  type SeedVerdict,
+} from './seed';
 import { toIssues, type StandardSchemaV1 } from './standard-schema';
 import { DEFAULT_MAX_RECORD_BYTES, topicConfig, type AnyTopicDef, type Contracts } from './topic';
 
@@ -67,6 +75,8 @@ export type BrokerOptions = {
    * The bus worker sends `wake` on the control port. Called once per sleep.
    */
   onWake?: (isolateId: string, topic: string) => void;
+  /** Seeding news for the host: rejected source records and ended seeds (ADR 0003, decision 18). */
+  onSeed?: (e: SeedEvent) => void;
 };
 
 /** Who is publishing: an isolate (grants apply), the host (`kernel.publish`), or the kernel itself (system topics). */
@@ -231,6 +241,7 @@ export class Broker {
   /** Suspended isolates by topic: who to wake when a record arrives there. */
   readonly #sleepers = new Map<string, Set<string>>();
   readonly #onWake: (isolateId: string, topic: string) => void;
+  readonly #onSeed: (e: SeedEvent) => void;
   #dropped = 0;
 
   constructor(opts: BrokerOptions) {
@@ -242,6 +253,7 @@ export class Broker {
     this.#timers = opts.timers ?? { set: (fn, ms) => void setTimeout(fn, ms) };
     this.#durable = opts.durable ?? ((topic) => this.#engine.durable(topic));
     this.#onWake = opts.onWake ?? (() => {});
+    this.#onSeed = opts.onSeed ?? (() => {});
     for (const def of [...(opts.systemTopics ?? SYSTEM_TOPICS), ...opts.contracts.topics]) {
       this.#engine.createTopic(topicConfig(def));
       this.#topics.set(def.name, {
@@ -351,7 +363,11 @@ export class Broker {
       const from = seed.from.name;
       const before = runs.get(from);
       const hasData = this.#engine.head(from) > this.#engine.tail(from);
-      if (this.#engine.head(def.name) > 0 || (!hasData && !before)) continue;
+      if (seedDone(this.#engine, def.name)) continue;
+      // A seed cut short resumes; otherwise only an empty topic seeds, from a source with records.
+      if (!seedPending(this.#engine, def.name)) {
+        if (this.#engine.head(def.name) > 0 || (!hasData && !before)) continue;
+      }
       topic.seeding = [];
       const run = (before ?? Promise.resolve())
         .then(() =>
@@ -364,14 +380,23 @@ export class Broker {
               const v = validate(def.schema, value);
               const verdict = (r: Validated): SeedVerdict => {
                 const c = this.#check(def.name, r, def.durability === 'persistent');
-                return c.ok ? { ok: true, value: c.value } : { ok: false, reason: c.error };
+                if (c.ok) return { ok: true, value: c.value };
+                return {
+                  ok: false,
+                  code: c.error.code,
+                  issues: c.error.issues ?? [{ message: c.error.message, path: [] }],
+                };
               };
               return v instanceof Promise ? v.then(verdict) : verdict(v);
             },
+            onReject: this.#seedReporter(def.name, from),
           }),
         )
         .then(
-          () => this.#open(def.name, topic),
+          (r) => {
+            this.#onSeed({ kind: 'seeded', topic: def.name, ...r });
+            this.#open(def.name, topic);
+          },
           (e: unknown) => {
             console.warn(`[isoloop] seeding ${def.name} from ${from} failed`, e);
             this.#open(def.name, topic);
@@ -380,6 +405,25 @@ export class Broker {
       runs.set(def.name, run);
     }
     return Promise.all(runs.values()).then(() => {});
+  }
+
+  /** Reports rejected seed records, at most `SEED_REPORTS_PER_SEC` a second. */
+  #seedReporter(
+    topic: string,
+    from: string,
+  ): (offset: number, v: Extract<SeedVerdict, { ok: false }>) => void {
+    let windowStart = -Infinity;
+    let sent = 0;
+    return (offset, v) => {
+      const now = this.#now();
+      if (now - windowStart >= 1000) {
+        windowStart = now;
+        sent = 0;
+      }
+      if (sent >= SEED_REPORTS_PER_SEC) return;
+      sent++;
+      this.#onSeed({ kind: 'rejected', topic, from, offset, code: v.code, issues: v.issues });
+    };
   }
 
   /** A seed ended: the topic takes its waiting publishes, then its waiting subscribes. */

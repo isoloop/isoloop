@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { connect, flush } from '../test/memory-port';
 import { Broker } from './broker';
 import { TsEngine } from './engine/ts-engine';
-import { SEED_BATCH } from './seed';
+import type { SeedEvent } from '@isoloop/protocol';
+import { SEED_BATCH, SEED_DONE, SEED_FROM, SEED_HEAD } from './seed';
 import { contracts, topic, topicConfig, unchecked, type AnyTopicDef } from './topic';
 
 const all: Grants = { publish: ['*'], subscribe: ['*'] };
@@ -26,10 +27,16 @@ const other = topic('notes.v1', {
 /** A broker whose engine already holds `n` v1 records, as if restored from disk. */
 function setup(n: number, topics: AnyTopicDef[] = [v1, v2, other]) {
   const engine = new TsEngine();
-  const broker = new Broker({ contracts: contracts(...topics), engine, now: () => 5 });
+  const events: SeedEvent[] = [];
+  const broker = new Broker({
+    contracts: contracts(...topics),
+    engine,
+    now: () => 5,
+    onSeed: (e) => events.push(e),
+  });
   for (let i = 0; i < n; i++)
     engine.append(v1.name, { value: { sku: `s${i}` }, ts: 100 + i, producer: 'old' });
-  return { broker, engine };
+  return { broker, engine, events };
 }
 
 describe('seeding: state and buffering', () => {
@@ -120,6 +127,83 @@ describe('seeding: state and buffering', () => {
       { sku: 's0', qty: 1, v: 3 },
       { sku: 's1', qty: 1, v: 3 },
     ]);
+  });
+});
+
+describe('seeding: exactly once, rejects and progress', () => {
+  it('resumes after the saved progress, without appending again what a cut-short seed already wrote', async () => {
+    const { broker, engine } = setup(10);
+    // A first run mapped v1 0..6, but saved progress only up to v1 offset 4 (v2 head 5).
+    for (let i = 0; i < 7; i++)
+      engine.append(v2.name, { value: { sku: `s${i}`, qty: 1 }, ts: 100 + i, producer: 'old' });
+    engine.commit(v2.name, SEED_FROM, 4);
+    engine.commit(v2.name, SEED_HEAD, 5);
+    await broker.seed();
+    expect(engine.read(v2.name, 0, 100).map((r) => r.value)).toEqual(
+      Array.from({ length: 10 }, (_, i) => ({ sku: `s${i}`, qty: 1 })),
+    );
+    expect(engine.committed(v2.name, SEED_DONE)).toBe(10);
+  });
+
+  it('skips and reports what map throws on, returns a promise for, or v2 rejects; v2 still opens', async () => {
+    const picky = topic('picky.v2', {
+      schema: z.object({ sku: z.string().startsWith('s') }),
+      retention: { kind: 'last-n', n: 100 },
+      seed: {
+        from: v1,
+        map: (v: { sku: string }, r) => {
+          if (r.offset === 1) throw new Error('boom');
+          // A promise that also looks like the value: still `seed_async`.
+          if (r.offset === 2) return Object.assign(Promise.resolve(v), { sku: v.sku });
+          return r.offset === 3 ? { sku: 'x' } : v;
+        },
+      },
+    });
+    const { broker, engine, events } = setup(5, [v1, picky]);
+    await broker.seed();
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: 'rejected',
+        topic: 'picky.v2',
+        from: v1.name,
+        offset: 1,
+        code: 'invalid',
+      }),
+      expect.objectContaining({ kind: 'rejected', offset: 2, code: 'seed_async' }),
+      expect.objectContaining({ kind: 'rejected', offset: 3, code: 'invalid' }),
+      { kind: 'seeded', topic: 'picky.v2', copied: 2, rejected: 3 },
+    ]);
+    expect(engine.read('picky.v2', 0, 10).map((r) => r.value)).toEqual([
+      { sku: 's0' },
+      { sku: 's4' },
+    ]);
+    // The rejected records stay in v1.
+    expect(engine.head(v1.name)).toBe(5);
+    const a = connect(broker, 'A', all);
+    expect(await a.call('publish', { topic: 'picky.v2', value: { sku: 'sNew' } })).toEqual({
+      ok: true,
+      value: { offset: 2 },
+    });
+  });
+
+  it('reports at most 10 rejects a second, and counts them all in bus:seeded', async () => {
+    const strict = topic('strict.v2', {
+      schema: z.never(),
+      retention: { kind: 'last-n', n: 100 },
+      seed: { from: v1, map: (v: unknown) => v },
+    });
+    const { broker, events } = setup(30, [v1, strict]);
+    await broker.seed();
+    expect(events.filter((e) => e.kind === 'rejected')).toHaveLength(10);
+    expect(events.at(-1)).toEqual({ kind: 'seeded', topic: 'strict.v2', copied: 0, rejected: 30 });
+  });
+
+  it('a seed that ended doesn’t run again, even with new v1 records', async () => {
+    const { broker, engine } = setup(2);
+    await broker.seed();
+    engine.append(v1.name, { value: { sku: 'late' }, ts: 1, producer: 'p' });
+    await broker.seed();
+    expect(engine.head(v2.name)).toBe(2);
   });
 });
 

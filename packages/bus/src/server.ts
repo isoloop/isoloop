@@ -370,6 +370,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
       engine,
       dev,
       onWake: (isolateId, topic) => post({ v: 1, t: 'wake', p: { isolateId, topic } }),
+      onSeed: (e) => post({ v: 1, t: 'seed', p: e }),
     });
     return { b, restored: await engine.restore(stored) };
   };

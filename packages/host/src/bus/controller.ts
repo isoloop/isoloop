@@ -20,6 +20,7 @@ import {
   type ErrorCode,
   type Grants,
   type HostToBus,
+  type SeedEvent,
   type StartPosition,
   isBusToHost,
   isBusToIsolate,
@@ -58,6 +59,8 @@ export type BusControllerEvents = {
   reattach(isolateId: string): void;
   /** A record arrived for a suspended isolate's subscription (ADR 0001). */
   wake(isolateId: string, topic: string): void;
+  /** Seeding news (ADR 0003, decision 18). */
+  seed(e: SeedEvent): void;
 };
 
 export type BusControllerOptions = {
@@ -227,6 +230,9 @@ export function createBusController(o: BusControllerOptions): BusController {
       }
       case 'wake':
         o.events.wake(msg.p.isolateId, msg.p.topic);
+        return;
+      case 'seed':
+        o.events.seed(msg.p);
         return;
       case 'error':
         if (msg.p.fatal && msg.p.code !== undefined) {
