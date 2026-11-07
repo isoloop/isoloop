@@ -1,5 +1,6 @@
 import type { LogStorage, StoredState } from '../engine/types';
 import { decodeFrame, frameOffset, pack, scanFrames, unpack } from './frame';
+import { syncHandle } from './handle';
 import { nextOffset, scanSegment } from './recover';
 import { quarantineNewest, quarantinedHead } from './safe-mode';
 
@@ -67,6 +68,9 @@ const SLOTS = ['offsets.0', 'offsets.1'] as const;
 
 type Commits = Record<string, number>;
 
+/** The file isn't there. Any other error (one still held, I/O) is not the same as missing. */
+const notFound = (e: unknown): boolean => e instanceof DOMException && e.name === 'NotFoundError';
+
 /** Whether compaction keeps a record, from its offset and key. */
 type Keep = (offset: number, key: string | undefined) => boolean;
 
@@ -86,8 +90,9 @@ async function readOffsets(
     try {
       // oxlint-disable-next-line no-await-in-loop -- two small files
       bytes = await readFile(dir, slot);
-    } catch {
-      continue;
+    } catch (e) {
+      if (notFound(e)) continue;
+      throw e;
     }
     const frame = scanFrames(bytes).frames[0];
     if (!frame) continue;
@@ -108,8 +113,9 @@ async function readMarker(
   let bytes: Uint8Array;
   try {
     bytes = await readFile(dir, name);
-  } catch {
-    return undefined;
+  } catch (e) {
+    if (notFound(e)) return undefined;
+    throw e;
   }
   const frame = scanFrames(bytes).frames[0];
   if (!frame) return undefined;
@@ -125,7 +131,7 @@ async function writeFile(
   bytes: Uint8Array,
 ): Promise<void> {
   const file = await dir.getFileHandle(name, { create: true });
-  const handle = await file.createSyncAccessHandle();
+  const handle = await syncHandle(file);
   try {
     handle.write(bytes, { at: 0 });
     handle.truncate(bytes.length);
@@ -140,7 +146,7 @@ async function remove(dir: FileSystemDirectoryHandle, name: string): Promise<voi
   try {
     await dir.removeEntry(name);
   } catch (e) {
-    if (!(e instanceof DOMException && e.name === 'NotFoundError')) throw e;
+    if (!notFound(e)) throw e;
   }
 }
 
@@ -162,7 +168,7 @@ async function names(dir: FileSystemDirectoryHandle): Promise<string[]> {
 /** Reads a whole file through a sync access handle, closing it after. */
 async function readFile(dir: FileSystemDirectoryHandle, name: string): Promise<Uint8Array> {
   const file = await dir.getFileHandle(name);
-  const handle = await file.createSyncAccessHandle();
+  const handle = await syncHandle(file);
   try {
     return readAll(handle);
   } finally {
@@ -266,7 +272,7 @@ export class OpfsStorage implements LogStorage {
 
   /** Truncates the newest segment after its last intact frame; returns the head. */
   async #recoverNewest(files: TopicFiles, seg: Seg): Promise<number> {
-    const handle = await (await files.dir.getFileHandle(seg.name)).createSyncAccessHandle();
+    const handle = await syncHandle(await files.dir.getFileHandle(seg.name));
     try {
       const bytes = readAll(handle);
       const scan = scanSegment(bytes);
@@ -439,7 +445,7 @@ export class OpfsStorage implements LogStorage {
     }
     const name = segmentName(first);
     const file = await files.dir.getFileHandle(name, { create: true });
-    const handle = await file.createSyncAccessHandle();
+    const handle = await syncHandle(file);
     const active: Active = { name, handle, size: handle.getSize() };
     files.active = active;
     files.segments.push({ first, name });
@@ -583,7 +589,7 @@ export class OpfsStorage implements LogStorage {
               // oxlint-disable-next-line no-await-in-loop -- output files open one at a time
               const file = await files.dir.getFileHandle(seg.name, { create: true });
               // oxlint-disable-next-line no-await-in-loop
-              const handle = await file.createSyncAccessHandle();
+              const handle = await syncHandle(file);
               out = { name: seg.name, handle, size: 0 };
               outputs.push(seg);
             }

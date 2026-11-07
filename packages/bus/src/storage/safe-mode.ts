@@ -1,3 +1,4 @@
+import { syncHandle } from './handle';
 import { nextOffset, scanSegment } from './recover';
 
 const SEGMENT = /^(\d{16})(?:\.\d+)?\.seg$/;
@@ -23,7 +24,7 @@ export function quarantinedHead(names: Iterable<string>): number {
 }
 
 async function readWhole(dir: FileSystemDirectoryHandle, name: string): Promise<Uint8Array> {
-  const src = await (await dir.getFileHandle(name)).createSyncAccessHandle();
+  const src = await syncHandle(await dir.getFileHandle(name));
   try {
     const bytes = new Uint8Array(src.getSize());
     src.read(bytes, { at: 0 });
@@ -34,7 +35,7 @@ async function readWhole(dir: FileSystemDirectoryHandle, name: string): Promise<
 }
 
 async function write(dir: FileSystemDirectoryHandle, to: string, bytes: Uint8Array): Promise<void> {
-  const dst = await (await dir.getFileHandle(to, { create: true })).createSyncAccessHandle();
+  const dst = await syncHandle(await dir.getFileHandle(to, { create: true }));
   try {
     dst.write(bytes, { at: 0 });
     dst.truncate(bytes.length);

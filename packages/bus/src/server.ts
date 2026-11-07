@@ -354,17 +354,21 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
       // Persistent topics come back from disk before anything is let in.
       built = await build(list, storage, stored, dev);
     } catch (e) {
-      // A stored record broke the restore: a crash while loading. The host
-      // restarts the bus, and after a second one boots it in safe mode.
-      post({
-        v: 1,
-        t: 'error',
-        p: {
-          message: `Restoring persistent topics failed: ${e instanceof Error ? e.message : String(e)}`,
-          fatal: true,
-        },
-      });
-      return;
+      if (!(e instanceof DOMException)) {
+        // A stored record broke the restore: a crash while loading. The host
+        // restarts the bus, and after a second one boots it in safe mode.
+        const message = e instanceof Error ? e.message : String(e);
+        post({
+          v: 1,
+          t: 'error',
+          p: { message: `Restoring persistent topics failed: ${message}`, fatal: true },
+        });
+        return;
+      }
+      // The files, not a record: run in memory, as when they don't open.
+      console.warn('[isoloop] persistent topics are in memory: reading them back failed', e);
+      storage = new MemoryStorage();
+      built = await build(list, storage, await storage.open(), dev);
     }
     const { b, restored } = built;
     broker = b;
