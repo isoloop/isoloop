@@ -245,6 +245,25 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         });
         return;
       }
+      case 'flush': {
+        const { id } = msg;
+        void b.flush().then(
+          () =>
+            id !== undefined && post({ v: 1, t: 'result', re: id, p: { ok: true, value: null } }),
+          (e: unknown) =>
+            id !== undefined &&
+            post({
+              v: 1,
+              t: 'result',
+              re: id,
+              p: {
+                ok: false,
+                error: { code: 'bus_unavailable', message: `flush: write failed: ${String(e)}` },
+              },
+            }),
+        );
+        return;
+      }
       default: {
         const never: never = msg;
         return never;
@@ -276,6 +295,11 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         }
         earlyPublishes++;
         break;
+      case 'flush':
+        // Nothing is written before the broker exists.
+        if (msg.id !== undefined)
+          post({ v: 1, t: 'result', re: msg.id, p: { ok: true, value: null } });
+        return;
       case 'boot':
         return;
     }

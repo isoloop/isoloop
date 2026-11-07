@@ -312,6 +312,14 @@ export class Broker {
     this.#storageFull = full;
   }
 
+  /**
+   * Writes what persistent topics have pending at once: the page is freezing
+   * or going away (ADR 0001, what the browser still controls).
+   */
+  flush(): Promise<void> {
+    return this.#engine.flush({ now: true });
+  }
+
   /** Retention pass over every topic (`time` and `compacted`); the bus worker runs it every second. */
   compact(): void {
     for (const name of this.#topics.keys()) this.#engine.compact(name);

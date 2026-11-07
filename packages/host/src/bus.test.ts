@@ -257,6 +257,27 @@ describe('bus controller', () => {
     expect(quota).toHaveLength(1);
   });
 
+  it.each(['freeze', 'pagehide'])(
+    'on %s, persistent topics are written at once, not at the next group commit (M2b)',
+    async (event) => {
+      const { kernel, log } = setup({
+        workers: { isolateBootstrap: bootstrap, bus: worker('./__fixtures__/slow-commit-bus.ts') },
+      });
+      const ready = log('bus:ready');
+      await vi.waitUntil(() => ready.length >= 1, { timeout: 3000 });
+      let acked = false;
+      const published = kernel.publish(saved, { value: 1 }).then(() => {
+        acked = true;
+      });
+      // The fixture's group commit waits a minute, so nothing acks yet.
+      await new Promise((r) => setTimeout(r, 200));
+      expect(acked).toBe(false);
+      (event === 'freeze' ? document : window).dispatchEvent(new Event(event));
+      await published;
+      expect(acked).toBe(true);
+    },
+  );
+
   it('a contracts mismatch is fatal: bus:failed, isolates fail, spawn throws', async () => {
     const differ = { ...list, topics: list.topics.filter((t) => t.name !== 'notes.v1') };
     const { kernel, log } = setup({ contracts: { url: contractsUrl, list: differ } });

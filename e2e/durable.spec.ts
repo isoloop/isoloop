@@ -65,3 +65,33 @@ test('a second tab runs in memory with bus:durability-degraded; after the first 
   // Now on disk: the first tab's record is there, the second's in-memory one isn't.
   expect(await publishAndRead(second, 3)).toEqual([1, 3]);
 });
+
+test('a record published just before the page freezes and is discarded is on disk after the reload', async ({
+  page,
+}) => {
+  const first = await boot(page);
+  test.skip(first.includes('open-failed'), 'no OPFS in this browser build');
+  await page.evaluate((topic) => {
+    const kernel = window.durable?.kernel;
+    if (!kernel) throw new Error('no kernel');
+    // Not awaited: the page freezes right after the publish.
+    void kernel.publish(topic, { value: 42 });
+    document.dispatchEvent(new Event('freeze'));
+  }, saved);
+  // Give the flush a moment, then drop the page as a discard would.
+  await page.waitForTimeout(100);
+  // Loading the page again drops the old one; its bus worker lets go of the lock a moment later.
+  await expect(async () => {
+    expect(await boot(page)).toEqual([]);
+  }).toPass({ timeout: 10_000 });
+  const got = await page.evaluate(async (topic) => {
+    const kernel = window.durable?.kernel;
+    if (!kernel) throw new Error('no kernel');
+    const values: unknown[] = [];
+    const off = kernel.subscribe(topic, (r) => values.push(r.value), { from: 'earliest' });
+    await new Promise((r) => setTimeout(r, 300));
+    off();
+    return values;
+  }, saved);
+  expect(got).toEqual([42]);
+});

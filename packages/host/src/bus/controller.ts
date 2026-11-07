@@ -95,6 +95,11 @@ export interface BusController {
   feed(input: Extract<SupervisorInput, { k: 'tick' | 'hidden' | 'visible' }>): void;
   /** `failed` once the bus is down for good. */
   readonly state: IsolateSupervision['state'];
+  /**
+   * The page is freezing or going away: asks a running bus to write its
+   * pending persistent records now. Nothing to do while no bus runs.
+   */
+  flush(): void;
   /** Test hook: kills the bus worker as a crash would. */
   crash(): void;
   destroy(): void;
@@ -427,6 +432,10 @@ export function createBusController(o: BusControllerOptions): BusController {
 
     get state() {
       return fatal ? 'failed' : sup.state;
+    },
+
+    flush() {
+      if (worker && !down()) worker.postMessage({ v: 1, t: 'flush', p: {} } satisfies HostToBus);
     },
 
     crash() {

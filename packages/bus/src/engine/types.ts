@@ -37,8 +37,12 @@ export interface LogEngine {
    * storage that keeps it (ADR 0007). The broker acks those after `flush`.
    */
   durable(topic: string): boolean;
-  /** Resolves once every append so far to a durable topic is on disk. */
-  flush(): Promise<void>;
+  /**
+   * Resolves once every append so far to a durable topic is on disk. `now`
+   * writes the pending batch at once instead of at the next group commit (the
+   * page is freezing or going away).
+   */
+  flush(o?: { now?: boolean }): Promise<void>;
   /**
    * Whether `read(topic, fromOffset, …)` can answer now. False when the
    * records from there were evicted to disk and aren't paged in: call `page`
@@ -74,8 +78,11 @@ export interface LogStorage {
   open(): Promise<StoredState>;
   /** Buffered; group commit every 5 ms / 256 records. */
   appendBatch(topic: string, encoded: Uint8Array[]): void;
-  /** Resolves when the batch is durable; a persistent publish is acked after it. */
-  flush(): Promise<void>;
+  /**
+   * Resolves when the batch is durable; a persistent publish is acked after
+   * it. `now` commits the pending batch without waiting for the group commit.
+   */
+  flush(o?: { now?: boolean }): Promise<void>;
   saveOffsets(offsets: Record<string, Record<string, number>>): void;
   /**
    * Retention on disk (last-n, time): deletes the segments whose records are
