@@ -11,6 +11,12 @@ export type Envelope<T extends string, P> = {
   id?: string;
   /** Id of the message this replies to. */
   re?: string;
+  /**
+   * The pool member a message is for (host → worker) or from (worker → host),
+   * on a pooled worker's isolate port (M2c, ADR 0001). Absent on an own
+   * worker's port, and on messages about the whole worker (`beat`).
+   */
+  isolate?: string;
   p: P;
 };
 
@@ -24,7 +30,8 @@ const isOptionalString = (x: unknown): boolean => x === undefined || typeof x ==
 
 /**
  * True for a well-formed envelope this build can read: `v` is a supported
- * version, `t` is a string, `id`/`re` are absent or strings, and `p` is present.
+ * version, `t` is a string, `id`/`re`/`isolate` are absent or strings, and `p`
+ * is present.
  * Says nothing about whether `t` is known; see the per-port guards.
  */
 export function isEnvelope(x: unknown): x is AnyEnvelope {
@@ -34,7 +41,8 @@ export function isEnvelope(x: unknown): x is AnyEnvelope {
     typeof x['t'] === 'string' &&
     'p' in x &&
     isOptionalString(x['id']) &&
-    isOptionalString(x['re'])
+    isOptionalString(x['re']) &&
+    isOptionalString(x['isolate'])
   );
 }
 
