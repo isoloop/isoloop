@@ -1,6 +1,14 @@
 # M3c: Dashboard sizes
 
-**Status:** not started. Third epic of the [M3 initiative](m3-adapters-dashboard.md), added 2026-11-07 after the first public deploy (`markets-v0.1.0`).
+**Status:** done 2026-11-08; ships as `markets-v0.2.0` when the user tags it. Third epic of the [M3 initiative](m3-adapters-dashboard.md), added 2026-11-07 after the first public deploy (`markets-v0.1.0`).
+
+**Results** ([recorded comparison](https://github.com/isoloop/examples/tree/main/apps/markets/comparison), Chromium on a 4-core CI runner, and [engine constraints](../investigations/engine-constraints.md) for WebKit):
+
+- **Isolation:** with one widget blocked (a 3 s busy loop in a chart, M3b's scenario), typing on native waits about 2.8 s; on Isoloop it stays at 29–38 ms and the page keeps 60 fps. A crashed widget restarts on its own while the others keep drawing (E2E `stress.spec.ts`).
+- **Costs, measured:** about 1.3–1.5× the CPU across all threads and 1.6–2.7× the memory (754 MB against 278 MB for the React pair at Heavy); about 20–30 ms more per keystroke at every size (Isoloop 27–37 ms, native 5–16 ms); about 60 KB more JavaScript, gzipped; about three times the time to first data. On Playwright's WebKit (Linux, no GPU) there's a further cost: WebKit presents worker-drawn canvases on the main thread, so Isoloop's typing on the CI runner is 170–642 ms at Normal and over budget or timed out at Heavy. The budget check reports WebKit at Normal without asserting it and marks Heavy as expected to fail. Not yet checked in Safari.
+- **Main-thread headroom:** at Normal and Heavy, Isoloop's main thread is busy 17–21% of the time against native's 42–59%. On these workloads native never ran out of headroom: neither build dropped frames at any size, so no responsiveness difference appeared outside the fault case, and decision 2's hypothesis isn't borne out. Isoloop isn't faster than native here; it keeps more of the main thread free and contains faults, at the costs above.
+- **Open question:** whether a realistic heavy workload, taken from real apps rather than inflated, shows a responsiveness difference. The fair native baseline there includes hand-written workers, not only a single-threaded app.
+- **Deviations from the tasks:** Normal and Heavy E2E run at the replay's own rate, not 10×; the canvas E2E allows up to 30 s for the engines to fill; the DOM widgets E2E checks that each build fills them rather than parity; the panel shows thread time per category, with per-isolate figures in `timings.v1`; there is no throttled-CPU column (CDP throttling doesn't slow workers); a widget header with where it runs and its updates/s was added (task 9b).
 
 **Goal:** grow the markets dashboard into a realistic, larger app with selectable sizes and more kinds of widgets, and measure the native and Isoloop builds at each size, so readers can see how each behaves as an app grows and which kinds of work account for the difference.
 

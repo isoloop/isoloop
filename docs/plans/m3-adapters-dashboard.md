@@ -4,7 +4,7 @@
 
 **Done when** (RFC 0001): the dashboard is live on a public URL and a recorded comparison is in the README.
 
-M3 is an initiative with two epics. Each has its own done-when, demo and write-up.
+M3 is an initiative with three epics, all done (M3c on 2026-11-08). Each has its own done-when, demo and write-up.
 
 | Epic | Plan | Done when |
 | --- | --- | --- |
