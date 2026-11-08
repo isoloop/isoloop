@@ -2,7 +2,7 @@
 
 **Status:** planned 2026-11-08; starts after [M2c](m2c-worker-pools.md).
 
-**Goal:** visual isolates (isolates with a surface) can share a pooled worker, each with its own scoped `isoloop-dom` document, so an app can group about 8 widgets per worker instead of one worker per widget.
+**Goal:** visual isolates (isolates with a surface) can share a pooled worker, alone or together with headless members, each with its own scoped `isoloop-dom` document, so an app can group about 8 widgets per worker instead of one worker per widget.
 
 **Why:** [ADR 0001](../adr/0001-one-worker-per-isolate.md) and [ADR 0010](../adr/0010-own-render-bridge.md) allow only headless isolates in pools, because the render bridge installs one global `document` per worker. Dashboards with dozens of widgets reach the soft budget of 32 workers long before they run out of work to do; the plant dashboard ([M3d](m3d-plant-dashboard.md)) has 72.
 
@@ -15,8 +15,9 @@
 1. **Split from M2c.** Headless pools first (M2c); visual pools here, on top of the same pool mechanics.
 2. **The ADR comes first and goes to the user.** Task 0 drafts the amendment; forks don't approve ADRs. No implementation merges before it's accepted.
 3. **Grouping is the app's choice,** declared in the host manifest (ADR 0001). The plant dashboard groups by machine: about 8 widgets per pool.
-4. **Same fault story, stated plainly.** A hang in one pooled widget stalls and then restarts its whole pool; other pools and own-worker isolates are unaffected. The demo shows that trade-off rather than hiding it.
-5. **Hypothesis for the gate.** Pooling visual isolates saves memory and startup time per widget. Each member still carries its own framework code, so the saving may be smaller than for headless isolates; task 1 measures it, and if it's under about 30% memory with no faster startup, M2d stops and reports.
+4. **Mixed pools are allowed.** A pool can hold headless and visual members together, for example a machine's feed and engines with its widgets (the plant dashboard's `machine` placement). Supervision, budget and grants treat them the same way.
+5. **Same fault story, stated plainly.** A hang in one pooled widget stalls and then restarts its whole pool; other pools and own-worker isolates are unaffected. The demo shows that trade-off rather than hiding it.
+6. **Hypothesis for the gate.** Pooling visual isolates saves memory and startup time per widget. Each member still carries its own framework code, so the saving may be smaller than for headless isolates; task 1 measures it, and if it's under about 30% memory with no faster startup, M2d stops and reports.
 
 ## Tasks
 
@@ -29,7 +30,7 @@
 - **Acceptance:** the user accepts the ADR.
 
 ### 1. Benchmark gate
-- Prototype: 8 React widgets in one worker with scoped documents, against 8 own workers; memory and startup on three engines (decision 5).
+- Prototype: 8 React widgets in one worker with scoped documents, against 8 own workers; memory and startup on three engines (decision 6).
 - **Acceptance:** numbers recorded; stop if the gate fails.
 
 ### 2. Scoped documents in `@isoloop/dom`
@@ -40,16 +41,16 @@
 - The mechanism the ADR chose (for example the `@isoloop/vite` transform), with React and Preact adapters running unchanged.
 - **Tests:** the adapter conformance suites pass with two members per worker, on every supported major.
 
-### 4. Lift `pools_headless_only`
-- `spawn` accepts `pool` on visual isolates; group supervision (M2c) restarts every member and re-renders each surface.
-- **Tests (browser):** a hanging widget restarts its pool's surfaces; other pools keep drawing.
+### 4. Lift `pools_headless_only`, mixed pools
+- `spawn` accepts `pool` on visual isolates, and a pool may mix headless and visual members (decision 4); group supervision (M2c) restarts every member and re-renders each surface.
+- **Tests (browser):** a hanging widget restarts its pool's surfaces; other pools keep drawing; in a mixed pool (one headless feed, two widgets) a hang in either kind restarts all three, the feed catches up from its committed offsets and the widgets redraw.
 
 ### 5. Host calls and events per member
 - `measure`, `focus`, `scrollIntoView` and the event bridge carry the member id; a member can't reach another member's surface.
 - **Tests:** browser, including a member that tries to address another's node.
 
 ### 6. E2E and devtools data
-- Fixture with two visual pools of three, one own-worker widget; kill, hang and throw cases on all three engines. Kernel reports each surface's pool.
+- Fixture with two visual pools of three, one mixed pool (a headless member and two widgets), one own-worker widget; kill, hang and throw cases on all three engines. Kernel reports each surface's pool.
 
 ### 7. Docs and prerelease
 - Guide section on visual pools and their shared fate; the ADR's consequences in the design doc; changeset; prerelease for the plant dashboard ([M2c](m2c-worker-pools.md) decision 8).
