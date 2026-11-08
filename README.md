@@ -21,7 +21,7 @@ The source is in [`examples/four-loops`](examples/four-loops): each pane is an i
 
 ## The comparison
 
-The [markets dashboard](https://github.com/isoloop/examples/tree/main/apps/markets), built twice from one source: as an ordinary main-thread app and on Isoloop, in React and in Preact. The same scripted scenario runs on each: live-like market data at 10×, typing into the alerts panel, then typing while one chart runs a 3 s busy loop and the trades table floods the bus. Recorded in CI ([results and method](https://github.com/isoloop/examples/tree/main/apps/markets/comparison), [side-by-side video](https://github.com/isoloop/examples/blob/main/apps/markets/comparison/side-by-side.webm)):
+The [markets dashboard](https://github.com/isoloop/examples/tree/main/apps/dashboards/markets), built twice from one source: as an ordinary main-thread app and on Isoloop, in React and in Preact. The same scripted scenario runs on each: live-like market data at 10×, typing into the alerts panel, then typing while one chart runs a 3 s busy loop and the trades table floods the bus. Recorded in CI ([results and method](https://github.com/isoloop/examples/tree/main/apps/dashboards/markets/comparison), [side-by-side video](https://github.com/isoloop/examples/blob/main/apps/dashboards/markets/comparison/side-by-side.webm)):
 
 | Build | Typing, calm (median) | Typing, one chart blocked (median) | (worst) | fps after | Long tasks (10 s) | First data | JS, gzipped |
 | --- | --- | --- | --- | --- | --- | --- | --- |

@@ -2,7 +2,7 @@
 
 **Status:** done 2026-11-08; ships as `markets-v0.2.0` when the user tags it. Third epic of the [M3 initiative](m3-adapters-dashboard.md), added 2026-11-07 after the first public deploy (`markets-v0.1.0`).
 
-**Results** ([recorded comparison](https://github.com/isoloop/examples/tree/main/apps/markets/comparison), Chromium on a 4-core CI runner, and [engine constraints](../investigations/engine-constraints.md) for WebKit):
+**Results** ([recorded comparison](https://github.com/isoloop/examples/tree/main/apps/dashboards/markets/comparison), Chromium on a 4-core CI runner, and [engine constraints](../investigations/engine-constraints.md) for WebKit):
 
 - **Isolation:** with one widget blocked (a 3 s busy loop in a chart, M3b's scenario), typing on native waits about 2.8 s; on Isoloop it stays at 29–38 ms and the page keeps 60 fps. A crashed widget restarts on its own while the others keep drawing (E2E `stress.spec.ts`).
 - **Costs, measured:** about 1.3–1.5× the CPU across all threads and 1.6–2.7× the memory (754 MB against 278 MB for the React pair at Heavy); about 20–30 ms more per keystroke at every size (Isoloop 27–37 ms, native 5–16 ms); about 60 KB more JavaScript, gzipped; about three times the time to first data. On Playwright's WebKit (Linux, no GPU) there's a further cost: WebKit presents worker-drawn canvases on the main thread, so Isoloop's typing on the CI runner is 170–642 ms at Normal and over budget or timed out at Heavy. The budget check reports WebKit at Normal without asserting it and marks Heavy as expected to fail. Not yet checked in Safari.
@@ -39,7 +39,7 @@
 
 ## Tasks
 
-All in `isoloop/examples`, `apps/markets`, unless a task says otherwise.
+All in `isoloop/examples`, `apps/markets` (since moved to `apps/dashboards/markets`), unless a task says otherwise.
 
 ### 1. Sizes and the widget registry
 - A registry of widgets with their category tags (data × output), and the three sizes as counts per category. `?size=` plus the test-only parameters, the header switch, and the size carried over by the toggle (`src/url.ts`).

@@ -2,7 +2,7 @@
 
 *M3b write-up, 2026-11-07*
 
-M3b's promise: **the flagship dashboard, backend-less on a static host, at the flip of a toggle against the same app built the ordinary way, with the numbers recorded.** The dashboard lives in its own repository, [`isoloop/examples`](https://github.com/isoloop/examples/tree/main/apps/markets), and installs `@isoloop/*` from npm like any app would.
+M3b's promise: **the flagship dashboard, backend-less on a static host, at the flip of a toggle against the same app built the ordinary way, with the numbers recorded.** The dashboard lives in its own repository, [`isoloop/examples`](https://github.com/isoloop/examples/tree/main/apps/dashboards/markets), and installs `@isoloop/*` from npm like any app would.
 
 ## What it is
 
@@ -20,7 +20,7 @@ Native gets the defences a normal app would have, and no more: a store, error bo
 
 ## The numbers
 
-Recorded by the Comparison workflow on a 4-core CI runner, Chromium ([method and video](https://github.com/isoloop/examples/tree/main/apps/markets/comparison)):
+Recorded by the Comparison workflow on a 4-core CI runner, Chromium ([method and video](https://github.com/isoloop/examples/tree/main/apps/dashboards/markets/comparison)):
 
 | Build | Typing, calm (median) | Typing, one chart blocked (median) | (worst) | fps after | Long tasks (10 s) | First data | JS, gzipped |
 | --- | --- | --- | --- | --- | --- | --- | --- |
