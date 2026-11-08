@@ -29,7 +29,7 @@ import {
 import { createBusController, HOST_CONNECTION_PREFIX, type BusController } from './bus/controller';
 import { createCompositor, type FallbackRender, type SurfaceStats } from './compositor';
 import { missingFeatures } from './features';
-import { load, type LoadedWorker } from './loader';
+import { createLoader, type LoadedWorker } from './loader';
 import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from './render/isoloop-dom';
 import { createRouter, type OnNavigate, type Router } from './router';
 import { checkRequires } from './version';
@@ -117,7 +117,12 @@ export type IsolateManifest = {
   grants?: Grants;
   /** Renders the fallback shown once the isolate has `failed`. Defaults to a message and a Retry button. */
   fallback?: FallbackRender;
-  /** Named worker pool (ADR 0001). Typed now, rejected with `pools_unsupported` until M2c. */
+  /**
+   * Named worker pool (ADR 0001, M2c): the isolate shares one worker with
+   * every other isolate naming the same pool. Headless isolates only; one
+   * with a `surface` is rejected with `pools_headless_only`. Pool members
+   * share an event loop, globals and fate: a hang or crash restarts the pool.
+   */
   pool?: string;
   /**
    * Opt-in suspension (ADR 0001), default `'never'`. `'when-idle'` waits
@@ -136,7 +141,8 @@ export type IsolateManifest = {
 /** Codes `createKernel` and `spawn` throw with (design §4.1). */
 export type KernelErrorCode =
   | 'unsupported_browser'
-  | 'pools_unsupported'
+  /** A manifest with `pool` and a `surface`: pools are for headless isolates (M2c; visual pools are M2d). */
+  | 'pools_headless_only'
   | 'invalid_manifest'
   | 'invalid_config'
   /** The bus couldn't load its contracts, so nothing can start (ADR 0003, decision 7). */
@@ -294,6 +300,8 @@ export interface Kernel {
   readonly debug: {
     crashBus(): void;
     messages(): Record<string, number>;
+    /** Live workers, a pool counting once, and each running pool's members. */
+    workers(): { live: number; pools: Record<string, readonly string[]> };
     onSurfaceWrite(fn: (phase: 'start' | 'end') => void): () => void;
   };
 }
@@ -406,10 +414,11 @@ function validate(m: IsolateManifest): void {
   if (m.pool !== undefined) {
     if (typeof m.pool !== 'string' || m.pool === '')
       throw new KernelError('invalid_manifest', `"${m.id}": \`pool\` must be a non-empty string`);
-    throw new KernelError(
-      'pools_unsupported',
-      `"${m.id}" asks for pool "${m.pool}", but worker pools arrive in M2c (ADR 0001)`,
-    );
+    if (m.surface)
+      throw new KernelError(
+        'pools_headless_only',
+        `"${m.id}" has a surface and asks for pool "${m.pool}"; pools take headless isolates only (ADR 0001)`,
+      );
   }
   const s = m.suspend;
   if (s !== undefined && s !== 'never' && s !== 'when-idle') {
@@ -489,11 +498,13 @@ export function createKernel(config: KernelConfig): Kernel {
   };
 
   const post = (slot: Slot, msg: HostToIsolate, transfer: Transferable[] = []): void => {
-    slot.loaded?.worker.postMessage(msg, transfer);
+    slot.loaded?.post(msg, transfer);
   };
 
   /** Messages the main thread received, by type: the I7 test hook (`kernel.debug`). */
   const received: Record<string, number> = {};
+  /** Pool members share a worker, so each of its messages reaches several listeners: count it once. */
+  const counted = new WeakSet<Event>();
   const count = (msg: unknown): void => {
     const t: unknown = typeof msg === 'object' && msg !== null ? Reflect.get(msg, 't') : undefined;
     const k = typeof t === 'string' ? t : '?';
@@ -505,7 +516,7 @@ export function createKernel(config: KernelConfig): Kernel {
     slot.graceTimer = undefined;
     for (const o of slot.observers.splice(0)) o.disconnect();
     if (!slot.loaded) return;
-    slot.loaded.worker.terminate();
+    slot.loaded.terminate();
     slot.loaded = null;
     // A suspended headless isolate is woken by records on its topics (ADR 0001).
     controller?.detach(slot.manifest.id, {
@@ -522,11 +533,9 @@ export function createKernel(config: KernelConfig): Kernel {
     }, graceMs);
   };
 
-  const live = (): number => {
-    let n = 0;
-    for (const slot of slots.values()) if (slot.loaded) n++;
-    return n;
-  };
+  const loader = createLoader();
+  /** Live workers: a pool counts once (ADR 0001). */
+  const live = (): number => loader.workers();
 
   const run = (slot: Slot, effects: SupervisorEffect[]): void => {
     const id = slot.manifest.id;
@@ -829,7 +838,7 @@ export function createKernel(config: KernelConfig): Kernel {
       : new MessageChannel().port2; // no bus worker: an unconnected port
     let loaded: LoadedWorker;
     try {
-      loaded = load({
+      loaded = loader.load({
         bootstrapUrl: config.workers.isolateBootstrap,
         id: manifest.id,
         src: manifest.src,
@@ -839,6 +848,7 @@ export function createKernel(config: KernelConfig): Kernel {
         heartbeatMs: everyMs,
         busPort,
         ...(o.wake ? { wake: true } : {}),
+        ...(manifest.pool === undefined ? {} : { pool: manifest.pool }),
       });
     } catch (err) {
       controller?.detach(manifest.id);
@@ -851,8 +861,11 @@ export function createKernel(config: KernelConfig): Kernel {
       return;
     }
     loaded.worker.addEventListener('message', (e: MessageEvent<unknown>) => {
-      count(e.data);
-      if (slot.loaded === loaded) onMessage(slot, e.data);
+      if (!counted.has(e)) {
+        counted.add(e);
+        count(e.data);
+      }
+      if (slot.loaded === loaded && loaded.mine(e.data)) onMessage(slot, e.data);
     });
     loaded.worker.addEventListener('error', (e) => {
       e.preventDefault();
@@ -961,10 +974,7 @@ export function createKernel(config: KernelConfig): Kernel {
               const port = controller.connect(id, slot.manifest.grants ?? DEFAULT_GRANTS, {
                 reattach: true,
               });
-              slot.loaded.worker.postMessage(
-                { v: 1, t: 'reattach', p: { busPort: port } } satisfies HostToIsolate,
-                [port],
-              );
+              slot.loaded.post({ v: 1, t: 'reattach', p: { busPort: port } }, [port]);
             },
           },
         })
@@ -1258,6 +1268,7 @@ export function createKernel(config: KernelConfig): Kernel {
     debug: {
       crashBus: () => controller?.crash(),
       messages: () => ({ ...received }),
+      workers: () => ({ live: loader.workers(), pools: loader.pools() }),
       onSurfaceWrite: (fn) => {
         surfaceWrites.add(fn);
         return () => {

@@ -84,11 +84,14 @@ function startHeartbeat(everyMs: number): void {
 
 /** `shutdown` for a member: `bye` once its handlers settle or the grace runs out. */
 function shutdownMember(m: Member, graceMs: number, reason: ShutdownReason): void {
+  // Out of the routing table at once, so a new `init` with the same name (a
+  // restart) gets a fresh member while this one finishes.
+  if (members.get(m.name) === m) members.delete(m.name);
+  m.receive = null;
   const done = m.shutdownHook?.(reason) ?? Promise.resolve();
   const grace = new Promise((r) => setTimeout(r, Math.max(0, graceMs - 50)));
   void Promise.race([done, grace]).finally(() => {
     m.post({ v: 1, t: 'bye', p: {} });
-    members.delete(m.name);
     // An own worker closes after its isolate; a pool after its last member.
     if (members.size === 0) self.close();
   });
