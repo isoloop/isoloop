@@ -1,0 +1,131 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Worker OffscreenCanvas and main-thread responsiveness</title>
+<style>
+  body {
+    font:
+      14px/1.4 system-ui,
+      sans-serif;
+    margin: 16px;
+  }
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 160px);
+    gap: 4px;
+    margin-top: 12px;
+  }
+  canvas {
+    width: 160px;
+    height: 90px;
+    border: 1px solid #8884;
+  }
+  output {
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+<!--
+  Standalone repro, no libraries (docs/investigations/engine-constraints.md).
+  N dedicated workers each draw on an OffscreenCanvas transferred from a
+  <canvas> on this page (transferControlToOffscreen), R times per second.
+  The page itself does nothing but count its own animation frames and timer
+  ticks. If drawing in workers costs no main-thread time, both counters stay
+  near 60/s and 50/s at any N × R.
+  Query: ?workers=24&rate=10 starts at once (for automation); the result is
+  also in window.result after 5 s.
+-->
+<p>
+  Workers <input id="n" type="number" value="24" min="1" max="64" /> draws/s each
+  <input id="r" type="number" value="10" min="1" max="120" />
+  <button id="go">Start</button>
+  <button id="stop">Stop</button>
+</p>
+<p>
+  Canvas updates/s requested: <output id="req">0</output> · main-thread animation frames/s:
+  <output id="fps">–</output> · main-thread 20 ms timer ticks/s: <output id="ticks">–</output> ·
+  longest frame gap: <output id="gap">–</output>
+</p>
+<div id="grid"></div>
+<script>
+  const WORKER = `
+    let ctx, w, h, n = 0;
+    onmessage = (e) => {
+      const { canvas, rate } = e.data;
+      ctx = canvas.getContext('2d'); w = canvas.width; h = canvas.height;
+      setInterval(() => {
+        n++;
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#36c'; ctx.beginPath();
+        for (let x = 0; x <= w; x += 4) ctx.lineTo(x, h / 2 + Math.sin((x + n * 7) / 17) * h / 3);
+        ctx.stroke();
+      }, 1000 / rate);
+    };`;
+  const url = URL.createObjectURL(new Blob([WORKER], { type: 'text/javascript' }));
+  let workers = [];
+  const grid = document.getElementById('grid');
+  function stop() {
+    for (const w of workers) w.terminate();
+    workers = [];
+    grid.textContent = '';
+    document.getElementById('req').value = 0;
+  }
+  function start(n, rate) {
+    stop();
+    for (let i = 0; i < n; i++) {
+      const c = document.createElement('canvas');
+      c.width = 320;
+      c.height = 180;
+      grid.append(c);
+      const off = c.transferControlToOffscreen();
+      const w = new Worker(url);
+      w.postMessage({ canvas: off, rate }, [off]);
+      workers.push(w);
+    }
+    document.getElementById('req').value = n * rate;
+  }
+  // Main-thread counters, reported once a second.
+  let frames = 0,
+    ticks = 0,
+    last = 0,
+    gap = 0;
+  const raf = (t) => {
+    if (last) gap = Math.max(gap, t - last);
+    last = t;
+    frames++;
+    requestAnimationFrame(raf);
+  };
+  requestAnimationFrame(raf);
+  setInterval(() => ticks++, 20);
+  const history = [];
+  let mark = performance.now();
+  setInterval(() => {
+    const now = performance.now(),
+      s = (now - mark) / 1000;
+    mark = now;
+    const row = {
+      fps: Math.round(frames / s),
+      ticks: Math.round(ticks / s),
+      gapMs: Math.round(gap),
+    };
+    history.push(row);
+    document.getElementById('fps').value = row.fps;
+    document.getElementById('ticks').value = row.ticks;
+    document.getElementById('gap').value = row.gapMs + ' ms';
+    frames = 0;
+    ticks = 0;
+    gap = 0;
+  }, 1000);
+  document.getElementById('go').onclick = () =>
+    start(+document.getElementById('n').value, +document.getElementById('r').value);
+  document.getElementById('stop').onclick = stop;
+  const q = new URLSearchParams(location.search);
+  if (q.has('workers')) {
+    start(+q.get('workers'), +(q.get('rate') ?? 10));
+    // The 1 s report interval is a timer too: if the main thread stalls, it
+    // fires late, and the wall-clock time below shows it.
+    const t0 = performance.now();
+    setTimeout(() => {
+      window.result = { wallMs: Math.round(performance.now() - t0), history: history.slice(-4) };
+    }, 5000);
+  }
+</script>

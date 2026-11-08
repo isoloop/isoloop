@@ -15,6 +15,15 @@ Ideas we've consciously deferred or want to explore later. None of them is plann
 - **Solid and Svelte adapters.** Both compile markup to HTML strings, parse them in a `<template>` and copy them with `cloneNode(true)` or `importNode`, so they need HTML parsing and `cloneNode` in the `isoloop-dom` subset first (group 2). Next after 0.1. ([ADR 0010](adr/0010-own-render-bridge.md#frameworks-and-versions))
 - **Vue adapter.** Evaluate after Solid and Svelte: its runtime DOM renderer probably works on the same additions, or a custom renderer could target records directly. ([ADR 0010](adr/0010-own-render-bridge.md#frameworks-and-versions))
 
+## Rendering
+
+The main thread shows everything isolates render ([engine constraints](investigations/engine-constraints.md) §1 and §2). These would reduce what it has to do; each needs measurements first, and an ADR if it changes the protocol or adds API.
+
+- **Fewer canvases.** One worker draws several widgets' charts into one shared canvas laid over the grid, so the page presents one canvas instead of many. Aimed at engines where presenting worker canvases costs main-thread time per canvas (§2). Layout, scrolling and hit-testing get harder.
+- **Pace canvas updates across isolates.** The host sets a page-wide budget of canvas presents per frame and isolates draw in turn. Library API, so an ADR.
+- **Input first in the compositor.** Pause applying DOM batches while input is pending (`navigator.scheduling.isInputPending` in Chromium, or yielding to the event loop), so keystrokes run first. Helps DOM applying, not canvas presentation, which happens inside the engine.
+- **The iframe tier for performance.** The [system design §11](design/system-design.md) iframe tier, planned for hostile code, used for heavy widgets on browsers that give a cross-site iframe its own process (§7). A process and a site per widget; it may not help with canvas presentation, since every process's frames meet in the same compositor.
+
 ## Storage
 
 - **IndexedDB storage when OPFS sync access is missing.** Today such a tab falls back to memory topics with `bus:durability-degraded` (`no-sync-access`). A second storage engine is worth it only if a major browser lacks sync access in normal browsing. ([ADR 0007](adr/0007-bus-worker-supervision.md), M2b task 15)
