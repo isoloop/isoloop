@@ -75,7 +75,7 @@ Without them the import fails and the isolate crashes with reason `error` and a 
 
 ## Placement rules
 
-- **One worker per isolate by default** ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). A headless isolate can name a pool (`manifest.pool`) and share a worker with the other isolates naming it; pool members share an event loop, globals and fate. A visual isolate with `pool` is rejected with `pools_headless_only` (visual pools are M2d).
+- **One worker per isolate by default** ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). A headless isolate can name a pool (`manifest.pool`) and share a worker with the other isolates naming it; pool members share an event loop, globals and fate: if one stops responding or takes the worker down, the whole pool restarts (each member's `isolate:crash` names the `pool`); a member's own fatal error restarts only that member. A visual isolate with `pool` is rejected with `pools_headless_only` (visual pools are M2d).
 - **Suspension is opt-in.** `manifest.suspend: 'when-idle'` (60 s) or `{ whenIdle: { afterMs } }` lets an idle isolate's worker be shut down and woken later (ADR 0001); the default `'never'` keeps it running, in a hidden tab too.
 - **Worker budget.** Passing `workers.budget` live workers (32 by default) logs one warning and emits `workers:budget`. It never blocks a spawn. Each worker has its own heap, so the right number depends on the device.
 - **Spawn failures.** If `new Worker` throws (say, the browser is out of memory), the isolate crashes with reason `spawn-failed`, then gets the normal backoff and restart limit.
