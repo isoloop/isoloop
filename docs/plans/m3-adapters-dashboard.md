@@ -11,7 +11,7 @@ M3 is an initiative with four epics: M3a, M3b and M3c are done (M3c on 2026-11-0
 | M3a Adapters | [m3a-adapters.md](m3a-adapters.md) | Both adapters pass the adapter conformance suite on every supported major (Preact 10 and 11, React 18 and 19) |
 | M3b Dashboard | [m3b-dashboard.md](m3b-dashboard.md) | The initiative's done-when above |
 | M3c Dashboard sizes | [m3c-dashboard-sizes.md](m3c-dashboard-sizes.md) | Lite, Normal and Heavy on every build; the comparison across sizes recorded |
-| M3d Plant dashboard | [m3d-plant-dashboard.md](m3d-plant-dashboard.md) | 72 widgets on four builds, including native with hand-written workers; the comparison on desktop and a phone recorded |
+| M3d Plant dashboard | [m3d-plant-dashboard.md](m3d-plant-dashboard.md) | 72 widgets on three builds (including native with hand-written workers) and four Isoloop placements; the comparison on desktop and a phone recorded |
 
 M3a comes first; M3b's data pipeline (feeds, replay, aggregator, alerts) only needs the vanilla API and can start during M3a. [M2b](m2b-durable-log.md) runs in parallel with both, and M4 needs M3 and M2b.
 

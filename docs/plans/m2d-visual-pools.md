@@ -6,7 +6,7 @@
 
 **Why:** [ADR 0001](../adr/0001-one-worker-per-isolate.md) and [ADR 0010](../adr/0010-own-render-bridge.md) allow only headless isolates in pools, because the render bridge installs one global `document` per worker. Dashboards with dozens of widgets reach the soft budget of 32 workers long before they run out of work to do; the plant dashboard ([M3d](m3d-plant-dashboard.md)) has 72.
 
-**Done when:** the plant dashboard ([M3d](m3d-plant-dashboard.md)) ships with its pooled build: 72 widgets in 9 visual pools of about 8, each widget rendering into its own surface, and a hang in one widget restarting only its own pool.
+**Done when:** the plant dashboard ([M3d](m3d-plant-dashboard.md)) ships with its Isoloop build in the default `split` placement: 72 widgets in 9 visual pools of about 8, each widget rendering into its own surface, and a hang in one widget restarting only its own pool.
 
 **Depends on:** [M2c](m2c-worker-pools.md) (pool bootstrap, group supervision). Amends ADR 0001 and ADR 0010, which needs the user's approval (task 0).
 
