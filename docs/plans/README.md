@@ -15,18 +15,19 @@ One plan per milestone of [RFC 0001](../rfcs/0001-threaded-runtime.md#mvp-roadma
 | ↳ M3b Dashboard (epic) | [m3b-dashboard.md](m3b-dashboard.md) | Full | Done (live since `markets-v0.1.0`) | The M3 done-when |
 | ↳ M3c Dashboard sizes (epic) | [m3c-dashboard-sizes.md](m3c-dashboard-sizes.md) | Full | Done (`markets-v0.2.0`) | Lite, Normal and Heavy sizes on every build; the comparison across sizes recorded, whatever it shows |
 | ↳ M3d Plant dashboard (epic) | [m3d-plant-dashboard.md](m3d-plant-dashboard.md) | Full | Not started | 72-widget plant dashboard on three builds and four placements, compared on desktop and a phone, whatever it shows |
+| ↳ M3e Live widget creator (epic) | (plan after M3d is under way) | — | Not started | Users compose a widget from a JSON spec (source topic → fixed operators: filter/window/aggregate/combine → view) and add it at runtime; the pipeline runs in a new isolate placed in its own worker or a chosen pool; specs persist in a persistent topic; no user code/eval; measured: creator responsiveness while an expensive custom view computes, on native, native + workers and Isoloop |
 | M4 Devtools + 0.1 | [m4-devtools-release.md](m4-devtools-release.md) | Outline | Not started | `0.1.0` on npm with a launch post |
 | M5 Shared-memory engine | [m5-shared-memory-engine.md](m5-shared-memory-engine.md) | Outline | Not started | Benchmark results published, whichever engine wins |
 | M5b Delivery batching (spike) | [m5b-delivery-batching.md](m5b-delivery-batching.md) | Outline | Not started | Findings written up; ADR amending §6.3 or a recalibrated §9 budget accepted |
 
-An outline gets its full task list when it's next to start, so the list reflects what was learned. Next: M2c (headless pools), then M2d (visual pools), then M3d (the plant dashboard), then M4 (0.1). Decided 2026-11-08: pools come before 0.1 so the plant dashboard can use them. M5 and M5b come after 0.1.
+An outline gets its full task list when it's next to start, so the list reflects what was learned. Next: M2c (headless pools), then M2d (visual pools), then M3d (the plant dashboard), then M3e (the live widget creator), then M4 (0.1). Decided 2026-11-08: pools come before 0.1 so the plant dashboard can use them. M5 and M5b come after 0.1.
 
 ```mermaid
 flowchart LR
   M0 --> M1 --> M2 --> M3a --> M3b --> M4
   M2 --> M2b --> M4
   M4 --> M5 --> M5b
-  M2b --> M2c --> M2d --> M3d --> M4
+  M2b --> M2c --> M2d --> M3d --> M3e --> M4
   M3b --> M3c --> M3d
   M3b -. "dashboard metrics reused" .-> M4
 ```

@@ -106,3 +106,4 @@ All in `isoloop/examples`, `apps/dashboards/plant`, unless a task says otherwise
 - **Memory** with about 90 workers in the `own` placement; recorded as a cost. On a phone it may not run at all (decision 6).
 - **WebKit** canvas presentation ([engine constraints](../investigations/engine-constraints.md)) will weigh on 24 canvas widgets.
 - **The phone run** is manual and depends on a device being available.
+- **Follow-up: [M3e](README.md), the live widget creator,** builds on this dashboard: M3d's topics and its generic widgets (charts, tables, gauges) should stay reusable by user-composed widgets, so keep them free of plant-specific assumptions where it costs nothing.
