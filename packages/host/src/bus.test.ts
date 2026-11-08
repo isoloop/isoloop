@@ -158,11 +158,22 @@ describe('bus controller', () => {
     // The memory topic is reset once; the persistent one resumes where X committed.
     await vi.waitUntil(() => latest('X')?.ports === 2 && latest('X')?.resets['count.v1'] === 1);
     await Promise.all([20, 21, 22, 23, 24].map((i) => kernel.publish(saved, { value: i })));
-    await vi.waitUntil(() => latest('X')?.offsets['saved.v1']?.length === 25);
+    // Delivery is at-least-once (design §5, `autoCommit`): X's commits reach the log a moment
+    // after the bus answers them, so a crash can land before the last ones do and
+    // the new bus redelivers from the last stored commit. On a slow runner that
+    // was every record from 0. What must hold: no reset, no gap, every acked
+    // record, and the redelivery is one ordered run up to the newest.
+    const seen = (): number[] => latest('X')?.offsets['saved.v1'] ?? [];
+    await vi.waitUntil(() => seen().at(-1) === 24, { timeout: 3000 });
     const x = latest('X');
     expect(x?.resets['saved.v1']).toBeUndefined();
     expect(x?.gaps).toBe(0);
-    expect(x?.offsets['saved.v1']).toEqual(Array.from({ length: 25 }, (_, i) => i));
+    const offsets = seen();
+    expect(offsets.slice(0, 20)).toEqual(Array.from({ length: 20 }, (_, i) => i));
+    const resumed = offsets.slice(20);
+    const from = resumed[0] ?? 20;
+    expect(from).toBeLessThanOrEqual(20);
+    expect(resumed).toEqual(Array.from({ length: 25 - from }, (_, i) => from + i));
 
     // And the host reads the whole log back from the new bus.
     const got: number[] = [];
