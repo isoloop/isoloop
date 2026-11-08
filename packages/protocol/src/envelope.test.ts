@@ -13,6 +13,7 @@ describe('isEnvelope', () => {
     ['with id', { v: 1, t: 'call', id: 'c1', p: {} }],
     ['with re', { v: 1, t: 'result', re: 'c1', p: { ok: true, value: 1 } }],
     ['payload undefined but present', { v: 1, t: 'x', p: undefined }],
+    ['with isolate (a pool member)', { v: 1, t: 'ready', isolate: 'feed-t1', p: {} }],
   ])('accepts %s', (_name, x) => {
     expect(isEnvelope(x)).toBe(true);
   });
@@ -29,6 +30,7 @@ describe('isEnvelope', () => {
     ['no p', { v: 1, t: 'beat' }],
     ['id not a string', { v: 1, t: 'call', id: 1, p: {} }],
     ['re not a string', { v: 1, t: 'result', re: null, p: {} }],
+    ['isolate not a string', { v: 1, t: 'event', isolate: 3, p: {} }],
   ])('rejects %s', (_name, x) => {
     expect(isEnvelope(x)).toBe(false);
   });
