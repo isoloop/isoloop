@@ -24,6 +24,8 @@ The main thread shows everything isolates render ([engine constraints](investiga
 - **Input first in the compositor.** Pause applying DOM batches while input is pending (`navigator.scheduling.isInputPending` in Chromium, or yielding to the event loop), so keystrokes run first. Helps DOM applying, not canvas presentation, which happens inside the engine.
 - **The iframe tier for performance.** The [system design §11](design/system-design.md) iframe tier, planned for hostile code, used for heavy widgets on browsers that give a cross-site iframe its own process (§7). A process and a site per widget; it may not help with canvas presentation, since every process's frames meet in the same compositor.
 
+- **Attribute errors per member in a pool with `AsyncContext`.** Today an error thrown from a shared framework scheduler or a timer in a pooled worker can't be traced to a member, so the whole pool restarts. `AsyncContext` would carry the member across `await` and timers, so such errors could stay the member's own. Waits on browsers shipping it. ([ADR 0015](adr/0015-visual-pools.md))
+
 ## Storage
 
 - **IndexedDB storage when OPFS sync access is missing.** Today such a tab falls back to memory topics with `bus:durability-degraded` (`no-sync-access`). A second storage engine is worth it only if a major browser lacks sync access in normal browsing. ([ADR 0007](adr/0007-bus-worker-supervision.md), M2b task 15)

@@ -2,7 +2,7 @@
 
 **Status:** planned 2026-11-08; starts after [M2c](m2c-worker-pools.md).
 
-**Goal:** visual isolates (isolates with a surface) can share a pooled worker, alone or together with headless members, each with its own scoped `isoloop-dom` document, so an app can group about 8 widgets per worker instead of one worker per widget.
+**Goal:** visual isolates (isolates with a surface) can share a pooled worker, alone or together with headless members, each rendering into its own root in the worker's one `isoloop-dom` document ([ADR 0015](../adr/0015-visual-pools.md)), so an app can group about 8 widgets per worker instead of one worker per widget.
 
 **Why:** [ADR 0001](../adr/0001-one-worker-per-isolate.md) and [ADR 0010](../adr/0010-own-render-bridge.md) allow only headless isolates in pools, because the render bridge installs one global `document` per worker. Dashboards with dozens of widgets reach the soft budget of 32 workers long before they run out of work to do; the plant dashboard ([M3d](m3d-plant-dashboard.md)) has 72.
 
@@ -17,29 +17,26 @@
 3. **Grouping is the app's choice,** declared in the host manifest (ADR 0001). The plant dashboard groups by machine: about 8 widgets per pool.
 4. **Mixed pools are allowed.** A pool can hold headless and visual members together, for example a machine's feed and engines with its widgets (the plant dashboard's `machine` placement). Supervision, budget and grants treat them the same way.
 5. **Same fault story, stated plainly.** A hang in one pooled widget stalls and then restarts its whole pool; other pools and own-worker isolates are unaffected. The demo shows that trade-off rather than hiding it.
-6. **Hypothesis for the gate.** Pooling visual isolates saves memory and startup time per widget. Each member still carries its own framework code, so the saving may be smaller than for headless isolates; task 1 measures it, and if it's under about 30% memory with no faster startup, M2d stops and reports.
+6. **Hypothesis for the gate.** Pooling visual isolates saves memory and startup time per widget without making updates noticeably slower. Members built together share one framework instance ([ADR 0015](../adr/0015-visual-pools.md)); members built apart carry their own, so they save less. Task 1 measures it; M2d stops and reports if the saving is under about 30% memory with no faster startup, or if the pooled p95 update latency is more than twice the own-worker p95 and over 50 ms.
+7. **Option D from ADR 0015** (agreed in grilling, Q31–Q36; the ADR is accepted when the user merges it): one `isoloop-dom` document per worker and one render root per member, rather than binding the globals at bundle time. Members can read each other's DOM and input, so pooling is the host's explicit opt-in and secrets stay on their own worker; moving a node between members' roots is an error; each member gets a portal root; React and Preact members may share a pool.
 
 ## Tasks
 
-### 0. ADR draft: scoped documents in a pooled worker
-- Draft an amendment to ADR 0001 (visual isolates may join a pool) and ADR 0010 (one `isoloop-dom` document per isolate, not per worker) for the user's approval. Options to compare, with a recommendation:
-  - **Bundle-time binding:** `@isoloop/vite` rewrites an isolate's free references to `document`, `window` and the DOM globals to its own scoped instance, so each member's framework copy sees only its own document.
-  - **Switching the global per task:** set `globalThis.document` before running a member's code. Simple, but unsafe across `await` and timers.
-  - **Realms:** `ShadowRealm` isn't available in workers on any engine yet; noted as the long-term option.
-- Covers what's shared (event loop, timers, `globalThis`), event routing per surface, and the seam ([ADR 0012](../adr/0012-isolates-built-apart.md)): separately built isolates must still work, or the limit is stated.
+### 0. ADR: visual isolates in pools
+- [ADR 0015](../adr/0015-visual-pools.md): one `isoloop-dom` document per worker, one render root per member (option D), compared with bundle-time binding, switching the global per task, one document per member, and `ShadowRealm`, with spike evidence. Covers what members share, records and events per member, errors, isolates built apart (ADR 0012) and the portal root.
 - **Acceptance:** the user accepts the ADR.
 
 ### 1. Benchmark gate
-- Prototype: 8 React widgets in one worker with scoped documents, against 8 own workers; memory and startup on three engines (decision 6).
-- **Acceptance:** numbers recorded; stop if the gate fails.
+- Prototype: 8 React widgets in one worker with one document and a root per member, against 8 own workers, on three engines. Measures memory, startup, and the p95 time from a record being published to its patch being applied, with the 8 widgets updating at the plant dashboard's data rate (decision 6).
+- **Acceptance:** numbers recorded; stop if the gate fails on either condition.
 
-### 2. Scoped documents in `@isoloop/dom`
-- One DOM subset instance per member; patches and events carry the isolate id; the host applier routes them to the right surface.
-- **Tests:** unit (two documents in one worker don't see each other's nodes); browser (two React members render into two surfaces).
+### 2. A root per member in `@isoloop/dom`
+- One document per worker with one render root per member; records attributed to the member whose root holds the node and posted per member with `isolate`; the host applier takes the member's root id. Moving a node from one member's root into another's throws, attributed to the mover.
+- **Tests:** unit (two roots in one document send separate batches; a cross-member move throws and names the mover); browser (two React members render into two surfaces).
 
-### 3. Binding the globals
-- The mechanism the ADR chose (for example the `@isoloop/vite` transform), with React and Preact adapters running unchanged.
-- **Tests:** the adapter conformance suites pass with two members per worker, on every supported major.
+### 3. Adapters: per-member error boundary and portal root
+- `@isoloop/react` and `@isoloop/preact` wrap each member root in a boundary that reports render errors to that member, and give each member a portal container inside its root (for example `ctx.portalRoot`).
+- **Tests:** the adapter conformance suites pass with two members per worker, on every supported major; a render error in one member leaves the other rendering; a modal portalled into the portal root shows in that member's surface; a pool mixing a React and a Preact member renders both.
 
 ### 4. Lift `pools_headless_only`, mixed pools
 - `spawn` accepts `pool` on visual isolates, and a pool may mix headless and visual members (decision 4); group supervision (M2c) restarts every member and re-renders each surface.
@@ -50,14 +47,14 @@
 - **Tests:** browser, including a member that tries to address another's node.
 
 ### 6. E2E and devtools data
-- Fixture with two visual pools of three, one mixed pool (a headless member and two widgets), one own-worker widget; kill, hang and throw cases on all three engines. Kernel reports each surface's pool.
+- Fixture with two visual pools of three, one mixed pool (a headless member and two widgets), one pool mixing a React and a Preact widget, one own-worker widget; kill, hang and throw cases on all three engines. Kernel reports each surface's pool.
 
 ### 7. Docs and prerelease
-- Guide section on visual pools and their shared fate; the ADR's consequences in the design doc; changeset; prerelease for the plant dashboard ([M2c](m2c-worker-pools.md) decision 8).
+- Guide section on visual pools: shared fate, and in plain words that members of a pool can read each other's DOM and input, so widgets handling secrets stay on their own worker; one framework per pool recommended; pointing modal, tooltip and toast libraries at the portal root. Devtools data carries the same warning per pool. The ADR's consequences in the design doc; changeset; prerelease for the plant dashboard ([M2c](m2c-worker-pools.md) decision 8).
 
 ## Open risks
 
-- **Frameworks reaching for globals** the binding misses (`window.addEventListener`, `queueMicrotask` ordering, module-level caches). The conformance suites in task 3 are the check.
-- **Separately built isolates** may not get the binding if it's done at bundle time; the ADR has to say whether they can join a visual pool.
+- **No DOM isolation inside a pool.** Members can read each other's DOM and input (ADR 0015 decision 6); the guide and devtools say so, and secrets stay on their own worker.
+- **Errors from a shared framework scheduler** can't be traced to a member, so the pool restarts as a group; `AsyncContext` would fix it once browsers ship it ([would-like](../would-like.md)).
 - **One member's long render delays its neighbours' frames.** That's the cost of sharing an event loop; measured in the plant dashboard.
-- **The gate may fail** if per-widget framework code dominates memory.
+- **The gate may fail** on memory (members built apart carry their own framework) or on update latency (one event loop renders 8 widgets).

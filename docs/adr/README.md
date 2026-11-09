@@ -22,6 +22,7 @@ Short records of decisions that shape Isoloop's design. Each has a status:
 | [0012](0012-isolates-built-apart.md) | Isolates built apart from the host are supported: the seam (`ctx`, the DOM subset, adapter hooks) only grows, isolates are stamped with `requires`, and the host runs `[FLOOR, VERSION]` (`runtime-too-old`, `isolate-too-old`) | Accepted |
 | 0013 | *Withdrawn 2026-11-07, never accepted:* `@isoloop/local`, a single-thread kernel for the M3b comparison. The comparison is native against Isoloop instead ([M3b plan](../plans/m3b-dashboard.md), task 15), so no such kernel is needed | Withdrawn |
 | [0014](0014-own-codec.md) | Our own binary codec for persistent topics, `isoloop-codec@1`: no library was more than 2× faster (at most 1.42×), ours is smaller on the wire and in the bundle | Accepted |
+| [0015](0015-visual-pools.md) | Visual isolates may join pools: one `isoloop-dom` document per worker, one render root per member; records, events and host calls carry the member; no moves between members; mixed pools and mixed frameworks allowed; members can read each other's DOM and input (secrets stay on their own worker); a portal root per member; gate on memory, start-up and update latency first (M2d task 1) | Accepted |
 
 Ideas an ADR deferred are collected in [would-like](../would-like.md).
 
