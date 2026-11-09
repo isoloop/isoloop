@@ -73,11 +73,17 @@ function startHeartbeat(everyMs: number): void {
   setInterval(() => {
     const now = performance.now();
     const lagMs = Math.max(0, now - last - everyMs);
-    // An own worker reports its isolate's idleness; a pool's beat is the
-    // worker's alone (suspension of a pool as a whole is M2c task 6).
-    const own = mode === 'own' ? members.get(undefined) : undefined;
-    const idle = own?.idleReport?.();
-    postWorker({ v: 1, t: 'beat', p: idle ? { lagMs, idle } : { lagMs } });
+    // An own worker reports its isolate's idleness; a pool every member's,
+    // by name, so the host can suspend the pool as a whole (ADR 0001).
+    if (mode === 'pool') {
+      const reports: Record<string, IdleReport> = {};
+      for (const m of members.values())
+        if (m.name !== undefined && m.idleReport) reports[m.name] = m.idleReport();
+      postWorker({ v: 1, t: 'beat', p: { lagMs, members: reports } });
+    } else {
+      const idle = members.get(undefined)?.idleReport?.();
+      postWorker({ v: 1, t: 'beat', p: idle ? { lagMs, idle } : { lagMs } });
+    }
     last = now;
   }, everyMs);
 }

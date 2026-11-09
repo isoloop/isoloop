@@ -74,7 +74,14 @@ export type IsolateToHost =
    */
   | Envelope<'patch', { fmt: string; batch: unknown; styles?: string[]; head?: string[] }>
   | Envelope<'call', { method: HostMethod; args: unknown[] }>
-  | Envelope<'beat', { lagMs: number; heapBytes?: number; idle?: IdleReport }>
+  /**
+   * `idle`: an own worker's isolate. `members`: a pool's members, by isolate
+   * id (M2c); a pool suspends only as a whole (ADR 0001).
+   */
+  | Envelope<
+      'beat',
+      { lagMs: number; heapBytes?: number; idle?: IdleReport; members?: Record<string, IdleReport> }
+    >
   | Envelope<'error', ErrorPayload>
   /** Last message after `shutdown`: handlers ran, the host may terminate now (design §7.6). */
   | Envelope<'bye', Record<string, never>>;
