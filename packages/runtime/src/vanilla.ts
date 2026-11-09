@@ -98,11 +98,17 @@ export type VanillaRuntime = {
 };
 
 /** Builds the context for `start(ctx)`. `scope` is the worker global the DOM subset installs on. */
-export function createVanillaIsolate(init: InitPayload, post: Post, scope: object): VanillaRuntime {
-  const render = init.renderFmt === 'none' ? null : createRender(post, scope);
+export function createVanillaIsolate(
+  init: InitPayload,
+  post: Post,
+  scope: object,
+  /** A pool member: a visual one gets its own root in the worker's shared document (ADR 0015). */
+  pooled = false,
+): VanillaRuntime {
+  const render = init.renderFmt === 'none' ? null : createRender(post, scope, pooled);
   const calls = createHostCalls({
     post,
-    beforeCall: () => render?.dom.flush(),
+    beforeCall: () => render?.flush(),
     idOf: (node) => (render ? render.idOf(node) : undefined),
     surface: render !== null,
     navigate: init.grants.navigate === true,
@@ -130,7 +136,7 @@ export function createVanillaIsolate(init: InitPayload, post: Post, scope: objec
     setValue(node, value, o) {
       if (!render) return;
       if (!(node instanceof WNode)) throw new TypeError('setValue: not a node of this isolate');
-      render.dom.setValue(node, value, o);
+      render.setValue(node, value, o);
     },
     onShutdown: (fn) => {
       onShutdown.push(fn);
@@ -158,7 +164,8 @@ export function createVanillaIsolate(init: InitPayload, post: Post, scope: objec
     },
     async shutdown(reason) {
       await Promise.allSettled(onShutdown.map(async (fn) => fn(reason)));
-      render?.dom.flush();
+      render?.flush();
+      render?.dispose();
     },
   };
 }

@@ -19,6 +19,8 @@ export {
   WElement,
   WNode,
   WText,
+  type RenderRoot,
+  type RootOptions,
   type WorkerDom,
   type WorkerDomOptions,
 } from './dom';

@@ -390,3 +390,114 @@ describe('deliver', () => {
     expect(hit).toBe(false);
   });
 });
+
+function pool() {
+  const dom = createDom({ onBatch: noop, schedule: () => {} });
+  const member = () => {
+    const batches: DomBatch[] = [];
+    const r = dom.addRoot({ onBatch: (b) => batches.push(b), schedule: () => {} });
+    const records = (): DomRecord[] => {
+      r.flush();
+      return batches.splice(0).flat();
+    };
+    return { r, records };
+  };
+  return { dom, doc: dom.document, a: member(), b: member() };
+}
+
+describe('a root per member (ADR 0015, M2d task 2)', () => {
+  it('sends each root its own records, with the root as ROOT_ID', () => {
+    const { doc, a, b } = pool();
+    const pa = doc.createElement('p');
+    pa.textContent = 'a';
+    a.r.root.appendChild(pa);
+    const pb = doc.createElement('p');
+    pb.textContent = 'b';
+    b.r.root.appendChild(pb);
+    pa.setAttribute('data-x', '1');
+    const ra = a.records();
+    const rb = b.records();
+    expect(ra.map((r) => r[0])).toEqual(['insert', 'attr']);
+    expect(rb.map((r) => r[0])).toEqual(['insert']);
+    expect(ra[0]?.[1]).toBe(ROOT_ID);
+    expect(rb[0]?.[1]).toBe(ROOT_ID);
+    expect(JSON.stringify(ra)).not.toContain('"b"');
+    expect(JSON.stringify(rb)).not.toContain('"a"');
+    // Ids are the document's, so the two roots never share one.
+    expect(a.r.idOf(pa)).toBe(pa.isoId);
+    expect(b.r.idOf(pa)).toBeUndefined();
+    expect(a.r.idOf(a.r.root)).toBe(ROOT_ID);
+    expect(a.r.root.isoId).not.toBe(b.r.root.isoId);
+  });
+
+  it('records a listener on the root against ROOT_ID', () => {
+    const { a } = pool();
+    a.r.root.addEventListener('click', noop);
+    expect(a.records()).toEqual([['listen', ROOT_ID, 'click', true]]);
+  });
+
+  it("throws when a node moves to another member's root, and sends nothing", () => {
+    const { doc, a, b } = pool();
+    const p = doc.createElement('p');
+    a.r.root.appendChild(p);
+    a.records();
+    expect(() => b.r.root.appendChild(p)).toThrow(/another member's root/);
+    expect(p.parentNode).toBe(a.r.root);
+    expect(a.records()).toEqual([]);
+    expect(b.records()).toEqual([]);
+    // Taken out first, then put under the other root: still refused.
+    a.r.root.removeChild(p);
+    a.records();
+    expect(() => b.r.root.appendChild(p)).toThrow(/another member's root/);
+    // Also when it comes in inside a detached subtree.
+    const box = doc.createElement('div');
+    box.appendChild(p);
+    expect(() => b.r.root.appendChild(box)).toThrow(/another member's root/);
+    // Back under its own root is fine.
+    a.r.root.appendChild(box);
+    expect(a.records().map((r) => r[0])).toEqual(['insert']);
+  });
+
+  it('adopts a node made through the shared document into the root it joins', () => {
+    const { doc, b } = pool();
+    const span = doc.createElement('span');
+    b.r.root.appendChild(span);
+    expect(b.records()[0]?.[0]).toBe('insert');
+    expect(b.r.idOf(span)).toBe(span.isoId);
+  });
+
+  it("delivers a root's events, ROOT_ID to the root, and ignores other members' nodes", () => {
+    const { doc, a, b } = pool();
+    const pa = doc.createElement('p');
+    a.r.root.appendChild(pa);
+    const seen: string[] = [];
+    pa.addEventListener('click', () => seen.push('pa'));
+    a.r.root.addEventListener('click', () => seen.push('root a'));
+    const mods = { alt: false, ctrl: false, meta: false, shift: false };
+    a.r.deliver({ type: 'click', target: pa.isoId, currentTargets: [], mods });
+    a.r.deliver({ type: 'click', target: ROOT_ID, currentTargets: [], mods });
+    b.r.deliver({ type: 'click', target: pa.isoId, currentTargets: [], mods });
+    expect(seen).toEqual(['pa', 'root a', 'root a']);
+  });
+
+  it('finds ids under every root', () => {
+    const { doc, a, b } = pool();
+    const x = doc.createElement('i');
+    x.setAttribute('id', 'x');
+    b.r.root.appendChild(x);
+    a.r.root.appendChild(doc.createElement('b'));
+    expect(doc.getElementById('x')).toBe(x);
+  });
+
+  it('stops sending and forgets its nodes once disposed', () => {
+    const { doc, a } = pool();
+    const p = doc.createElement('p');
+    a.r.root.appendChild(p);
+    a.records();
+    a.r.dispose();
+    p.setAttribute('data-x', '1');
+    expect(a.records()).toEqual([]);
+    expect(a.r.idOf(p)).toBeUndefined();
+    expect(doc.getElementById('x')).toBeNull();
+  });
+});

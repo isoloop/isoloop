@@ -40,15 +40,28 @@ const domError = (name: string, message: string): Error => {
   return e;
 };
 
-/** Shared state of one document: ids, the recorder, known nodes. */
+/**
+ * One render root and where its records go. A worker has one; a pool has one
+ * per visual member, all in the same document (ADR 0015).
+ */
+type Owner = {
+  readonly root: WElement;
+  push(r: DomRecord): void;
+};
+
+/** Shared state of one document: ids, the render roots, known nodes. */
 type Core = {
-  /** The render root, set by `createDom()`. */
-  root: WElement | null;
+  /** The render roots, in the order they were made. */
+  roots: Set<WElement>;
   nextId: number;
   known: Map<NodeId, WNode>;
-  record(r: DomRecord): void;
   /** An element was inserted into `document.head`, which the bridge doesn't render. */
   onHead(tag: string): void;
+};
+
+/** Records a change to a known node, to the root that holds it. */
+const emit = (n: WNode, r: DomRecord): void => {
+  n.isoOwner?.push(r);
 };
 
 /** Listener storage and capture/bubble dispatch through `isoParentTarget()`. */
@@ -175,6 +188,12 @@ export abstract class WNode extends WEventTarget {
   /** @internal */ isoNext: WNode | null = null;
   /** @internal Whether the host knows this node (it's in the tree under the root). */
   isoKnown = false;
+  /**
+   * @internal The root this node was rendered under, once it has been. Kept
+   * after the node leaves the tree, so it can't move to another member's root
+   * in a pool (ADR 0015, decision 3).
+   */
+  isoOwner: Owner | null = null;
 
   constructor(doc: WDocument, id: NodeId) {
     super();
@@ -186,8 +205,17 @@ export abstract class WNode extends WEventTarget {
     return this.isoParent;
   }
 
+  /**
+   * @internal The id the host knows this node by: a render root is always
+   * `ROOT_ID` to its own surface, whatever its id in the document.
+   */
+  get isoWire(): NodeId {
+    const root: WNode | undefined = this.isoOwner?.root;
+    return root === this ? ROOT_ID : this.isoId;
+  }
+
   /** @internal */ override isoListenChanged(type: string, on: boolean): void {
-    if (this.isoKnown) this.ownerDocument.isoCore.record(['listen', this.isoId, type, on]);
+    if (this.isoKnown) emit(this, ['listen', this.isoWire, type, on]);
   }
 
   get parentNode(): WParentNode | null {
@@ -249,7 +277,7 @@ export abstract class WCharacterData extends WNode {
     const data = str(v);
     if (data === this.isoData) return;
     this.isoData = data;
-    if (this.isoKnown) this.ownerDocument.isoCore.record(['text', this.isoId, data]);
+    if (this.isoKnown) emit(this, ['text', this.isoWire, data]);
   }
   get length(): number {
     return this.isoData.length;
@@ -515,18 +543,26 @@ export abstract class WParentNode extends WNode {
     if (this.ownerDocument.head === (this as WParentNode) && child instanceof WElement) {
       this.ownerDocument.isoCore.onHead(child.localName);
     }
+    // A node rendered under one member's root can't move under another's
+    // (ADR 0015, decision 3). Thrown here, in the code doing the move.
+    if (this.isoKnown && ownedElsewhere(child, this.isoOwner)) {
+      throw domError(
+        'HierarchyRequestError',
+        "insertBefore: a node can't move to another member's root in a pool",
+      );
+    }
     const wasKnown = child.isoKnown;
     child.isoParent?.isoUnlink(child);
     this.isoLink(child, ref);
     const core = this.ownerDocument.isoCore;
     if (wasKnown && this.isoKnown)
-      core.record(['move', this.isoId, child.isoId, ref?.isoId ?? null]);
+      emit(this, ['move', this.isoWire, child.isoId, ref?.isoId ?? null]);
     else if (wasKnown) {
-      core.record(['remove', child.isoId]);
+      emit(child, ['remove', child.isoId]);
       forget(child, core);
     } else if (this.isoKnown) {
-      core.record(['insert', this.isoId, serialize(child), ref?.isoId ?? null]);
-      learn(child, core);
+      emit(this, ['insert', this.isoWire, serialize(child), ref?.isoId ?? null]);
+      learn(child, core, this.isoOwner);
     }
     return child;
   }
@@ -535,9 +571,8 @@ export abstract class WParentNode extends WNode {
     if (child.isoParent !== this) throw domError('NotFoundError', 'removeChild: not a child');
     this.isoUnlink(child);
     if (child.isoKnown) {
-      const core = this.ownerDocument.isoCore;
-      core.record(['remove', child.isoId]);
-      forget(child, core);
+      emit(child, ['remove', child.isoId]);
+      forget(child, this.ownerDocument.isoCore);
     }
     return child;
   }
@@ -635,12 +670,12 @@ export class WElement extends WParentNode {
     const v = str(value);
     if (this.isoAttrs.get(n) === v) return;
     this.isoAttrs.set(n, v);
-    if (this.isoKnown) this.ownerDocument.isoCore.record(['attr', this.isoId, n, v]);
+    if (this.isoKnown) emit(this, ['attr', this.isoWire, n, v]);
   }
   removeAttribute(name: string): void {
     const n = this.isoAttrName(name);
     if (!this.isoAttrs.delete(n)) return;
-    if (this.isoKnown) this.ownerDocument.isoCore.record(['attr', this.isoId, n, null]);
+    if (this.isoKnown) emit(this, ['attr', this.isoWire, n, null]);
   }
   /** @internal HTML attribute names are case-insensitive; SVG ones aren't. */
   isoAttrName(name: string): string {
@@ -683,8 +718,7 @@ export class WElement extends WParentNode {
   /** @internal */ isoSetProp(name: SyncedProp, value: string | boolean, record: boolean): void {
     if (this.isoProps.get(name) === value) return;
     this.isoProps.set(name, value);
-    if (record && this.isoKnown)
-      this.ownerDocument.isoCore.record(['prop', this.isoId, name, value]);
+    if (record && this.isoKnown) emit(this, ['prop', this.isoWire, name, value]);
   }
 }
 
@@ -993,8 +1027,11 @@ export class WDocument extends WEventTarget {
       }
       return null;
     };
-    const root = this.isoCore.root;
-    return (root ? walk(root) : null) ?? walk(this.head);
+    for (const root of this.isoCore.roots) {
+      const hit = walk(root);
+      if (hit) return hit;
+    }
+    return walk(this.head);
   }
 
   /**
@@ -1051,10 +1088,18 @@ function serialize(n: WNode): SerializedNode {
   };
 }
 
-function learn(n: WNode, core: Core): void {
+/** Whether `n` or anything under it was rendered under a root other than `owner`. */
+function ownedElsewhere(n: WNode, owner: Owner | null): boolean {
+  if (n.isoOwner && n.isoOwner !== owner) return true;
+  // A known subtree has one owner; only a detached one can hold strays.
+  return !n.isoKnown && n.childNodes.some((c) => ownedElsewhere(c, owner));
+}
+
+function learn(n: WNode, core: Core, owner: Owner | null): void {
   n.isoKnown = true;
+  n.isoOwner = owner;
   core.known.set(n.isoId, n);
-  for (const c of n.childNodes) learn(c, core);
+  for (const c of n.childNodes) learn(c, core, owner);
 }
 
 function forget(n: WNode, core: Core): void {
@@ -1093,25 +1138,83 @@ export interface WorkerDom {
    * holds that value, since what the user typed may differ (M3a task 6).
    */
   setValue(node: WNode, value: string, opts?: { force?: boolean }): void;
+  /**
+   * Adds another render root to this document, with its own batches: one per
+   * visual member of a pool (ADR 0015). Its surface knows it as `ROOT_ID`.
+   */
+  addRoot(opts: RootOptions): RenderRoot;
 }
 
-export function createDom(opts: WorkerDomOptions): WorkerDom {
-  const schedule = opts.schedule ?? ((fn: () => void) => queueMicrotask(fn));
+export type RootOptions = {
+  /** Receives this root's batches, in order. */
+  onBatch(batch: DomBatch): void;
+  /** Called once per batch with the flush to run; default `queueMicrotask`. */
+  schedule?: (flush: () => void) => void;
+};
+
+/** One member's render root in a shared document (ADR 0015). */
+export interface RenderRoot {
+  readonly root: WElement;
+  /** Sends this root's pending records now, if any. */
+  flush(): void;
+  /** Dispatches an event from this root's surface; `ROOT_ID` names the root. */
+  deliver(event: DomEvent): void;
+  /** The id this root's surface knows `node` by, or `undefined` if it isn't rendered under this root. */
+  idOf(node: WNode): NodeId | undefined;
+  setValue(node: WNode, value: string, opts?: { force?: boolean }): void;
+  /** Stops sending this root's records and forgets its nodes: the member stopped. */
+  dispose(): void;
+}
+
+const isControl = (
+  node: WNode,
+): node is WHTMLInputElement | WHTMLTextAreaElement | WHTMLSelectElement =>
+  node instanceof WHTMLInputElement ||
+  node instanceof WHTMLTextAreaElement ||
+  node instanceof WHTMLSelectElement;
+
+function setValueOf(node: WNode, value: string, o: { force?: boolean }): void {
+  if (!isControl(node)) throw new TypeError('setValue: not an input, textarea or select');
+  if (!o.force) {
+    node.value = value;
+    return;
+  }
+  node.isoSetProp('value', value, false);
+  if (node.isoKnown) emit(node, ['prop', node.isoWire, 'value', value, true]);
+}
+
+function deliverTo(node: WNode | undefined, event: DomEvent): void {
+  if (!node) return;
+  // The host already shows what the user typed; sync it without echoing a record.
+  if (isControl(node) && event.value !== undefined) node.isoSetProp('value', event.value, false);
+  if (node instanceof WHTMLInputElement && event.checked !== undefined)
+    node.isoSetProp('checked', event.checked, false);
+  if (event.type === 'scroll' && node instanceof WElement) {
+    node.isoScroll = { top: event.scrollTop ?? 0, left: event.scrollLeft ?? 0 };
+  }
+  node.dispatchEvent(toEvent(event));
+}
+
+/** A root's recorder: records batched per microtask (or `schedule`) into `onBatch`. */
+function recorder(
+  root: WElement,
+  onBatch: (batch: DomBatch) => void,
+  schedule: (flush: () => void) => void,
+): { owner: Owner; flush: () => void; stop: () => void } {
   let pending: DomRecord[] = [];
   let scheduled = false;
+  let live = true;
   const flush = (): void => {
     scheduled = false;
     if (pending.length === 0) return;
     const batch = pending;
     pending = [];
-    opts.onBatch(batch);
+    if (live) onBatch(batch);
   };
-  const core: Core = {
-    root: null,
-    nextId: ROOT_ID + 1,
-    known: new Map(),
-    onHead: opts.onHead ?? (() => {}),
-    record(r) {
+  const owner: Owner = {
+    root,
+    push(r) {
+      if (!live) return;
       pending.push(r);
       if (!scheduled) {
         scheduled = true;
@@ -1119,45 +1222,66 @@ export function createDom(opts: WorkerDomOptions): WorkerDom {
       }
     },
   };
+  return {
+    owner,
+    flush,
+    stop: () => {
+      live = false;
+      pending = [];
+    },
+  };
+}
+
+export function createDom(opts: WorkerDomOptions): WorkerDom {
+  const schedule = opts.schedule ?? ((fn: () => void) => queueMicrotask(fn));
+  const core: Core = {
+    roots: new Set(),
+    nextId: ROOT_ID + 1,
+    known: new Map(),
+    onHead: opts.onHead ?? (() => {}),
+  };
   const document = new WDocument(core);
-  const root = new WHTMLElement(document, ROOT_ID, 'iso-root', 'html');
-  root.isoKnown = true;
-  core.known.set(ROOT_ID, root);
-  core.root = root;
+  const makeRoot = (id: NodeId): WHTMLElement => {
+    const root = new WHTMLElement(document, id, 'iso-root', 'html');
+    root.isoKnown = true;
+    core.known.set(id, root);
+    core.roots.add(root);
+    return root;
+  };
+  const root = makeRoot(ROOT_ID);
+  const main = recorder(root, (b) => opts.onBatch(b), schedule);
+  root.isoOwner = main.owner;
 
   return {
     document,
     root,
-    flush,
+    flush: main.flush,
     idOf: (node) => node.isoId,
-    setValue(node, value, o = {}) {
-      const control =
-        node instanceof WHTMLInputElement ||
-        node instanceof WHTMLTextAreaElement ||
-        node instanceof WHTMLSelectElement;
-      if (!control) throw new TypeError('setValue: not an input, textarea or select');
-      if (!o.force) {
-        node.value = value;
-        return;
-      }
-      node.isoSetProp('value', value, false);
-      if (node.isoKnown) core.record(['prop', node.isoId, 'value', value, true]);
-    },
-    deliver(event) {
-      const node = core.known.get(event.target);
-      if (!node) return;
-      // The host already shows what the user typed; sync it without echoing a record.
-      const control =
-        node instanceof WHTMLInputElement ||
-        node instanceof WHTMLTextAreaElement ||
-        node instanceof WHTMLSelectElement;
-      if (control && event.value !== undefined) node.isoSetProp('value', event.value, false);
-      if (node instanceof WHTMLInputElement && event.checked !== undefined)
-        node.isoSetProp('checked', event.checked, false);
-      if (event.type === 'scroll' && node instanceof WElement) {
-        node.isoScroll = { top: event.scrollTop ?? 0, left: event.scrollLeft ?? 0 };
-      }
-      node.dispatchEvent(toEvent(event));
+    setValue: (node, value, o = {}) => setValueOf(node, value, o),
+    deliver: (event) => deliverTo(core.known.get(event.target), event),
+    addRoot(o) {
+      const member = makeRoot(core.nextId++);
+      const rec = recorder(member, (b) => o.onBatch(b), o.schedule ?? schedule);
+      member.isoOwner = rec.owner;
+      const mine = (node: WNode | undefined): WNode | undefined =>
+        node?.isoKnown && node.isoOwner === rec.owner ? node : undefined;
+      return {
+        root: member,
+        flush: rec.flush,
+        idOf: (node) => (mine(node) ? node.isoWire : undefined),
+        setValue(node, value, so = {}) {
+          if (node.isoOwner && node.isoOwner !== rec.owner)
+            throw new TypeError("setValue: not a node of this member's root");
+          setValueOf(node, value, so);
+        },
+        deliver: (event) =>
+          deliverTo(mine(event.target === ROOT_ID ? member : core.known.get(event.target)), event),
+        dispose() {
+          rec.stop();
+          core.roots.delete(member);
+          forget(member, core);
+        },
+      };
     },
   };
 }
