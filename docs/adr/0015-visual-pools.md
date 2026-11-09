@@ -37,22 +37,26 @@ What the frameworks reference was checked in the versions we support (React DOM 
 
 1. **Visual isolates may join a pool (option D).** `pools_headless_only` goes away. A pool can hold visual members, headless members, or both (mixed pools, as the plant dashboard's `machine` placement needs). Placement stays the host manifest's choice alone (ADR 0001).
 2. **One `isoloop-dom` document per worker, one render root per visual member.** Each member's root is an element with its own id in the worker's id space, and that root is the member's `ctx.root`. Ids are unique per worker, so a node id names one node whichever member holds it.
-3. **Records go out per member.** The worker attributes each record to the member whose root holds the node, and posts that member's batch on its own envelope with `isolate` (the field M2c added). A node moved from one member's root to another's goes out as a remove from one and an insert into the other.
+3. **Records go out per member.** The worker attributes each record to the member whose root holds the node, and posts that member's batch on its own envelope with `isolate` (the field M2c added). **Moving a node from one member's root into another's is forbidden:** the worker throws an error attributed to the member doing the move, so one member can't take or inject another's nodes.
 4. **The host keeps one applier per surface.** The applier gets the member's root id instead of assuming the fixed root id (ADR 0010's format is unchanged: records, ids and moves stay the same). Frame budgets, update counts and timings stay per isolate.
 5. **Events and host calls carry the member.** The host sends a surface's events on that member's envelope; the worker delivers them to the node they name, so capture and bubble run from the node through the member's root to the shared document, as on a page. `measure`, `focus`, `scrollIntoView` and other host calls name the member and the node id, and the host resolves them through that member's applier.
-6. **What members share, stated in the guide.** On top of what M2c's pools already share (event loop, timers, `globalThis`, frozen built-ins, fate):
-   - **the document:** a member can see and query other members' nodes, and a listener on `document` or `window` hears every member's events;
+6. **Members of a pool can read each other's DOM and input.** On top of what M2c's pools already share (event loop, timers, `globalThis`, frozen built-ins, fate), they share:
+   - **the document:** a member can see and query other members' nodes, including what users typed into another member's fields;
+   - **document and window listeners:** a key listener on `document` in one member hears keystrokes in every member's fields;
    - **the focus:** one `document.activeElement`, as on a page;
    - **the head:** hoisted tags and styles are page-wide on the host anyway;
    - **framework instances,** when members were built together;
    - **frames:** one `requestAnimationFrame` loop in the worker.
 
-   Pools stay for trusted members, as ADR 0001 says.
-7. **Errors.** An error the runtime can attribute stays the member's own: `start()` throwing, and a render error the adapter catches at the member's root (`@isoloop/react` and `@isoloop/preact` wrap each member root in a boundary that reports to that member). An error it can't attribute, such as one thrown from a shared scheduler or a timer, is a worker error, and the pool restarts as a group, as in M2c.
-8. **Stopping one member** unmounts its root, removes it from the document and forgets its nodes, while the pool keeps running. As in M2c, timers the member left running keep going; the guide says to clear them in `onShutdown`.
-9. **Isolates built apart (ADR 0012) can join.** Option D needs nothing from the isolate's build: it renders into `ctx.root` and uses the global document as in its own worker. Members built apart carry their own framework copy, so they share less memory.
-10. **Code that renders into `document.body`** doesn't reach any surface, in a pool or in its own worker. The surface is `ctx.root`.
-11. **Gate first (M2d task 1).** Before any pool code, a prototype puts 8 React widgets in one worker with this design against 8 own workers, measuring memory and start-up on Chromium, Firefox and WebKit. If it saves less than about 30% memory and doesn't start them faster, M2d stops and this ADR records the result.
+   Pooling is the host's explicit opt-in, per isolate, in the manifest; nothing is pooled by default. The guide and devtools state it plainly: "members of this pool can read each other's DOM and input". Widgets that handle secrets (passwords, tokens, payment details) stay on their own worker. Pools stay for trusted members, as ADR 0001 says.
+7. **React and Preact members may share a pool.** They share the document like any members. The guide recommends one framework per pool, since the memory saving comes from members sharing one framework instance; M2d tests a pool that mixes them.
+8. **Errors.** An error the runtime can attribute stays the member's own: `start()` throwing, and a render error the adapter catches at the member's root (`@isoloop/react` and `@isoloop/preact` wrap each member root in a boundary that reports to that member). An error it can't attribute, such as one thrown from a shared scheduler or a timer, is a worker error, and the pool restarts as a group, as in M2c. Attributing those per member with `AsyncContext`, once browsers ship it, is in [would-like](../would-like.md).
+9. **Stopping one member** unmounts its root, removes it from the document and forgets its nodes, while the pool keeps running. As in M2c, timers the member left running keep going; the guide says to clear them in `onShutdown`.
+10. **Isolates built apart (ADR 0012) can join.** Option D needs nothing from the isolate's build: it renders into `ctx.root` and uses the global document as in its own worker. Members built apart carry their own framework copy, so they share less memory.
+11. **A portal root per member.** Libraries that render modals, tooltips, toasts and menus into `document.body` would reach no surface, in a pool or in its own worker. The adapters give each member a portal container inside its own root (for example `ctx.portalRoot`), and the guide shows how to point such libraries at it. Overlays that must cover the whole page, outside the member's surface, stay a host concern.
+12. **Gate first (M2d task 1).** Before any pool code, a prototype puts 8 React widgets in one worker with this design against 8 own workers, on Chromium, Firefox and WebKit. It measures memory, start-up, and the p95 time from a record being published to its patch being applied, with the 8 widgets updating at the plant dashboard's data rate. M2d stops, and this ADR records the result, if either:
+    - pooling saves less than about 30% memory and doesn't start the widgets faster; or
+    - the pooled p95 is more than twice the own-worker p95 **and** more than 50 ms.
 
 On acceptance, ADR 0001's staging note and ADR 0010's point 2 get a line pointing here.
 
@@ -64,7 +68,8 @@ On acceptance, ADR 0001's staging note and ADR 0010's point 2 get a line pointin
   - the record format and the host applier barely change;
   - isolates built apart can still join.
 - **Bad:**
-  - no DOM isolation between members of a pool: queries, document listeners and focus are shared. That fits ADR 0001's "trusted members only", but it's a step further than M2c's shared globals;
+  - no DOM isolation between members of a pool: a member can read another's DOM and what users type into it, and document listeners and focus are shared. That fits ADR 0001's "trusted members only", but it's a step further than M2c's shared globals, so secrets stay on their own worker;
+  - a library that portals into `document.body` needs pointing at the member's portal root;
   - one busy member delays every member's renders in that worker. That's the pool's shared event loop, and the plant dashboard keeps heavy computation in data pools for that reason;
   - an error thrown from a shared framework scheduler can't be traced to a member, so it restarts the whole pool;
   - attributing records per member costs a lookup per record (the node's member, cached on insert).
