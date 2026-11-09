@@ -4,7 +4,12 @@
   "description": "Isolate-side runtime that runs inside each worker.",
   "license": "MIT",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/bootstrap.ts",
+    "./src/worker.ts",
+    "./dist/bootstrap.js",
+    "./dist/worker.js"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/isoloop/isoloop.git",
@@ -23,6 +28,10 @@
       "@isoloop/source": "./src/bootstrap.ts",
       "import": "./dist/bootstrap.js"
     },
+    "./worker": {
+      "@isoloop/source": "./src/worker.ts",
+      "import": "./dist/worker.js"
+    },
     "./testing": {
       "@isoloop/source": "./src/testing.ts",
       "types": "./dist/testing.d.ts",
@@ -37,6 +46,9 @@
       },
       "./bootstrap": {
         "import": "./dist/bootstrap.js"
+      },
+      "./worker": {
+        "import": "./dist/worker.js"
       },
       "./testing": {
         "types": "./dist/testing.d.ts",

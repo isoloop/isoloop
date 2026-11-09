@@ -5,7 +5,7 @@ export default defineConfig([
   { entry: ['src/index.ts', 'src/testing.ts'], platform: 'browser', dts: true },
   // The isolate worker entry, loaded by URL: one self-contained file.
   {
-    entry: ['src/bootstrap.ts'],
+    entry: ['src/bootstrap.ts', 'src/worker.ts'],
     platform: 'browser',
     dts: false,
     clean: false,

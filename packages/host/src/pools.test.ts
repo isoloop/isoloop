@@ -141,7 +141,7 @@ describe('worker pools (M2c)', () => {
       // worker throughout: no pool restart, no crash of its own.
       const k = kernel({
         ...fast,
-        supervisor: { strategy: 'one-for-one', backoff: { baseMs: 50, maxMs: 50 } },
+        supervisor: { strategy: 'one-for-one', backoff: { initialMs: 50, maxMs: 50 } },
       });
       const crashes: KernelEvents['isolate:crash'][] = [];
       k.on('isolate:crash', (e) => crashes.push(e));

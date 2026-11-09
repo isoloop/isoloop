@@ -188,7 +188,8 @@ async function startIsolate(
   }
 }
 
-self.addEventListener('message', (e: MessageEvent<unknown>) => {
+/** Handles one message from the host: `init` boots a member, the rest is routed. */
+function onMessage(e: MessageEvent<unknown>): void {
   const msg = e.data;
   if (!isHostToIsolate(msg)) return;
   if (msg.t !== 'init') {
@@ -217,4 +218,27 @@ self.addEventListener('message', (e: MessageEvent<unknown>) => {
   boot(m, msg.p).catch((err: unknown) => {
     fatal(m, err instanceof Error ? err.message : String(err));
   });
-});
+}
+
+/*
+ * Once per worker. WebKit evaluates a module worker's entry a second time
+ * when one of its modules imports it by URL (bundlers put shared code in the
+ * entry chunk), and both instances would keep a listener: a second instance
+ * would boot restarted pool members twice and close the worker when its copy
+ * left. So every side effect starts here, under a marker on the worker's
+ * global, and a second instance stays inert (docs/investigations/engine-constraints.md).
+ */
+const STARTED = Symbol.for('isoloop.bootstrap');
+
+function startOnce(): void {
+  self.addEventListener('message', onMessage);
+}
+
+if (Reflect.get(self, STARTED) === true) {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Vite's import.meta.env, absent elsewhere
+  if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV === true)
+    console.warn('isoloop: worker entry evaluated twice; ignoring');
+} else {
+  Reflect.set(self, STARTED, true);
+  startOnce();
+}

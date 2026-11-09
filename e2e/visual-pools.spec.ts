@@ -53,7 +53,7 @@ const run = (page: import('@playwright/test').Page, faulty: string, fault: Fault
     async ({ base, layout, faulty: who, fault: which }): Promise<Out> => {
       const kernel = await window.harness.createBusKernel(new URL('contracts.js', base).href, {
         heartbeat: { blockedAfterMs: 200, killAfterMs: 800 },
-        supervisor: { strategy: 'one-for-one', backoff: { baseMs: 50, maxMs: 50 } },
+        supervisor: { strategy: 'one-for-one' },
       });
       const crashes: Out['crashes'] = [];
       kernel.on('isolate:crash', (e) => crashes.push(e));
@@ -226,4 +226,3 @@ test('React and Preact widgets share a pool, and the kernel reports every pool',
   });
   expect(out.crashes).toEqual([]);
 });
-
