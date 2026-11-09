@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -57,5 +57,25 @@ describe('@isoloop/vite builds', () => {
     expect(manifest.isolates).toEqual({ counter: 'counter.js', clock: 'clock.js' });
     expect(typeof (await startOf(join(out, 'clock.js')))).toBe('function');
     await expect(readFile(join(out, 'index.html'), 'utf8')).rejects.toThrow();
+  });
+
+  it('no chunk imports the isolate worker entry, so it is evaluated once (WebKit re-evaluates an entry imported by URL)', async () => {
+    const { out } = await run({ isolates });
+    const assets = join(out, 'assets');
+    const files = (await readdir(assets)).filter((f) => f.endsWith('.js'));
+    const code = new Map(
+      await Promise.all(
+        files.map(async (f) => [f, await readFile(join(assets, f), 'utf8')] as const),
+      ),
+    );
+    // The app's entry names the isolate worker's URL; find the file it points at.
+    const html = await readFile(join(out, 'index.html'), 'utf8');
+    const appEntry = /src="\.\/assets\/([^"]+\.js)"|src="\/assets\/([^"]+\.js)"/.exec(html);
+    const app = code.get(appEntry?.[1] ?? appEntry?.[2] ?? '') ?? '';
+    const entries = files.filter((f) => /^(worker|bootstrap)-/.test(f) && app.includes(f));
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries)
+      for (const [f, src] of code)
+        if (f !== entry) expect(src.includes(`./${entry}`), `${f} imports ${entry}`).toBe(false);
   });
 });

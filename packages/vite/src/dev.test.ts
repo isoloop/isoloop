@@ -33,8 +33,9 @@ describe('@isoloop/vite in dev', () => {
     const base = await serve();
     const mod = await (await fetch(new URL('@id/virtual:isoloop/workers', base))).text();
     const urls = [...mod.matchAll(/from "([^"]+)"/g)].map((m) => m[1] ?? '');
-    expect(urls.some((u) => u.includes('bootstrap'))).toBe(true);
-    expect(urls.some((u) => u.includes('worker'))).toBe(true);
+    // The isolate worker's tiny entry (runtime/worker), and the bus worker.
+    expect(urls.some((u) => u.includes('runtime/src/worker'))).toBe(true);
+    expect(urls.some((u) => u.includes('bus/'))).toBe(true);
     // The `?worker&url` modules export the worker's URL; that URL serves the worker.
     const served = await Promise.all(
       urls.map(async (u) => {
@@ -54,7 +55,7 @@ describe('@isoloop/vite in dev', () => {
   it('bus: false leaves the bus worker out', async () => {
     const base = await serve({ bus: false });
     const mod = await (await fetch(new URL('@id/virtual:isoloop/workers', base))).text();
-    expect(mod).toContain('bootstrap');
+    expect(mod).toContain('runtime/src/worker');
     expect(mod).not.toContain('bus/');
   });
 

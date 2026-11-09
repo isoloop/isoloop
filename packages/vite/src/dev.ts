@@ -70,7 +70,7 @@ export function devPlugin(o: HeaderOptions & WorkersOptions): Plugin {
       if (id !== RESOLVED) return null;
       const bus = o.bus ?? true;
       return [
-        "import isolateBootstrap from '@isoloop/runtime/bootstrap?worker&url';",
+        "import isolateBootstrap from '@isoloop/runtime/worker?worker&url';",
         ...(bus ? ["import bus from '@isoloop/bus/worker?worker&url';"] : []),
         `export default { isolateBootstrap${bus ? ', bus' : ''} };`,
       ].join('\n');

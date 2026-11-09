@@ -53,10 +53,7 @@ const run = (page: import('@playwright/test').Page, faulty: string, fault: Fault
     async ({ base, layout, faulty: who, fault: which }): Promise<Out> => {
       const kernel = await window.harness.createBusKernel(new URL('contracts.js', base).href, {
         heartbeat: { blockedAfterMs: 200, killAfterMs: 800 },
-        // A member that throws isn't restarted, as in the M2c pools suite: the
-        // test is that it fails alone. (Restarting a pool member twice in the
-        // same worker stalls the worker on WebKit; found here, tracked apart.)
-        supervisor: { strategy: which === 'throw' ? 'never' : 'one-for-one' },
+        supervisor: { strategy: 'one-for-one' },
       });
       const crashes: Out['crashes'] = [];
       kernel.on('isolate:crash', (e) => crashes.push(e));
@@ -119,7 +116,12 @@ const run = (page: import('@playwright/test').Page, faulty: string, fault: Fault
         // No fault: just let a few heartbeats pass.
         await new Promise((r) => setTimeout(r, 1500));
       } else if (which === 'throw') {
-        await wait(() => crashes.length > 0, 8000, 'the throw');
+        // Restarted in its pool worker until it fails for good (maxRestarts).
+        await wait(
+          () => kernel.isolates().find((s) => s.id === who)?.state === 'failed',
+          10_000,
+          'the throws',
+        );
         await new Promise((r) => setTimeout(r, 1500));
       } else {
         const pool = layout.find(([id]) => id === who)?.[1];
