@@ -22,7 +22,7 @@ A longer-term question, and not a plan: what would an engine look like if each i
 ## 2. WebKit presents worker-drawn canvas frames through the main thread
 
 - **What:** in Playwright's WebKit on Linux, every frame a worker draws on an `OffscreenCanvas` transferred from the page (`transferControlToOffscreen`) costs the page's main thread time, outside any JavaScript. With enough canvas updates per second the main thread stops running frames and timers. Chromium doesn't show this.
-- **Environment:** Playwright 1.64.1, headless; WebKit 27.2 and Chromium 156.0.8078.4; Linux under WSL2, 32 cores, no GPU. Not checked in Safari on macOS or iOS, or on a GPU-backed WebKit.
+- **Environment:** Playwright 1.64.1, headless; WebKit 27.2 and Chromium 156.0.8078.4; Linux under WSL2, 32 cores, no GPU. In Safari 26.5 on an iPad the limit doesn't show (below); not checked in Safari on macOS.
 
 **Standalone repro, no Isoloop code:** [`assets/webkit-offscreen-freeze.html`](assets/webkit-offscreen-freeze.html). N workers each draw a sine line on a transferred 320×180 canvas R times a second; the page only counts its own animation frames. The page also runs the same load two other ways, to compare on a real device: `bitmap` (each worker draws on its own `OffscreenCanvas` and posts the frame with `transferToImageBitmap`; the page shows the newest frame per canvas in its animation frame through `bitmaprenderer` and acks, so a worker skips draws until then) and `main` (the page draws on plain canvases itself, as a native build does). **Run all** goes through every mode at six loads and gives a table and JSON to copy. The table below is the original `transfer` case; medians of 3 one-second readings after 5 s:
 
@@ -38,6 +38,19 @@ A longer-term question, and not a plan: what would an engine look like if each i
 | 8 × 30 | 240 | page stops, as above | – | 60 |
 
 The cost grows with updates per second and with the number of canvases (24 × 5 is worse than 12 × 10 at the same 120 updates/s).
+
+**In Safari on an iPad** (Safari 26.5, iPadOS; the user's device, 2026-11-09), the same page's **Run all**, medians of 3 one-second readings after 5 s:
+
+| Canvases × draws/s | Updates/s | `transfer` frames/s (longest gap) | `bitmap` frames/s (longest gap), shown/s | `main` frames/s (longest gap) |
+| --- | --- | --- | --- | --- |
+| 8 × 10 | 80 | 60 (17 ms) | 60 (17 ms), 77 | 60 (17 ms) |
+| 24 × 5 | 120 | 60 (18 ms) | 57 (43 ms), 112 | 60 (18 ms) |
+| 24 × 10 | 240 | 60 (18 ms) | 60 (46 ms), 238 | 60 (18 ms) |
+| 8 × 60 | 480 | 60 (18 ms) | 60 (17 ms), 428 | 60 (17 ms) |
+| 24 × 30 | 720 | 60 (17 ms) | 60 (29 ms), 692 | 60 (17 ms) |
+| 24 × 60 | 1440 | 60 (17 ms) | 54 (31 ms), 770 | 60 (17 ms) |
+
+Transferred worker canvases cost the iPad's main thread nothing measurable at any load, including 24 × 60, which stops Playwright's WebKit on Linux. Posting `ImageBitmap`s to the page is no better there and has longer gaps. The 20 ms timer gives 42 ticks/s in every mode and at every load, so that's Safari's timer granularity, not load. So far the limit belongs to Playwright's headless, software-rendered WebKit on Linux, not to Safari on this device.
 
 **In the markets dashboard:** Isoloop React at Heavy (24 widgets, 17 of them canvases), on WebKit and Chromium, with parts switched off through URL flags on a throwaway branch (`diag/webkit-main-thread` in isoloop/examples, not merged). Typing latency is measured as `budget.spec.ts` does it. A main-thread probe posts a message to itself every 25 ms and records how long it waits; time inside `requestAnimationFrame` callbacks (where the compositor applies DOM batches) and inside `message` listeners is summed separately. 3 runs each, one page at a time, after 10 s of warm-up; medians, with the range in brackets:
 
