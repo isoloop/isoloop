@@ -42,7 +42,7 @@ export type LoadOptions = {
   busPort: MessagePort;
   /** Waking from suspension: `latest` subscriptions resume from `committed` (ADR 0001). */
   wake?: boolean;
-  /** Named pool to join (headless isolates only; the kernel checks). */
+  /** Named pool to join (ADR 0001, ADR 0015). */
   pool?: string;
 };
 

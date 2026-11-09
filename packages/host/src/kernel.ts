@@ -118,10 +118,12 @@ export type IsolateManifest = {
   /** Renders the fallback shown once the isolate has `failed`. Defaults to a message and a Retry button. */
   fallback?: FallbackRender;
   /**
-   * Named worker pool (ADR 0001, M2c): the isolate shares one worker with
-   * every other isolate naming the same pool. Headless isolates only; one
-   * with a `surface` is rejected with `pools_headless_only`. Pool members
-   * share an event loop, globals and fate: a hang or crash restarts the pool.
+   * Named worker pool (ADR 0001, M2c, M2d): the isolate shares one worker
+   * with every other isolate naming the same pool, headless or visual (ADR
+   * 0015). Pool members share an event loop, globals and fate: a hang or
+   * crash restarts the pool. Visual members also share one document, so
+   * they can read each other's DOM and input: pool only trusted isolates,
+   * and keep widgets that handle secrets on their own worker.
    */
   pool?: string;
   /**
@@ -142,7 +144,6 @@ export type IsolateManifest = {
 export type KernelErrorCode =
   | 'unsupported_browser'
   /** A manifest with `pool` and a `surface`: pools are for headless isolates (M2c; visual pools are M2d). */
-  | 'pools_headless_only'
   | 'invalid_manifest'
   | 'invalid_config'
   /** The bus couldn't load its contracts, so nothing can start (ADR 0003, decision 7). */
@@ -433,11 +434,6 @@ function validate(m: IsolateManifest): void {
   if (m.pool !== undefined) {
     if (typeof m.pool !== 'string' || m.pool === '')
       throw new KernelError('invalid_manifest', `"${m.id}": \`pool\` must be a non-empty string`);
-    if (m.surface)
-      throw new KernelError(
-        'pools_headless_only',
-        `"${m.id}" has a surface and asks for pool "${m.pool}"; pools take headless isolates only (ADR 0001)`,
-      );
   }
   const s = m.suspend;
   if (s !== undefined && s !== 'never' && s !== 'when-idle') {

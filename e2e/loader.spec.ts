@@ -48,7 +48,7 @@ test('without CORS it crashes with a clear reason', async ({ page }) => {
   expect(out.ok || out.message).toContain('needs CORS headers');
 });
 
-test('a visual manifest with a pool is rejected with pools_headless_only', async ({ page }) => {
+test('a visual manifest with a pool is accepted (ADR 0015)', async ({ page }) => {
   const code = await page.evaluate(() => {
     const kernel = window.harness.createKernel();
     try {
@@ -59,7 +59,7 @@ test('a visual manifest with a pool is rejected with pools_headless_only', async
       return err instanceof Error && 'code' in err ? err.code : 'unknown';
     }
   });
-  expect(code).toBe('pools_headless_only');
+  expect(code).toBe('spawned');
 });
 
 test('spawning past the budget warns once and still starts every isolate', async ({ page }) => {
