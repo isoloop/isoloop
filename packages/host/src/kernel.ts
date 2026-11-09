@@ -190,7 +190,17 @@ export type PoolSnapshot = {
    * Members share a worker, so one member can reach another's bus port.
    */
   grants: Grants;
+  /**
+   * True when a member has a surface: the pool's visual members render into
+   * one shared document (ADR 0015), so `warning` is set.
+   */
+  sharesDocument: boolean;
+  /** For devtools, when `sharesDocument`: what that means for the members. */
+  warning?: string;
 };
+
+/** ADR 0015, decision 6, in the words the guide and devtools use. */
+const SHARED_DOCUMENT_WARNING = "Members of this pool can read each other's DOM and input.";
 
 /** `bus:quota` fires once storage use reaches this share of the quota. */
 const QUOTA_WARN = 0.8;
@@ -1387,13 +1397,18 @@ export function createKernel(config: KernelConfig): Kernel {
         const name = slot.manifest.pool;
         if (name === undefined || slot.sup.state === 'stopped') continue;
         const g = slot.manifest.grants ?? DEFAULT_GRANTS;
-        const pool = out.get(name) ?? {
+        const pool: PoolSnapshot = out.get(name) ?? {
           name,
           members: [],
           running: name in running,
           grants: { publish: [], subscribe: [] },
+          sharesDocument: false,
         };
         pool.members.push(slot.manifest.id);
+        if (slot.manifest.surface && !pool.sharesDocument) {
+          pool.sharesDocument = true;
+          pool.warning = SHARED_DOCUMENT_WARNING;
+        }
         for (const t of g.publish)
           if (!pool.grants.publish.includes(t)) pool.grants.publish.push(t);
         for (const t of g.subscribe)

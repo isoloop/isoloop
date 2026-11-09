@@ -172,7 +172,7 @@ The source of truth is `packages/protocol/src` (`isolate.ts`, `bus.ts`, `control
 
 The package also exports `isEnvelope`, `assertNever`, the error-code list (`ERROR_CODES`), the `Grants` matchers (`matchTopic`, `matchAny`; topic globs like `catalog.*`), `BusError` (what `publish`, `request` and `reply` reject with), the system topics (`SYSTEM_TOPICS`, `systemTopic`), and the structural topic types host and runtime use so they never import `bus`: `TopicRef`, `TypedRecord`, `SchemaTypes`, `ContractsList` and `topicConfigOf`. It also exports `routeTopic` (`isoloop.route.v1`, value `{ href, pathname, path, search, hash, state }`, [ADR 0002](../adr/0002-host-owns-routing.md)). Routing error codes: `cross_origin`, `routing_disabled`, `navigate_failed`.
 
-Some codes never travel on a port: the host API throws them as a `KernelError`. `createKernel` throws `unsupported_browser`, with every missing feature named, when the browser lacks module workers, `MessageChannel`, adopted stylesheets on a `ShadowRoot`, or OPFS ([ADR 0009](../adr/0009-toolchain.md#rules) rule 7). `createKernel` also throws `invalid_config` for a malformed `components` entry. `spawn` throws `pools_headless_only`, `invalid_manifest` and `bus_failed` (§4.1).
+Some codes never travel on a port: the host API throws them as a `KernelError`. `createKernel` throws `unsupported_browser`, with every missing feature named, when the browser lacks module workers, `MessageChannel`, adopted stylesheets on a `ShadowRoot`, or OPFS ([ADR 0009](../adr/0009-toolchain.md#rules) rule 7). `createKernel` also throws `invalid_config` for a malformed `components` entry. `spawn` throws `invalid_manifest` and `bus_failed` (§4.1).
 
 ## 4. `@isoloop/host`
 
@@ -201,7 +201,7 @@ type KernelConfig = {
 type NavigateRequest = { href: string; replace: boolean; state?: unknown; from: string };   // href absolute, same-origin; from = isolate id
 
 interface Kernel {
-  spawn(manifest: IsolateManifest): IsolateHandle;     // manifest.surface optional (ADR 0008); manifest.pool: headless isolates only (M2c), else pools_headless_only;
+  spawn(manifest: IsolateManifest): IsolateHandle;     // manifest.surface optional (ADR 0008); manifest.pool: headless or visual (M2c, ADR 0015);
                                                        // manifest.suspend: 'never' (default) | 'when-idle' | { whenIdle: { afterMs } } (ADR 0001)
   stop(id: string): Promise<void>;
   restart(id: string): Promise<void>;
@@ -210,7 +210,7 @@ interface Kernel {
   subscribe<Out>(topic: TopicRef<unknown, Out>, fn: (r: TypedRecord<Out>) => void, opts?: { from?: StartPosition }): () => void;   // from 'latest' by default
   on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:ready, bus:crash, bus:recovered, bus:durability-degraded, bus:quota, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
   isolates(): IsolateSnapshot[];                                      // used by devtools; `pool` for pool members (M2c)
-  pools(): PoolSnapshot[];                                            // M2c: members, worker running, effective grants (union)
+  pools(): PoolSnapshot[];                                            // M2c: members, worker running, effective grants (union); ADR 0015: sharesDocument, warning
   syncRoute(): void;                                   // host router changed the URL; republish isoloop.route.v1 if href/state differ (ADR 0002)
   dropTopic(name: string, o?: { force?: boolean }): Promise<void>;   // M2b: delete an orphaned persistent topic; seed_pending / force rules (ADR 0003)
   destroy(): Promise<void>;
@@ -224,7 +224,7 @@ Defaults: heartbeat `100 / 400 / 10_000` ms, ready timeout `10_000` ms, frame bu
 
 `contracts` and `workers.bus` come together: giving only one throws `invalid_config`. Without both there is no bus worker: isolates get an unconnected bus port and `kernel.publish` rejects with `bus_unavailable`.
 
-`createKernel` stays synchronous, so isolates start while the bus loads its contracts. If loading fails, every isolate fails with reason `bus-failed` (no restart) and `bus:failed { code }` is emitted (ADR 0003 amendment pending). `spawn` throws a `KernelError` with a `code`: `pools_headless_only` (a `pool` on an isolate with a `surface`; visual pools are M2d), `invalid_manifest` (also for ids starting with `isoloop:`, which name the kernel's own bus connections), or `bus_failed` once the bus couldn't load its contracts. `kernel.publish` rejects with a `BusError` carrying the broker's code. A host publish the bus never answered before it crashed is sent again to the new bus, as isolates re-send theirs, and each carries `(epoch, seq)` so a persistent topic answers a record it already wrote with its original offset (§5, [ADR 0007](../adr/0007-bus-worker-supervision.md) steps 5 and 6); host publishes made while the bus restarts are queued. Once the bus has failed for good, isolates get a port that answers every call with `bus_unavailable`.
+`createKernel` stays synchronous, so isolates start while the bus loads its contracts. If loading fails, every isolate fails with reason `bus-failed` (no restart) and `bus:failed { code }` is emitted (ADR 0003 amendment pending). `spawn` throws a `KernelError` with a `code`: `invalid_manifest` (also for ids starting with `isoloop:`, which name the kernel's own bus connections), or `bus_failed` once the bus couldn't load its contracts. `kernel.publish` rejects with a `BusError` carrying the broker's code. A host publish the bus never answered before it crashed is sent again to the new bus, as isolates re-send theirs, and each carries `(epoch, seq)` so a persistent topic answers a record it already wrote with its original offset (§5, [ADR 0007](../adr/0007-bus-worker-supervision.md) steps 5 and 6); host publishes made while the bus restarts are queued. Once the bus has failed for good, isolates get a port that answers every call with `bus_unavailable`.
 
 With `suspend` set, an isolate subscribed to a `last-n` or `time` topic gets a console warning, since records may expire while it sleeps. It comes from the bus metrics, so about a second after the subscribe. The manifest's `bus: { onReset: 'restart' }` opts an isolate into a restart instead of `reset` after a bus restart ([ADR 0007](../adr/0007-bus-worker-supervision.md)). Hosting requirements (CSP, CORS) are in [the hosting guide](../guide/hosting.md).
 
@@ -305,6 +305,8 @@ Owns every surface in the DOM and is the **only** code that writes to it.
 ### 4.5 RenderBridge (host side)
 
 Applies `isoloop-dom@1` batches from an isolate's worker-side DOM subset ([ADR 0010](../adr/0010-own-render-bridge.md)). It has no dependency. A batch is a list of plain records keyed by our node ids: `insert`, `move` (one record, so node identity survives), `remove`, `text`, `attr`, `prop` and `listen`. Every tag, attribute and URL goes through the component registry first.
+
+**Visual pools ([ADR 0015](../adr/0015-visual-pools.md)).** A pooled worker keeps one subset document, and each visual member renders into its own root element in it. The worker sends each member's records on that member's envelope, with the member's root as `ROOT_ID`, so each surface keeps its own applier and the format is unchanged; events and host calls come back for a member, and a node id another member holds is `not_found`. Moving a node between members' roots throws in the worker. Consequences: members of a pool can read each other's DOM and input (so secrets stay on their own worker), share one focus and one frame loop, and a render error the adapters catch at a member's root is that member's own, while an error from a shared scheduler restarts the pool.
 
 ```ts
 interface HostRenderBridge {

@@ -59,6 +59,14 @@ describe('visual pools (M2d)', () => {
     spawn('W3');
     await until(() => ['W1', 'W2', 'W3'].every((id) => value(id) === '-'));
     expect(kernel.debug.workers()).toEqual({ live: 2, pools: { p: ['W1', 'W2'] } });
+    // Devtools data says what sharing a document means (ADR 0015, decision 6).
+    expect(kernel.pools()).toEqual([
+      expect.objectContaining({
+        name: 'p',
+        sharesDocument: true,
+        warning: "Members of this pool can read each other's DOM and input.",
+      }),
+    ]);
     await kernel.publish(count, { value: 7 });
     await until(() => ['W1', 'W2', 'W3'].every((id) => value(id) === '7'));
     // Clicks reach only their own member.

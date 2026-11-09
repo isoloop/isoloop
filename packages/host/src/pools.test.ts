@@ -178,6 +178,7 @@ describe('worker pools (M2c)', () => {
           members: ['A', 'B'],
           running: true,
           grants: { publish: ['a.out', 'b.out'], subscribe: ['in.*', 'b.in'], navigate: true },
+          sharesDocument: false,
         },
       ]);
       await k.stop('A');
@@ -187,6 +188,7 @@ describe('worker pools (M2c)', () => {
           members: ['B'],
           running: true,
           grants: { publish: ['b.out'], subscribe: ['in.*', 'b.in'], navigate: true },
+          sharesDocument: false,
         },
       ]);
       await k.stop('B');

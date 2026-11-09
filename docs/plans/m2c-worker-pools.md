@@ -1,6 +1,6 @@
 # M2c: Worker pools (headless)
 
-**Status:** planned 2026-11-08, next to start. Moved ahead of [M4](m4-devtools-release.md) (0.1): the order is now M2c → [M2d](m2d-visual-pools.md) → [M3d](m3d-plant-dashboard.md) → M4, so the plant dashboard can use pools and 0.1 ships with them.
+**Status:** done 2026-11-09 (gate passed, [ADR 0001](../adr/0001-one-worker-per-isolate.md) records it). Planned 2026-11-08. Moved ahead of [M4](m4-devtools-release.md) (0.1): the order is now M2c → [M2d](m2d-visual-pools.md) → [M3d](m3d-plant-dashboard.md) → M4, so the plant dashboard can use pools and 0.1 ships with them.
 
 **Goal:** a headless isolate can opt into a named pool (`manifest.pool: 'feeds-t1'`) and share one worker with the other members of that pool, while own-worker isolates keep the full isolation guarantee ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). Visual isolates with `pool` stay rejected (`pools_headless_only`) until [M2d](m2d-visual-pools.md).
 
