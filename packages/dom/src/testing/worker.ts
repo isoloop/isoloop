@@ -72,7 +72,8 @@ const sorted = (xs: Iterable<string>): string[] => {
 
 /** What a fixture worker posts to the page. */
 export type FixtureMessage =
-  | { t: 'batch'; batch: DomBatch }
+  /** `member`: which root in a pooled fixture (`servePoolFixture`). */
+  | { t: 'batch'; batch: DomBatch; member?: number }
   | { t: 'usage'; log: UsageLog }
   | { t: 'error'; error: string };
 
@@ -84,8 +85,43 @@ const fail = (err: unknown): void => {
   post({ t: 'error', error: err instanceof Error ? (err.stack ?? err.message) : String(err) });
 };
 
-const isEventMessage = (x: unknown): x is { t: 'event'; event: DomEvent } =>
+const isEventMessage = (x: unknown): x is { t: 'event'; event: DomEvent; member?: number } =>
   typeof x === 'object' && x !== null && Reflect.get(x, 't') === 'event';
+
+const catchErrors = (): void => {
+  // Frameworks commit from their own tasks, so errors come from anywhere.
+  addEventListener('error', (e) => {
+    e.preventDefault();
+    fail(e.error);
+  });
+  addEventListener('unhandledrejection', (e) => {
+    e.preventDefault();
+    fail(e.reason);
+  });
+};
+
+/**
+ * A pooled fixture (ADR 0015, M2d): one subset document installed as this
+ * worker's `document`, with `n` render roots, one per member. Each root's
+ * batches are posted with its `member` index, and the page's events for a
+ * member go to its root. Pair with `mountMembers()` on the page.
+ */
+export function servePoolFixture(n: number): Element[] {
+  const dom = createDom({ onBatch: () => {} });
+  install(dom, self);
+  const roots = Array.from({ length: n }, (_, member) =>
+    dom.addRoot({ onBatch: (batch) => post({ t: 'batch', batch, member }) }),
+  );
+  addEventListener('message', (e: MessageEvent<unknown>) => {
+    if (isEventMessage(e.data)) roots[e.data.member ?? 0]?.deliver(e.data.event);
+  });
+  catchErrors();
+  return roots.map((r) => {
+    const container: unknown = r.root;
+    if (!(container instanceof Element)) throw new Error('the subset is not installed');
+    return container;
+  });
+}
 
 /**
  * Installs the subset as this worker's `document`, posts every batch, and

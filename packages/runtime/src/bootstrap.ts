@@ -127,7 +127,7 @@ async function boot(m: Member, init: InitPayload): Promise<void> {
   // the isolate module loads: React checks for a DOM at load time (M3a).
   // Loaded on demand, so a worker's first beat doesn't wait for the subset.
   const { createVanillaIsolate } = await import('./vanilla');
-  const runtime = createVanillaIsolate(init, m.post, self);
+  const runtime = createVanillaIsolate(init, m.post, self, mode === 'pool');
 
   let mod: unknown;
   try {

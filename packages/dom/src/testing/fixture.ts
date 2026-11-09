@@ -77,6 +77,31 @@ export function mountFixture(worker: Worker): FixtureHost {
   };
 }
 
+/**
+ * The page side of `servePoolFixture(n)`: one container per member, each
+ * with its own applier, getting only that member's batches and sending its
+ * events back for that member (ADR 0015, M2d task 2).
+ */
+export function mountMembers(worker: Worker, n: number): HTMLElement[] {
+  const surfaces = Array.from({ length: n }, (_, member) => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    const applier = createApplier(container, OPEN);
+    for (const type of EVENTS) {
+      container.addEventListener(type, (e) => {
+        const event = applier.eventFor(e);
+        if (event) worker.postMessage({ t: 'event', event, member });
+      });
+    }
+    return { container, applier };
+  });
+  worker.addEventListener('message', (e: MessageEvent<unknown>) => {
+    if (isMessage(e.data) && e.data.t === 'batch')
+      surfaces[e.data.member ?? 0]?.applier.apply(e.data.batch);
+  });
+  return surfaces.map((s) => s.container);
+}
+
 /** Sets a control's value the way typing does: through the prototype's setter, past React's value tracker. */
 function setNative(el: HTMLInputElement | HTMLSelectElement, value: string): void {
   const proto =
