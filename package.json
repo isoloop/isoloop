@@ -10,7 +10,7 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "lint": "oxlint --type-aware",
-    "typecheck": "pnpm -r typecheck && tsc --noEmit && tsc --noEmit -p e2e/isolates/adapters/preact && tsc --noEmit -p e2e/isolates/adapters/react && tsc --noEmit -p bench/memory-per-isolate/app && tsc --noEmit -p bench/pools/app",
+    "typecheck": "pnpm -r typecheck && tsc --noEmit && tsc --noEmit -p e2e/isolates/adapters/preact && tsc --noEmit -p e2e/isolates/adapters/react && tsc --noEmit -p bench/memory-per-isolate/app && tsc --noEmit -p bench/pools/app && tsc --noEmit -p bench/visual-pools/app",
     "test": "vitest run",
     "test:node": "vitest run --project protocol --project codec --project bus --project vite",
     "test:browser": "vitest run --project bus-browser --project dom --project host --project runtime --project preact-10 --project preact-11 --project react-18 --project react-19",
@@ -25,7 +25,8 @@
     "build": "pnpm -r build",
     "dev": "pnpm --filter four-loops dev",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
-    "bench:pools": "playwright test --config bench/pools/playwright.config.ts"
+    "bench:pools": "playwright test --config bench/pools/playwright.config.ts",
+    "bench:visual-pools": "playwright test --config bench/visual-pools/playwright.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
