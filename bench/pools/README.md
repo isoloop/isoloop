@@ -11,7 +11,7 @@
 - **Memory:** the browser's whole process tree, proportional set size (PSS, Linux `/proc/<pid>/smaps_rollup`), 2 s after the members started, minus the same page 2 s before they started. On Chromium also `performance.measureUserAgentSpecificMemory()`, which counts only the workers' JavaScript realms.
 - **Start-up:** in the page, from the first `new Worker` to the last member's `start()` returning.
 - **Runs:** 7 per mode and engine, each in a fresh browser (both modes start cold), alternating which mode goes first. Playwright 1.64.1 on Linux (WSL2, 32 cores, no GPU): Chromium 156, Firefox 157, WebKit 27.2. Medians, with the range.
-- Run it with `pnpm bench:pools` (`GATE_RUNS` sets the runs; default 5). Results go to `bench-results/pools.json`.
+- Run it with `pnpm bench:pools` (`GATE_RUNS` sets the runs; default 5). Results go to `bench-results/pools.json`. CI's bench job runs it with 3 runs per mode on tags, pull requests and the weekly run, and reports the numbers without asserting them (M2c task 9); they are in the job log and the `bench-results` artifact.
 
 ## Results
 
