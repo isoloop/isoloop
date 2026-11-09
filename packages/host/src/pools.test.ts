@@ -135,6 +135,29 @@ describe('worker pools (M2c)', () => {
       expect(crashes.some((c) => c.id === 'D')).toBe(false);
     });
 
+    it('a member restarted several times in its pool worker restarts alone; its pool mates never notice', async () => {
+      // A throws in start() every time, so the supervisor restarts it again
+      // and again inside the same pool worker. B must keep running in that
+      // worker throughout: no pool restart, no crash of its own.
+      const k = kernel({
+        ...fast,
+        supervisor: { strategy: 'one-for-one', backoff: { baseMs: 50, maxMs: 50 } },
+      });
+      const crashes: KernelEvents['isolate:crash'][] = [];
+      k.on('isolate:crash', (e) => crashes.push(e));
+      const ready: string[] = [];
+      k.on('isolate:ready', (e) => ready.push(e.id));
+      k.spawn({ id: 'B', src: counter, pool: 'p' });
+      await waitFor(() => running(k, ['B']));
+      k.spawn({ id: 'A', src: throws, pool: 'p' });
+      await waitFor(() => crashes.filter((c) => c.id === 'A').length >= 4, 8000);
+      await new Promise((r) => setTimeout(r, 800));
+      expect(crashes.filter((c) => c.id !== 'A')).toEqual([]);
+      expect(crashes.filter((c) => c.id === 'A').every((c) => c.reason === 'error')).toBe(true);
+      expect(ready.filter((id) => id === 'B')).toEqual(['B']);
+      expect(running(k, ['B'])).toBe(true);
+    });
+
     it('a member whose start() throws crashes alone; the rest of its pool keeps running', async () => {
       const k = kernel({ ...fast, supervisor: { strategy: 'never' } });
       const crashes: KernelEvents['isolate:crash'][] = [];
