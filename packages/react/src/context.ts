@@ -15,3 +15,14 @@ export function useIsolate(): IsolateContext {
   if (!ctx) throw new Error('useIsolate: not inside a component rendered by defineIsolate()');
   return ctx;
 }
+
+/**
+ * `ctx.portalRoot`: the container inside this isolate's surface for modals,
+ * tooltips, toasts and menus (ADR 0015), for `createPortal` or a library's
+ * container option. Throws in a headless isolate.
+ */
+export function usePortalRoot(): Element {
+  const portal: unknown = useIsolate().portalRoot;
+  if (!(portal instanceof Element)) throw new Error('usePortalRoot: this isolate has no surface');
+  return portal;
+}

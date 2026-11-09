@@ -40,6 +40,14 @@ export type IsolateContext<Root = IsolateRoot> = {
   readonly config: unknown;
   /** The render target; `undefined` for a headless isolate (ADR 0008). */
   readonly root: Root | undefined;
+  /**
+   * A container inside `root` for modals, tooltips, toasts and menus that
+   * libraries would otherwise render into `document.body`, which reaches no
+   * surface (ADR 0015, decision 11). Made on first use, typically from a
+   * component while it renders, and added as `root`'s last child once that
+   * render has committed; `undefined` for a headless isolate.
+   */
+  readonly portalRoot: Root | undefined;
   readonly host: HostApi;
   /** The log bus, on its own port to the bus worker (design §5). */
   readonly bus: BusClient;
@@ -52,6 +60,13 @@ export type IsolateContext<Root = IsolateRoot> = {
    * keeps the caret at the end, e.g. to clear a chat box after sending.
    */
   setValue(node: unknown, value: string, opts?: { force?: boolean }): void;
+  /**
+   * Reports an error as this isolate's own: framework adapters call it for a
+   * render error their boundary caught, so in a pool it crashes only this
+   * member, not the whole worker (ADR 0015, decision 8). `fatal` (the
+   * default) crashes the isolate, which the host restarts as usual.
+   */
+  reportError(error: unknown, opts?: { fatal?: boolean }): void;
   /** Runs on stop, within the host's grace period, before the worker goes. */
   onShutdown(fn: (reason: ShutdownReason) => void | Promise<void>): void;
   /**
@@ -125,11 +140,25 @@ export function createVanillaIsolate(
     },
   });
   const onShutdown: ((reason: ShutdownReason) => void | Promise<void>)[] = [];
+  let portal: unknown;
 
   const ctx: IsolateContext<unknown> = {
     id: init.isolateId,
     config: init.config,
     root: render?.root,
+    portalRoot: undefined,
+    reportError(error, o = {}) {
+      const fatal = o.fatal ?? true;
+      const p =
+        error instanceof Error
+          ? {
+              message: error.message,
+              ...(error.stack === undefined ? {} : { stack: error.stack }),
+              fatal,
+            }
+          : { message: String(error), fatal };
+      post({ v: 1, t: 'error', p });
+    },
     host: calls.api,
     bus: bus.client,
     styles: (css) => render?.styles(css),
@@ -143,6 +172,27 @@ export function createVanillaIsolate(
     },
     keepAwake: () => awake.hold(),
   };
+
+  // Made on first read. Not enumerable, so code that walks the context's
+  // properties (React's dev tooling reads props) doesn't make it early.
+  Object.defineProperty(ctx, 'portalRoot', {
+    enumerable: false,
+    get() {
+      if (!render) return undefined;
+      if (!portal) {
+        const { root } = render;
+        const div = root.ownerDocument.createElement('div');
+        div.setAttribute('data-isoloop-portal', '');
+        // Attached after the current task's render has committed: React and
+        // Preact clear the container's other children on their first render.
+        queueMicrotask(() => {
+          if (div.parentNode !== root) root.appendChild(div);
+        });
+        portal = div;
+      }
+      return portal;
+    },
+  });
 
   return {
     ctx,

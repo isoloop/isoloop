@@ -1,7 +1,8 @@
 import type { TopicRef } from '@isoloop/protocol';
 import { createTestContext } from '@isoloop/runtime/testing';
 import { afterEach, describe, expect, it } from 'vitest';
-import { defineIsolate, usePublish, useTopic } from './index';
+import { createPortal } from 'preact/compat';
+import { defineIsolate, usePortalRoot, usePublish, useTopic } from './index';
 
 // M3a task 7: rendering and topics, on the project's Preact major. The
 // context is a test double; the real worker path is the adapter E2E suite.
@@ -79,5 +80,33 @@ describe('Preact adapter: rendering and topics', () => {
   it('refuses a headless context', () => {
     const { ctx } = createTestContext({ id: 'H' });
     expect(() => defineIsolate(() => null).start(ctx)).toThrow(/"H" is headless/);
+  });
+});
+
+describe('Preact adapter: per-isolate boundary and portal root (M2d task 3, ADR 0015)', () => {
+  it("reports a render error as the isolate's own and renders nothing in its place", async () => {
+    const Boom = (): never => {
+      throw new Error('boom');
+    };
+    const { root, errors } = mount(Boom);
+    await settle();
+    expect(errors.map((e) => [String(e.error), e.fatal])).toEqual([['Error: boom', true]]);
+    expect(root.innerHTML).toBe('');
+  });
+
+  it('renders a portal into ctx.portalRoot, inside the root', async () => {
+    function Modal() {
+      return createPortal(<dialog open>hi</dialog>, usePortalRoot());
+    }
+    const { root } = mount(() => (
+      <>
+        <p>app</p>
+        <Modal />
+      </>
+    ));
+    await settle();
+    expect(root.innerHTML).toBe(
+      '<p>app</p><div data-isoloop-portal=""><dialog open="">hi</dialog></div>',
+    );
   });
 });
