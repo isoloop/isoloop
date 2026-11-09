@@ -5,7 +5,9 @@ import { HARNESS, ISOLATES_CORS } from './servers';
 
 // The adapter conformance suite (M3a task 13, the epic's done-criterion): one
 // fixture app per adapter and major (e2e/isolates/adapters, built by
-// e2e/build-adapters.ts), through the same checks on the harness page.
+// e2e/build-adapters.ts), through the same checks on the harness page. Each
+// runs on its own worker and again as a member of a visual pool next to a
+// second instance (M2d, ADR 0015).
 
 const MAJORS = [
   ['preact', 10],
@@ -16,69 +18,76 @@ const MAJORS = [
 
 const el = (page: Page, cls: string) => page.locator(`section[data-id="F"] iso-surface .${cls}`);
 
-async function setup(page: Page, src: string): Promise<void> {
+async function setup(page: Page, src: string, pooled: boolean): Promise<void> {
   await page.goto(HARNESS);
   await expect(page.locator('body[data-ready]')).toBeAttached();
   await page.evaluate(
-    async ({ base, src: file }) => {
+    async ({ base, src: file, inPool }) => {
       const kernel = await window.harness.createBusKernel(new URL('contracts.js', base).href, {
         heartbeat: { blockedAfterMs: 5000 },
       });
       window.kernel = kernel;
-      const surface = document.createElement('section');
-      surface.dataset['id'] = 'F';
-      document.getElementById('root')?.append(surface);
-      kernel.spawn({
-        id: 'F',
-        src: new URL(file, base).href,
-        surface,
-        grants: { publish: ['notes.v1'], subscribe: ['notes.v1'], navigate: true },
-      });
+      // In a pool, a sibling of the same app shares F's worker and document.
+      for (const id of inPool ? ['F', 'G'] : ['F']) {
+        const surface = document.createElement('section');
+        surface.dataset['id'] = id;
+        document.getElementById('root')?.append(surface);
+        kernel.spawn({
+          id,
+          src: new URL(file, base).href,
+          surface,
+          grants: { publish: ['notes.v1'], subscribe: ['notes.v1'], navigate: true },
+          ...(inPool ? { pool: 'p' } : {}),
+        });
+      }
     },
-    { base: ISOLATES_CORS, src },
+    { base: ISOLATES_CORS, src, inPool: pooled },
   );
 }
 
-for (const [fw, major] of MAJORS) {
-  test.describe(`${fw} ${major}`, () => {
-    test.beforeEach(async ({ page }) => {
-      await setup(page, `adapter-${fw}-${major}.js`);
-      await expect(el(page, 'fw')).toHaveText(new RegExp(`^${fw} ${major}\\.`));
-    });
+for (const [fw, major] of MAJORS)
+  for (const pooled of [false, true]) {
+    test.describe(`${fw} ${major}${pooled ? ', in a visual pool' : ''}`, () => {
+      test.beforeEach(async ({ page }) => {
+        await setup(page, `adapter-${fw}-${major}.js`, pooled);
+        await expect(el(page, 'fw')).toHaveText(new RegExp(`^${fw} ${major}\\.`));
+      });
 
-    test('renders, and events round-trip through the bus', async ({ page }) => {
-      await expect(el(page, 'count')).toHaveText('0');
-      await el(page, 'inc').click();
-      await expect(el(page, 'count')).toHaveText('1');
-      await el(page, 'inc').click();
-      await expect(el(page, 'count')).toHaveText('2');
-    });
+      test('renders, and events round-trip through the bus', async ({ page }) => {
+        await expect(el(page, 'count')).toHaveText('0');
+        await el(page, 'inc').click();
+        await expect(el(page, 'count')).toHaveText('1');
+        await el(page, 'inc').click();
+        await expect(el(page, 'count')).toHaveText('2');
+      });
 
-    test('host-owned inputs keep what the user types', async ({ page }) => {
-      const text = 'typed fast';
-      await el(page, 'field').pressSequentially(text, { delay: 10 });
-      await expect(el(page, 'echo')).toHaveText(text.toUpperCase());
-      await expect(el(page, 'field')).toHaveValue(text);
-    });
+      test('host-owned inputs keep what the user types', async ({ page }) => {
+        const text = 'typed fast';
+        await el(page, 'field').pressSequentially(text, { delay: 10 });
+        await expect(el(page, 'echo')).toHaveText(text.toUpperCase());
+        await expect(el(page, 'field')).toHaveValue(text);
+      });
 
-    test('a crash restarts the isolate, which replays its state from the log', async ({ page }) => {
-      await el(page, 'inc').click();
-      await el(page, 'inc').click();
-      await expect(el(page, 'count')).toHaveText('2');
-      await el(page, 'crash').click();
-      await expect
-        .poll(() => page.evaluate(() => window.kernel.isolates().find((s) => s.id === 'F')))
-        .toMatchObject({ state: 'running', restarts: 1 });
-      await expect(el(page, 'count')).toHaveText('2');
-      await el(page, 'inc').click();
-      await expect(el(page, 'count')).toHaveText('3');
-    });
+      test('a crash restarts the isolate, which replays its state from the log', async ({
+        page,
+      }) => {
+        await el(page, 'inc').click();
+        await el(page, 'inc').click();
+        await expect(el(page, 'count')).toHaveText('2');
+        await el(page, 'crash').click();
+        await expect
+          .poll(() => page.evaluate(() => window.kernel.isolates().find((s) => s.id === 'F')))
+          .toMatchObject({ state: 'running', restarts: 1 });
+        await expect(el(page, 'count')).toHaveText('2');
+        await el(page, 'inc').click();
+        await expect(el(page, 'count')).toHaveText('3');
+      });
 
-    test('a route change reaches the component', async ({ page }) => {
-      await expect(el(page, 'path')).toHaveText('/');
-      await el(page, 'go').click();
-      await expect(page).toHaveURL(`${HARNESS}next`);
-      await expect(el(page, 'path')).toHaveText('/next');
+      test('a route change reaches the component', async ({ page }) => {
+        await expect(el(page, 'path')).toHaveText('/');
+        await el(page, 'go').click();
+        await expect(page).toHaveURL(`${HARNESS}next`);
+        await expect(el(page, 'path')).toHaveText('/next');
+      });
     });
-  });
-}
+  }

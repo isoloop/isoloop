@@ -37,6 +37,7 @@ type HarnessKernel = {
     id: string;
     state: string;
     restarts: number;
+    pool?: string;
     surface?: { queued: number; applied: number };
   }[];
   restart(id: string): Promise<void>;
