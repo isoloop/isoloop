@@ -1,11 +1,13 @@
 # Worker pools
 
-By default every isolate gets its own worker ([ADR 0001](../adr/0001-one-worker-per-isolate.md)): its own thread, heap and copy of the runtime, so one isolate that blocks or crashes affects only itself. A **pool** puts several headless isolates in one worker instead. It saves memory and start-up time, and gives up isolation between the members.
+By default every isolate gets its own worker ([ADR 0001](../adr/0001-one-worker-per-isolate.md)): its own thread, heap and copy of the runtime, so one isolate that blocks or crashes affects only itself. A **pool** puts several isolates in one worker instead, headless ones, visual ones (widgets) or both. It saves memory and start-up time, and gives up isolation between the members.
 
 ```ts
 kernel.spawn({ id: 'feed-t1', src: feedUrl, pool: 'machine-t1' });
 kernel.spawn({ id: 'stats-t1', src: statsUrl, pool: 'machine-t1' });
-kernel.spawn({ id: 'alerts', src: alertsUrl }); // its own worker
+kernel.spawn({ id: 'trend-t1', src: trendUrl, surface: trendEl, pool: 'widgets-t1' });
+kernel.spawn({ id: 'gauges-t1', src: gaugesUrl, surface: gaugesEl, pool: 'widgets-t1' });
+kernel.spawn({ id: 'login', src: loginUrl, surface: loginEl }); // its own worker
 ```
 
 Placement belongs to the host: the isolate's code is the same either way, and an isolate can't ask for a pool or refuse one. The pool's worker starts with its first member and goes away after its last.
@@ -13,6 +15,8 @@ Placement belongs to the host: the isolate's code is the same either way, and an
 ## What it saves
 
 Measured for 20 small headless isolates, own workers against one pool ([bench/pools](../../bench/pools/README.md), 2026-11-08): 71–86% less memory and 2–3 times faster start-up on Chromium, Firefox and WebKit. Each worker's fixed cost (thread, engine instance, loaded code) is paid once per pool instead of once per isolate. Isolates with large state of their own save a smaller share, because that state costs the same in a pool. CI reports these numbers on every bench run.
+
+For 8 React widgets fed at the plant dashboard's data rate ([bench/visual-pools](../../bench/visual-pools/README.md), 2026-11-09): 35–64% less memory, start-up up to twice as fast, and no change in the time from a record being published to its patch being applied. Widgets built together share one framework instance in a pool, which is where most of the saving comes from.
 
 ## What members share
 
@@ -23,18 +27,51 @@ Measured for 20 small headless isolates, own workers against one pool ([bench/po
 - **Leftovers.** When one member is stopped or restarted alone, the pool stops routing messages and records to it, but timers it started keep running in the shared worker until they end. Clear them in `ctx.onShutdown`.
 - **Suspension.** A pool suspends only as a whole: when every member asks for `suspend` and all of them are idle. A record or `kernel.resume` for any member wakes the whole pool. Registering a member that asks for `suspend` next to one that never suspends warns once.
 
+## Visual pools
+
+Widgets in a pool each render into their own surface, but inside the worker they share one document, as widgets on one page do ([ADR 0015](../adr/0015-visual-pools.md)). On top of everything above, that means:
+
+- **Members of a pool can read each other's DOM and input.** A member can find another member's nodes through `document`, including what users type into its fields, and a key listener on `document` or `window` hears keystrokes in every member's fields. `kernel.pools()` says so for every pool with a visual member (`sharesDocument`, `warning`). **Keep widgets that handle secrets (passwords, tokens, payment details) on their own worker.**
+- **One focus.** `document.activeElement` is the pool's, as on a page.
+- **Frames.** One `requestAnimationFrame` loop drives every member. A slow render in one widget delays the others' next frame.
+- **Nodes stay with their member.** Moving a node from one member's root into another's throws, in the code doing the move.
+- **Render errors stay the member's own.** The React and Preact adapters catch a render error at the member's root and report it with `ctx.reportError`, so only that widget crashes and restarts. An error thrown from a timer or a shared scheduler can't be traced to a member, so the whole pool restarts.
+- **Headless and visual members can share a pool,** for example a machine's feed with its widgets. They share fate like any members: if the feed hangs, its widgets restart with it.
+- **React and Preact widgets can share a pool,** but the memory saving comes from members sharing one framework instance, so prefer one framework per pool. Widgets built apart from the host ([ADR 0012](../adr/0012-isolates-built-apart.md)) bring their own framework copy and save less.
+
+### Modals, tooltips and toasts
+
+Libraries that render overlays usually append them to `document.body`, which reaches no surface, in a pool or in an own worker. Each visual isolate has a portal container inside its own surface instead: `ctx.portalRoot`, or `usePortalRoot()` in the React and Preact adapters. Point the library at it:
+
+```tsx
+import { createPortal } from 'react-dom';
+import { usePortalRoot } from '@isoloop/react';
+
+function Confirm({ onYes }: { onYes: () => void }) {
+  return createPortal(
+    <dialog open>
+      Delete? <button onClick={onYes}>Yes</button>
+    </dialog>,
+    usePortalRoot(),
+  );
+}
+```
+
+Most overlay libraries take a container option for the same purpose. The portal container is made on first use and lives inside the widget's surface, so the overlay is clipped to the widget. An overlay that must cover the whole page belongs to the host page, not to an isolate.
+
 ## When to pool
 
 | Pool | Keep in its own worker |
 |---|---|
 | Small headless isolates: feeds, adapters, light transforms, state managers | Heavy computation (it holds up the whole pool) |
+| Widgets that belong together: one machine's panel, one feature's views | Widgets that handle secrets (members can read each other's DOM and input) |
 | Isolates that belong together and can fail together (one machine's feeds, one feature) | Code you trust less than its neighbours, or from another team |
 | Many isolates that each do little, where the worker count adds up | Isolates whose crash must not take others down |
 
-Group by what fails together: a pool is a unit of failure. Visual isolates can't join a pool yet: `spawn` rejects one with `pools_headless_only` ([M2d](../plans/m2d-visual-pools.md) adds visual pools).
+Group by what fails together: a pool is a unit of failure.
 
 ## Inspecting pools
 
 - `kernel.isolates()`: each member's `pool`.
-- `kernel.pools()`: each pool's members, whether its worker runs, and its effective grants.
+- `kernel.pools()`: each pool's members, whether its worker runs, its effective grants, and whether its members share a document (`sharesDocument`, with a `warning`).
 - A pool counts as one worker against `workers.budget`.

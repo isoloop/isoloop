@@ -1,6 +1,6 @@
 # M2d: Visual pools
 
-**Status:** planned 2026-11-08; starts after [M2c](m2c-worker-pools.md).
+**Status:** built 2026-11-09 (tasks 0–7; [ADR 0015](../adr/0015-visual-pools.md) accepted, gate passed). Its done-when is met when the plant dashboard ([M3d](m3d-plant-dashboard.md)) ships.
 
 **Goal:** visual isolates (isolates with a surface) can share a pooled worker, alone or together with headless members, each rendering into its own root in the worker's one `isoloop-dom` document ([ADR 0015](../adr/0015-visual-pools.md)), so an app can group about 8 widgets per worker instead of one worker per widget.
 
