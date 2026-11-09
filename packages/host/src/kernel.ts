@@ -181,9 +181,10 @@ const QUOTA_WARN = 0.8;
 export type KernelEvents = {
   'isolate:state': { id: string; state: IsolateState; prev: IsolateState };
   'isolate:ready': { id: string };
-  'isolate:crash': { id: string; reason: CrashReason; message: string };
+  /** `pool`: the isolate's pool, when it is a pool member (M2c); a pool's members crash together. */
+  'isolate:crash': { id: string; reason: CrashReason; message: string; pool?: string };
   /** Past the restart limit, or strategy `never`: the isolate stays down. */
-  'isolate:failed': { id: string; reason: CrashReason; message: string };
+  'isolate:failed': { id: string; reason: CrashReason; message: string; pool?: string };
   'isolate:error': { id: string; message: string };
   /** More live workers than `workers.budget`. Emitted once per kernel. */
   'workers:budget': { live: number; budget: number };
@@ -597,7 +598,11 @@ export function createKernel(config: KernelConfig): Kernel {
               break;
             case 'isolate:crash':
             case 'isolate:failed':
-              emit(fx.event, { id, ...fx.data });
+              emit(fx.event, {
+                id,
+                ...fx.data,
+                ...(slot.manifest.pool === undefined ? {} : { pool: slot.manifest.pool }),
+              });
               break;
             case 'isolate:error':
               emit(fx.event, { id, ...fx.data });
@@ -609,9 +614,34 @@ export function createKernel(config: KernelConfig): Kernel {
   };
 
   const feed = (slot: Slot, input: SupervisorInput): void => {
+    const loaded = slot.loaded;
     const { s, effects } = step(slot.sup, input, cfg);
     slot.sup = s;
     run(slot, effects);
+    if (loaded?.pool !== undefined) poolFate(slot, loaded, effects);
+  };
+
+  /**
+   * A pool's members share fate (M2c, ADR 0001). When one crashes for a
+   * reason that is the worker's (it stopped beating, or the worker itself
+   * errored), every other member on that worker crashes with it, so the
+   * worker is terminated with its last member and they all restart in a new
+   * one, each replaying from its committed offsets. A member's own fatal
+   * error, ready timeout or version mismatch stays that member's: it leaves
+   * the pool alone.
+   */
+  const poolFate = (slot: Slot, loaded: LoadedWorker, effects: SupervisorEffect[]): void => {
+    for (const fx of effects) {
+      if (fx.k !== 'emit' || fx.event !== 'isolate:crash') continue;
+      const { reason, message } = fx.data;
+      if (reason !== 'unresponsive' && reason !== 'worker-error') return;
+      const at = performance.now();
+      const why = `pool "${loaded.pool}" restarted: "${slot.manifest.id}" ${reason === 'unresponsive' ? 'stopped responding' : 'took the worker down'} (${message})`;
+      for (const other of slots.values())
+        if (other !== slot && other.loaded?.worker === loaded.worker)
+          feed(other, { k: 'poolCrash', at, reason, message: why });
+      return;
+    }
   };
 
   /**

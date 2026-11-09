@@ -108,6 +108,11 @@ export type SupervisorInput =
     }
   /** The bus failed its contracts check: stop and fail, no restart. */
   | { k: 'busFailed'; at: number; message: string }
+  /**
+   * Another member of this isolate's pool took the shared worker down (M2c,
+   * ADR 0001): it crashes too, with that member's reason, and restarts.
+   */
+  | { k: 'poolCrash'; at: number; reason: CrashReason; message: string }
   | { k: 'stop' }
   | { k: 'respawn' }
   /** The kernel judged a running isolate idle (ADR 0001). */
@@ -221,6 +226,9 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
 
     case 'workerError':
       return live(s.state) ? crash(s, input.at, 'worker-error', input.message, cfg) : same;
+
+    case 'poolCrash':
+      return live(s.state) ? crash(s, input.at, input.reason, input.message, cfg) : same;
 
     case 'spawnFailed':
       return s.state === 'stopped' || s.state === 'failed'

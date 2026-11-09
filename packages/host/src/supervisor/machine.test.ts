@@ -373,6 +373,29 @@ describe('supervisor transition table', () => {
   });
 });
 
+describe('poolCrash (M2c)', () => {
+  it('crashes a live pool member with the reason of the member that took the worker down', () => {
+    const input: SupervisorInput = {
+      k: 'poolCrash',
+      at: 5,
+      reason: 'unresponsive',
+      message: 'pool "p" restarted',
+    };
+    const out = step(at('running'), input, cfg);
+    expect(out.s).toMatchObject({ state: 'restarting', reason: 'unresponsive', restarts: 1 });
+    expect(out.effects).toContainEqual({ k: 'terminate' });
+    expect(out.effects).toContainEqual(crashed('unresponsive', 'pool "p" restarted'));
+  });
+
+  it('leaves a member alone that is not live', () => {
+    for (const state of ['stopped', 'failed', 'restarting', 'suspended'] as const)
+      expect(
+        step(at(state), { k: 'poolCrash', at: 5, reason: 'worker-error', message: 'x' }, cfg)
+          .effects,
+      ).toEqual([]);
+  });
+});
+
 describe('supervisor edges', () => {
   it('clears reason and error on spawn', () => {
     const { s } = run(at('running'), [
