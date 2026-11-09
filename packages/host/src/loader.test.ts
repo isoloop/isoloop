@@ -42,14 +42,14 @@ const codeOf = (fn: () => unknown): string | undefined => {
 };
 
 describe('placement rules (ADR 0001)', () => {
-  it('accepts a pool for a headless isolate, and rejects one for a visual isolate with pools_headless_only', () => {
+  it('accepts a pool for headless and visual isolates alike (ADR 0015)', () => {
     const k = kernel();
     expect(codeOf(() => k.spawn({ id: 'A', src: counter, pool: 'light' }))).toBeUndefined();
     const surface = document.createElement('div');
-    expect(codeOf(() => k.spawn({ id: 'B', src: counter, surface, pool: 'light' }))).toBe(
-      'pools_headless_only',
-    );
-    expect(k.isolates().map((s) => s.id)).toEqual(['A']);
+    expect(
+      codeOf(() => k.spawn({ id: 'B', src: counter, surface, pool: 'light' })),
+    ).toBeUndefined();
+    expect(k.isolates().map((s) => s.id)).toEqual(['A', 'B']);
   });
 
   it('accepts every suspend setting, and rejects a malformed one with invalid_manifest', () => {

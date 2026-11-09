@@ -1,15 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  createKernel,
-  KernelError,
-  type Kernel,
-  type KernelConfig,
-  type KernelEvents,
-} from './index';
+import { createKernel, type Kernel, type KernelConfig, type KernelEvents } from './index';
 
 // Worker pools, the host side (M2c task 2, ADR 0001): headless isolates naming
 // the same pool share one worker, started with the first member and gone
-// after the last; visual isolates can't join a pool.
+// after the last. Visual pools (M2d, ADR 0015) are in visual-pools.test.ts.
 
 const bootstrap = `${new URL('../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
 const counter = new URL('./__fixtures__/counter.ts', import.meta.url).href;
@@ -90,19 +84,6 @@ describe('worker pools (M2c)', () => {
     k.spawn({ id: 'B', src: counter, pool: 'q' });
     await waitFor(() => running(k, ['A', 'B']));
     expect(k.debug.workers()).toEqual({ live: 2, pools: { p: ['A'], q: ['B'] } });
-  });
-
-  it('rejects a visual isolate with a pool: pools_headless_only', () => {
-    const k = kernel();
-    const surface = document.createElement('div');
-    let code: string | undefined;
-    try {
-      k.spawn({ id: 'V', src: counter, surface, pool: 'p' });
-    } catch (err) {
-      code = err instanceof KernelError ? err.code : 'other';
-    }
-    expect(code).toBe('pools_headless_only');
-    expect(k.isolates()).toEqual([]);
   });
 
   describe('supervision as a group (M2c task 3)', () => {
