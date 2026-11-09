@@ -114,11 +114,16 @@ describe('React adapter: rendering and topics', () => {
   });
 });
 
+const Boom = (): never => {
+  throw new Error('boom');
+};
+
+function Modal() {
+  return createPortal(<dialog open>hi</dialog>, usePortalRoot());
+}
+
 describe('React adapter: per-isolate boundary and portal root (M2d task 3, ADR 0015)', () => {
   it("reports a render error as the isolate's own and renders nothing in its place", async () => {
-    const Boom = (): never => {
-      throw new Error('boom');
-    };
     const { root, errors } = mount(Boom);
     await settle();
     expect(errors.map((e) => [String(e.error), e.fatal])).toEqual([['Error: boom', true]]);
@@ -126,9 +131,6 @@ describe('React adapter: per-isolate boundary and portal root (M2d task 3, ADR 0
   });
 
   it('renders a portal into ctx.portalRoot, inside the root', async () => {
-    function Modal() {
-      return createPortal(<dialog open>hi</dialog>, usePortalRoot());
-    }
     const { root } = mount(() => (
       <>
         <p>app</p>
