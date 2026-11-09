@@ -26,7 +26,7 @@ The maintainer's preference is to own the stack and keep dependencies to a minim
 ## Decision
 
 1. **We write our own render bridge, `isoloop-dom@1`, with no dependency.** It is small and covers exactly what the Preact and React adapters need. Remote DOM isn't used.
-2. **The worker side is a DOM subset**, installed as `document` and the DOM globals only in isolates that have a surface. It provides:
+2. **The worker side is a DOM subset**, installed as `document` and the DOM globals only in isolates that have a surface. In a pooled worker there is still one document, with one render root per visual member ([ADR 0015](0015-visual-pools.md), 2026-11-09). It provides:
    - **Documents and nodes:** `document.createElement`, `createElementNS` (SVG namespace only), `createTextNode`; `Node`, `Element`, `HTMLElement`, `SVGElement`, `Text`.
    - **Tree reads:** `parentNode`, `firstChild`, `lastChild`, `nextSibling`, `childNodes`, `children`, `nodeType`, `nodeName`, `localName`, `tagName`, `namespaceURI`, `ownerDocument`, `nodeValue`, `textContent`, `data`.
    - **Tree writes:** `appendChild`, `insertBefore`, `removeChild`, `replaceChildren`, `append`, `remove`.

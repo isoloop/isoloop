@@ -1,6 +1,6 @@
 # ADR 0015: Visual isolates in pools, one document per worker
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-09)
 - **Date:** 2026-11-09
 - **Amends:** [ADR 0001](0001-one-worker-per-isolate.md) (visual isolates may join a pool) and [ADR 0010](0010-own-render-bridge.md) (one `isoloop-dom` document per worker, now with one render root per member)
 - **Plan:** [M2d](../plans/m2d-visual-pools.md), task 0
@@ -58,7 +58,7 @@ What the frameworks reference was checked in the versions we support (React DOM 
     - pooling saves less than about 30% memory and doesn't start the widgets faster; or
     - the pooled p95 is more than twice the own-worker p95 **and** more than 50 ms.
 
-On acceptance, ADR 0001's staging note and ADR 0010's point 2 get a line pointing here.
+ADR 0001's staging note and ADR 0010's point 2 point here.
 
 ## Consequences
 
