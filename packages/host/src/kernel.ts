@@ -571,10 +571,18 @@ export function createKernel(config: KernelConfig): Kernel {
           shutdown(slot, fx.graceMs, 'suspend');
           break;
         case 'wake':
-          if (!slot.queuedWake) {
-            slot.queuedWake = true;
-            wakeQueue.push(slot);
-          }
+          // Any member's wake condition wakes the whole pool (M2c, ADR 0001).
+          for (const s of slot.manifest.pool === undefined
+            ? [slot]
+            : [...slots.values()].filter(
+                (o) =>
+                  o.manifest.pool === slot.manifest.pool &&
+                  (o === slot || o.sup.state === 'suspended'),
+              ))
+            if (!s.queuedWake) {
+              s.queuedWake = true;
+              wakeQueue.push(s);
+            }
           pumpWakes();
           break;
         case 'spawn':
@@ -826,7 +834,7 @@ export function createKernel(config: KernelConfig): Kernel {
           return;
         }
         case 'beat':
-          slot.idle = msg.p.idle;
+          slot.idle = slot.loaded?.pool === undefined ? msg.p.idle : msg.p.members?.[id];
           if (
             config.dev &&
             !slot.warnedHold &&
@@ -1077,13 +1085,50 @@ export function createKernel(config: KernelConfig): Kernel {
   const visible = (slot: Slot): boolean =>
     Boolean(slot.manifest.surface) && slot.intersecting && !document.hidden;
 
+  /**
+   * Suspendable now (ADR 0001). A pool member only when its whole pool is:
+   * every other member not stopped or failed is idle or already suspended,
+   * so the pool suspends as a whole (M2c).
+   */
   function isIdle(slot: Slot, at: number): boolean {
+    if (!memberIdle(slot, at)) return false;
+    const pool = slot.manifest.pool;
+    if (pool === undefined) return true;
+    for (const other of slots.values()) {
+      if (other === slot || other.manifest.pool !== pool) continue;
+      const st = other.sup.state;
+      if (st === 'stopped' || st === 'failed' || st === 'suspended') continue;
+      if (!memberIdle(other, at)) return false;
+    }
+    return true;
+  }
+
+  function memberIdle(slot: Slot, at: number): boolean {
     const afterMs = suspendAfter(slot.manifest);
     const idle = slot.idle;
     if (afterMs === undefined || slot.sup.state !== 'running' || !idle) return false;
     if (idle.holds.length > 0 || idle.inFlight > 0 || idle.sinceDeliveryMs < afterMs) return false;
     if (slot.manifest.surface && (visible(slot) || at - slot.hiddenSince < afterMs)) return false;
     return true;
+  }
+
+  /** Pools already warned that a member's `suspend` has no effect. */
+  const warnedPools = new Set<string>();
+  /**
+   * Registration warning (M2c): a pool suspends only as a whole, so a member
+   * that asks for `suspend` in a pool with a member that never suspends
+   * never will. Warns once per pool.
+   */
+  function warnPoolSuspend(pool: string): void {
+    if (warnedPools.has(pool)) return;
+    const members = [...slots.values()].filter((s) => s.manifest.pool === pool);
+    const asks = members.filter((s) => suspendAfter(s.manifest) !== undefined);
+    const never = members.filter((s) => suspendAfter(s.manifest) === undefined);
+    if (asks.length === 0 || never.length === 0) return;
+    warnedPools.add(pool);
+    console.warn(
+      `[isoloop] pool "${pool}" suspends only as a whole, and ${never.map((s) => `"${s.manifest.id}"`).join(', ')} never suspends, so \`suspend\` on ${asks.map((s) => `"${s.manifest.id}"`).join(', ')} has no effect (ADR 0001).`,
+    );
   }
 
   /** Starts queued wakes, visible surfaces first in on-screen order, at most `maxWakes` at once. */
@@ -1240,6 +1285,7 @@ export function createKernel(config: KernelConfig): Kernel {
         warnedTopics: new Set(),
       };
       slots.set(manifest.id, slot);
+      if (manifest.pool !== undefined) warnPoolSuspend(manifest.pool);
       if (document.hidden) feed(slot, { k: 'hidden' });
       if (manifest.surface) {
         compositor.attach(manifest.id, manifest.surface, bridgeFor(manifest.id), (event) => {
