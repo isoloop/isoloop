@@ -60,6 +60,24 @@ What the frameworks reference was checked in the versions we support (React DOM 
 
 ADR 0001's staging note and ADR 0010's point 2 point here.
 
+## Gate result (2026-11-09)
+
+Passed on all three engines ([bench/visual-pools](../../bench/visual-pools/README.md), M2d task 1). 8 React widgets in one worker, one document with a root per widget, against 8 own workers, fed at the plant dashboard's data rate (vibration in 50 ms chunks at 1 kHz, slow signals every 200 ms). Medians of 7 runs, each in a fresh browser:
+
+| Engine | Memory, own → pool | Saving | Start-up, own → pool | p95 publish→patch, own → pool |
+|---|---|---|---|---|
+| Chromium | 96.7 → 63.0 MB | 35% | 75 → 36 ms | 9.8 → 9.6 ms |
+| Firefox | 83.3 → 30.4 MB | 64% | 62 → 39 ms | 17.4 → 17.3 ms |
+| WebKit | 132.6 → 66.3 MB | 50% | 35 → 33 ms | 16.8 → 16.6 ms |
+
+Neither stop condition was met: the memory saving is at least 30% everywhere (Chromium's 35% is the closest), and the pooled p95 is within a few tenths of a millisecond of the own-worker p95. Limits:
+
+- **Light widgets:** one event loop keeps up with all 8; heavier widgets in one pool delay each other.
+- **A prototype:** no runtime, supervision or per-member record routing, which the real pool adds.
+- **Frame-quantised latency:** differences smaller than a frame don't show.
+- **Widgets built together** share one React instance; widgets built apart save less.
+- **One machine:** desktop Linux with many cores; the plant dashboard measures a mid-range phone.
+
 ## Consequences
 
 - **Good:**
