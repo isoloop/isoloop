@@ -1,7 +1,7 @@
 <!doctype html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Worker OffscreenCanvas and main-thread responsiveness</title>
+<title>Worker canvas and main-thread responsiveness</title>
 <style>
   body {
     font:
@@ -20,81 +20,211 @@
     height: 90px;
     border: 1px solid #8884;
   }
-  output {
+  output,
+  table {
     font-variant-numeric: tabular-nums;
+  }
+  table {
+    border-collapse: collapse;
+    margin-top: 8px;
+  }
+  td,
+  th {
+    border: 1px solid #8886;
+    padding: 2px 8px;
+    text-align: right;
+  }
+  textarea {
+    width: 100%;
+    max-width: 640px;
+    height: 6em;
   }
 </style>
 <!--
-  Standalone repro, no libraries (docs/investigations/engine-constraints.md).
-  N dedicated workers each draw on an OffscreenCanvas transferred from a
-  <canvas> on this page (transferControlToOffscreen), R times per second.
-  The page itself does nothing but count its own animation frames and timer
-  ticks. If drawing in workers costs no main-thread time, both counters stay
-  near 60/s and 50/s at any N × R.
-  Query: ?workers=24&rate=10 starts at once (for automation); the result is
-  also in window.result after 5 s.
+  Standalone repro, no libraries (docs/investigations/engine-constraints.md,
+  constraint 2). N canvases, each redrawn R times per second, three ways:
+
+  - transfer: a dedicated worker per canvas draws on an OffscreenCanvas
+    transferred from a <canvas> on this page (transferControlToOffscreen).
+    The worker presents whenever it draws.
+  - bitmap: a dedicated worker per canvas draws on its own OffscreenCanvas,
+    takes the frame with transferToImageBitmap and posts it. The page shows
+    the newest frame per canvas in its animation frame (bitmaprenderer) and
+    then acks; a worker skips its draws until its last frame was acked, so the
+    page never shows more than one frame per canvas per animation frame.
+  - main: the page draws the same picture on a plain <canvas> itself, on one
+    timer per canvas (what a native build does).
+
+  The page counts its own animation frames, 20 ms timer ticks and the longest
+  frame gap. If drawing costs no main-thread time, those stay near 60/s, 50/s
+  and ~17 ms. "Shown/s" counts frames that reached a canvas on the page
+  (bitmap and main only; transfer presents aren't visible to the page).
+
+  Type in the box while it runs: "typing" is the time from keydown to the
+  next animation frame after it, the latest and the worst in the last second.
+
+  "Run all" goes through every mode at each load, 5 s each, and fills the
+  table and the JSON box. The transfer cases run last, lightest first, because
+  a stopped page stops the sequence: the row that says "running" is the one
+  that stopped it.
+
+  Query: ?workers=24&rate=10&mode=transfer|bitmap|main starts at once (for
+  automation; mode defaults to transfer); the result is in window.result
+  after 5 s. ?all runs "Run all" at once.
 -->
 <p>
-  Workers <input id="n" type="number" value="24" min="1" max="64" /> draws/s each
+  Canvases <input id="n" type="number" value="24" min="1" max="64" /> draws/s each
   <input id="r" type="number" value="10" min="1" max="120" />
+  <select id="mode">
+    <option value="transfer">transfer (worker, transferred canvas)</option>
+    <option value="bitmap">bitmap (worker, ImageBitmap to the page)</option>
+    <option value="main">main (page draws)</option>
+  </select>
   <button id="go">Start</button>
   <button id="stop">Stop</button>
+  <button id="all">Run all</button>
 </p>
 <p>
-  Canvas updates/s requested: <output id="req">0</output> · main-thread animation frames/s:
-  <output id="fps">–</output> · main-thread 20 ms timer ticks/s: <output id="ticks">–</output> ·
-  longest frame gap: <output id="gap">–</output>
+  Canvas updates/s requested: <output id="req">0</output> · shown/s: <output id="shown">–</output> ·
+  main-thread animation frames/s: <output id="fps">–</output> · 20 ms timer ticks/s:
+  <output id="ticks">–</output> · longest frame gap: <output id="gap">–</output> · typing:
+  <output id="typing">–</output>
 </p>
+<p><input id="type" placeholder="type here while it runs" size="40" /></p>
+<p id="ua"></p>
+<table id="table" hidden>
+  <thead>
+    <tr>
+      <th>mode</th>
+      <th>canvases × draws/s</th>
+      <th>requested/s</th>
+      <th>shown/s</th>
+      <th>frames/s</th>
+      <th>ticks/s</th>
+      <th>longest gap</th>
+      <th>wall time for 5 s</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+<p><textarea id="json" readonly hidden></textarea></p>
 <div id="grid"></div>
 <script>
-  const WORKER = `
-    let ctx, w, h, n = 0;
+  const DRAW = `
+    function draw(ctx, w, h, n) {
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#36c'; ctx.beginPath();
+      for (let x = 0; x <= w; x += 4) ctx.lineTo(x, h / 2 + Math.sin((x + n * 7) / 17) * h / 3);
+      ctx.stroke();
+    }`;
+  // One worker script for both worker modes.
+  const WORKER = `${DRAW}
+    let n = 0, waiting = false, off, ctx;
     onmessage = (e) => {
-      const { canvas, rate } = e.data;
-      ctx = canvas.getContext('2d'); w = canvas.width; h = canvas.height;
+      if (e.data === 'ack') { waiting = false; return; }
+      const { canvas, rate, mode } = e.data;
+      off = canvas ?? new OffscreenCanvas(320, 180);
+      ctx = off.getContext('2d');
       setInterval(() => {
         n++;
-        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
-        ctx.strokeStyle = '#36c'; ctx.beginPath();
-        for (let x = 0; x <= w; x += 4) ctx.lineTo(x, h / 2 + Math.sin((x + n * 7) / 17) * h / 3);
-        ctx.stroke();
+        if (mode === 'bitmap') {
+          if (waiting) return; // the page hasn't shown the last frame yet
+          draw(ctx, off.width, off.height, n);
+          const bmp = off.transferToImageBitmap();
+          waiting = true;
+          postMessage(bmp, [bmp]);
+        } else {
+          draw(ctx, off.width, off.height, n);
+        }
       }, 1000 / rate);
     };`;
+  eval(DRAW); // the same draw() on the main thread
   const url = URL.createObjectURL(new Blob([WORKER], { type: 'text/javascript' }));
-  let workers = [];
   const grid = document.getElementById('grid');
+  const $ = (id) => document.getElementById(id);
+  document.getElementById('ua').textContent = navigator.userAgent;
+
+  let workers = [],
+    timers = [],
+    pending = new Map(), // canvas index → { bmp, ctx, worker }
+    shown = 0;
+
   function stop() {
     for (const w of workers) w.terminate();
+    for (const t of timers) clearInterval(t);
+    for (const p of pending.values()) p.bmp.close();
     workers = [];
+    timers = [];
+    pending = new Map();
     grid.textContent = '';
-    document.getElementById('req').value = 0;
+    $('req').value = 0;
   }
-  function start(n, rate) {
+
+  function start(n, rate, mode) {
     stop();
     for (let i = 0; i < n; i++) {
       const c = document.createElement('canvas');
       c.width = 320;
       c.height = 180;
       grid.append(c);
-      const off = c.transferControlToOffscreen();
+      if (mode === 'main') {
+        const ctx = c.getContext('2d');
+        let k = 0;
+        timers.push(
+          setInterval(() => {
+            draw(ctx, c.width, c.height, ++k);
+            shown++;
+          }, 1000 / rate),
+        );
+        continue;
+      }
       const w = new Worker(url);
-      w.postMessage({ canvas: off, rate }, [off]);
+      if (mode === 'transfer') {
+        const off = c.transferControlToOffscreen();
+        w.postMessage({ canvas: off, rate, mode }, [off]);
+      } else {
+        const ctx = c.getContext('bitmaprenderer');
+        w.onmessage = (e) => {
+          const old = pending.get(i);
+          if (old) old.bmp.close();
+          pending.set(i, { bmp: e.data, ctx, worker: w });
+        };
+        w.postMessage({ rate, mode });
+      }
       workers.push(w);
     }
-    document.getElementById('req').value = n * rate;
+    $('req').value = n * rate;
   }
+
   // Main-thread counters, reported once a second.
   let frames = 0,
     ticks = 0,
     last = 0,
-    gap = 0;
+    gap = 0,
+    keyAt = 0,
+    typing = [];
   const raf = (t) => {
     if (last) gap = Math.max(gap, t - last);
     last = t;
     frames++;
+    if (pending.size) {
+      for (const p of pending.values()) {
+        p.ctx.transferFromImageBitmap(p.bmp);
+        p.worker.postMessage('ack');
+        shown++;
+      }
+      pending.clear();
+    }
+    if (keyAt) {
+      typing.push(performance.now() - keyAt);
+      keyAt = 0;
+    }
     requestAnimationFrame(raf);
   };
   requestAnimationFrame(raf);
+  $('type').addEventListener('keydown', (e) => {
+    keyAt = e.timeStamp || performance.now();
+  });
   setInterval(() => ticks++, 20);
   const history = [];
   let mark = performance.now();
@@ -106,26 +236,88 @@
       fps: Math.round(frames / s),
       ticks: Math.round(ticks / s),
       gapMs: Math.round(gap),
+      shown: Math.round(shown / s),
     };
     history.push(row);
-    document.getElementById('fps').value = row.fps;
-    document.getElementById('ticks').value = row.ticks;
-    document.getElementById('gap').value = row.gapMs + ' ms';
-    frames = 0;
-    ticks = 0;
-    gap = 0;
+    $('fps').value = row.fps;
+    $('ticks').value = row.ticks;
+    $('gap').value = row.gapMs + ' ms';
+    $('shown').value = row.shown;
+    if (typing.length)
+      $('typing').value =
+        `${Math.round(typing.at(-1))} ms (worst ${Math.round(Math.max(...typing))} ms)`;
+    frames = ticks = gap = shown = 0;
+    typing = [];
   }, 1000);
-  document.getElementById('go').onclick = () =>
-    start(+document.getElementById('n').value, +document.getElementById('r').value);
-  document.getElementById('stop').onclick = stop;
+
+  const median = (xs) => {
+    const s = [...xs].sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)];
+  };
+  // Runs one case for 5 s; resolves with the medians of its last 3 readings.
+  function measure(n, rate, mode) {
+    start(n, rate, mode);
+    const t0 = performance.now();
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        const h = history.slice(-3);
+        resolve({
+          mode,
+          canvases: n,
+          rate,
+          requested: n * rate,
+          shown: mode === 'transfer' ? null : median(h.map((r) => r.shown)),
+          fps: median(h.map((r) => r.fps)),
+          ticks: median(h.map((r) => r.ticks)),
+          gapMs: median(h.map((r) => r.gapMs)),
+          wallMs: Math.round(performance.now() - t0),
+        });
+      }, 5000),
+    );
+  }
+
+  // Loads around the plant dashboard's (24 canvases, 8 of them redrawn every
+  // frame) and the constraint's table.
+  const LOADS = [
+    [8, 10],
+    [24, 5],
+    [24, 10],
+    [8, 60],
+    [24, 30],
+    [24, 60],
+  ];
+  async function runAll() {
+    const body = $('table').tBodies[0];
+    body.textContent = '';
+    $('table').hidden = false;
+    $('json').hidden = false;
+    const results = [];
+    const cases = [
+      ...['main', 'bitmap'].flatMap((m) => LOADS.map(([n, r]) => [n, r, m])),
+      ...LOADS.map(([n, r]) => [n, r, 'transfer']),
+    ];
+    for (const [n, r, m] of cases) {
+      const tr = body.insertRow();
+      tr.innerHTML = `<td>${m}</td><td>${n} × ${r}</td><td>${n * r}</td><td colspan="5">running</td>`;
+      const res = await measure(n, r, m);
+      tr.innerHTML = `<td>${m}</td><td>${n} × ${r}</td><td>${n * r}</td><td>${res.shown ?? '–'}</td><td>${res.fps}</td><td>${res.ticks}</td><td>${res.gapMs} ms</td><td>${res.wallMs} ms</td>`;
+      results.push(res);
+      $('json').value = JSON.stringify({ userAgent: navigator.userAgent, results }, null, 1);
+    }
+    stop();
+    window.result = results;
+  }
+
+  $('go').onclick = () => start(+$('n').value, +$('r').value, $('mode').value);
+  $('stop').onclick = stop;
+  $('all').onclick = runAll;
   const q = new URLSearchParams(location.search);
-  if (q.has('workers')) {
-    start(+q.get('workers'), +(q.get('rate') ?? 10));
+  if (q.has('all')) runAll();
+  else if (q.has('workers')) {
     // The 1 s report interval is a timer too: if the main thread stalls, it
     // fires late, and the wall-clock time below shows it.
-    const t0 = performance.now();
-    setTimeout(() => {
-      window.result = { wallMs: Math.round(performance.now() - t0), history: history.slice(-4) };
-    }, 5000);
+    measure(+q.get('workers'), +(q.get('rate') ?? 10), q.get('mode') ?? 'transfer').then((r) => {
+      window.result = { wallMs: r.wallMs, history: history.slice(-4), ...r };
+    });
   }
 </script>
