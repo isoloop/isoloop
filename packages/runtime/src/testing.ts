@@ -35,6 +35,8 @@ export type TestContextOptions = {
 
 export type TestContext = {
   readonly ctx: IsolateContext;
+  /** What `ctx.reportError` got, in order. */
+  readonly errors: { error: unknown; fatal: boolean }[];
   /** Delivers a record to every subscription on `topic`, in order. */
   emit: (topic: string, value: unknown, key?: string) => void;
   /** Runs `onReset` of every subscription on `topic` (a bus restart lost it, ADR 0007). */
@@ -53,7 +55,9 @@ export function createTestContext(o: TestContextOptions = {}): TestContext {
   const subs = new Set<Sub>();
   const published: TestContext['published'] = [];
   const shutdownFns: ((reason: ShutdownReason) => void | Promise<void>)[] = [];
+  const errors: TestContext['errors'] = [];
   let offset = 0;
+  let portal: object | undefined;
 
   const bus: BusClient = {
     publish(topic, rec) {
@@ -117,6 +121,10 @@ export function createTestContext(o: TestContextOptions = {}): TestContext {
     config: o.config ?? null,
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- any element on the test page will do
     root: o.root as IsolateRoot | undefined,
+    portalRoot: undefined,
+    reportError: (error, ro = {}) => {
+      errors.push({ error, fatal: ro.fatal ?? true });
+    },
     host,
     bus,
     styles: () => {},
@@ -127,8 +135,37 @@ export function createTestContext(o: TestContextOptions = {}): TestContext {
     keepAwake: () => () => {},
   };
 
+  // Made on first read, and not enumerable, as in the runtime.
+  Object.defineProperty(ctx, 'portalRoot', {
+    enumerable: false,
+    get() {
+      const root = o.root;
+      if (!root) return undefined;
+      if (!portal) {
+        // Any DOM-like root: its document makes the container (no DOM lib here).
+        const doc: unknown = Reflect.get(root, 'ownerDocument');
+        const make: unknown = doc ? Reflect.get(doc, 'createElement') : undefined;
+        if (typeof make !== 'function') return undefined;
+        const div: unknown = Reflect.apply(make, doc, ['div']);
+        if (typeof div !== 'object' || div === null) return undefined;
+        const set: unknown = Reflect.get(div, 'setAttribute');
+        const add: unknown = Reflect.get(root, 'appendChild');
+        if (typeof set !== 'function' || typeof add !== 'function') return undefined;
+        Reflect.apply(set, div, ['data-isoloop-portal', '']);
+        // After the render that asked for it has committed, as in the runtime.
+        queueMicrotask(() => {
+          if (Reflect.get(div, 'parentNode') !== root) Reflect.apply(add, root, [div]);
+        });
+        portal = div;
+      }
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- an element on the test page
+      return portal as IsolateRoot;
+    },
+  });
+
   return {
     ctx,
+    errors,
     published,
     emit(topic, value, key) {
       const rec: BusRecord = {

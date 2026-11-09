@@ -3,7 +3,7 @@
  * host hooks, on React 18 and 19.
  */
 export { defineIsolate, type IsolateProps } from './define';
-export { useIsolate } from './context';
+export { useIsolate, usePortalRoot } from './context';
 export { usePublish, useTopic, type UseTopicOptions } from './hooks/topic';
 export { useRequest, type RequestOptions } from './hooks/request';
 export { useHost } from './hooks/host';
