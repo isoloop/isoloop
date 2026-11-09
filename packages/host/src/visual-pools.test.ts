@@ -10,6 +10,7 @@ const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
 const widget = new URL('./__fixtures__/pool-widget.ts', import.meta.url).href;
 const feed = new URL('./__fixtures__/pool-feed.ts', import.meta.url).href;
+const reach = new URL('./__fixtures__/pool-reach.ts', import.meta.url).href;
 
 const kernels: Kernel[] = [];
 afterEach(async () => {
@@ -135,5 +136,32 @@ describe('visual pools (M2d)', () => {
       await kernel.destroy();
       document.body.replaceChildren();
     }
+  });
+
+  describe('host calls and events per member (M2d task 5)', () => {
+    it("a member can't reach another member's node, through ctx.host or a forged call", async () => {
+      const { kernel } = setup();
+      const reports: Record<string, unknown>[] = [];
+      kernel.subscribe(report, (r) => reports.push(r.value), { from: 'earliest' });
+      for (const [id, role] of [
+        ['T', 'target'],
+        ['P', 'prober'],
+      ] as const) {
+        const surface = document.createElement('section');
+        document.body.append(surface);
+        kernel.spawn({ id, src: reach, surface, grants: ALL, pool: 'p', config: { role } });
+      }
+      await until(() => reports.some((r) => r['id'] === 'P'));
+      expect(reports.find((r) => r['id'] === 'P')).toEqual({
+        id: 'P',
+        // The shared document lets it find the node (ADR 0015, decision 6)...
+        found: true,
+        // ...but the host answers only about its own.
+        ownMeasure: 'ok',
+        otherMeasure: 'not_found',
+        otherFocus: 'not_found',
+        forged: 'not_found',
+      });
+    });
   });
 });
