@@ -161,6 +161,8 @@ export class KernelError extends Error {
 export type IsolateSnapshot = {
   id: string;
   state: IsolateState;
+  /** The pool it runs in (M2c, ADR 0001); absent for an own worker. */
+  pool?: string;
   /** `performance.now()` of the last beat. */
   lastBeatAt: number;
   lagMs: number;
@@ -173,6 +175,20 @@ export type IsolateSnapshot = {
   dropped: number;
   /** Open `ctx.keepAwake()` holds, from the last beat (devtools). */
   holds?: { ageMs: number; stack?: string }[];
+};
+
+/** A named pool (M2c, ADR 0001), for devtools. */
+export type PoolSnapshot = {
+  name: string;
+  /** Isolates naming this pool, not stopped, in spawn order. */
+  members: string[];
+  /** True while the pool's worker runs. */
+  running: boolean;
+  /**
+   * What the pool can do in effect: the union of its members' grants.
+   * Members share a worker, so one member can reach another's bus port.
+   */
+  grants: Grants;
 };
 
 /** `bus:quota` fires once storage use reaches this share of the quota. */
@@ -284,6 +300,8 @@ export interface Kernel {
   ): () => void;
   on<E extends KernelEvent>(event: E, fn: (e: KernelEvents[E]) => void): () => void;
   isolates(): IsolateSnapshot[];
+  /** Named pools with members (M2c): members, whether the worker runs, effective grants. */
+  pools(): PoolSnapshot[];
   /**
    * The host's router changed the URL: republish `isoloop.route.v1` if
    * `href` or `state` differ (ADR 0002). Wire it once, e.g.
@@ -1179,6 +1197,7 @@ export function createKernel(config: KernelConfig): Kernel {
     return {
       id: slot.manifest.id,
       state,
+      ...(slot.manifest.pool === undefined ? {} : { pool: slot.manifest.pool }),
       lastBeatAt,
       lagMs,
       restarts,
@@ -1317,6 +1336,30 @@ export function createKernel(config: KernelConfig): Kernel {
 
     isolates() {
       return [...slots.values()].map(snapshot);
+    },
+
+    pools() {
+      const running = loader.pools();
+      const out = new Map<string, PoolSnapshot>();
+      for (const slot of slots.values()) {
+        const name = slot.manifest.pool;
+        if (name === undefined || slot.sup.state === 'stopped') continue;
+        const g = slot.manifest.grants ?? DEFAULT_GRANTS;
+        const pool = out.get(name) ?? {
+          name,
+          members: [],
+          running: name in running,
+          grants: { publish: [], subscribe: [] },
+        };
+        pool.members.push(slot.manifest.id);
+        for (const t of g.publish)
+          if (!pool.grants.publish.includes(t)) pool.grants.publish.push(t);
+        for (const t of g.subscribe)
+          if (!pool.grants.subscribe.includes(t)) pool.grants.subscribe.push(t);
+        if (g.navigate) pool.grants.navigate = true;
+        out.set(name, pool);
+      }
+      return [...out.values()];
     },
 
     syncRoute() {
