@@ -20,6 +20,7 @@ import {
   type IsolateToHost,
   type ShutdownReason,
 } from '@isoloop/protocol';
+import { freezeBuiltins } from './freeze';
 import type { VanillaRuntime } from './vanilla';
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -198,7 +199,12 @@ self.addEventListener('message', (e: MessageEvent<unknown>) => {
   const wants: Mode = name === undefined ? 'own' : 'pool';
   // An own worker takes one init; a pool takes one per member.
   if (mode === 'own' || (mode === 'pool' && wants === 'own')) return;
-  mode ??= wants;
+  if (mode === null) {
+    mode = wants;
+    // Pool members share this realm: freeze the built-ins before any member
+    // loads, so one can't patch them for the others (M2c decision 6).
+    if (mode === 'pool') freezeBuiltins();
+  }
   if (members.has(name)) return;
   const m: Member = {
     name,

@@ -160,4 +160,22 @@ describe('bootstrap as a pool', () => {
     await new Promise((r) => setTimeout(r, 300));
     expect(of(q.got, 'ready', 'x')).toEqual([]);
   });
+
+  it('freezes the built-ins in a pool: a member cannot patch them, but can still override on instances', async () => {
+    const p = pool();
+    p.add('a', 'patch');
+    await until(() => published(p.bus.get('a')).length > 0);
+    expect(published(p.bus.get('a'))).toEqual([
+      { patched: false, override: 'MyError', frozen: true },
+    ]);
+  });
+
+  it('leaves an own worker’s built-ins alone', async () => {
+    const p = pool();
+    p.add(undefined, 'patch');
+    await until(() => published(p.bus.get('(own)')).length > 0);
+    expect(published(p.bus.get('(own)'))).toEqual([
+      { patched: true, override: 'MyError', frozen: false },
+    ]);
+  });
 });
