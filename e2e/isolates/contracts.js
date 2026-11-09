@@ -32,7 +32,21 @@ export const saved = {
   durability: 'persistent',
 };
 
-const topics = [notes, headless, saved];
+/** Input for the pools suite (M2c): numbers each member reads from `committed`. */
+export const feed = {
+  name: 'feed.v1',
+  schema: schema((v) => typeof v === 'number'),
+  retention: { kind: 'last-n', n: 1000 },
+};
+
+/** What each pool-suite member reports: id, start instance, values seen. */
+export const pooled = {
+  name: 'pooled.v1',
+  schema: schema((v) => typeof v === 'object' && v !== null),
+  retention: { kind: 'last-n', n: 10_000 },
+};
+
+const topics = [notes, headless, saved, feed, pooled];
 
 export default {
   '~isoloop': 'contracts',
