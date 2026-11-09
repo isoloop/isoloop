@@ -1,6 +1,6 @@
 # Investigation: engine constraints Isoloop runs into
 
-- **Date:** 2026-11-08
+- **Date:** 2026-11-08 (§9 added 2026-11-09)
 - **Question:** which limits of today's browsers and engines shape what Isoloop can do, how much does each cost us, and what do we do about it?
 - **Answer:** the biggest one is structural: a document has exactly one thread that can touch its DOM, so everything an isolate shows passes through the page's main thread. Most of the others are consequences of that, or limits on how we can measure it. On Playwright's Linux WebKit, showing frames that workers draw on transferred canvases costs main-thread time, and at the markets dashboard's Heavy size it is most of Isoloop's typing latency there (§2). Each section gives a repro, the impact on Isoloop, what we do today, and what an engine without the limit would do.
 
@@ -116,3 +116,13 @@ Earlier local numbers (examples #35's investigation) were higher, 348 ms at Heav
 - **Impact:** a throttled run slows native's widgets and not Isoloop's, so it isn't a like-for-like slower device. The markets comparison has no throttled column for that reason, and throttled screenshots taken by hand in DevTools favour Isoloop the same way.
 - **Today:** comparisons run unthrottled, on real core counts (`taskset`), and on real devices.
 - **An engine without the limit:** throttling that applies to the whole renderer, workers included.
+
+## 9. WebKit evaluates a module worker's entry again when it's imported by URL
+
+- **What:** in a module worker, when one of the worker's own modules imports the worker's entry script by its URL, WebKit evaluates the entry a second time, as a separate module instance with its own top-level state and listeners. Chromium and Firefox return the entry from the worker's module map, as the HTML Standard intends. This is [WebKit bug 324459](https://bugs.webkit.org/show_bug.cgi?id=324459), fixed in WebKit's main branch as [323507@main](https://commits.webkit.org/323507@main) on 2026-10-12; no Safari release is named on the bug yet.
+- **Repro:** [`webkit-worker-entry-reimport.html`](assets/webkit-worker-entry-reimport.html), one file, no library code: the entry counts its evaluations, and on a message imports a module that imports `import.meta.url`. Chromium 156 and Firefox 157: 1 evaluation, one reply per message. Playwright's WebKit 27.2: 2 evaluations, two replies per message.
+- **Impact on Isoloop:** bundlers put code shared with the lazily loaded `vanilla` chunk into the bootstrap's chunk, so `vanilla` imported the worker's entry back, and every isolate worker on WebKit got a second bootstrap with its own `message` listener.
+  - **Own workers:** the second copy never received an `init` (the host sends one, before the copy exists) and posted nothing: checked on WebKit with the production builds of the E2E harness and the four-loops example, counting `init`, patches, `ready` and bus publishes per bootstrap copy. Behaviour and the WebKit figures in §2 and the M3c write-up are unaffected; the cost was one extra module evaluation per worker.
+  - **Pools (M2c, M2d):** the second copy booted a restarted member a second time and called `self.close()` when that copy left, so the pool's heartbeat stopped and the whole pool restarted after a member's second restart.
+- **Today:** the bootstrap starts once per worker, under a `Symbol.for('isoloop.bootstrap')` marker on the worker's global, and a second copy stays inert (with a warning in Vite dev). `@isoloop/vite` loads `@isoloop/runtime/worker`, a tiny entry that holds the host's messages, imports the bootstrap and replays them, so no chunk imports the entry; a build test checks that. Isolates built apart that start the bootstrap directly rely on the guard. The M2d E2E restarts a pooled widget repeatedly on all three engines.
+- **An engine without the limit:** the worker's top-level module script is registered in the module map under its URL, which is what 323507@main does.

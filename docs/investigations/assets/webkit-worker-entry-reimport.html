@@ -1,0 +1,48 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Module worker entry re-evaluated when imported</title>
+<!--
+  Standalone repro, no library code (docs/investigations/engine-constraints.md).
+  A module worker's entry counts its own evaluations and adds a message
+  listener; on 'load' it imports a module that imports the entry back by its
+  own URL (import.meta.url). Expected (HTML module map): the entry evaluates
+  once and each message gets one reply. WebKit bug 324459, fixed in WebKit
+  main as 323507@main: the entry evaluates twice and both copies reply.
+-->
+<pre id="out">running…</pre>
+<script>
+  const entry = `
+    self.__evals = (self.__evals || 0) + 1;
+    const instance = self.__evals;
+    export const shared = 1;
+    self.addEventListener('message', async (e) => {
+      if (e.data === 'load') {
+        const child = URL.createObjectURL(new Blob(
+          ['import { shared } from ' + JSON.stringify(import.meta.url) + '; export default shared;'],
+          { type: 'text/javascript' }));
+        await import(child);
+      }
+      self.postMessage({ instance, evals: self.__evals, got: e.data });
+    });`;
+  const worker = new Worker(URL.createObjectURL(new Blob([entry], { type: 'text/javascript' })), {
+    type: 'module',
+  });
+  const replies = [];
+  worker.onmessage = (e) => replies.push(e.data);
+  worker.postMessage('load');
+  setTimeout(() => worker.postMessage('after'), 300);
+  setTimeout(() => {
+    const evals = Math.max(...replies.map((r) => r.evals));
+    const afterReplies = replies.filter((r) => r.got === 'after').length;
+    const ok = evals === 1 && afterReplies === 1;
+    window.result = { ok, evals, afterReplies, replies };
+    document.getElementById('out').textContent =
+      (ok
+        ? 'PASS: the entry evaluated once\n'
+        : 'FAIL: the entry evaluated ' +
+          evals +
+          ' times; ' +
+          afterReplies +
+          ' replies to one message\n') + JSON.stringify(replies, null, 1);
+  }, 800);
+</script>
