@@ -15,7 +15,7 @@ type HarnessKernel = {
   on(event: 'isolate:ready', fn: (e: { id: string }) => void): () => void;
   on(
     event: 'isolate:crash',
-    fn: (e: { id: string; reason: string; message: string }) => void,
+    fn: (e: { id: string; reason: string; message: string; pool?: string }) => void,
   ): () => void;
   on(
     event: 'isolate:state',
@@ -47,7 +47,7 @@ type HarnessKernel = {
 
 type HarnessConfig = {
   supervisor?: { strategy?: 'one-for-one' | 'never' };
-  heartbeat?: { blockedAfterMs?: number; killAfterMs?: number };
+  heartbeat?: { everyMs?: number; blockedAfterMs?: number; killAfterMs?: number };
   budget?: number;
   routing?: boolean;
   basePath?: string;
