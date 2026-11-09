@@ -209,7 +209,8 @@ interface Kernel {
   publish<In>(topic: TopicRef<In>, rec: { key?: string; value: In }): Promise<void>;   // rejects with a BusError
   subscribe<Out>(topic: TopicRef<unknown, Out>, fn: (r: TypedRecord<Out>) => void, opts?: { from?: StartPosition }): () => void;   // from 'latest' by default
   on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:ready, bus:crash, bus:recovered, bus:durability-degraded, bus:quota, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
-  isolates(): IsolateSnapshot[];                                      // used by devtools
+  isolates(): IsolateSnapshot[];                                      // used by devtools; `pool` for pool members (M2c)
+  pools(): PoolSnapshot[];                                            // M2c: members, worker running, effective grants (union)
   syncRoute(): void;                                   // host router changed the URL; republish isoloop.route.v1 if href/state differ (ADR 0002)
   dropTopic(name: string, o?: { force?: boolean }): Promise<void>;   // M2b: delete an orphaned persistent topic; seed_pending / force rules (ADR 0003)
   destroy(): Promise<void>;

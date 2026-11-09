@@ -168,4 +168,48 @@ describe('worker pools (M2c)', () => {
       expect(k.debug.workers().pools).toEqual({ p: ['B'] });
     });
   });
+
+  describe('budget, grants and devtools data (M2c task 5)', () => {
+    it('reports each isolate’s pool, and each pool’s members, worker and effective grants', async () => {
+      const k = kernel();
+      k.spawn({
+        id: 'A',
+        src: counter,
+        pool: 'p',
+        grants: { publish: ['a.out'], subscribe: ['in.*'] },
+      });
+      k.spawn({
+        id: 'B',
+        src: counter,
+        pool: 'p',
+        grants: { publish: ['b.out'], subscribe: ['in.*', 'b.in'], navigate: true },
+      });
+      k.spawn({ id: 'D', src: counter });
+      await waitFor(() => running(k, ['A', 'B', 'D']));
+      expect(k.isolates().map((s) => [s.id, s.pool])).toEqual([
+        ['A', 'p'],
+        ['B', 'p'],
+        ['D', undefined],
+      ]);
+      expect(k.pools()).toEqual([
+        {
+          name: 'p',
+          members: ['A', 'B'],
+          running: true,
+          grants: { publish: ['a.out', 'b.out'], subscribe: ['in.*', 'b.in'], navigate: true },
+        },
+      ]);
+      await k.stop('A');
+      expect(k.pools()).toEqual([
+        {
+          name: 'p',
+          members: ['B'],
+          running: true,
+          grants: { publish: ['b.out'], subscribe: ['in.*', 'b.in'], navigate: true },
+        },
+      ]);
+      await k.stop('B');
+      expect(k.pools()).toEqual([]);
+    });
+  });
 });

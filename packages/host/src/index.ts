@@ -5,6 +5,7 @@ export {
   type IsolateHandle,
   type IsolateManifest,
   type IsolateSnapshot,
+  type PoolSnapshot,
   type Kernel,
   type KernelConfig,
   type KernelEvent,
