@@ -411,9 +411,11 @@ export class TsEngine implements LogEngine {
   /** Drops every record below `offset` (last-n). */
   #dropBelow(t: Topic, offset: number): void {
     if (offset <= t.tail) return;
-    t.live -= this.#countLive(t, t.tail, offset);
+    const from = t.tail;
+    t.live -= this.#countLive(t, from, offset);
     t.tail = offset;
     this.#freeChunks(t);
+    this.#clearBelowTail(t, from);
   }
 
   /** Records in `[from, to)` still held. Last-n topics have no holes, so this is `to - from` there. */
@@ -426,6 +428,7 @@ export class TsEngine implements LogEngine {
 
   /** Drops records from the tail while the oldest is older than `cutoff` (time). */
   #expire(t: Topic, cutoff: number): void {
+    const from = t.tail;
     let o = t.tail;
     // Evicted chunks expire whole, once their newest record has: their
     // records aren't in memory to check one by one.
@@ -438,6 +441,7 @@ export class TsEngine implements LogEngine {
       if (s.maxTs >= cutoff) {
         t.tail = o;
         this.#freeChunks(t);
+        this.#clearBelowTail(t, from);
         return;
       }
       t.live -= s.count;
@@ -452,6 +456,21 @@ export class TsEngine implements LogEngine {
     }
     t.tail = Math.min(o, t.head);
     this.#freeChunks(t);
+    this.#clearBelowTail(t, from);
+  }
+
+  /**
+   * Clears the slots in `[from, tail)` that are still in a held chunk:
+   * `#freeChunks` frees whole chunks only, so without this a slow topic keeps
+   * its expired records referenced until the chunk holding its tail fills,
+   * minutes at a few records a second (plant memory investigation, #162).
+   * Each record is cleared once, as the tail passes it.
+   */
+  #clearBelowTail(t: Topic, from: number): void {
+    for (let o = Math.max(from, t.base * this.#size); o < t.tail; o++) {
+      const chunk = this.#chunkOf(t, o);
+      if (chunk) chunk[o % this.#size] = undefined;
+    }
   }
 
   /** Drops records superseded by a later record with the same key; keyless records stay. */
@@ -540,6 +559,13 @@ export class TsEngine implements LogEngine {
   /** Chunks held for a topic, for tests and metrics. */
   chunkCount(topic: string): number {
     return this.#topic(topic).chunks.length;
+  }
+
+  /** Records held in memory for a topic, for tests and metrics. */
+  heldCount(topic: string): number {
+    let n = 0;
+    for (const chunk of this.#topic(topic).chunks) for (const r of chunk ?? []) if (r) n++;
+    return n;
   }
 }
 
