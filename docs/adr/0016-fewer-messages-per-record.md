@@ -3,7 +3,8 @@
 - **Status:** Proposed
 - **Date:** 2026-11-10
 - **Amends:** [ADR 0005](0005-bus-topology-message-channels.md) (what travels on an isolate's bus port) and [ADR 0003](0003-schema-format-standard-schema.md), decision 10 (how a failed publish is reported)
-- **Touches:** [ADR 0007](0007-bus-worker-supervision.md), step 5 (publishes re-sent after a bus restart) and [ADR 0012](0012-isolates-built-apart.md), decision 2 (`ctx.bus` is part of the seam)
+- **Records a change to:** the [ADR 0012](0012-isolates-built-apart.md) seam (`ctx.bus.publish`, decision 2, point 8)
+- **Touches:** [ADR 0007](0007-bus-worker-supervision.md), step 5 (publishes re-sent after a bus restart)
 - **Evidence:** [plant memory investigation](../investigations/plant-memory.md) (PR #162); matched head-to-head in `isoloop/examples`, `apps/dashboards/plant/comparison/matched/`
 
 ## Context
@@ -36,18 +37,23 @@ The rule this ADR follows, agreed with the user on 2026-11-10: a change goes in 
 ### 1. Combined commits (amends ADR 0005)
 
 1. **A new `commits` message** on the bus port, isolate → bus: `commits { offsets: { topic: string; offset: number }[] }`. Each entry is the highest settled offset of one subscription, the same value a `commit` carries today.
-2. **The bus client sends at most one `commits` per port every ~100 ms.** It holds the latest settled offset per subscription and sends them together. It sends early:
+2. **The bus client sends at most one `commits` per port per commit interval** (point 7; 100 ms by default). It holds the latest settled offset per subscription and sends them together. It sends early:
    - when any subscription's uncommitted count reaches half its credit, so a busy subscription never pauses because of the interval;
    - on `shutdown`, for every reason (`stop`, `restart`, `suspend`), before it acknowledges, so a graceful stop or a suspend loses nothing;
    - on the bus client's own close path;
    - on a new port after a bus restart, before its subscriptions resume (ADR 0007, step 4).
 3. **What counts as settled is unchanged.** A record is settled when its handler returns. A handler that throws marks the subscription stuck, and the commit stops at the record before it, as `drain` does today.
-4. **Host subscriptions do the same:** one `commits` per host port every ~100 ms, or earlier at half the credit.
+4. **Host subscriptions do the same:** one `commits` per host port per commit interval, or earlier at half the credit.
 5. **The single `commit` message is removed, not kept beside `commits`.** Both ends of the bus port come from one build: the bootstrap, which creates the bus client, ships with the host, and ADR 0012 lists the host ↔ worker protocol as free to change in any release. Keeping both would mean two code paths and two sets of tests for one job.
 6. **The cost:**
    - A crashed isolate, or a worker killed without a graceful shutdown, can have up to ~100 ms of handled records delivered again on restart. Delivery is at-least-once already; the window grows from one record to ~100 ms.
    - A group member that crashes leaves up to ~100 ms more for the group's redelivery.
    - The commit lag in `BusMetrics.subscriptions` is coarser by up to ~100 ms.
+7. **The interval is one kernel setting: `KernelConfig.bus.commitIntervalMs`.**
+   - **Default 100 ms.** The server measurements try 100 and 250 ms, and the default follows them.
+   - **Range:** an integer from 0 to 1,000. `0` means every task: pending commits are sent at the end of each task that settled a record, in that task's `batch` (decision 3). Anything else makes `createKernel` throw `invalid_config`. The cap keeps the redelivery window after a crash under a second.
+   - **Per kernel, not per subscription.** The interval is one timer per port, covering every subscription on it, so a per-subscription value has no natural place. `KernelConfig` has no `bus` block yet. The per-isolate `bus` options are on the manifest (`IsolateManifest.bus.onReset`), so this new block takes the same name. The kernel passes the value to each isolate in `init` and to the bus worker at `boot`.
+   - **`acked` (decision 2, point 6) shares it.** Both say how far behind the other side's bookkeeping may be, and one knob is easier to reason about. They can share it because each has its own early send, independent of the interval: commits at half the credit, `acked` at half the inbox limit. A busy subscription or a busy publisher never stalls because of the interval.
 
 ### 2. Memory-topic publishes answer only on failure (amends ADR 0003, decision 10)
 
@@ -59,14 +65,21 @@ The rule this ADR follows, agreed with the user on 2026-11-10: a change goes in 
 3. **`{ ack: true }` keeps today's behaviour:** `ctx.bus.publish(topic, rec, { ack: true })` waits for the `result` and rejects with the error.
 4. **Persistent topics always wait for the result,** with or without `ack`, so their promise still means the record is on disk. Topic handles (`TopicRef`) carry only a name and schema types, so the bus client can't tell a persistent topic from a memory one. The kernel adds the names of the persistent topics to the isolate's `init`; it has them from the contracts `list`. The bus client then sends an `id` for those topics' publishes.
 5. **Requests and replies are unchanged.** They already answer only on failure, or with the reply.
-6. **Cumulative acknowledgements keep re-send and back-pressure** (proposed here to keep ADR 0007, step 5 and the 1,000 limit):
-   - About every 100 ms, the broker sends each publishing port `acked { epoch, seq }`, the highest `seq` it has processed from that port, accepted or rejected. It sends nothing when there's nothing new.
+6. **Cumulative acknowledgements keep re-send and back-pressure** (ADR 0007, step 5 and the 1,000 limit):
+   - Once per commit interval (decision 1, point 7), the broker sends each publishing port `acked { epoch, seq }`, the highest `seq` it has processed from that port, accepted or rejected. It sends nothing when there's nothing new.
+   - It sends early when the port has half the inbox limit (500) processed and not yet acked. Without that, a publisher above 1,000 records per interval would hit `bus_unavailable` only because of the interval.
    - The bus client keeps id-less publishes until they're acked. Up to that point it re-sends them after a bus restart, as it does with unanswered calls today, and they still count towards the 1,000 limit.
-   - The cost is about 10 messages/s per publishing port instead of one per publish.
+   - The cost, at the default interval, is about 10 messages/s per publishing port instead of one per publish.
 7. **The cost:**
    - Awaiting a memory-topic `publish` no longer means the bus accepted the record, only that it was sent. Code that relies on the rejection has to pass `{ ack: true }`.
    - A rejection arrives through `onError` instead of the promise, so it no longer reaches the `catch` next to the call.
    - With point 6, nothing else is lost. Without point 6, publishes in flight during a bus crash would be lost and publishers would have no back-pressure.
+8. **A recorded change to the ADR 0012 seam.** `ctx.bus.publish` is part of `IsolateContext`, which ADR 0012, decision 2 says only grows between floor changes. This decision changes it in place instead:
+   - A memory-topic publish no longer rejects on `invalid`; the rejection goes to `onError`.
+   - `{ ack: true }` is added.
+   - The floor doesn't move.
+
+   **Why in place:** there's no `@isoloop/*` 0.1 yet and so no users; the only isolates built apart are this repo's examples, which move with it. A second method, `ctx.bus.emit()`, with the new behaviour and `publish` left alone, would keep the seam growing. But then only code that switched to `emit` would gain, and every app would carry both methods. From 0.1, a change like this goes through ADR 0012's deprecation and floor rules.
 
 ### 3. Batching per port per task (amends ADR 0005)
 
@@ -85,10 +98,10 @@ The rule this ADR follows, agreed with the user on 2026-11-10: a change goes in 
   - The changes are new message types (`commits`, `rejected`, `acked`, `batch`) and the removal of `commit`, on a port whose two ends come from one build (ADR 0012, decision 2).
   - Isolates built apart don't speak the bus protocol; they use `ctx.bus`.
   - The M5b plan assumed a new message shape would need a version bump. It doesn't here, for the same reason: no port carries two builds' versions of the protocol.
-  - The open question below is whether decision 2 changes the `ctx.bus.publish` seam.
+  - `ctx.bus.publish` is the one seam change, recorded in decision 2, point 8.
 - **Expected messages per second for the plant**, `matched` at 1 kHz. These are **estimates** from reading the code, not measurements; the server runs decide.
   - **Baseline:** about 1,760, after the app moves `plant.timings` off the bus and drops the health engine's subscription to its own topic.
-  - **Decision 1:** commits from about 610 to about 450 at a 100 ms interval. Ports that receive fewer than 10 records/s already commit less often than the interval, so only faster ones save. At 250 ms it's about 260. See open question 2.
+  - **Decision 1:** commits from about 610 to about 450 at the default 100 ms interval. Ports that receive fewer than 10 records/s already commit less often than the interval, so only faster ones save. At 250 ms it's about 260. The server runs measure both (`KernelConfig.bus.commitIntervalMs`).
   - **Decision 2:** about 260 results fewer, and about 10 `acked`/s per publishing port more (roughly 40 feeds and engines).
   - **Decision 3:** about 120–160 fewer: the feed's vib and scalars in one message, and engines' commits riding with their publishes.
   - **Together:** about 1,150–1,250, roughly a third below the baseline.
@@ -101,18 +114,19 @@ The rule this ADR follows, agreed with the user on 2026-11-10: a change goes in 
 - **Tests each change needs:**
   - **Commits:**
     - Broker: `commits` with several topics, stale and out-of-order offsets ignored, credit returned, a group's redelivery after a member detaches with commits pending.
-    - Bus client: the interval, the half-credit flush, the flush on `stop`/`restart`/`suspend` before the shutdown answer, a throwing handler stopping the commit, and pending commits sent on the new port after a bus restart.
+    - Bus client: the interval (`0`, the default and the maximum), the half-credit flush, the flush on `stop`/`restart`/`suspend` before the shutdown answer, a throwing handler stopping the commit, and pending commits sent on the new port after a bus restart.
     - Host controller: the same for host subscriptions.
     - E2E: a pool restart and a wake from suspend resume at the right offset.
   - **Publishes:**
-    - Broker: `rejected` for every error code an id-less publish can hit; `acked` cumulative, per port, and only when something is new.
+    - Broker: `rejected` for every error code an id-less publish can hit; `acked` cumulative, per port, only when something is new, and early at half the inbox limit.
     - Bus client: `{ ack: true }` and persistent topics (named in `init`) still reject; id-less publishes held until acked, re-sent after a bus restart, and counted towards the 1,000 limit; `onError` gets the topic and `seq`.
     - Host: a rejection appears in the isolate's error report.
   - **Batching:**
     - Broker and bus client: order across mixed inner envelopes, one bad inner envelope not affecting the others, size and credit limits per inner record.
     - Host controller: batches on host ports.
     - The engine conformance suites run unchanged.
-- **Docs:** the bus protocol section of the design doc and the guide's `ctx.bus.publish` reference (the `ack` option, where rejections go).
+- **Config:** `createKernel` validates `bus.commitIntervalMs` (`invalid_config` outside 0–1,000).
+- **Docs:** the bus protocol section of the design doc, the guide's `ctx.bus.publish` reference (the `ack` option, where rejections go), and `KernelConfig.bus.commitIntervalMs`.
 
 ## Alternatives considered
 
@@ -123,16 +137,8 @@ The rule this ADR follows, agreed with the user on 2026-11-10: a change goes in 
     - The bus's direct view of each member's position. It would move into the pool runtime.
   - **Why deferred:** decided after decisions 1–3 are measured, and only if deliveries are still a meaningful share of the cost.
 - **Commit only on an interval, without the half-credit flush.** Simpler, but a subscription receiving more than 1,000 records per interval would pause on credit.
+- **A separate interval for `acked`.** Not needed while each has its own early send (decision 1, point 7). It can be split later without changing the protocol.
+- **`ctx.bus.emit()` beside an unchanged `publish`.** It keeps ADR 0012's seam growing, but only code that switches to it gains (decision 2, point 8).
 - **Answer only on failure, without `acked`.** Fewer messages (about 40/s fewer in the plant), but publishes in flight during a bus restart would be lost, and publishers would lose their back-pressure (ADR 0007, step 5; the 1,000 limit).
 - **Keep `commit` beside `commits`.** Not needed: both ends of the bus port ship in one build.
 - **Shared memory rings between the bus and the workers.** These would remove most copies, but need cross-origin isolation (engine constraint 5), which the demo's hosting can't set. Not now.
-
-## Open questions
-
-1. **Is decision 2 a change to the seam?** `ctx.bus.publish` is part of `IsolateContext` (ADR 0012, decision 2), and today its promise rejects on `invalid`. Decision 2 changes that default for memory topics.
-   - **(a)** Treat it as a change made before 0.1, in place, like ADR 0010's M3a amendment. No `@isoloop/*` 0.1 exists yet, and the only isolates built apart are this repo's examples. The floor stays.
-   - **(b)** Leave `publish` as it is, and add `ctx.bus.emit(topic, rec)` with decision 2's behaviour. The seam only grows, so nothing has to be deprecated, and apps opt in per call.
-
-   The agreed decision was (a). (b) follows ADR 0012 more strictly, at the cost of a second method.
-2. **The commit interval.** At 100 ms the plant's commits fall by about a quarter, because most of its ports receive fewer than 10 records/s. At 250 ms they fall by more than half, and a crash can redeliver up to 250 ms. Should the interval be 250 ms, or measured at both on the server?
-3. **`acked` (decision 2, point 6)** wasn't in the agreed outline. It is proposed here because without it a bus restart loses in-flight publishes and publishers lose back-pressure. Is it accepted as part of decision 2?
