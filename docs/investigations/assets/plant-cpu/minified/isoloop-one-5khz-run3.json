@@ -1,0 +1,114 @@
+{
+  "config": "isoloop:one",
+  "build": "isoloop",
+  "placement": "one",
+  "rate": 5,
+  "round": 3,
+  "windowMs": 10000,
+  "warmMs": 15000,
+  "processMsPerS": {
+    "browser": 2.0000000000000018,
+    "renderer": 1111,
+    "GPU": 337.99999999999994,
+    "network.mojom.NetworkService": 0
+  },
+  "untraced": [
+    {
+      "pid": 4703,
+      "type": "renderer",
+      "tid": 4736,
+      "comm": "DedicatedWorker",
+      "msPerS": 689,
+      "sysMsPerS": 19
+    },
+    {
+      "pid": 4679,
+      "type": "GPU",
+      "tid": 4718,
+      "comm": "VizCompositorTh",
+      "msPerS": 309,
+      "sysMsPerS": 17
+    },
+    {
+      "pid": 4703,
+      "type": "renderer",
+      "tid": 4703,
+      "comm": "chrome-headless",
+      "msPerS": 247,
+      "sysMsPerS": 8
+    },
+    {
+      "pid": 4703,
+      "type": "renderer",
+      "tid": 4735,
+      "comm": "DedicatedWorker",
+      "msPerS": 49,
+      "sysMsPerS": 6
+    },
+    {
+      "pid": 4703,
+      "type": "renderer",
+      "tid": 4707,
+      "comm": "ThreadPoolForeg",
+      "msPerS": 41,
+      "sysMsPerS": 5
+    },
+    {
+      "pid": 4703,
+      "type": "renderer",
+      "tid": 4728,
+      "comm": "Compositor",
+      "msPerS": 36,
+      "sysMsPerS": 6
+    },
+    {
+      "pid": 4679,
+      "type": "GPU",
+      "tid": 4717,
+      "comm": "Chrome_ChildIOT",
+      "msPerS": 28,
+      "sysMsPerS": 19
+    },
+    {
+      "pid": 4703,
+      "type": "renderer",
+      "tid": 4710,
+      "comm": "Chrome_ChildIOT",
+      "msPerS": 20,
+      "sysMsPerS": 12
+    },
+    {
+      "pid": 4703,
+      "type": "renderer",
+      "tid": 4711,
+      "comm": "ThreadPoolForeg",
+      "msPerS": 19,
+      "sysMsPerS": 2
+    },
+    {
+      "pid": 4703,
+      "type": "renderer",
+      "tid": 4731,
+      "comm": "ThreadPoolForeg",
+      "msPerS": 9,
+      "sysMsPerS": 0
+    },
+    {
+      "pid": 4653,
+      "type": "browser",
+      "tid": 4653,
+      "comm": "chrome-headless",
+      "msPerS": 1,
+      "sysMsPerS": 1
+    },
+    {
+      "pid": 4653,
+      "type": "browser",
+      "tid": 4663,
+      "comm": "Chrome_IOThread",
+      "msPerS": 1,
+      "sysMsPerS": 1
+    }
+  ],
+  "traced": {}
+}
