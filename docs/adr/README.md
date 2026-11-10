@@ -23,6 +23,7 @@ Short records of decisions that shape Isoloop's design. Each has a status:
 | 0013 | *Withdrawn 2026-11-07, never accepted:* `@isoloop/local`, a single-thread kernel for the M3b comparison. The comparison is native against Isoloop instead ([M3b plan](../plans/m3b-dashboard.md), task 15), so no such kernel is needed | Withdrawn |
 | [0014](0014-own-codec.md) | Our own binary codec for persistent topics, `isoloop-codec@1`: no library was more than 2× faster (at most 1.42×), ours is smaller on the wire and in the bundle | Accepted |
 | [0015](0015-visual-pools.md) | Visual isolates may join pools: one `isoloop-dom` document per worker, one render root per member; records, events and host calls carry the member; no moves between members; mixed pools and mixed frameworks allowed; members can read each other's DOM and input (secrets stay on their own worker); a portal root per member; gate on memory, start-up and update latency first (M2d task 1) | Accepted |
+| [0016](0016-fewer-messages-per-record.md) | Fewer bus messages per record: combined `commits` every ~100 ms (or at half the credit, and on shutdown); memory-topic publishes answer only on failure (`rejected`), with cumulative `acked` keeping re-send and back-pressure, `{ ack: true }` and persistent topics as today; envelopes sent in one task travel as one `batch`; one delivery per pool worker deferred | Proposed |
 
 Ideas an ADR deferred are collected in [would-like](../would-like.md).
 
