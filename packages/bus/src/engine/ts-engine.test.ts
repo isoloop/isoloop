@@ -43,6 +43,32 @@ describe('TsEngine', () => {
     expect(e.chunkCount('t')).toBe(2);
   });
 
+  it('lets go of expired records at once, not when their chunk fills (time)', () => {
+    // A slow topic fills a 4,096-record chunk in minutes; the records below
+    // the tail must not stay referenced until it does (plant memory, #162).
+    let now = 0;
+    const e = new TsEngine({ now: () => now });
+    e.createTopic(cfg({ kind: 'time', ms: 10 }));
+    for (let i = 0; i < 1_000; i++) e.append('t', rec(i, undefined, i));
+    now = 1_005;
+    e.compact('t');
+    expect(e.tail('t')).toBe(995);
+    expect(e.chunkCount('t')).toBe(1);
+    expect(e.heldCount('t')).toBe(5);
+    expect(e.read('t', 0, 100).map((r) => r.value)).toEqual([995, 996, 997, 998, 999]);
+  });
+
+  it('lets go of dropped records at once, not when their chunk fills (last-n)', () => {
+    const e = new TsEngine();
+    e.createTopic(cfg({ kind: 'last-n', n: 10 }));
+    for (let i = 0; i < 1_000; i++) e.append('t', rec(i));
+    expect(e.chunkCount('t')).toBe(1);
+    expect(e.heldCount('t')).toBe(10);
+    expect(e.read('t', 0, 100).map((r) => r.value)).toEqual(
+      Array.from({ length: 10 }, (_, i) => 990 + i),
+    );
+  });
+
   it('compacts itself once enough records are superseded', () => {
     const e = new TsEngine({ chunkSize: 16, dirtyMin: 8 });
     e.createTopic(cfg({ kind: 'compacted' }));
