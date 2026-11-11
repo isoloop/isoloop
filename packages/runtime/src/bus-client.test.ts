@@ -70,6 +70,38 @@ describe('createBusClient', () => {
     await vi.waitUntil(() => onReset.mock.calls.length === 1);
   });
 
+  it('runs a synchronous handler through a delivery without yielding per record', async () => {
+    const bus = fakeBus();
+    const { client } = createBusClient(bus.port);
+    const seen: number[] = [];
+    let atFirstMicrotask: number[] = [];
+    client.subscribe(nums, (r) => {
+      if (seen.length === 0) queueMicrotask(() => (atFirstMicrotask = [...seen]));
+      seen.push(r.value);
+    });
+    await bus.next('subscribe');
+    bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(0), rec(1), rec(2)] } });
+    await vi.waitUntil(() => seen.length === 3);
+    // All three ran before the first record's microtask: no await between them.
+    expect(atFirstMicrotask).toEqual([0, 10, 20]);
+  });
+
+  it('still waits for an async handler, and a synchronous throw stops the commits there', async () => {
+    const bus = fakeBus();
+    const errors: unknown[] = [];
+    const { client } = createBusClient(bus.port, { onError: (e) => errors.push(e) });
+    client.subscribe(nums, (r) => {
+      if (r.value === 10) throw new Error('boom');
+    });
+    await bus.next('subscribe');
+    bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(0), rec(1), rec(2)] } });
+    await vi.waitUntil(() => errors.length === 1);
+    await new Promise((res) => setTimeout(res, 20));
+    expect(bus.got.filter((m) => m.t === 'commit').map((m) => m.p)).toEqual([
+      { topic: 'nums.v1', offset: 0 },
+    ]);
+  });
+
   it('replies on the topic the request record came from', async () => {
     const bus = fakeBus();
     const { client } = createBusClient(bus.port);
