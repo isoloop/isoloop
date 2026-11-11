@@ -1,0 +1,28 @@
+
+== matched vs native-workers, 5 kHz (runs: base 4)
+                     renderer    gap       msg(browser)    msg(isoloop js)        port msgs/s    gpu
+native-workers     978 [960-995]             19                  0                 36               286
+isobase       1167 [1146-1181]   +188     121 [118-122]      44 [41-46]    3007 [2999-3011]    340
+isoloop       1144 [1083-1159]   +166     112 [106-114]      43 [41-45]    2401 [2393-2403]    335
+isoc250       1142 [1131-1153]   +164     107 [106-108]      40 [37-40]    2206 [2198-2210]    334
+
+== one vs native, 5 kHz (runs: base 4)
+                     renderer    gap       msg(browser)    msg(isoloop js)        port msgs/s    gpu
+native         946 [941-1015]              6                  0                 32               283
+isobase       1127 [1103-1133]   +180     102 [101-104]      34 [32-38]    2904 [2898-2908]    344
+isoloop       1123 [1092-1164]   +176      94 [93-96]      32 [29-33]    2319 [2300-2336]    341
+isoc250       1088 [1084-1107]   +142      92 [89-93]      30 [29-31]    2132 [2126-2144]    338
+
+== matched vs native-workers, 1 kHz (runs: base 4)
+                     renderer    gap       msg(browser)    msg(isoloop js)        port msgs/s    gpu
+native-workers     824 [800-846]             16                  0                 23               286
+isobase        923 [922-939]    +99      89 [87-94]      32 [29-33]    1890 [1882-1893]    327
+isoloop        945 [924-976]   +121      87 [85-95]      32 [31-35]    1594 [1583-1600]    322
+isoc250        918 [913-932]    +94      86 [84-88]      30 [29-31]    1443 [1439-1457]    326
+
+== one vs native, 1 kHz (runs: base 4)
+                     renderer    gap       msg(browser)    msg(isoloop js)        port msgs/s    gpu
+native         787 [761-984]              6                  0                 22               285
+isobase        884 [877-931]    +96      80 [77-81]      24 [20-25]    1818 [1815-1828]    347
+isoloop        906 [876-970]   +118      73 [72-76]      22 [20-24]    1545 [1539-1555]    341
+isoc250        880 [856-1042]    +92      76 [69-79]      20 [20-24]    1398 [1394-1413]    346

@@ -142,6 +142,63 @@ The agreed rule applies to each: a change goes in if it keeps every feature and 
 
 Removing these would need shared-memory rings between the bus and the workers. That requires cross-origin isolation ([engine constraint 5](engine-constraints.md#5-shared-memory-and-memory-measurement-need-cross-origin-isolation)), which GitHub Pages can't provide without a service-worker workaround.
 
+## ADR 0016 decision 1, measured: combined commits
+
+- **Date:** 2026-11-11. The build is isoloop#166 (not merged), measured before merge.
+- **What changed:** subscribers send one `commits` message per port per commit interval instead of one `commit` per record.
+- **Answer:**
+  - **Messages:** port messages fall by 20% at 100 ms and by 27% at 250 ms (`matched`, 5 kHz).
+  - **Messaging CPU in the browser** falls by 8–14 ms/s, beyond the round spread.
+  - **Isoloop's own messaging JS** falls by up to 4 ms/s, beyond the spread only at 250 ms.
+  - **The renderer total** doesn't move beyond the spread at either interval.
+
+  Commits turn out to be cheap messages: about 600 fewer a second save about 10 ms/s, roughly a third of what an average port message costs. Most of the messaging cost is in the deliveries, which decision 1 leaves alone.
+
+**How it was measured:**
+- **Session:** one session on the benchmark server, as in [Method](#method): 4 physical cores fixed at 2.0 GHz, Chromium, the probe above, 4 interleaved rounds.
+- **Interleaved per round:**
+  - native + workers and native
+  - the stock libraries `0.0.0-next.61245db` (`isobase`)
+  - #166's libraries, packed, at `commitIntervalMs` 100 (`isoloop`) and 250 (`isoc250`)
+- **App:** both Isoloop builds run isoloop/examples `8f22ce0`, which includes the metrics-sampler fix (examples#61). They differ only in the libraries and the interval.
+- **Port messages a second** are `MessagePort::Accept` trace events in the renderer, which counts every message any thread receives on a port. Native + workers' own messages use `DedicatedWorkerGlobalScope::postMessage` and hardly show in this count.
+- **Data:** [`assets/plant-cpu/adr16-commits/`](assets/plant-cpu/adr16-commits/) holds per-run buckets, message counts, and the scripts (`run-adr16.sh`, `session.sh`, `msgs.mjs`, `compare.py`).
+
+**Medians of 4 runs, ms of CPU per second, with the lowest to highest run in brackets:**
+
+| `matched`, 5 kHz | Renderer | Messaging in the browser | Isoloop messaging JS | Port messages/s |
+| --- | --- | --- | --- | --- |
+| native + workers | 978 [960–995] | 19 | 0 | 36 |
+| stock | 1,167 [1,146–1,181] | 121 [118–122] | 44 [41–46] | 3,007 [2,999–3,011] |
+| commits, 100 ms | 1,144 [1,083–1,159] | 112 [106–114] | 43 [41–45] | 2,401 [2,393–2,403] |
+| commits, 250 ms | 1,142 [1,131–1,153] | 107 [106–108] | 40 [37–40] | 2,206 [2,198–2,210] |
+
+| `one`, 5 kHz | Renderer | Messaging in the browser | Isoloop messaging JS | Port messages/s |
+| --- | --- | --- | --- | --- |
+| native | 946 [941–1,015] | 6 | 0 | 32 |
+| stock | 1,127 [1,103–1,133] | 102 [101–104] | 34 [32–38] | 2,904 [2,898–2,908] |
+| commits, 100 ms | 1,123 [1,092–1,164] | 94 [93–96] | 32 [29–33] | 2,319 [2,300–2,336] |
+| commits, 250 ms | 1,088 [1,084–1,107] | 92 [89–93] | 30 [29–31] | 2,132 [2,126–2,144] |
+
+At 1 kHz the pattern is the same:
+
+| | Port messages/s: stock → 100 ms → 250 ms | Messaging in the browser | Renderer |
+| --- | --- | --- | --- |
+| `matched` | 1,890 → 1,594 → 1,443 | 89 → 87 → 86, within the spread | 923 → 945 → 918, within the spread |
+| `one` | 1,818 → 1,545 → 1,398 | 80 → 73 → 76 | 884 → 906 → 880, within the spread |
+
+The GPU process doesn't change: 340 → 335 → 334 for `matched` at 5 kHz.
+
+**What it means:**
+- **The message count fell more than ADR 0016 estimated.** About −600 port messages a second at 5 kHz, where the ADR estimated −160 commits. The early sends at half the credit rarely fire at these rates, and many ports commit far less often than once per record.
+- **The CPU saved is about a third of an average message's cost.** Stock `matched` pays 121 + 44 ms/s across 3,007 messages a second, or about 0.055 ms each. At that average rate the cut would be worth ~33 ms/s; the measured saving is ~10. A commit is small, has no fan-out, and the broker's handling of it is short. Deliveries and publishes carry the rest.
+- **100 against 250 ms:** 250 ms saves another ~200 messages and ~5 ms/s of messaging at 5 kHz, beyond the spread for the browser's messaging. The cost is a redelivery window after a crash that is 2.5 times longer. The renderer totals of the two overlap.
+- **Against the rule** (keeps every feature, saves beyond the round spread):
+  - **Pass:** the messaging buckets.
+  - **Within the spread:** the renderer total.
+  - **Kept:** the features, with decision 1's stated cost.
+- **For the rest of ADR 0016:** what's left is mostly deliveries and publishes, as decisions 2 and 3 and the deferred C target. Their estimates should be scaled by what a delivery costs, not by the average message, so they should be measured the same way before more is assumed.
+
 ## Caveats
 
 - **Software rendering.** The container has no GPU, so canvases and tiles are rasterized on the CPU in every build. With a GPU, the canvas rows would shrink in both builds and messaging would be a larger share of a smaller gap.
