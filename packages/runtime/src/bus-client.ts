@@ -11,8 +11,11 @@
  * - Settled offsets go out together, one `commits` per commit interval, or
  *   earlier at half a subscription's credit and on `close` (ADR 0016,
  *   decision 1). A crash can redeliver up to one interval of records.
- * - On `reattach` (a bus restart) it swaps the port, sends every subscription
- *   again and re-sends every publish the old bus never answered, in order.
+ * - On `reattach` (a bus restart) it swaps the port, drops the commits still
+ *   pending (the new broker would reject them before the subscriptions, so a
+ *   persistent topic redelivers up to one interval, as after a crash; ADR
+ *   0016, decision point 3), sends every subscription again and re-sends
+ *   every publish the old bus never answered, in order.
  *   Each publish and request carries `(epoch, seq)`, so a persistent topic
  *   doesn't append a re-send the old bus already wrote (ADR 0007, step 5).
  */
@@ -349,11 +352,15 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
         pending.delete(p.msg.id);
         p.settle({ ok: true, value: null });
       }
-      // Pending commits first (ADR 0016, decision 1), then subscriptions,
-      // then everything the old bus never answered, in the order it was
-      // sent. Its memory log is gone, so nothing duplicates there; a
-      // persistent topic answers what it already holds by its id.
-      committer.flush();
+      // Pending commits are dropped, not sent: the new broker accepts a
+      // commit only for a topic this connection subscribes to, and these
+      // would arrive first. A persistent topic redelivers up to one interval
+      // instead, the same window as after a crash (ADR 0016, decision point
+      // 3). Then subscriptions, then everything the old bus never answered,
+      // in the order it was sent. Its memory log is gone, so nothing
+      // duplicates there; a persistent topic answers what it already holds
+      // by its id.
+      committer.take();
       for (const sub of subs.values()) {
         sub.queue.length = 0;
         sendSubscribe(sub);

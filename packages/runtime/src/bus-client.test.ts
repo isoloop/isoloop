@@ -270,7 +270,7 @@ describe('combined commits (ADR 0016, decision 1)', () => {
     expect(order).toEqual(['commits', 'unsubscribe']);
   });
 
-  it('sends pending commits first on the new port after a bus restart', async () => {
+  it('drops pending commits on a bus restart, then commits again on the new port', async () => {
     const bus = fakeBus();
     const handle = createBusClient(bus.port, { commitIntervalMs: 1000 });
     handle.client.subscribe(nums, () => {});
@@ -280,9 +280,18 @@ describe('combined commits (ADR 0016, decision 1)', () => {
     const next = fakeBus();
     handle.reattach(next.port);
     await next.next('subscribe');
-    expect(next.got.map((m) => m.t).slice(0, 2)).toEqual(['commits', 'subscribe']);
-    expect(commitsOf(next.got)).toEqual([[{ topic: 'nums.v1', offset: 7 }]]);
+    // Neither port gets the pending offset 7: the new broker would reject it
+    // before the subscription, and the old port is gone (ADR 0016, point 3).
+    expect(next.got[0]?.t).toBe('subscribe');
+    expect(commitsOf(next.got)).toEqual([]);
     expect(commitsOf(bus.got)).toEqual([]);
+    // What the new bus delivers is committed as usual.
+    next.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(5)] } });
+    await new Promise((r) => setTimeout(r, 10));
+    // close sends what's pending and waits for an answer this fake never gives.
+    void handle.close();
+    await vi.waitUntil(() => commitsOf(next.got).length === 1);
+    expect(commitsOf(next.got)).toEqual([[{ topic: 'nums.v1', offset: 5 }]]);
   });
 
   it('forgets offsets of a memory topic the bus restart lost', async () => {
