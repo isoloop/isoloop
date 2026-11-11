@@ -4,6 +4,8 @@
  * in the compositor.
  */
 import {
+  commitIntervalProblem,
+  DEFAULT_COMMIT_INTERVAL_MS,
   BusError,
   isIsolateToHost,
   isSystemTopic,
@@ -105,6 +107,16 @@ export type KernelConfig = {
   suspend?: { maxConcurrentWakes?: number };
   /** Dev checks: the bus checks every schema output with `structuredClone` (ADR 0003, decision 11). Default false. */
   dev?: boolean;
+  bus?: {
+    /**
+     * How far behind the broker's record of what each subscriber handled may
+     * be (ADR 0016, decision 1): one `commits` message per port per interval,
+     * earlier at half a subscription's credit. An integer from 0 to 1,000;
+     * 0 is every task. A crash can redeliver up to one interval of records.
+     * Default 100.
+     */
+    commitIntervalMs?: number;
+  };
 };
 
 export type IsolateManifest = {
@@ -473,6 +485,11 @@ export function createKernel(config: KernelConfig): Kernel {
       'invalid_config',
       '`contracts` and `workers.bus` go together: the bus worker needs both',
     );
+  if (config.bus?.commitIntervalMs !== undefined) {
+    const problem = commitIntervalProblem(config.bus.commitIntervalMs);
+    if (problem) throw new KernelError('invalid_config', problem);
+  }
+  const commitIntervalMs = config.bus?.commitIntervalMs ?? DEFAULT_COMMIT_INTERVAL_MS;
   const everyMs = config.heartbeat?.everyMs ?? 100;
   const def = DEFAULT_SUPERVISOR_CONFIG;
   const cfg: SupervisorConfig = {
@@ -908,6 +925,7 @@ export function createKernel(config: KernelConfig): Kernel {
         grants,
         renderFmt: manifest.surface ? ISOLOOP_DOM_FMT : 'none',
         heartbeatMs: everyMs,
+        commitIntervalMs,
         busPort,
         ...(o.wake ? { wake: true } : {}),
         ...(manifest.pool === undefined ? {} : { pool: manifest.pool }),
@@ -973,6 +991,7 @@ export function createKernel(config: KernelConfig): Kernel {
           workerUrl: config.workers.bus,
           contracts: config.contracts,
           heartbeatMs: everyMs,
+          commitIntervalMs,
           supervisor: cfg,
           dev: config.dev ?? false,
           onControlMessage: (m) => count(m),

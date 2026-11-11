@@ -309,18 +309,20 @@ describe('commits', () => {
   it('rejects commits for topics not subscribed, past head, or malformed', async () => {
     const { broker } = setup();
     const a = connect(broker, 'A', all);
-    expect(await a.call('commit', { topic: 'notes.v1', offset: 0 })).toMatchObject({
+    expect(await a.call('commits', { offsets: [{ topic: 'notes.v1', offset: 0 }] })).toMatchObject({
       error: { code: 'forbidden' },
     });
     await a.call('subscribe', { topic: 'notes.v1', from: 'latest' });
-    expect(await a.call('commit', { topic: 'notes.v1', offset: 0 })).toMatchObject({
+    expect(await a.call('commits', { offsets: [{ topic: 'notes.v1', offset: 0 }] })).toMatchObject({
       error: { code: 'invalid' },
     });
     await broker.publish({ kind: 'host' }, 'notes.v1', undefined, 'x');
-    expect(await a.call('commit', { topic: 'notes.v1', offset: -1 })).toMatchObject({
-      error: { code: 'invalid' },
-    });
-    expect(await a.call('commit', { topic: 'notes.v1', offset: 0 })).toEqual({
+    expect(await a.call('commits', { offsets: [{ topic: 'notes.v1', offset: -1 }] })).toMatchObject(
+      {
+        error: { code: 'invalid' },
+      },
+    );
+    expect(await a.call('commits', { offsets: [{ topic: 'notes.v1', offset: 0 }] })).toEqual({
       ok: true,
       value: null,
     });
@@ -382,7 +384,7 @@ describe('I6: a restarted isolate resumes after its last commit', () => {
     const c1 = connect(broker, 'C', all);
     await c1.call('subscribe', { topic: 'log.v1', from: 'committed' });
     expect(c1.values('log.v1')).toEqual([0, 1, 2, 3]);
-    await c1.call('commit', { topic: 'log.v1', offset: 1 }); // handled 0 and 1, crashed before 2
+    await c1.call('commits', { offsets: [{ topic: 'log.v1', offset: 1 }] }); // handled 0 and 1, crashed before 2
 
     broker.detach('C', true);
     expect(c1.closed).toBe(true);
@@ -407,8 +409,8 @@ describe('I6: a restarted isolate resumes after its last commit', () => {
     const b = connect(broker, 'B', all);
     await a.call('subscribe', { topic: 'log.v1', from: 'earliest' });
     await b.call('subscribe', { topic: 'log.v1', from: 'earliest' });
-    await a.call('commit', { topic: 'log.v1', offset: 2 });
-    await b.call('commit', { topic: 'log.v1', offset: 0 });
+    await a.call('commits', { offsets: [{ topic: 'log.v1', offset: 2 }] });
+    await b.call('commits', { offsets: [{ topic: 'log.v1', offset: 0 }] });
     broker.detach('A', true);
     broker.detach('B', true);
     const a2 = connect(broker, 'A', all);
@@ -427,7 +429,7 @@ describe('I6: a restarted isolate resumes after its last commit', () => {
     for (const i of [0, 1]) await broker.publish({ kind: 'host' }, 'log.v1', undefined, i); // oxlint-disable-line no-await-in-loop
     const a = connect(broker, 'A', all);
     await a.call('subscribe', { topic: 'log.v1', from: 'earliest' });
-    await a.call('commit', { topic: 'log.v1', offset: 1 });
+    await a.call('commits', { offsets: [{ topic: 'log.v1', offset: 1 }] });
     broker.detach('A', false);
     const a2 = connect(broker, 'A', all);
     await a2.call('subscribe', { topic: 'log.v1', from: 'committed' });
@@ -768,7 +770,8 @@ describe('a reattached subscription to a persistent topic (ADR 0007 step 3)', ()
     await a.call('subscribe', { topic: 'saved.v1', from: 'earliest', group });
     // oxlint-disable-next-line no-await-in-loop -- in order, so offsets follow the values
     for (const value of [0, 1, 2]) await a.call('publish', { topic: 'saved.v1', value });
-    if (committed !== undefined) await a.call('commit', { topic: 'saved.v1', offset: committed });
+    if (committed !== undefined)
+      await a.call('commits', { offsets: [{ topic: 'saved.v1', offset: committed }] });
     return boot(disk);
   }
 

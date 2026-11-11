@@ -59,6 +59,9 @@ describe('per-member errors in a pool (M2c)', () => {
       ['G', 'running'],
     ]);
 
+    // `restart` kills F, as a crash would; let one commit interval pass so
+    // 1's commit reaches the bus first (ADR 0016, decision 1).
+    await new Promise((r) => setTimeout(r, 200));
     reports.length = 0;
     await kernel.restart('F');
     // 1 was committed; 2 threw, so 2 and 3 come again (at least once), to F only.

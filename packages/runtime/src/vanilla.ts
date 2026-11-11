@@ -131,6 +131,7 @@ export function createVanillaIsolate(
   const awake = createKeepAwake();
   const bus = createBusClient(init.busPort, {
     ...(init.wake ? { wake: true } : {}),
+    ...(init.commitIntervalMs === undefined ? {} : { commitIntervalMs: init.commitIntervalMs }),
     onError: (err) => {
       const p =
         err instanceof Error && err.stack !== undefined
@@ -214,6 +215,8 @@ export function createVanillaIsolate(
     },
     async shutdown(reason) {
       await Promise.allSettled(onShutdown.map(async (fn) => fn(reason)));
+      // Before `bye`, for every reason: a graceful stop or a suspend loses no commit.
+      await bus.close();
       render?.flush();
       render?.dispose();
     },

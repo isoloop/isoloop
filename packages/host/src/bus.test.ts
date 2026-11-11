@@ -406,6 +406,30 @@ describe('bus controller', () => {
     );
   });
 
+  it('rejects a commit interval outside 0 to 1,000 ms (ADR 0016)', () => {
+    for (const commitIntervalMs of [-1, 1001, 2.5])
+      expect(() =>
+        createKernel({
+          contracts: { url: contractsUrl, list },
+          workers: { isolateBootstrap: bootstrap, bus: busWorker },
+          bus: { commitIntervalMs },
+        }),
+      ).toThrow(expect.objectContaining({ code: 'invalid_config' }));
+  });
+
+  it('a host subscription commits early at half its credit, so it never pauses for the interval (ADR 0016)', async () => {
+    // 1,000 credit per subscription; with only the 1 s interval it would
+    // pause at 1,000 records, and `count.v1` keeps the last 100, so records
+    // published meanwhile would expire before reaching it.
+    const { kernel } = setup({ bus: { commitIntervalMs: 1000 } });
+    const got: number[] = [];
+    kernel.subscribe(count, (r) => got.push(r.value), { from: 'earliest' });
+    // oxlint-disable-next-line no-await-in-loop -- one at a time, so the log never holds more than the subscriber is behind
+    for (let i = 0; i < 1500; i++) await kernel.publish(count, { value: i });
+    await vi.waitUntil(() => got.length === 1500, { timeout: 5000 });
+    expect(got).toEqual(Array.from({ length: 1500 }, (_, i) => i));
+  });
+
   it('needs contracts and workers.bus together', () => {
     expect(() =>
       createKernel({ workers: { isolateBootstrap: bootstrap, bus: busWorker } }),
