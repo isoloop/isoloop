@@ -90,7 +90,10 @@ describe('createBusClient', () => {
   it('still waits for an async handler, and a synchronous throw stops the commits there', async () => {
     const bus = fakeBus();
     const errors: unknown[] = [];
-    const { client } = createBusClient(bus.port, { onError: (e) => errors.push(e) });
+    const { client } = createBusClient(bus.port, {
+      commitIntervalMs: 0,
+      onError: (e) => errors.push(e),
+    });
     client.subscribe(nums, (r) => {
       if (r.value === 10) throw new Error('boom');
     });
@@ -98,7 +101,7 @@ describe('createBusClient', () => {
     bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(0), rec(1), rec(2)] } });
     await vi.waitUntil(() => errors.length === 1);
     await new Promise((res) => setTimeout(res, 20));
-    expect(bus.got.filter((m) => m.t === 'commit').map((m) => m.p)).toEqual([
+    expect(bus.got.flatMap((m) => (m.t === 'commits' ? m.p.offsets : []))).toEqual([
       { topic: 'nums.v1', offset: 0 },
     ]);
   });
