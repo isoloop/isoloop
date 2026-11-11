@@ -199,6 +199,61 @@ The GPU process doesn't change: 340 → 335 → 334 for `matched` at 5 kHz.
   - **Kept:** the features, with decision 1's stated cost.
 - **For the rest of ADR 0016:** what's left is mostly deliveries and publishes, as decisions 2 and 3 and the deferred C target. Their estimates should be scaled by what a delivery costs, not by the average message, so they should be measured the same way before more is assumed.
 
+## ADR 0016 decision 3, measured: batching per port per task
+
+- **Date:** 2026-11-11. The build is isoloop#167 (not merged; stacked on #166), measured before merge.
+- **What changed:** with `KernelConfig.bus.batch` on, each end of a bus port sends what it has for that port at the end of a task as one `batch` message. Off, nothing changes on the wire. Both builds have combined commits at 100 ms.
+- **Answer:**
+  - **Messages:** port messages fall by 3% at 5 kHz and by 5% at 1 kHz.
+  - **The renderer total, the browser's messaging work, typing and late frames** don't move beyond the round spread, in either direction.
+  - **The bus worker's own JS** rises by 2–4 ms/s with batching on (its end-of-task queue).
+  - Under the rule (it must save beyond the spread), batching doesn't pass.
+
+**How it was measured:**
+- **Session:** one session on the benchmark server, as in [Method](#method): 4 physical cores fixed at 2.0 GHz, Chromium, 4 interleaved rounds.
+- **Builds:** `isoloop` (batching off) and `isobatch` (on) are the same packed #167 libraries and the same app, isoloop/examples `8f22ce0`. Only `bus.batch` differs. Native + workers and native were measured in the same rounds.
+- **Responsiveness:** the comparison runner (`compare:pairs`, 4 rounds) ran in the same session, once with batching off and once with it on.
+- **Data:** [`assets/plant-cpu/adr16-batch/`](assets/plant-cpu/adr16-batch/) holds per-run buckets, message counts, both comparison summaries, and the scripts (`run-batch.sh`, `session.sh`, `compare.py`).
+- **The analysis script:** this run used a copy of `analyze.mjs` with `isobatch` added to its run and source patterns. Isoloop's library code wasn't attributed to its packages in this run, because the packed tarballs didn't match the analysis's library lookup. So the "Isoloop messaging JS" column is missing below. The bus worker's chunk stands in for it. The renderer, browser-messaging and message-count figures don't depend on that attribution.
+
+**Medians of 4 runs, ms of CPU per second, with the lowest to highest run in brackets:**
+
+| `matched` | Renderer | Messaging in the browser | Bus worker chunk | Port messages/s |
+| --- | --- | --- | --- | --- |
+| native + workers, 5 kHz | 982 [967–990] | 18 | – | 34 |
+| batching off, 5 kHz | 1,150 [1,130–1,322] | 111 [105–116] | 14 | 2,391 [2,385–2,408] |
+| batching on, 5 kHz | 1,194 [1,150–1,257] | 108 [104–113] | 18 | 2,316 [2,290–2,327] |
+| native + workers, 1 kHz | 822 [808–833] | 15 | – | 22 |
+| batching off, 1 kHz | 966 [914–1,035] | 89 [88–91] | 11 | 1,602 [1,600–1,611] |
+| batching on, 1 kHz | 926 [926–944] | 83 [78–86] | 13 | 1,514 [1,508–1,522] |
+
+| `one` | Renderer | Messaging in the browser | Bus worker chunk | Port messages/s |
+| --- | --- | --- | --- | --- |
+| native, 5 kHz | 939 [920–975] | 6 | – | 32 |
+| batching off, 5 kHz | 1,102 [1,099–1,115] | 95 [94–97] | 13 | 2,332 [2,329–2,346] |
+| batching on, 5 kHz | 1,112 [1,103–1,134] | 92 [91–95] | 17 | 2,226 [2,218–2,256] |
+| native, 1 kHz | 801 [777–843] | 7 | – | 22 |
+| batching off, 1 kHz | 880 [878–910] | 78 [75–81] | 9 | 1,544 [1,527–1,550] |
+| batching on, 1 kHz | 908 [878–1,006] | 73 [70–79] | 11 | 1,463 [1,457–1,472] |
+
+**Responsiveness, from the comparison runner** (Isoloop's own figures, batching off → on):
+
+| | Typing | Late frames | CPU, all threads |
+| --- | --- | --- | --- |
+| `matched`, 5 kHz | 39 → 31 ms | 0 → 0 | 119% → 119% |
+| `one`, 5 kHz | 23 → 24 ms | 0 → 0 | 111% → 111% |
+| `matched`, 1 kHz | 32 → 23 ms | 0 → 0 | 96% → 98% |
+| `one`, 1 kHz | 21 → 21 ms | 0 → 0 | 87% → 88% |
+
+The typing changes are within the comparison's round spread. Nothing got worse beyond it.
+
+**What it means:**
+- **Few envelopes share a task on the same port in this app.** Each publish is its own task in its producer, and each delivery task in a subscriber starts from a different incoming message. The broker already sends a subscription's records in one `deliver` per microtask (up to 64), so batching per port has little left to merge.
+- **Batching per port can't merge across ports.** Most of the remaining messages are deliveries of one record to several isolates, and each isolate has its own port. The only change that merges those is delivering once per pool worker (ADR 0016's deferred C), which is per worker, not per port.
+- **Recommendation for decision 3:** remove it, as decision 3 point 7 provides for a change that doesn't save beyond the spread.
+  - It adds a second code path, the bus suites run twice, and the bus worker pays 2–4 ms/s for its queue, for a 3–5% message cut that doesn't show in CPU.
+  - The finding is kept here. If a workload ever sends many envelopes per task on one port (for example a widget publishing a burst), it can be measured again from #167's branch.
+
 ## Caveats
 
 - **Software rendering.** The container has no GPU, so canvases and tiles are rasterized on the CPU in every build. With a GPU, the canvas rows would shrink in both builds and messaging would be a larger share of a smaller gap.

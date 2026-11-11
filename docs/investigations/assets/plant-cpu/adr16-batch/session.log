@@ -1,0 +1,74 @@
+locked 2026-11-11T13:20:09Z
+ M apps/dashboards/plant/src/isoloop/kernel.ts
+ M pnpm-lock.yaml
+ M pnpm-workspace.yaml
+?? vendor/
+governor performance, 2000-2000 MHz, now 1988 MHz
+telegram-dl: Up 3 weeks (Paused)
+n8n: Up 3 weeks (Paused)
+portainer: Up 3 weeks (Paused)
+puppeteer-service: Up 3 weeks (Paused)
+qbittorrent: Up 3 weeks (Paused)
+ 13:20:11 up 27 days,  3:40,  3 users,  load average: 0.00, 0.00, 0.00
+governor performance, 2000-2000 MHz, now 1991 MHz
+telegram-dl: Up 3 weeks (Paused)
+n8n: Up 3 weeks (Paused)
+portainer: Up 3 weeks (Paused)
+puppeteer-service: Up 3 weeks (Paused)
+qbittorrent: Up 3 weeks (Paused)
+ 13:20:11 up 27 days,  3:40,  3 users,  load average: 0.00, 0.00, 0.00
+build 2026-11-11T13:20:18Z
+probe 2026-11-11T13:20:27Z
+native-workers-5khz-run1: renderer 989 ms/s (kernel 33; process 988), gpu 290
+isoloop-matched-5khz-run1: renderer 1130 ms/s (kernel 81; process 1137), gpu 333
+isobatch-matched-5khz-run1: renderer 1208 ms/s (kernel 76; process 1214), gpu 345
+native-5khz-run1: renderer 920 ms/s (kernel 27; process 922), gpu 290
+isoloop-one-5khz-run1: renderer 1115 ms/s (kernel 54; process 1118), gpu 341
+isobatch-one-5khz-run1: renderer 1103 ms/s (kernel 63; process 1106), gpu 346
+native-workers-5khz-run2: renderer 990 ms/s (kernel 33; process 991), gpu 285
+isoloop-matched-5khz-run2: renderer 1158 ms/s (kernel 76; process 1159), gpu 329
+isobatch-matched-5khz-run2: renderer 1179 ms/s (kernel 67; process 1180), gpu 334
+native-5khz-run2: renderer 933 ms/s (kernel 24; process 931), gpu 278
+isoloop-one-5khz-run2: renderer 1103 ms/s (kernel 54; process 1102), gpu 338
+isobatch-one-5khz-run2: renderer 1117 ms/s (kernel 53; process 1119), gpu 339
+native-workers-5khz-run3: renderer 975 ms/s (kernel 30; process 973), gpu 293
+isoloop-matched-5khz-run3: renderer 1322 ms/s (kernel 69; process 1323), gpu 334
+isobatch-matched-5khz-run3: renderer 1257 ms/s (kernel 67; process 1258), gpu 351
+native-5khz-run3: renderer 945 ms/s (kernel 26; process 944), gpu 284
+isoloop-one-5khz-run3: renderer 1102 ms/s (kernel 53; process 1103), gpu 348
+isobatch-one-5khz-run3: renderer 1134 ms/s (kernel 64; process 1135), gpu 337
+native-workers-5khz-run4: renderer 967 ms/s (kernel 30; process 969), gpu 279
+isoloop-matched-5khz-run4: renderer 1143 ms/s (kernel 67; process 1145), gpu 337
+isobatch-matched-5khz-run4: renderer 1150 ms/s (kernel 80; process 1151), gpu 334
+native-5khz-run4: renderer 975 ms/s (kernel 21; process 977), gpu 281
+isoloop-one-5khz-run4: renderer 1099 ms/s (kernel 57; process 1099), gpu 334
+isobatch-one-5khz-run4: renderer 1108 ms/s (kernel 62; process 1108), gpu 337
+native-workers-1khz-run1: renderer 819 ms/s (kernel 30; process 819), gpu 294
+isoloop-matched-1khz-run1: renderer 953 ms/s (kernel 62; process 956), gpu 336
+isobatch-matched-1khz-run1: renderer 927 ms/s (kernel 61; process 930), gpu 323
+native-1khz-run1: renderer 802 ms/s (kernel 21; process 802), gpu 289
+isoloop-one-1khz-run1: renderer 882 ms/s (kernel 47; process 884), gpu 338
+isobatch-one-1khz-run1: renderer 878 ms/s (kernel 48; process 881), gpu 357
+native-workers-1khz-run2: renderer 833 ms/s (kernel 31; process 830), gpu 281
+isoloop-matched-1khz-run2: renderer 914 ms/s (kernel 59; process 912), gpu 327
+isobatch-matched-1khz-run2: renderer 926 ms/s (kernel 70; process 929), gpu 318
+native-1khz-run2: renderer 800 ms/s (kernel 24; process 799), gpu 288
+isoloop-one-1khz-run2: renderer 879 ms/s (kernel 48; process 879), gpu 338
+isobatch-one-1khz-run2: renderer 892 ms/s (kernel 57; process 891), gpu 350
+native-workers-1khz-run3: renderer 808 ms/s (kernel 30; process 807), gpu 285
+isoloop-matched-1khz-run3: renderer 978 ms/s (kernel 71; process 971), gpu 341
+isobatch-matched-1khz-run3: renderer 944 ms/s (kernel 59; process 945), gpu 325
+native-1khz-run3: renderer 777 ms/s (kernel 17; process 779), gpu 285
+isoloop-one-1khz-run3: renderer 910 ms/s (kernel 49; process 909), gpu 341
+isobatch-one-1khz-run3: renderer 1006 ms/s (kernel 46; process 1005), gpu 341
+native-workers-1khz-run4: renderer 824 ms/s (kernel 28; process 824), gpu 292
+isoloop-matched-1khz-run4: renderer 1035 ms/s (kernel 70; process 1029), gpu 319
+isobatch-matched-1khz-run4: renderer 926 ms/s (kernel 61; process 926), gpu 316
+native-1khz-run4: renderer 843 ms/s (kernel 22; process 842), gpu 292
+isoloop-one-1khz-run4: renderer 878 ms/s (kernel 47; process 879), gpu 349
+isobatch-one-1khz-run4: renderer 923 ms/s (kernel 44; process 924), gpu 339
+analyze 2026-11-11T14:26:47Z
+compare off 2026-11-11T14:31:11Z
+compare on 2026-11-11T14:45:48Z
+done 2026-11-11T15:00:25Z
+exit 0
