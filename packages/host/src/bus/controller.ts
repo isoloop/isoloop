@@ -9,8 +9,10 @@
  * Contract errors (ADR 0003, decision 7) are fatal and never retried.
  */
 import {
+  createCommitter,
   topicConfigOf,
   type BusMetrics,
+  type Committer,
   type BusRecord,
   type BusToHost,
   type BusToIsolate,
@@ -76,6 +78,8 @@ export type BusControllerOptions = {
   onControlMessage?: (msg: unknown) => void;
   /** Host publishes buffered while no bus worker runs. Default 1,000. */
   inboxLimit?: number;
+  /** `KernelConfig.bus.commitIntervalMs` for the host's own subscriptions (ADR 0016). Default 100. */
+  commitIntervalMs?: number;
 };
 
 export type HostSubscription = {
@@ -179,7 +183,10 @@ export function createBusController(o: BusControllerOptions): BusController {
   const epoch = randomEpoch();
   let seq = 0;
   /** The host's own subscriptions, each on its own connection. */
-  const hostSubs = new Map<string, { sub: HostSubscription; port: MessagePort | null }>();
+  const hostSubs = new Map<
+    string,
+    { sub: HostSubscription; port: MessagePort | null; committer: Committer | null }
+  >();
 
   const send = (msg: HostToBus, transfer: Transferable[] = []): void => {
     if (worker) worker.postMessage(msg, transfer);
@@ -392,8 +399,22 @@ export function createBusController(o: BusControllerOptions): BusController {
     const entry = hostSubs.get(id);
     if (!entry) return;
     entry.port?.close();
+    entry.committer?.dispose();
     const port = connect(id, { publish: [], subscribe: ['*'] }, { reattach });
+    // One `commits` per host port per commit interval, earlier at half the
+    // credit (ADR 0016, decision 1, point 4).
+    const committer = createCommitter({
+      send: (offsets) => {
+        port.postMessage({ v: 1, t: 'commits', p: { offsets } });
+      },
+      ...(o.commitIntervalMs === undefined ? {} : { intervalMs: o.commitIntervalMs }),
+    });
+    // Offsets settled on the old port go first on the new one (decision 1, point 2).
+    const carried = entry.committer?.pending();
+    if (carried) for (const [topic, offset] of carried) committer.settle(topic, offset, 0);
+    committer.flush();
     entry.port = port;
+    entry.committer = committer;
     port.addEventListener('message', (e: MessageEvent<unknown>) => {
       const msg = e.data;
       if (!isBusToIsolate(msg) || msg.t !== 'deliver' || hostSubs.get(id)?.port !== port) return;
@@ -405,8 +426,7 @@ export function createBusController(o: BusControllerOptions): BusController {
         }
       }
       const last = msg.p.records.at(-1);
-      if (last)
-        port.postMessage({ v: 1, t: 'commit', p: { topic: sub.topic, offset: last.offset } });
+      if (last) committer.settle(sub.topic, last.offset, msg.p.records.length);
     });
     port.start();
     port.postMessage({ v: 1, t: 'subscribe', p: { topic: sub.topic, from: sub.from } });
@@ -456,11 +476,13 @@ export function createBusController(o: BusControllerOptions): BusController {
 
     subscribe(sub) {
       const id = `${HOST_CONNECTION_PREFIX}host:${++nextId}`;
-      hostSubs.set(id, { sub, port: null });
+      hostSubs.set(id, { sub, port: null, committer: null });
       if (!down()) bindHost(id, sub, false);
       return () => {
         const entry = hostSubs.get(id);
         hostSubs.delete(id);
+        entry?.committer?.flush();
+        entry?.committer?.dispose();
         entry?.port?.close();
         if (conns.delete(id) && worker)
           send({ v: 1, t: 'detach', p: { isolateId: id, keepOffsets: false } });
@@ -489,7 +511,10 @@ export function createBusController(o: BusControllerOptions): BusController {
     destroy() {
       destroyed = true;
       clearTimeout(spawnTimer);
-      for (const h of hostSubs.values()) h.port?.close();
+      for (const h of hostSubs.values()) {
+        h.committer?.dispose();
+        h.port?.close();
+      }
       hostSubs.clear();
       worker?.terminate();
       worker = null;

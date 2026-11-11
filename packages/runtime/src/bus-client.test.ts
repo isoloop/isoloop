@@ -47,7 +47,8 @@ describe('createBusClient', () => {
 
   it('runs handlers in order, commits after each, and calls onReset', async () => {
     const bus = fakeBus();
-    const { client } = createBusClient(bus.port);
+    // Interval 0: each task that settles a record sends its own commits.
+    const { client } = createBusClient(bus.port, { commitIntervalMs: 0 });
     const seen: number[] = [];
     const onReset = vi.fn();
     client.subscribe(
@@ -60,11 +61,11 @@ describe('createBusClient', () => {
     );
     expect((await bus.next('subscribe')).p).toEqual({ topic: 'nums.v1', from: 'committed' });
     bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(0), rec(1)] } });
-    await vi.waitUntil(() => bus.got.filter((m) => m.t === 'commit').length === 2);
+    await vi.waitUntil(() => bus.got.filter((m) => m.t === 'commits').length === 2);
     expect(seen).toEqual([0, 10]);
-    expect(bus.got.filter((m) => m.t === 'commit').map((m) => m.p)).toEqual([
-      { topic: 'nums.v1', offset: 0 },
-      { topic: 'nums.v1', offset: 1 },
+    expect(bus.got.filter((m) => m.t === 'commits').map((m) => m.p)).toEqual([
+      { offsets: [{ topic: 'nums.v1', offset: 0 }] },
+      { offsets: [{ topic: 'nums.v1', offset: 1 }] },
     ]);
     bus.send({ v: 1, t: 'reset', p: { topic: 'nums.v1', reason: 'bus_restart' } });
     await vi.waitUntil(() => onReset.mock.calls.length === 1);
@@ -191,5 +192,109 @@ describe('createBusClient', () => {
     void second.client.publish(nums, { value: 1 });
     const sent = await other.next('publish');
     expect(sent.p.epoch).not.toBe(epoch);
+  });
+});
+
+const commitsOf = (got: IsolateToBus[]) =>
+  got.flatMap((m) => (m.t === 'commits' ? [m.p.offsets] : []));
+
+describe('combined commits (ADR 0016, decision 1)', () => {
+  it('sends the settled offsets together, once per interval', async () => {
+    const bus = fakeBus();
+    const { client } = createBusClient(bus.port, { commitIntervalMs: 60 });
+    client.subscribe(nums, () => {});
+    await bus.next('subscribe');
+    bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(0), rec(1), rec(2)] } });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(commitsOf(bus.got)).toEqual([]);
+    await vi.waitUntil(() => commitsOf(bus.got).length === 1);
+    expect(commitsOf(bus.got)).toEqual([[{ topic: 'nums.v1', offset: 2 }]]);
+  });
+
+  it('sends early at half a subscription’s credit, so it never pauses for the interval', async () => {
+    const bus = fakeBus();
+    const { client } = createBusClient(bus.port, { commitIntervalMs: 1000, credit: 4 });
+    client.subscribe(nums, () => {});
+    await bus.next('subscribe');
+    bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [0, 1, 2].map(rec) } });
+    await vi.waitUntil(() => commitsOf(bus.got).length === 1);
+    expect(commitsOf(bus.got)).toEqual([[{ topic: 'nums.v1', offset: 1 }]]);
+  });
+
+  it('stops at the record before a handler that throws', async () => {
+    const bus = fakeBus();
+    const onError = vi.fn();
+    const handle = createBusClient(bus.port, { commitIntervalMs: 1000, onError });
+    handle.client.subscribe(nums, (r) => {
+      if (r.offset === 1) throw new Error('boom');
+    });
+    await bus.next('subscribe');
+    bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [0, 1, 2].map(rec) } });
+    await vi.waitUntil(() => onError.mock.calls.length === 1);
+    void handle.close();
+    await vi.waitUntil(() => commitsOf(bus.got).length === 1);
+    expect(commitsOf(bus.got)).toEqual([[{ topic: 'nums.v1', offset: 0 }]]);
+  });
+
+  it('close sends what is pending at once: shutdown, for every reason', async () => {
+    const bus = fakeBus();
+    const handle = createBusClient(bus.port, { commitIntervalMs: 1000 });
+    handle.client.subscribe(nums, () => {});
+    await bus.next('subscribe');
+    bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(5)] } });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(commitsOf(bus.got)).toEqual([]);
+    let closed = false;
+    void handle.close().then(() => {
+      closed = true;
+    });
+    const sent = await bus.next('commits');
+    expect(sent.p.offsets).toEqual([{ topic: 'nums.v1', offset: 5 }]);
+    // It waits for the broker's answer before shutdown goes on to `bye`.
+    await new Promise((r) => setTimeout(r, 10));
+    expect(closed).toBe(false);
+    bus.send({ v: 1, t: 'result', re: sent.id ?? '', p: { ok: true, value: null } });
+    await vi.waitUntil(() => closed);
+  });
+
+  it('commits before it unsubscribes', async () => {
+    const bus = fakeBus();
+    const { client } = createBusClient(bus.port, { commitIntervalMs: 1000 });
+    const off = client.subscribe(nums, () => {});
+    await bus.next('subscribe');
+    bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(3)] } });
+    await new Promise((r) => setTimeout(r, 10));
+    off();
+    await bus.next('unsubscribe');
+    const order = bus.got.map((m) => m.t).filter((k) => k === 'commits' || k === 'unsubscribe');
+    expect(order).toEqual(['commits', 'unsubscribe']);
+  });
+
+  it('sends pending commits first on the new port after a bus restart', async () => {
+    const bus = fakeBus();
+    const handle = createBusClient(bus.port, { commitIntervalMs: 1000 });
+    handle.client.subscribe(nums, () => {});
+    await bus.next('subscribe');
+    bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(7)] } });
+    await new Promise((r) => setTimeout(r, 10));
+    const next = fakeBus();
+    handle.reattach(next.port);
+    await next.next('subscribe');
+    expect(next.got.map((m) => m.t).slice(0, 2)).toEqual(['commits', 'subscribe']);
+    expect(commitsOf(next.got)).toEqual([[{ topic: 'nums.v1', offset: 7 }]]);
+    expect(commitsOf(bus.got)).toEqual([]);
+  });
+
+  it('forgets offsets of a memory topic the bus restart lost', async () => {
+    const bus = fakeBus();
+    const handle = createBusClient(bus.port, { commitIntervalMs: 1000 });
+    handle.client.subscribe(nums, () => {});
+    await bus.next('subscribe');
+    bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(2)] } });
+    await new Promise((r) => setTimeout(r, 10));
+    bus.send({ v: 1, t: 'reset', p: { topic: 'nums.v1', reason: 'bus_restart' } });
+    await new Promise((r) => setTimeout(r, 10));
+    await handle.close();
+    expect(commitsOf(bus.got)).toEqual([]);
   });
 });

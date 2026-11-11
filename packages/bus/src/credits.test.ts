@@ -20,7 +20,8 @@ function setup(retention: Retention, opts: { inboxLimit: number; batchSize?: num
 
 const batches = (iso: FakeIsolate) => iso.inbox.flatMap((m) => (m.t === 'deliver' ? [m.p] : []));
 
-const commit = (iso: FakeIsolate, offset: number) => iso.call('commit', { topic: 't.v1', offset });
+const commit = (iso: FakeIsolate, offset: number) =>
+  iso.call('commits', { offsets: [{ topic: 't.v1', offset }] });
 
 describe('credits and backpressure', () => {
   it('a consumer that never commits gets exactly the inbox limit, then nothing', async () => {
@@ -141,7 +142,7 @@ describe('credits and backpressure', () => {
     for (let i = 0; i < 4; i++) void broker.publish({ kind: 'host' }, 'c.v1', 'k', i);
     await flush();
     engine.compact('c.v1'); // keeps only offset 3
-    await a.call('commit', { topic: 'c.v1', offset: 0 });
+    await a.call('commits', { offsets: [{ topic: 'c.v1', offset: 0 }] });
     const last = batches(a).at(-1);
     expect(last).not.toHaveProperty('gap');
     expect(a.values('c.v1')).toEqual([0, 3]);
