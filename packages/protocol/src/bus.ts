@@ -35,7 +35,12 @@ export type IsolateToBus =
   | Envelope<'publish', { topic: string; key?: string; value: unknown } & PublishId>
   | Envelope<'subscribe', { topic: string; from: StartPosition; group?: string }>
   | Envelope<'unsubscribe', { topic: string }>
-  | Envelope<'commit', { topic: string; offset: number }>
+  /**
+   * Each entry is the highest settled offset of one subscription on this port
+   * (ADR 0016, decision 1): at most one message per commit interval, earlier
+   * at half a subscription's credit, on shutdown and on a new port.
+   */
+  | Envelope<'commits', { offsets: { topic: string; offset: number }[] }>
   /**
    * `bus.request`: appended like a publish, with `req` set on the record. `id`
    * is required; the reply (or `reply_invalid`) comes back as `result { re: id }`.
@@ -60,7 +65,7 @@ export const ISOLATE_TO_BUS: MessageTypes<IsolateToBus> = {
   publish: true,
   subscribe: true,
   unsubscribe: true,
-  commit: true,
+  commits: true,
   request: true,
   reply: true,
 };

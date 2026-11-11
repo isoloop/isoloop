@@ -595,7 +595,8 @@ export class Broker {
   }
 
   #receive(conn: Connection, msg: unknown): void {
-    if (!isIsolateToBus(msg) || !hasTopic(msg.p)) {
+    // Every message names its topic, except `commits`, whose entries each do (ADR 0016).
+    if (!isIsolateToBus(msg) || (msg.t !== 'commits' && !hasTopic(msg.p))) {
       this.#dropped++;
       return;
     }
@@ -675,9 +676,25 @@ export class Broker {
         reply({ ok: true, value: null });
         return;
       }
-      case 'commit':
-        reply(this.#commit(conn, msg.p.topic, msg.p.offset));
+      case 'commits': {
+        // Each entry stands alone (ADR 0016, decision 1): one that fails
+        // doesn't stop the others. With an id, the reply is the first failure.
+        const offsets: unknown = msg.p.offsets;
+        if (!Array.isArray(offsets)) {
+          reply(fail('invalid', 'commits needs an offsets array'));
+          return;
+        }
+        let first: CallResult = { ok: true, value: null };
+        for (const e of offsets as unknown[]) {
+          const r =
+            typeof e === 'object' && e !== null && 'topic' in e && typeof e.topic === 'string'
+              ? this.#commit(conn, e.topic, 'offset' in e ? e.offset : undefined)
+              : fail('invalid', 'each commit needs a topic and an offset');
+          if (!r.ok && first.ok) first = r;
+        }
+        reply(first);
         return;
+      }
       default: {
         const never: never = msg;
         this.#dropped++;

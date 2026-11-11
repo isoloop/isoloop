@@ -4,16 +4,24 @@
  *
  * - `publish` resolves on the broker's `result`, or rejects with a `BusError`.
  * - `subscribe` runs handlers one record at a time, in order. With
- *   `autoCommit` (default) it commits once a handler settles, so delivery is
- *   at least once. A handler that throws stops the subscription's commits:
- *   the record and those after it are redelivered on the next start.
- * - On `reattach` (a bus restart) it swaps the port, sends every subscription
- *   again and re-sends every publish the old bus never answered, in order.
+ *   `autoCommit` (default) a record counts as settled once its handler
+ *   returns, so delivery is at least once. A handler that throws stops the
+ *   subscription's commits: the record and those after it are redelivered on
+ *   the next start.
+ * - Settled offsets go out together, one `commits` per commit interval, or
+ *   earlier at half a subscription's credit and on `close` (ADR 0016,
+ *   decision 1). A crash can redeliver up to one interval of records.
+ * - On `reattach` (a bus restart) it swaps the port, drops the commits still
+ *   pending (the new broker would reject them before the subscriptions, so a
+ *   persistent topic redelivers up to one interval, as after a crash; ADR
+ *   0016, decision point 3), sends every subscription again and re-sends
+ *   every publish the old bus never answered, in order.
  *   Each publish and request carries `(epoch, seq)`, so a persistent topic
  *   doesn't append a re-send the old bus already wrote (ADR 0007, step 5).
  */
 import {
   BusError,
+  createCommitter,
   isBusToIsolate,
   type BusRecord,
   type BusToIsolate,
@@ -77,6 +85,10 @@ export type BusClientOptions = {
   now?: () => number;
   /** This instance's `epoch` for publish ids. Default: random, new per client. */
   epoch?: number;
+  /** `KernelConfig.bus.commitIntervalMs`: 0 is every task. Default 100. */
+  commitIntervalMs?: number;
+  /** The broker's credit per subscription; commits go out early at half of it. Default 1,000. */
+  credit?: number;
 };
 
 /** A random epoch: a new isolate instance, so a new one per client. */
@@ -111,6 +123,12 @@ export type BusClientHandle = {
   idle(): { sinceDeliveryMs: number; inFlight: number };
   /** Swaps to a new bus port after a bus restart. */
   reattach(port: MessagePort): void;
+  /**
+   * Sends pending commits and stops the commit timer: shutdown, for every
+   * reason. Resolves once the broker has them, so the host's `detach`, which
+   * reaches the bus on another channel, can't overtake them.
+   */
+  close(): Promise<void>;
 };
 
 export function createBusClient(first: MessagePort, o: BusClientOptions = {}): BusClientHandle {
@@ -146,8 +164,15 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
     });
   };
 
+  const committer = createCommitter({
+    send: (offsets) => {
+      send({ v: 1, t: 'commits', p: { offsets } });
+    },
+    ...(o.commitIntervalMs === undefined ? {} : { intervalMs: o.commitIntervalMs }),
+    ...(o.credit === undefined ? {} : { credit: o.credit }),
+  });
   const commit = (topic: string, offset: number): void => {
-    send({ v: 1, t: 'commit', p: { topic, offset } });
+    committer.settle(topic, offset);
   };
 
   const drain = async (sub: Sub): Promise<void> => {
@@ -213,6 +238,8 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
         const sub = subs.get(msg.p.topic);
         if (!sub) return;
         sub.queue.length = 0;
+        // Offsets from the lost log mean nothing in the new one.
+        committer.drop(msg.p.topic);
         try {
           sub.opts.onReset?.();
         } catch (err) {
@@ -263,6 +290,8 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
       return () => {
         if (subs.get(topic.name) !== sub) return;
         subs.delete(topic.name);
+        // What it settled still counts: committed before it leaves.
+        committer.flush();
         send({ v: 1, t: 'unsubscribe', p: { topic: topic.name } });
       };
     },
@@ -323,14 +352,25 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
         pending.delete(p.msg.id);
         p.settle({ ok: true, value: null });
       }
-      // Subscriptions first, then everything the old bus never answered, in
-      // the order it was sent. Its memory log is gone, so nothing duplicates
-      // there; a persistent topic answers what it already holds by its id.
+      // Pending commits are dropped, not sent: the new broker accepts a
+      // commit only for a topic this connection subscribes to, and these
+      // would arrive first. A persistent topic redelivers up to one interval
+      // instead, the same window as after a crash (ADR 0016, decision point
+      // 3). Then subscriptions, then everything the old bus never answered,
+      // in the order it was sent. Its memory log is gone, so nothing
+      // duplicates there; a persistent topic answers what it already holds
+      // by its id.
+      committer.take();
       for (const sub of subs.values()) {
         sub.queue.length = 0;
         sendSubscribe(sub);
       }
       for (const p of unanswered) if (p.msg.t !== 'subscribe') send(p.msg);
+    },
+    async close() {
+      const offsets = committer.take();
+      committer.dispose();
+      if (offsets) await call({ v: 1, t: 'commits', p: { offsets } });
     },
   };
 }
