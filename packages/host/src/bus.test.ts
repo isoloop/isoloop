@@ -2,6 +2,7 @@
 // Isolates run a test bootstrap that speaks the bus protocol directly.
 import type { BusRecord } from '@isoloop/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { busConfig } from './__fixtures__/bus-mode';
 import list, { count, notes, report, saved, type Report } from './__fixtures__/contracts';
 import { BusError, createKernel, type Kernel, type KernelConfig, type KernelEvents } from './index';
 
@@ -34,6 +35,7 @@ function setup(extra: Partial<KernelConfig> = {}) {
     workers: { isolateBootstrap: bootstrap, bus: busWorker },
     supervisor: { backoff: { initialMs: 50 } },
     ...extra,
+    bus: busConfig(extra.bus),
   });
   kernels.push(kernel);
   const log = <E extends keyof KernelEvents>(e: E): KernelEvents[E][] => {
@@ -83,7 +85,9 @@ describe('bus controller', () => {
     expect(got[0]).toMatchObject({ offset: 0, key: 'k', value: 41, producer: 'host' });
     expect(ready).toEqual([{ first: true }]);
     // The isolate's subscription got it too, on its own port.
-    await vi.waitUntil(() => latest('X')?.seen === 0);
+    // (It checked `seen === 0` before, which passed only by reading the
+    // first report before the second arrived.)
+    await vi.waitUntil(() => latest('X')?.seen === 1);
   });
 
   it('rejects isoloop.* and invalid publishes with a BusError', async () => {

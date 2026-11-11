@@ -88,6 +88,13 @@ export default defineConfig({
       ]),
       browser('dom'),
       browser('host'),
+      // The bus suites again with KernelConfig.bus.batch on (ADR 0016, decision 3).
+      {
+        test: {
+          ...browser('host-batch', 'packages/host/src/{bus,bus-client,pools-bus}.test.ts').test,
+          provide: { busBatch: true },
+        },
+      },
       browser('runtime'),
       preact(10),
       preact(11),

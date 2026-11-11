@@ -34,6 +34,8 @@ export type InitPayload = {
   wake?: boolean;
   /** `KernelConfig.bus.commitIntervalMs` (ADR 0016, decision 1). Default 100. */
   commitIntervalMs?: number;
+  /** `KernelConfig.bus.batch` (ADR 0016, decision 3): batch what the bus port sends per task. Default off. */
+  batch?: boolean;
 };
 
 /** What a beat says about whether the isolate could be suspended (ADR 0001). */

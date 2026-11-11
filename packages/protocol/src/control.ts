@@ -75,6 +75,11 @@ export type HostToBus =
         safeMode?: boolean;
         /** A bus restart: the worker it replaces may still hold the files' lock a moment. */
         restart?: boolean;
+        /**
+         * `KernelConfig.bus.batch` (ADR 0016, decision 3): the broker batches
+         * what it sends on each isolate port per task. Default off.
+         */
+        batch?: boolean;
       }
     >
   /**

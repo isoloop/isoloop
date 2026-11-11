@@ -11,6 +11,9 @@
  * - Settled offsets go out together, one `commits` per commit interval, or
  *   earlier at half a subscription's credit and on `close` (ADR 0016,
  *   decision 1). A crash can redeliver up to one interval of records.
+ * - With `batch` on (ADR 0016, decision 3, experimental), what it sends in
+ *   one task goes as one message at the end of the task. It always accepts
+ *   batches from the bus, whatever its own setting.
  * - On `reattach` (a bus restart) it swaps the port, sends every subscription
  *   again and re-sends every publish the old bus never answered, in order.
  *   Each publish and request carries `(epoch, seq)`, so a persistent topic
@@ -18,8 +21,10 @@
  */
 import {
   BusError,
+  createBatchSender,
   createCommitter,
   isBusToIsolate,
+  unbatch,
   type BusRecord,
   type BusToIsolate,
   type CallResult,
@@ -86,6 +91,8 @@ export type BusClientOptions = {
   commitIntervalMs?: number;
   /** The broker's credit per subscription; commits go out early at half of it. Default 1,000. */
   credit?: number;
+  /** `KernelConfig.bus.batch`: send what one task produces as one message. Default off. */
+  batch?: boolean;
 };
 
 /** A random epoch: a new isolate instance, so a new one per client. */
@@ -142,8 +149,15 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
   /** Which topic a delivered record came from, for `reply` and `commit`. */
   const topicOf = new WeakMap<object, string>();
 
+  // Every send on the port goes through it, so order holds with batching on.
+  const sender = createBatchSender<IsolateToBus>(
+    (msg) => {
+      port.postMessage(msg);
+    },
+    () => o.batch === true,
+  );
   const send = (msg: IsolateToBus): void => {
-    port.postMessage(msg);
+    sender.send(msg);
   };
 
   const call = (msg: IsolateToBus): Promise<CallResult> => {
@@ -180,8 +194,11 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
       if (!r) break;
       topicOf.set(r, sub.topic);
       try {
+        const done = sub.fn(r);
+        // A synchronous handler settles in the same microtask, so its commit
+        // can share a batch with what it published (ADR 0016, decision 3).
         // oxlint-disable-next-line no-await-in-loop -- one record at a time, in order, by design
-        await sub.fn(r);
+        if (done instanceof Promise) await done;
       } catch (err) {
         sub.stuck = true;
         o.onError?.(err);
@@ -250,7 +267,9 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
 
   const listen = (p: MessagePort): void => {
     p.addEventListener('message', (e: MessageEvent<unknown>) => {
-      if (port === p && isBusToIsolate(e.data)) receive(e.data);
+      unbatch(e.data, (msg) => {
+        if (port === p && isBusToIsolate(msg)) receive(msg);
+      });
     });
     p.start();
   };
@@ -336,6 +355,9 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
     idle: () => ({ sinceDeliveryMs: now() - lastDelivery, inFlight: pending.size }),
     reattach(next) {
       const old = port;
+      // Queued for the old bus, which is gone: what needs an answer is
+      // re-sent below from `pending`, as without batching.
+      sender.clear();
       port = next;
       old.close();
       listen(next);

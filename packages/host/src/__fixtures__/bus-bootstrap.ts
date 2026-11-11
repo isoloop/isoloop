@@ -49,8 +49,16 @@ const use = (p: MessagePort): void => {
   port?.close();
   port = p;
   ports++;
-  p.addEventListener('message', (e: MessageEvent<BusMsg>) => {
-    const m = e.data;
+  // Receivers always accept a batch (ADR 0016, decision 3): its envelopes,
+  // in order, as if they had arrived one by one.
+  p.addEventListener(
+    'message',
+    (e: MessageEvent<BusMsg | { t: 'batch'; p: { msgs: BusMsg[] } }>) => {
+      const d = e.data;
+      for (const m of d.t === 'batch' ? d.p.msgs : [d]) handle(m);
+    },
+  );
+  const handle = (m: BusMsg): void => {
     if (m.t === 'reset') {
       resets[m.p.topic] = (resets[m.p.topic] ?? 0) + 1;
       report();
@@ -67,7 +75,7 @@ const use = (p: MessagePort): void => {
           p: { offsets: [{ topic: m.p.topic, offset: last.offset }] },
         });
     }
-  });
+  };
   p.start();
   for (const topic of topics)
     p.postMessage({ v: 1, t: 'subscribe', p: { topic, from: 'committed' } });

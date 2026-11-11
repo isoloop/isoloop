@@ -1,4 +1,11 @@
-import { BusError, type BusToIsolate, type IsolateToBus, type TopicRef } from '@isoloop/protocol';
+import {
+  BusError,
+  isBatch,
+  unbatch,
+  type BusToIsolate,
+  type IsolateToBus,
+  type TopicRef,
+} from '@isoloop/protocol';
 import { describe, expect, it, vi } from 'vitest';
 import { createBusClient } from './bus-client';
 
@@ -264,5 +271,124 @@ describe('combined commits (ADR 0016, decision 1)', () => {
     await new Promise((r) => setTimeout(r, 10));
     await handle.close();
     expect(commitsOf(bus.got)).toEqual([]);
+  });
+});
+
+/** A bus end that counts port messages and opens batches, as the broker does. */
+function batchingBus() {
+  const { port1, port2 } = new MessageChannel();
+  const raw: unknown[] = [];
+  const got: IsolateToBus[] = [];
+  port1.addEventListener('message', (e: MessageEvent<unknown>) => {
+    raw.push(e.data);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the client sends IsolateToBus
+    unbatch(e.data, (m) => got.push(m as IsolateToBus));
+  });
+  port1.start();
+  const send = (m: unknown): void => port1.postMessage(m);
+  return { port: port2, raw, got, send };
+}
+
+describe('batching per port per task (ADR 0016, decision 3)', () => {
+  it('what one task sends goes as one message, in order; the next task starts a new one', async () => {
+    const bus = batchingBus();
+    const { client } = createBusClient(bus.port, { epoch: 1, batch: true });
+    void client.publish(nums, { value: 1 });
+    void client.publish(nums, { value: 2 });
+    void client.publish(nums, { value: 3 });
+    await new Promise((r) => setTimeout(r, 0));
+    void client.publish(nums, { value: 4 });
+    void client.publish(nums, { value: 5 });
+    await vi.waitUntil(() => bus.got.length === 5);
+    expect(bus.raw).toHaveLength(2);
+    expect(bus.raw.every((m) => isBatch(m))).toBe(true);
+    expect(bus.got.map((m) => (m.t === 'publish' ? m.p.seq : -1))).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('off, it sends one message per envelope, as before', async () => {
+    const bus = batchingBus();
+    const { client } = createBusClient(bus.port);
+    void client.publish(nums, { value: 1 });
+    void client.publish(nums, { value: 2 });
+    await vi.waitUntil(() => bus.got.length === 2);
+    expect(bus.raw).toHaveLength(2);
+    expect(bus.raw.some((m) => isBatch(m))).toBe(false);
+  });
+
+  it('accepts batches from the bus whatever its own setting', async () => {
+    const bus = batchingBus();
+    const { client } = createBusClient(bus.port);
+    const seen: number[] = [];
+    client.subscribe(nums, (r) => {
+      seen.push(r.value);
+    });
+    const ok = client.publish(nums, { value: 9 });
+    await vi.waitUntil(() => bus.got.length === 2);
+    const pub = bus.got.find((m) => m.t === 'publish');
+    bus.send({
+      v: 1,
+      t: 'batch',
+      p: {
+        msgs: [
+          { v: 1, t: 'result', re: pub?.id ?? '', p: { ok: true, value: { offset: 0 } } },
+          { v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(0), rec(1)] } },
+        ],
+      },
+    });
+    await expect(ok).resolves.toBeUndefined();
+    await vi.waitUntil(() => seen.length === 2);
+    expect(seen).toEqual([0, 10]);
+  });
+
+  it('a commit rides with the publish its handler made in the same task', async () => {
+    const bus = batchingBus();
+    const { client } = createBusClient(bus.port, { batch: true, commitIntervalMs: 0 });
+    client.subscribe(nums, (r) => {
+      void client.publish(nums, { value: r.value + 1 });
+    });
+    await vi.waitUntil(() => bus.got.some((m) => m.t === 'subscribe'));
+    const before = bus.raw.length;
+    bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(4)] } });
+    await vi.waitUntil(() => bus.got.some((m) => m.t === 'commits'));
+    const after = bus.raw.slice(before);
+    expect(after).toHaveLength(1);
+    const [only] = after;
+    expect(isBatch(only) ? only.p.msgs.map((m) => m.t) : []).toEqual(['publish', 'commits']);
+  });
+
+  it('on reattach, what was queued for the old bus is dropped, not sent twice', async () => {
+    const old = batchingBus();
+    const handle = createBusClient(old.port, { epoch: 2, batch: true });
+    const a = handle.client.publish(nums, { value: 1 });
+    const fresh = batchingBus();
+    handle.reattach(fresh.port); // same task: the publish is still queued
+    await vi.waitUntil(() => fresh.got.length === 1);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(old.got).toEqual([]);
+    expect(fresh.got.map((m) => [m.t, m.p])).toEqual([
+      ['publish', { topic: 'nums.v1', value: 1, epoch: 2, seq: 1 }],
+    ]);
+    const pub = fresh.got[0];
+    fresh.send({ v: 1, t: 'result', re: pub?.id ?? '', p: { ok: true, value: null } });
+    await expect(a).resolves.toBeUndefined();
+  });
+
+  it('close still waits for the broker’s answer to its last commits', async () => {
+    const bus = batchingBus();
+    const handle = createBusClient(bus.port, { batch: true, commitIntervalMs: 1000 });
+    handle.client.subscribe(nums, () => {});
+    await vi.waitUntil(() => bus.got.some((m) => m.t === 'subscribe'));
+    bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [rec(5)] } });
+    await new Promise((r) => setTimeout(r, 10));
+    let closed = false;
+    void handle.close().then(() => {
+      closed = true;
+    });
+    await vi.waitUntil(() => bus.got.some((m) => m.t === 'commits'));
+    const sent = bus.got.find((m) => m.t === 'commits');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(closed).toBe(false);
+    bus.send({ v: 1, t: 'result', re: sent?.id ?? '', p: { ok: true, value: null } });
+    await vi.waitUntil(() => closed);
   });
 });

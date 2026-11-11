@@ -132,6 +132,7 @@ export function createVanillaIsolate(
   const bus = createBusClient(init.busPort, {
     ...(init.wake ? { wake: true } : {}),
     ...(init.commitIntervalMs === undefined ? {} : { commitIntervalMs: init.commitIntervalMs }),
+    ...(init.batch ? { batch: true } : {}),
     onError: (err) => {
       const p =
         err instanceof Error && err.stack !== undefined

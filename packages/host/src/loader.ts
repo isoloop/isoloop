@@ -40,6 +40,8 @@ export type LoadOptions = {
   heartbeatMs: number;
   /** `KernelConfig.bus.commitIntervalMs` (ADR 0016, decision 1). */
   commitIntervalMs?: number;
+  /** `KernelConfig.bus.batch` (ADR 0016, decision 3). */
+  batch?: boolean;
   /** The isolate's end of its bus connection; transferred in `init`. */
   busPort: MessagePort;
   /** Waking from suspension: `latest` subscriptions resume from `committed` (ADR 0001). */
@@ -61,6 +63,7 @@ const initOf = (o: LoadOptions): HostToIsolate => ({
     busPort: o.busPort,
     heartbeatMs: o.heartbeatMs,
     ...(o.commitIntervalMs === undefined ? {} : { commitIntervalMs: o.commitIntervalMs }),
+    ...(o.batch ? { batch: true } : {}),
     src: new URL(o.src, document.baseURI).href,
     ...(o.wake ? { wake: true } : {}),
   },

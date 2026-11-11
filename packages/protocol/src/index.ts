@@ -5,6 +5,7 @@ export * from './events';
 export * from './isolate';
 export * from './bus';
 export * from './commits';
+export * from './batch';
 export * from './bus-error';
 export * from './control';
 export * from './system-topics';

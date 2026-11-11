@@ -3,6 +3,7 @@
 // its own id, the other members keep running, and restarting that member
 // alone replays it from its own committed offset.
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { busConfig } from './__fixtures__/bus-mode';
 import list, { count, report } from './__fixtures__/contracts';
 import { createKernel, type Kernel, type KernelEvents } from './index';
 
@@ -19,6 +20,7 @@ afterEach(async () => {
 
 function setup() {
   const kernel = createKernel({
+    bus: busConfig(),
     contracts: { url: new URL('./__fixtures__/contracts.ts', import.meta.url).href, list },
     workers: {
       isolateBootstrap: worker('../../runtime/src/bootstrap.ts'),
@@ -38,6 +40,8 @@ function setup() {
 }
 
 const ALL = { publish: ['*'], subscribe: ['*'] };
+/** An isolate's first start, with the bus suites running twice side by side (host, host-batch). */
+const START_MS = 5000;
 
 describe('per-member errors in a pool (M2c)', () => {
   it('a throwing handler is that member’s error; restarting it alone replays its own records', async () => {
@@ -47,7 +51,7 @@ describe('per-member errors in a pool (M2c)', () => {
     const ready = log('isolate:ready');
     kernel.spawn({ id: 'F', src, grants: ALL, config: { mode: 'flaky' }, pool: 'p' });
     kernel.spawn({ id: 'G', src, grants: ALL, pool: 'p' });
-    await vi.waitUntil(() => ready.length === 2);
+    await vi.waitUntil(() => ready.length === 2, { timeout: START_MS });
     expect(kernel.debug.workers().pools).toEqual({ p: ['F', 'G'] });
     // oxlint-disable-next-line no-await-in-loop -- in order on purpose
     for (const value of [1, 2, 3]) await kernel.publish(count, { value });

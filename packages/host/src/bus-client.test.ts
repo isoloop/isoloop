@@ -1,5 +1,6 @@
 // The isolate BusClient on the real runtime and bus worker (plan m2-bus task 9).
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { busConfig } from './__fixtures__/bus-mode';
 import list, { count, report } from './__fixtures__/contracts';
 import { createKernel, type Kernel, type KernelEvents } from './index';
 
@@ -16,7 +17,7 @@ afterEach(async () => {
 
 function setup(commitIntervalMs?: number) {
   const kernel = createKernel({
-    ...(commitIntervalMs === undefined ? {} : { bus: { commitIntervalMs } }),
+    bus: busConfig(commitIntervalMs === undefined ? {} : { commitIntervalMs }),
     contracts: { url: new URL('./__fixtures__/contracts.ts', import.meta.url).href, list },
     workers: {
       isolateBootstrap: worker('../../runtime/src/bootstrap.ts'),
@@ -36,6 +37,8 @@ function setup(commitIntervalMs?: number) {
 }
 
 const ALL = { publish: ['*'], subscribe: ['*'] };
+/** An isolate's first start, with the bus suites running twice side by side (host, host-batch). */
+const START_MS = 5000;
 
 describe('BusClient', () => {
   it('a handler that throws commits nothing more; the record comes back after a restart', async () => {
@@ -43,7 +46,7 @@ describe('BusClient', () => {
     const errors = log('isolate:error');
     const ready = log('isolate:ready');
     kernel.spawn({ id: 'F', src, grants: ALL, config: { mode: 'flaky' } });
-    await vi.waitUntil(() => ready.length === 1);
+    await vi.waitUntil(() => ready.length === 1, { timeout: START_MS });
     // oxlint-disable-next-line no-await-in-loop -- in order on purpose
     for (const value of [1, 2, 3]) await kernel.publish(count, { value });
     await vi.waitUntil(() => reports.some((r) => r.values?.length === 3));
@@ -65,7 +68,7 @@ describe('BusClient', () => {
     const { kernel, reports, log } = setup(1000);
     const ready = log('isolate:ready');
     kernel.spawn({ id: 'F', src, grants: ALL, config: { mode: 'flaky' } });
-    await vi.waitUntil(() => ready.length === 1);
+    await vi.waitUntil(() => ready.length === 1, { timeout: START_MS });
     // oxlint-disable-next-line no-await-in-loop -- in order on purpose
     for (const value of [1, 2, 3]) await kernel.publish(count, { value });
     await vi.waitUntil(() => reports.some((r) => r.values?.length === 3));
@@ -94,5 +97,22 @@ describe('BusClient', () => {
     expect(values).toEqual(values.map((_, i) => first + i));
     expect(first).toBeGreaterThan(0);
     expect(reports.some((r) => (r.failed ?? 0) > 0)).toBe(false);
+  });
+
+  it('publishes sent in one task are each checked, counted and answered on their own (ADR 0016, decision 3)', async () => {
+    // Runs in `host` (one message per publish) and `host-batch` (one batch):
+    // the same answers, records and counts either way.
+    const { kernel, reports, log } = setup();
+    const metrics = log('bus:metrics');
+    const got: unknown[] = [];
+    kernel.subscribe(count, (r) => got.push(r.value), { from: 'earliest' });
+    kernel.spawn({ id: 'B', src, grants: ALL, config: { mode: 'burst' } });
+    await vi.waitUntil(() => reports.some((r) => r.id === 'B' && r.failed !== undefined), {
+      timeout: START_MS,
+    });
+    expect(reports.find((r) => r.id === 'B')?.failed).toBe(3);
+    await vi.waitUntil(() => got.length === 6);
+    expect(got).toEqual([0, 1, 3, 4, 6, 7]);
+    await vi.waitUntil(() => metrics.some((m) => m.rejected.invalid === 3), { timeout: 3000 });
   });
 });

@@ -24,8 +24,12 @@ import {
   type HostToBus,
   type SeedEvent,
   type StartPosition,
+  type BatchSender,
+  type IsolateToBus,
+  createBatchSender,
   isBusToHost,
   isBusToIsolate,
+  unbatch,
 } from '@isoloop/protocol';
 import {
   initialSupervision,
@@ -80,6 +84,8 @@ export type BusControllerOptions = {
   inboxLimit?: number;
   /** `KernelConfig.bus.commitIntervalMs` for the host's own subscriptions (ADR 0016). Default 100. */
   commitIntervalMs?: number;
+  /** `KernelConfig.bus.batch` (ADR 0016, decision 3): passed to the bus at boot, used on host ports. */
+  batch?: boolean;
 };
 
 export type HostSubscription = {
@@ -185,7 +191,13 @@ export function createBusController(o: BusControllerOptions): BusController {
   /** The host's own subscriptions, each on its own connection. */
   const hostSubs = new Map<
     string,
-    { sub: HostSubscription; port: MessagePort | null; committer: Committer | null }
+    {
+      sub: HostSubscription;
+      port: MessagePort | null;
+      committer: Committer | null;
+      /** Sends on `port`, batched per task with `bus.batch` on (ADR 0016, decision 3). */
+      sender: BatchSender<IsolateToBus> | null;
+    }
   >();
 
   const send = (msg: HostToBus, transfer: Transferable[] = []): void => {
@@ -322,6 +334,7 @@ export function createBusController(o: BusControllerOptions): BusController {
         dev: o.dev,
         ...(safeMode ? { safeMode: true } : {}),
         ...(mine > 0 ? { restart: true } : {}),
+        ...(o.batch ? { batch: true } : {}),
       },
     } satisfies HostToBus);
     for (const q of queue.splice(0)) w.postMessage(q.msg, q.transfer);
@@ -401,11 +414,17 @@ export function createBusController(o: BusControllerOptions): BusController {
     entry.port?.close();
     entry.committer?.dispose();
     const port = connect(id, { publish: [], subscribe: ['*'] }, { reattach });
+    const sender = createBatchSender<IsolateToBus>(
+      (msg) => {
+        port.postMessage(msg);
+      },
+      () => o.batch === true,
+    );
     // One `commits` per host port per commit interval, earlier at half the
     // credit (ADR 0016, decision 1, point 4).
     const committer = createCommitter({
       send: (offsets) => {
-        port.postMessage({ v: 1, t: 'commits', p: { offsets } });
+        sender.send({ v: 1, t: 'commits', p: { offsets } });
       },
       ...(o.commitIntervalMs === undefined ? {} : { intervalMs: o.commitIntervalMs }),
     });
@@ -415,21 +434,23 @@ export function createBusController(o: BusControllerOptions): BusController {
     committer.flush();
     entry.port = port;
     entry.committer = committer;
+    entry.sender = sender;
     port.addEventListener('message', (e: MessageEvent<unknown>) => {
-      const msg = e.data;
-      if (!isBusToIsolate(msg) || msg.t !== 'deliver' || hostSubs.get(id)?.port !== port) return;
-      for (const r of msg.p.records) {
-        try {
-          sub.fn(r);
-        } catch (err) {
-          console.error('[isoloop] kernel.subscribe handler threw', err);
+      unbatch(e.data, (msg) => {
+        if (!isBusToIsolate(msg) || msg.t !== 'deliver' || hostSubs.get(id)?.port !== port) return;
+        for (const r of msg.p.records) {
+          try {
+            sub.fn(r);
+          } catch (err) {
+            console.error('[isoloop] kernel.subscribe handler threw', err);
+          }
         }
-      }
-      const last = msg.p.records.at(-1);
-      if (last) committer.settle(sub.topic, last.offset, msg.p.records.length);
+        const last = msg.p.records.at(-1);
+        if (last) committer.settle(sub.topic, last.offset, msg.p.records.length);
+      });
     });
     port.start();
-    port.postMessage({ v: 1, t: 'subscribe', p: { topic: sub.topic, from: sub.from } });
+    sender.send({ v: 1, t: 'subscribe', p: { topic: sub.topic, from: sub.from } });
   };
 
   spawn();
@@ -476,13 +497,15 @@ export function createBusController(o: BusControllerOptions): BusController {
 
     subscribe(sub) {
       const id = `${HOST_CONNECTION_PREFIX}host:${++nextId}`;
-      hostSubs.set(id, { sub, port: null, committer: null });
+      hostSubs.set(id, { sub, port: null, committer: null, sender: null });
       if (!down()) bindHost(id, sub, false);
       return () => {
         const entry = hostSubs.get(id);
         hostSubs.delete(id);
         entry?.committer?.flush();
         entry?.committer?.dispose();
+        // What's queued for this task goes out before the port closes.
+        entry?.sender?.flush();
         entry?.port?.close();
         if (conns.delete(id) && worker)
           send({ v: 1, t: 'detach', p: { isolateId: id, keepOffsets: false } });

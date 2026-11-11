@@ -9,8 +9,10 @@
  * `serve()` takes the worker scope as a parameter, so `worker.ts` is one line.
  */
 import {
+  createBatchSender,
   isHostToBus,
   isSystemTopic,
+  unbatch,
   type BusMetrics,
   type BusToHost,
   type BusToIsolate,
@@ -147,37 +149,48 @@ type HeldPort = BusPort & { held: unknown[] };
 function holdPort(
   port: MessagePort,
   limit: number,
-  reject: (port: MessagePort, re: string) => void,
+  reject: (held: HeldPort, re: string) => void,
+  batching: () => boolean,
 ): HeldPort {
   let handler: ((msg: unknown) => void) | undefined;
   let buffered = 0;
+  // Every send on the port goes through it, so order holds with batching on
+  // (ADR 0016, decision 3).
+  const sender = createBatchSender<BusToIsolate>((msg) => {
+    port.postMessage(msg);
+  }, batching);
   const held: HeldPort = {
     held: [],
     post(msg: BusToIsolate) {
-      port.postMessage(msg);
+      sender.send(msg);
     },
     onMessage(h) {
       handler = h;
       for (const msg of held.held.splice(0)) h(msg);
     },
     close() {
+      sender.flush();
       port.close();
     },
   };
-  port.addEventListener('message', (e: MessageEvent<unknown>) => {
+  // A batch's envelopes count one by one: towards the inbox limit, and for
+  // the broker, which sees them as if they had arrived separately.
+  const one = (msg: unknown): void => {
     if (handler) {
-      handler(e.data);
+      handler(msg);
       return;
     }
-    const msg = e.data;
     if (isPublishLike(msg)) {
       if (buffered >= limit) {
-        if (typeof msg.id === 'string') reject(port, msg.id);
+        if (typeof msg.id === 'string') reject(held, msg.id);
         return;
       }
       buffered++;
     }
     held.held.push(msg);
+  };
+  port.addEventListener('message', (e: MessageEvent<unknown>) => {
+    unbatch(e.data, one);
   });
   port.start();
   return held;
@@ -205,6 +218,8 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
 
   let booted = false;
   let failed = false;
+  /** `KernelConfig.bus.batch`, from `boot`. Ports held before it read it when they send. */
+  let batching = false;
   let broker: Broker | undefined;
   /** The storage the broker's engine writes to, once booted. */
   let currentStorage: LogStorage | undefined;
@@ -299,9 +314,14 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
   };
 
   const held = (port: MessagePort): HeldPort =>
-    holdPort(port, limit, (p, re) => {
-      p.postMessage({ v: 1, t: 'result', re, p: unavailable('publish') } satisfies BusToIsolate);
-    });
+    holdPort(
+      port,
+      limit,
+      (h, re) => {
+        h.post({ v: 1, t: 'result', re, p: unavailable('publish') });
+      },
+      () => batching,
+    );
 
   /** Before the broker: keep what can wait, hold ports, reject publishes past the limit. */
   const wait = (msg: HostToBus): void => {
@@ -512,6 +532,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
     if (msg.t === 'boot') {
       if (booted) return;
       booted = true;
+      batching = msg.p.batch === true;
       void boot(msg.p);
       return;
     }

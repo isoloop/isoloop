@@ -116,6 +116,14 @@ export type KernelConfig = {
      * Default 100.
      */
     commitIntervalMs?: number;
+    /**
+     * Experimental (ADR 0016, decision 3): each end of a bus port sends what
+     * it has for that port at the end of each task as one message, instead of
+     * one message per envelope. Every message inside keeps its own checks,
+     * order and details. Measurement decides whether it becomes the default
+     * or is removed. Default `false`.
+     */
+    batch?: boolean;
   };
 };
 
@@ -490,6 +498,12 @@ export function createKernel(config: KernelConfig): Kernel {
     if (problem) throw new KernelError('invalid_config', problem);
   }
   const commitIntervalMs = config.bus?.commitIntervalMs ?? DEFAULT_COMMIT_INTERVAL_MS;
+  if (config.bus?.batch !== undefined && typeof config.bus.batch !== 'boolean')
+    throw new KernelError(
+      'invalid_config',
+      `bus.batch must be a boolean, got ${String(config.bus.batch)}`,
+    );
+  const batch = config.bus?.batch === true;
   const everyMs = config.heartbeat?.everyMs ?? 100;
   const def = DEFAULT_SUPERVISOR_CONFIG;
   const cfg: SupervisorConfig = {
@@ -926,6 +940,7 @@ export function createKernel(config: KernelConfig): Kernel {
         renderFmt: manifest.surface ? ISOLOOP_DOM_FMT : 'none',
         heartbeatMs: everyMs,
         commitIntervalMs,
+        ...(batch ? { batch: true } : {}),
         busPort,
         ...(o.wake ? { wake: true } : {}),
         ...(manifest.pool === undefined ? {} : { pool: manifest.pool }),
@@ -992,6 +1007,7 @@ export function createKernel(config: KernelConfig): Kernel {
           contracts: config.contracts,
           heartbeatMs: everyMs,
           commitIntervalMs,
+          ...(batch ? { batch: true } : {}),
           supervisor: cfg,
           dev: config.dev ?? false,
           onControlMessage: (m) => count(m),

@@ -37,6 +37,25 @@ export default {
       send();
       return;
     }
+    if (mode(ctx.config) === 'burst') {
+      // In one task: six good records and three the schema rejects, so a
+      // batch carries them all (ADR 0016, decision 3). Each is still checked,
+      // counted and answered on its own.
+      let failed = 0;
+      const all: Promise<void>[] = [];
+      for (let i = 0; i < 9; i++) {
+        const value = i % 3 === 2 ? 'bad' : i;
+        all.push(
+          ctx.bus.publish(count, { value }).catch(() => {
+            failed++;
+          }),
+        );
+      }
+      void Promise.all(all).then(() => {
+        send({ failed });
+      });
+      return;
+    }
     if (mode(ctx.config) === 'publisher') {
       // A steady stream 0, 1, 2, …; every promise must resolve, none reject.
       let n = 0;

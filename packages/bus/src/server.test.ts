@@ -1,4 +1,11 @@
-import type { BusToHost, BusToIsolate, CallResult, HostToBus } from '@isoloop/protocol';
+import {
+  isBatch,
+  unbatch,
+  type BusToHost,
+  type BusToIsolate,
+  type CallResult,
+  type HostToBus,
+} from '@isoloop/protocol';
 import { describe, expect, it, vi } from 'vitest';
 import list, { counts, notes } from './__fixtures__/contracts';
 import { loadContracts, mismatchedTopics, serve } from './server';
@@ -11,7 +18,7 @@ const load = (mod: unknown, topics = TOPICS) =>
   loadContracts('mod.js', topics, () => Promise.resolve(mod));
 
 /** The bus shell over a fake scope, with contracts that load when `release()` is called. */
-function shell(inboxLimit = 2) {
+function shell(inboxLimit = 2, batch = false) {
   let release: () => void = noop;
   const loaded = new Promise<void>((r) => (release = r));
   const got: BusToHost[] = [];
@@ -25,19 +32,30 @@ function shell(inboxLimit = 2) {
   );
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the shell only reads `data`
   const send = (msg: HostToBus): void => onMessage({ data: msg } as MessageEvent<unknown>);
-  send({ v: 1, t: 'boot', p: { contractsUrl: 'x', topics: TOPICS, heartbeatMs: 1e6 } });
+  send({
+    v: 1,
+    t: 'boot',
+    p: { contractsUrl: 'x', topics: TOPICS, heartbeatMs: 1e6, ...(batch ? { batch: true } : {}) },
+  });
   return { got, send, release };
 }
 
 function isolate() {
   const { port1, port2 } = new MessageChannel();
   const inbox: BusToIsolate[] = [];
-  port1.addEventListener('message', (e: MessageEvent<BusToIsolate>) => inbox.push(e.data));
+  /** How many port messages arrived, batches counting once. */
+  const messages = { n: 0, batches: 0 };
+  port1.addEventListener('message', (e: MessageEvent<unknown>) => {
+    messages.n++;
+    if (isBatch(e.data)) messages.batches++;
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the broker posts BusToIsolate
+    unbatch(e.data, (m) => inbox.push(m as BusToIsolate));
+  });
   port1.start();
   const result = (id: string): CallResult | undefined =>
     inbox.find((m): m is Extract<BusToIsolate, { t: 'result' }> => m.t === 'result' && m.re === id)
       ?.p;
-  return { port1, port2, inbox, result };
+  return { port1, port2, inbox, result, messages };
 }
 
 describe('bus shell', () => {
@@ -107,5 +125,104 @@ describe('loadContracts', () => {
     );
     await expect(loading).rejects.toMatchObject({ code: 'contracts_failed' });
     await expect(loading).rejects.toThrow('ERR_FAILED');
+  });
+
+  describe('with bus.batch on (ADR 0016, decision 3)', () => {
+    it('counts each publish in a batch towards the inbox limit while contracts load', async () => {
+      const bus = shell(2, true);
+      const a = isolate();
+      bus.send({
+        v: 1,
+        t: 'attach',
+        p: { isolateId: 'A', grants: { publish: ['*'], subscribe: [] }, port: a.port2 },
+      });
+      a.port1.postMessage({
+        v: 1,
+        t: 'batch',
+        p: {
+          msgs: ['p1', 'p2', 'p3'].map((id) => ({
+            v: 1,
+            t: 'publish',
+            id,
+            p: { topic: 'counts.v1', value: 1 },
+          })),
+        },
+      });
+      await vi.waitUntil(() => a.result('p3'));
+      expect(a.result('p3')).toMatchObject({ ok: false, error: { code: 'bus_unavailable' } });
+      bus.release();
+      await vi.waitUntil(() => a.result('p2'));
+      expect(a.result('p1')).toEqual({ ok: true, value: { offset: 0 } });
+      expect(a.result('p2')).toEqual({ ok: true, value: { offset: 1 } });
+      a.port1.close();
+    });
+
+    it('checks each envelope of a batch on its own: one bad publish leaves the others, across topics', async () => {
+      const bus = shell(10, true);
+      bus.release();
+      await vi.waitUntil(() => bus.got.some((m) => m.t === 'ready'));
+      const a = isolate();
+      bus.send({
+        v: 1,
+        t: 'attach',
+        p: { isolateId: 'A', grants: { publish: ['*'], subscribe: ['*'] }, port: a.port2 },
+      });
+      a.port1.postMessage({
+        v: 1,
+        t: 'batch',
+        p: {
+          msgs: [
+            { v: 1, t: 'subscribe', id: 's1', p: { topic: 'notes.v1', from: 'earliest' } },
+            { v: 1, t: 'publish', id: 'p1', p: { topic: 'counts.v1', value: 1 } },
+            { v: 1, t: 'publish', id: 'p2', p: { topic: 'notes.v1', value: { text: 7 } } },
+            { v: 1, t: 'publish', id: 'p3', p: { topic: 'notes.v1', value: { text: 'hi' } } },
+            { v: 1, t: 'publish', id: 'p4', p: { topic: 'counts.v1', value: 2 } },
+          ],
+        },
+      });
+      await vi.waitUntil(() => a.inbox.some((m) => m.t === 'deliver' && m.p.topic === 'notes.v1'));
+      await vi.waitUntil(() => a.result('p4'));
+      expect(a.result('p1')).toEqual({ ok: true, value: { offset: 0 } });
+      expect(a.result('p2')).toMatchObject({ ok: false, error: { code: 'invalid' } });
+      expect(a.result('p3')).toEqual({ ok: true, value: { offset: 0 } });
+      expect(a.result('p4')).toEqual({ ok: true, value: { offset: 1 } });
+      const delivered = a.inbox.flatMap((m) =>
+        m.t === 'deliver' && m.p.topic === 'notes.v1' ? m.p.records.map((r) => r.value) : [],
+      );
+      expect(delivered).toEqual([{ text: 'hi', by: 'anon' }]);
+      // What the broker sent in one task came back as fewer messages than envelopes.
+      expect(a.messages.batches).toBeGreaterThan(0);
+      expect(a.messages.n).toBeLessThan(a.inbox.length);
+      a.port1.close();
+    });
+
+    it('with it off, the broker still accepts batches and answers one envelope per message', async () => {
+      const bus = shell(10, false);
+      bus.release();
+      await vi.waitUntil(() => bus.got.some((m) => m.t === 'ready'));
+      const a = isolate();
+      bus.send({
+        v: 1,
+        t: 'attach',
+        p: { isolateId: 'A', grants: { publish: ['*'], subscribe: [] }, port: a.port2 },
+      });
+      a.port1.postMessage({
+        v: 1,
+        t: 'batch',
+        p: {
+          msgs: ['p1', 'p2'].map((id) => ({
+            v: 1,
+            t: 'publish',
+            id,
+            p: { topic: 'counts.v1', value: 1 },
+          })),
+        },
+      });
+      await vi.waitUntil(() => a.result('p2'));
+      expect(a.result('p1')).toMatchObject({ ok: true });
+      expect(a.messages.batches).toBe(0);
+      expect(a.messages.n).toBe(a.inbox.length);
+      a.port1.close();
+    });
   });
 });
