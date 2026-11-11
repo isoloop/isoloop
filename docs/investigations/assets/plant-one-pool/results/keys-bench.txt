@@ -1,0 +1,13 @@
+# Dev machine (ratios only, interleaved, 5 rounds, medians), Chromium 156, 5 kHz, 30 s simulated.
+plain                                    ×1.00
+* (every Array.prototype property)       ×1.41–1.43
+push                                     ×1.00
+shift                                    ×1.00
+splice                                   ×0.99
+slice                                    ×1.00
+indexOf,includes                         ×1.00
+map,forEach,reduce,filter                ×1.00
+sort,at,fill                             ×1.00
+@@iterator (Symbol.iterator)             ×1.40
+values                                   ×0.98
+@@iterator,values,keys,entries           ×1.40

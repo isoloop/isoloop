@@ -121,7 +121,8 @@ The host's `message` listener on each worker and its `onMessage` routing are the
 
 ### Not explained yet
 
-- **`one`'s feeds and engines:** at 5 kHz in `one`, the app's feeds and engines (`stats.push`, `vibChunk`, `fft`) take 96 ms/s, against 62 on native's main thread. In `matched` the same code takes the same time as in native + workers (57 against 57). `one` runs all eight machines' engines and all 72 widgets in one pool on one thread. Candidates that weren't tested:
+- **`one`'s feeds and engines:** explained in [plant-one-pool.md](plant-one-pool.md): the pool's frozen built-ins make the app's own code 1.4–2.5× slower in any pool, through the accessor on `Array.prototype[Symbol.iterator]`. The earlier note follows.
+  **`one`'s feeds and engines:** at 5 kHz in `one`, the app's feeds and engines (`stats.push`, `vibChunk`, `fft`) take 96 ms/s, against 62 on native's main thread. In `matched` the same code takes the same time as in native + workers (57 against 57). `one` runs all eight machines' engines and all 72 widgets in one pool on one thread. Candidates that weren't tested:
   - V8 getting less from its optimizations when one heap runs every machine's code
   - the pool worker's frozen built-ins (M2c task 7)
   - wall-time samples on a nearly saturated thread
