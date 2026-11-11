@@ -158,8 +158,11 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
       if (!r) break;
       topicOf.set(r, sub.topic);
       try {
+        const done = sub.fn(r);
+        // A synchronous handler settles in the same microtask: awaiting its
+        // plain return value would yield once per record for nothing.
         // oxlint-disable-next-line no-await-in-loop -- one record at a time, in order, by design
-        await sub.fn(r);
+        if (isThenable(done)) await done;
       } catch (err) {
         sub.stuck = true;
         o.onError?.(err);
@@ -330,4 +333,12 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
       for (const p of unanswered) if (p.msg.t !== 'subscribe') send(p.msg);
     },
   };
+}
+
+function isThenable(x: unknown): x is PromiseLike<unknown> {
+  return (
+    (typeof x === 'object' || typeof x === 'function') &&
+    x !== null &&
+    typeof (x as { then?: unknown }).then === 'function'
+  );
 }

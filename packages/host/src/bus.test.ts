@@ -83,7 +83,10 @@ describe('bus controller', () => {
     expect(got[0]).toMatchObject({ offset: 0, key: 'k', value: 41, producer: 'host' });
     expect(ready).toEqual([{ first: true }]);
     // The isolate's subscription got it too, on its own port.
-    await vi.waitUntil(() => latest('X')?.seen === 0);
+    // One record was published, so the isolate has seen exactly one. (It
+    // checked `seen === 0` before, which passed only by reading the first
+    // report before the second arrived.)
+    await vi.waitUntil(() => latest('X')?.seen === 1);
   });
 
   it('rejects isoloop.* and invalid publishes with a BusError', async () => {
