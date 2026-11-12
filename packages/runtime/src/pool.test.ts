@@ -170,6 +170,17 @@ describe('bootstrap as a pool', () => {
     ]);
   });
 
+  it('lets an instance override inherited names, except the properties V8 protects, which stay plain data', async () => {
+    const p = pool();
+    p.add('a', 'taming');
+    await until(() => published(p.bus.get('a')).length > 0);
+    // The fixture lists every name that broke its expectation; the cost of
+    // the protected properties is that overriding one throws in strict code.
+    expect(published(p.bus.get('a'))).toEqual([
+      { cannotOverride: [], canOverride: [], accessorNotData: [], frozen: true },
+    ]);
+  });
+
   it('leaves an own worker’s built-ins alone', async () => {
     const p = pool();
     p.add(undefined, 'patch');
