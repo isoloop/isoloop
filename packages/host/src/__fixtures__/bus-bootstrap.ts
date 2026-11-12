@@ -60,7 +60,12 @@ const use = (p: MessagePort): void => {
       (offsets[m.p.topic] ??= []).push(...m.p.records.map((r) => r.offset));
       if (m.p.topic !== 'report.v1') report();
       const last = m.p.records.at(-1);
-      if (last) p.postMessage({ v: 1, t: 'commit', p: { topic: m.p.topic, offset: last.offset } });
+      if (last)
+        p.postMessage({
+          v: 1,
+          t: 'commits',
+          p: { offsets: [{ topic: m.p.topic, offset: last.offset }] },
+        });
     }
   });
   p.start();

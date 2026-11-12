@@ -1,0 +1,15 @@
+{
+  // The memory ladder page and its isolates.
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "react": ["../../../packages/react/node_modules/@types/react"],
+      "react/*": ["../../../packages/react/node_modules/@types/react/*"],
+      "react-dom/*": ["../../../packages/react/node_modules/@types/react-dom/*"]
+    }
+  },
+  "include": ["."]
+}
