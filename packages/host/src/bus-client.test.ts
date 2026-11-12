@@ -14,8 +14,9 @@ afterEach(async () => {
   await Promise.all(kernels.splice(0).map((k) => k.destroy()));
 });
 
-function setup() {
+function setup(commitIntervalMs?: number) {
   const kernel = createKernel({
+    ...(commitIntervalMs === undefined ? {} : { bus: { commitIntervalMs } }),
     contracts: { url: new URL('./__fixtures__/contracts.ts', import.meta.url).href, list },
     workers: {
       isolateBootstrap: worker('../../runtime/src/bootstrap.ts'),
@@ -48,11 +49,31 @@ describe('BusClient', () => {
     await vi.waitUntil(() => reports.some((r) => r.values?.length === 3));
     expect(errors.map((e) => e.message)).toEqual(['flaky handler']);
 
+    // `restart` kills the worker, as a crash would. Commits go out once per
+    // interval (ADR 0016, decision 1): let one pass so 1's commit reaches the bus.
+    await new Promise((r) => setTimeout(r, 200));
     reports.length = 0;
     await kernel.restart('F');
     // 1 was committed; 2 threw, so 2 and 3 are delivered again (at least once).
     await vi.waitUntil(() => reports.some((r) => r.values?.length === 2), { timeout: 3000 });
     expect(reports.find((r) => r.values?.length === 2)?.values).toEqual([2, 3]);
+  });
+
+  it('a kill within the commit interval redelivers what was handled in it (ADR 0016, decision 1)', async () => {
+    // The cost decision 1 accepts: a worker killed without a graceful
+    // shutdown loses the offsets settled since the last send.
+    const { kernel, reports, log } = setup(1000);
+    const ready = log('isolate:ready');
+    kernel.spawn({ id: 'F', src, grants: ALL, config: { mode: 'flaky' } });
+    await vi.waitUntil(() => ready.length === 1);
+    // oxlint-disable-next-line no-await-in-loop -- in order on purpose
+    for (const value of [1, 2, 3]) await kernel.publish(count, { value });
+    await vi.waitUntil(() => reports.some((r) => r.values?.length === 3));
+    reports.length = 0;
+    await kernel.restart('F');
+    // Nothing was committed yet: 1 comes again too.
+    await vi.waitUntil(() => reports.some((r) => r.values?.length === 3), { timeout: 3000 });
+    expect(reports.find((r) => r.values?.length === 3)?.values).toEqual([1, 2, 3]);
   });
 
   it('publishes made during a bus restart arrive after it, in order, and none rejects', async () => {

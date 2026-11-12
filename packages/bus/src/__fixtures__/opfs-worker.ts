@@ -534,7 +534,7 @@ const scenarios: Record<string, (dir: string) => Promise<unknown>> = {
       if (!last || last.offset === committed) continue;
       committed = last.offset;
       // oxlint-disable-next-line no-await-in-loop
-      await s.call('commit', { topic: 'saved.v1', offset: committed });
+      await s.call('commits', { offsets: [{ topic: 'saved.v1', offset: committed }] });
     }
     const got = s.records('saved.v1');
     await storage.close();

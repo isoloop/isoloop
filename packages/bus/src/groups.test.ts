@@ -106,11 +106,11 @@ describe('consumer groups', () => {
     const b = await join('B');
     publish(10); // round-robin: A gets 0, 2, 4…; B gets 1, 3, 5…
     await flush();
-    await a.call('commit', { topic: T, offset: 8 });
+    await a.call('commits', { offsets: [{ topic: T, offset: 8 }] });
     expect(engine.committed(T, 'group:g')).toBe(0);
-    await b.call('commit', { topic: T, offset: 5 });
+    await b.call('commits', { offsets: [{ topic: T, offset: 5 }] });
     expect(engine.committed(T, 'group:g')).toBe(6);
-    await b.call('commit', { topic: T, offset: 9 });
+    await b.call('commits', { offsets: [{ topic: T, offset: 9 }] });
     expect(engine.committed(T, 'group:g')).toBe(9);
   });
 
@@ -119,7 +119,7 @@ describe('consumer groups', () => {
     const a = await join('A');
     publish(6);
     await flush();
-    await a.call('commit', { topic: T, offset: 2 });
+    await a.call('commits', { offsets: [{ topic: T, offset: 2 }] });
     broker.detach('A', true);
     const c = await join('C', 'g', 'committed');
     expect(c.values(T)).toEqual([3, 4, 5]);
@@ -137,7 +137,7 @@ describe('consumer groups', () => {
     await flush();
     expect(owner.values(T)).toEqual([0, 1]);
     expect(other.values(T)).toEqual([]);
-    await owner.call('commit', { topic: T, offset: 1 });
+    await owner.call('commits', { offsets: [{ topic: T, offset: 1 }] });
     expect(owner.values(T).slice(0, 4)).toEqual([0, 1, 2, 3]);
   });
 });

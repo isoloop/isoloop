@@ -246,7 +246,7 @@ describe('TsEngine: eviction and replay from disk (M2b task 11)', () => {
       await flush();
       const last = s.records('big.v1').at(-1);
       // oxlint-disable-next-line no-await-in-loop
-      if (last) await s.call('commit', { topic: 'big.v1', offset: last.offset });
+      if (last) await s.call('commits', { offsets: [{ topic: 'big.v1', offset: last.offset }] });
     }
     expect(s.values('big.v1')).toEqual(Array.from({ length: 2000 }, (_, i) => i));
   });

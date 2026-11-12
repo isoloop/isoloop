@@ -1,0 +1,162 @@
+{
+  "config": "native-workers",
+  "build": "native-workers",
+  "placement": null,
+  "rate": 5,
+  "round": 1,
+  "windowMs": 10000,
+  "warmMs": 15000,
+  "processMsPerS": {
+    "browser": 0.9999999999999981,
+    "renderer": 969.0000000000001,
+    "GPU": 285.99999999999994,
+    "network.mojom.NetworkService": 0
+  },
+  "untraced": [
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3754,
+      "comm": "chrome-headless",
+      "msPerS": 793,
+      "sysMsPerS": 8
+    },
+    {
+      "pid": 3726,
+      "type": "GPU",
+      "tid": 3753,
+      "comm": "VizCompositorTh",
+      "msPerS": 280,
+      "sysMsPerS": 4
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3771,
+      "comm": "Compositor",
+      "msPerS": 55,
+      "sysMsPerS": 11
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3758,
+      "comm": "ThreadPoolForeg",
+      "msPerS": 23,
+      "sysMsPerS": 2
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3767,
+      "comm": "ThreadPoolForeg",
+      "msPerS": 12,
+      "sysMsPerS": 2
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3783,
+      "comm": "DedicatedWorker",
+      "msPerS": 11,
+      "sysMsPerS": 3
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3775,
+      "comm": "DedicatedWorker",
+      "msPerS": 10,
+      "sysMsPerS": 1
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3776,
+      "comm": "DedicatedWorker",
+      "msPerS": 10,
+      "sysMsPerS": 1
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3777,
+      "comm": "DedicatedWorker",
+      "msPerS": 10,
+      "sysMsPerS": 2
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3778,
+      "comm": "DedicatedWorker",
+      "msPerS": 10,
+      "sysMsPerS": 0
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3780,
+      "comm": "DedicatedWorker",
+      "msPerS": 10,
+      "sysMsPerS": 1
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3782,
+      "comm": "DedicatedWorker",
+      "msPerS": 10,
+      "sysMsPerS": 1
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3779,
+      "comm": "DedicatedWorker",
+      "msPerS": 9,
+      "sysMsPerS": 1
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3774,
+      "comm": "ThreadPoolForeg",
+      "msPerS": 6,
+      "sysMsPerS": 0
+    },
+    {
+      "pid": 3726,
+      "type": "GPU",
+      "tid": 3752,
+      "comm": "Chrome_ChildIOT",
+      "msPerS": 5,
+      "sysMsPerS": 4
+    },
+    {
+      "pid": 3700,
+      "type": "browser",
+      "tid": 3710,
+      "comm": "Chrome_IOThread",
+      "msPerS": 2,
+      "sysMsPerS": 1
+    },
+    {
+      "pid": 3700,
+      "type": "browser",
+      "tid": 3700,
+      "comm": "chrome-headless",
+      "msPerS": 1,
+      "sysMsPerS": 1
+    },
+    {
+      "pid": 3754,
+      "type": "renderer",
+      "tid": 3781,
+      "comm": "DedicatedWorker",
+      "msPerS": 1,
+      "sysMsPerS": 0
+    }
+  ],
+  "traced": {}
+}

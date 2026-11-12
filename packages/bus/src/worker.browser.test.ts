@@ -54,7 +54,7 @@ function startBus(
       if (e.data.t === 'result' && e.data.re !== undefined) waiting.get(e.data.re)?.(e.data.p);
     });
     port1.start();
-    const call = (t: 'publish' | 'subscribe' | 'commit', p: Record<string, unknown>) => {
+    const call = (t: 'publish' | 'subscribe' | 'commits', p: Record<string, unknown>) => {
       const id = `m${++ids}`;
       const done = new Promise<CallResult>((resolve) => waiting.set(id, resolve));
       port1.postMessage({ v: 1, t, id, p });
