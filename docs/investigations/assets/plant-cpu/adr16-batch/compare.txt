@@ -1,0 +1,24 @@
+
+== matched vs native-workers, 5 kHz (runs 4/4)
+                      renderer    gap      msg browser     isoloop js          port msgs/s serialize/s   gpu
+native-workers     982 [967-990]             18               0              34                  424   288
+isoloop      1150 [1130-1322]   +168   111 [105-116]    0 [0-0]   2391 [2385-2408]    2597   333
+isobatch     1194 [1150-1257]   +212   108 [104-113]    0 [0-0]   2316 [2290-2327]    2522   340
+
+== one vs native, 5 kHz (runs 4/4)
+                      renderer    gap      msg browser     isoloop js          port msgs/s serialize/s   gpu
+native        939 [920-975]              6               0              32                   32   283
+isoloop      1102 [1099-1115]   +164    95 [94-97]    0 [0-0]   2332 [2329-2346]    2447   340
+isobatch     1112 [1103-1134]   +174    92 [91-95]    0 [0-0]   2226 [2218-2256]    2340   338
+
+== matched vs native-workers, 1 kHz (runs 4/4)
+                      renderer    gap      msg browser     isoloop js          port msgs/s serialize/s   gpu
+native-workers     822 [808-833]             15               0              22                  288   288
+isoloop       966 [914-1035]   +144    89 [88-91]    0 [0-0]   1602 [1600-1611]    1810   332
+isobatch      926 [926-944]   +105    83 [78-86]    0 [0-0]   1514 [1508-1522]    1720   320
+
+== one vs native, 1 kHz (runs 4/4)
+                      renderer    gap      msg browser     isoloop js          port msgs/s serialize/s   gpu
+native        801 [777-843]              7               0              22                   22   289
+isoloop       880 [878-910]    +80    78 [75-81]    0 [0-0]   1544 [1527-1550]    1659   340
+isobatch      908 [878-1006]   +106    73 [70-79]    0 [0-0]   1463 [1457-1472]    1580   346

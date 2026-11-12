@@ -1,0 +1,89 @@
+{
+  "engine": "chromium",
+  "build": "native",
+  "placement": null,
+  "rate": 5,
+  "stopped": false,
+  "url": "/native/?rate=5&seed=7",
+  "workers": 0,
+  "firstDataMs": 298,
+  "allWidgetsMs": 1190,
+  "frames": 600,
+  "fps": 60,
+  "frameP95Ms": 16.7,
+  "framesLate": 0,
+  "longTasks": 0,
+  "typingMedianMs": 91,
+  "typing": [100, 84, 107, 91, 38],
+  "mainThreadCpuPct": 87,
+  "rendererCpuPct": 97,
+  "gpuCpuPct": 28.2,
+  "rendererPssMb": 189,
+  "rendererPssGcMb": 165,
+  "memAtMs": 17281,
+  "holdMs": null,
+  "rendererPssHoldMb": null,
+  "rendererPssHoldGcMb": null,
+  "recoveryMs": 3220,
+  "dataGapT3S": 3,
+  "dataGapOthersS": 3.1,
+  "categories": [
+    {
+      "category": "raw · canvas",
+      "slots": 16,
+      "workMsPerSec": 76.07999935150147,
+      "applyMsPerSec": null,
+      "updatesPerSec": 472
+    },
+    {
+      "category": "raw · dom",
+      "slots": 8,
+      "workMsPerSec": 0.11999988555908203,
+      "applyMsPerSec": null,
+      "updatesPerSec": 45
+    },
+    {
+      "category": "filtered · dom",
+      "slots": 16,
+      "workMsPerSec": 0.3599998474121094,
+      "applyMsPerSec": null,
+      "updatesPerSec": 0
+    },
+    {
+      "category": "aggregated · canvas",
+      "slots": 8,
+      "workMsPerSec": 5.279998683929444,
+      "applyMsPerSec": null,
+      "updatesPerSec": 155
+    },
+    {
+      "category": "aggregated · dom",
+      "slots": 16,
+      "workMsPerSec": 0.23999996185302735,
+      "applyMsPerSec": null,
+      "updatesPerSec": 9
+    },
+    {
+      "category": "combined · canvas",
+      "slots": 2,
+      "workMsPerSec": 0.32000026702880857,
+      "applyMsPerSec": null,
+      "updatesPerSec": 2
+    },
+    {
+      "category": "combined · dom",
+      "slots": 6,
+      "workMsPerSec": 0.019999980926513672,
+      "applyMsPerSec": null,
+      "updatesPerSec": 5
+    },
+    {
+      "category": "engines",
+      "slots": 25,
+      "workMsPerSec": 19.639999294281004,
+      "applyMsPerSec": null,
+      "updatesPerSec": 0
+    }
+  ],
+  "bundle": "82 KB"
+}

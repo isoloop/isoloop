@@ -1,0 +1,842 @@
+{
+  "isobase-matched-1khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2962,
+      "Receive mojo message": 2401,
+      "SerializedScriptValueFactory::create": 2102,
+      "SerializedScriptValueFactory::deserialize": 1998,
+      "MessagePort::Accept": 1893,
+      "DedicatedWorkerGlobalScope::postMessage": 209,
+      "HandlePostMessage": 209,
+      "Receive mojo reply": 10,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isobase-matched-1khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2468,
+      "Receive mojo message": 2408,
+      "SerializedScriptValueFactory::create": 2086,
+      "SerializedScriptValueFactory::deserialize": 1982,
+      "MessagePort::Accept": 1882,
+      "DedicatedWorkerGlobalScope::postMessage": 204,
+      "HandlePostMessage": 204,
+      "Receive mojo reply": 9
+    }
+  },
+  "isobase-matched-1khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2483,
+      "Receive mojo message": 2406,
+      "SerializedScriptValueFactory::create": 2092,
+      "SerializedScriptValueFactory::deserialize": 1985,
+      "MessagePort::Accept": 1887,
+      "DedicatedWorkerGlobalScope::postMessage": 205,
+      "HandlePostMessage": 205,
+      "Receive mojo reply": 6,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isobase-matched-1khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2623,
+      "Receive mojo message": 2398,
+      "SerializedScriptValueFactory::create": 2100,
+      "SerializedScriptValueFactory::deserialize": 1994,
+      "MessagePort::Accept": 1892,
+      "DedicatedWorkerGlobalScope::postMessage": 208,
+      "HandlePostMessage": 208,
+      "Receive mojo reply": 11,
+      "Closed mojo endpoint": 1
+    }
+  },
+  "isobase-matched-5khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 3863,
+      "SerializedScriptValueFactory::create": 3209,
+      "MessagePort::Accept": 3005,
+      "SerializedScriptValueFactory::deserialize": 2993,
+      "Receive mojo message": 2904,
+      "DedicatedWorkerGlobalScope::postMessage": 204,
+      "HandlePostMessage": 204,
+      "Receive mojo reply": 10,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isobase-matched-5khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 3611,
+      "SerializedScriptValueFactory::create": 3216,
+      "MessagePort::Accept": 3011,
+      "SerializedScriptValueFactory::deserialize": 2986,
+      "Receive mojo message": 2898,
+      "DedicatedWorkerGlobalScope::postMessage": 204,
+      "HandlePostMessage": 204,
+      "Receive mojo reply": 7,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isobase-matched-5khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 3486,
+      "SerializedScriptValueFactory::create": 3205,
+      "MessagePort::Accept": 2999,
+      "SerializedScriptValueFactory::deserialize": 2985,
+      "Receive mojo message": 2904,
+      "DedicatedWorkerGlobalScope::postMessage": 205,
+      "HandlePostMessage": 205,
+      "Receive mojo reply": 9
+    }
+  },
+  "isobase-matched-5khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 3559,
+      "SerializedScriptValueFactory::create": 3216,
+      "MessagePort::Accept": 3009,
+      "SerializedScriptValueFactory::deserialize": 3001,
+      "Receive mojo message": 2892,
+      "DedicatedWorkerGlobalScope::postMessage": 207,
+      "HandlePostMessage": 207,
+      "Receive mojo reply": 14,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isobase-one-1khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2627,
+      "Receive mojo message": 2390,
+      "SerializedScriptValueFactory::create": 1930,
+      "SerializedScriptValueFactory::deserialize": 1845,
+      "MessagePort::Accept": 1815,
+      "DedicatedWorkerGlobalScope::postMessage": 115,
+      "HandlePostMessage": 115,
+      "Receive mojo reply": 10
+    }
+  },
+  "isobase-one-1khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2766,
+      "Receive mojo message": 2379,
+      "SerializedScriptValueFactory::create": 1946,
+      "SerializedScriptValueFactory::deserialize": 1850,
+      "MessagePort::Accept": 1828,
+      "DedicatedWorkerGlobalScope::postMessage": 118,
+      "HandlePostMessage": 118,
+      "Receive mojo reply": 14,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isobase-one-1khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2470,
+      "Receive mojo message": 2389,
+      "SerializedScriptValueFactory::create": 1934,
+      "SerializedScriptValueFactory::deserialize": 1840,
+      "MessagePort::Accept": 1818,
+      "DedicatedWorkerGlobalScope::postMessage": 116,
+      "HandlePostMessage": 116,
+      "Receive mojo reply": 8,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isobase-one-1khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2664,
+      "Receive mojo message": 2402,
+      "SerializedScriptValueFactory::create": 1934,
+      "SerializedScriptValueFactory::deserialize": 1844,
+      "MessagePort::Accept": 1819,
+      "DedicatedWorkerGlobalScope::postMessage": 115,
+      "HandlePostMessage": 115,
+      "Receive mojo reply": 13
+    }
+  },
+  "isobase-one-5khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 3250,
+      "SerializedScriptValueFactory::create": 3014,
+      "MessagePort::Accept": 2898,
+      "SerializedScriptValueFactory::deserialize": 2835,
+      "Receive mojo message": 2789,
+      "DedicatedWorkerGlobalScope::postMessage": 116,
+      "HandlePostMessage": 116,
+      "Receive mojo reply": 9
+    }
+  },
+  "isobase-one-5khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 3271,
+      "SerializedScriptValueFactory::create": 3020,
+      "MessagePort::Accept": 2908,
+      "SerializedScriptValueFactory::deserialize": 2840,
+      "Receive mojo message": 2748,
+      "DedicatedWorkerGlobalScope::postMessage": 114,
+      "HandlePostMessage": 114,
+      "Receive mojo reply": 9
+    }
+  },
+  "isobase-one-5khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 3250,
+      "SerializedScriptValueFactory::create": 3017,
+      "MessagePort::Accept": 2902,
+      "SerializedScriptValueFactory::deserialize": 2834,
+      "Receive mojo message": 2775,
+      "DedicatedWorkerGlobalScope::postMessage": 115,
+      "HandlePostMessage": 115,
+      "Receive mojo reply": 9
+    }
+  },
+  "isobase-one-5khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 3220,
+      "SerializedScriptValueFactory::create": 3022,
+      "MessagePort::Accept": 2905,
+      "SerializedScriptValueFactory::deserialize": 2840,
+      "Receive mojo message": 2784,
+      "DedicatedWorkerGlobalScope::postMessage": 117,
+      "HandlePostMessage": 117,
+      "Receive mojo reply": 13,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isoc250-matched-1khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2994,
+      "Receive mojo message": 2410,
+      "SerializedScriptValueFactory::create": 1666,
+      "SerializedScriptValueFactory::deserialize": 1558,
+      "MessagePort::Accept": 1457,
+      "DedicatedWorkerGlobalScope::postMessage": 209,
+      "HandlePostMessage": 209,
+      "Receive mojo reply": 12,
+      "Closed mojo endpoint": 1
+    }
+  },
+  "isoc250-matched-1khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2893,
+      "Receive mojo message": 2399,
+      "SerializedScriptValueFactory::create": 1644,
+      "SerializedScriptValueFactory::deserialize": 1544,
+      "MessagePort::Accept": 1441,
+      "DedicatedWorkerGlobalScope::postMessage": 204,
+      "HandlePostMessage": 204,
+      "Receive mojo reply": 8,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isoc250-matched-1khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2780,
+      "Receive mojo message": 2404,
+      "SerializedScriptValueFactory::create": 1650,
+      "SerializedScriptValueFactory::deserialize": 1543,
+      "MessagePort::Accept": 1445,
+      "DedicatedWorkerGlobalScope::postMessage": 205,
+      "HandlePostMessage": 205,
+      "Receive mojo reply": 6
+    }
+  },
+  "isoc250-matched-1khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2402,
+      "SimpleWatcher::OnHandleReady": 2085,
+      "SerializedScriptValueFactory::create": 1644,
+      "SerializedScriptValueFactory::deserialize": 1544,
+      "MessagePort::Accept": 1439,
+      "DedicatedWorkerGlobalScope::postMessage": 206,
+      "HandlePostMessage": 206,
+      "Receive mojo reply": 7
+    }
+  },
+  "isoc250-matched-5khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2895,
+      "SimpleWatcher::OnHandleReady": 2791,
+      "SerializedScriptValueFactory::create": 2404,
+      "MessagePort::Accept": 2198,
+      "SerializedScriptValueFactory::deserialize": 2189,
+      "DedicatedWorkerGlobalScope::postMessage": 205,
+      "HandlePostMessage": 205,
+      "Receive mojo reply": 9
+    }
+  },
+  "isoc250-matched-5khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2956,
+      "Receive mojo message": 2901,
+      "SerializedScriptValueFactory::create": 2412,
+      "MessagePort::Accept": 2209,
+      "SerializedScriptValueFactory::deserialize": 2192,
+      "DedicatedWorkerGlobalScope::postMessage": 205,
+      "HandlePostMessage": 204,
+      "Receive mojo reply": 9
+    }
+  },
+  "isoc250-matched-5khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2895,
+      "SimpleWatcher::OnHandleReady": 2811,
+      "SerializedScriptValueFactory::create": 2408,
+      "MessagePort::Accept": 2204,
+      "SerializedScriptValueFactory::deserialize": 2188,
+      "DedicatedWorkerGlobalScope::postMessage": 205,
+      "HandlePostMessage": 205,
+      "Receive mojo reply": 8
+    }
+  },
+  "isoc250-matched-5khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2899,
+      "SimpleWatcher::OnHandleReady": 2802,
+      "SerializedScriptValueFactory::create": 2416,
+      "MessagePort::Accept": 2210,
+      "SerializedScriptValueFactory::deserialize": 2188,
+      "DedicatedWorkerGlobalScope::postMessage": 205,
+      "HandlePostMessage": 205,
+      "Receive mojo reply": 9
+    }
+  },
+  "isoc250-one-1khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2388,
+      "SimpleWatcher::OnHandleReady": 2007,
+      "SerializedScriptValueFactory::create": 1513,
+      "SerializedScriptValueFactory::deserialize": 1422,
+      "MessagePort::Accept": 1397,
+      "DedicatedWorkerGlobalScope::postMessage": 116,
+      "HandlePostMessage": 116,
+      "Receive mojo reply": 13,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isoc250-one-1khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2307,
+      "SimpleWatcher::OnHandleReady": 1937,
+      "SerializedScriptValueFactory::create": 1527,
+      "SerializedScriptValueFactory::deserialize": 1429,
+      "MessagePort::Accept": 1413,
+      "DedicatedWorkerGlobalScope::postMessage": 114,
+      "HandlePostMessage": 114,
+      "Receive mojo reply": 8
+    }
+  },
+  "isoc250-one-1khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2374,
+      "SimpleWatcher::OnHandleReady": 2061,
+      "SerializedScriptValueFactory::create": 1518,
+      "SerializedScriptValueFactory::deserialize": 1427,
+      "MessagePort::Accept": 1400,
+      "DedicatedWorkerGlobalScope::postMessage": 118,
+      "HandlePostMessage": 118,
+      "Receive mojo reply": 17,
+      "Closed mojo endpoint": 1
+    }
+  },
+  "isoc250-one-1khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2388,
+      "SimpleWatcher::OnHandleReady": 2384,
+      "SerializedScriptValueFactory::create": 1509,
+      "SerializedScriptValueFactory::deserialize": 1415,
+      "MessagePort::Accept": 1394,
+      "DedicatedWorkerGlobalScope::postMessage": 114,
+      "HandlePostMessage": 114,
+      "Receive mojo reply": 11
+    }
+  },
+  "isoc250-one-5khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2776,
+      "SimpleWatcher::OnHandleReady": 2630,
+      "SerializedScriptValueFactory::create": 2246,
+      "MessagePort::Accept": 2132,
+      "SerializedScriptValueFactory::deserialize": 2062,
+      "DedicatedWorkerGlobalScope::postMessage": 114,
+      "HandlePostMessage": 114,
+      "Receive mojo reply": 12
+    }
+  },
+  "isoc250-one-5khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2812,
+      "SimpleWatcher::OnHandleReady": 2603,
+      "SerializedScriptValueFactory::create": 2246,
+      "MessagePort::Accept": 2132,
+      "SerializedScriptValueFactory::deserialize": 2057,
+      "DedicatedWorkerGlobalScope::postMessage": 114,
+      "HandlePostMessage": 114,
+      "Receive mojo reply": 10
+    }
+  },
+  "isoc250-one-5khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2792,
+      "SimpleWatcher::OnHandleReady": 2643,
+      "SerializedScriptValueFactory::create": 2257,
+      "MessagePort::Accept": 2144,
+      "SerializedScriptValueFactory::deserialize": 2068,
+      "DedicatedWorkerGlobalScope::postMessage": 115,
+      "HandlePostMessage": 115,
+      "Receive mojo reply": 10,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isoc250-one-5khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2748,
+      "SimpleWatcher::OnHandleReady": 2654,
+      "SerializedScriptValueFactory::create": 2238,
+      "MessagePort::Accept": 2126,
+      "SerializedScriptValueFactory::deserialize": 2065,
+      "DedicatedWorkerGlobalScope::postMessage": 114,
+      "HandlePostMessage": 114,
+      "Receive mojo reply": 10
+    }
+  },
+  "isoloop-matched-1khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2890,
+      "Receive mojo message": 2404,
+      "SerializedScriptValueFactory::create": 1797,
+      "SerializedScriptValueFactory::deserialize": 1691,
+      "MessagePort::Accept": 1592,
+      "DedicatedWorkerGlobalScope::postMessage": 205,
+      "HandlePostMessage": 205,
+      "Receive mojo reply": 9
+    }
+  },
+  "isoloop-matched-1khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2407,
+      "SimpleWatcher::OnHandleReady": 2379,
+      "SerializedScriptValueFactory::create": 1807,
+      "SerializedScriptValueFactory::deserialize": 1698,
+      "MessagePort::Accept": 1600,
+      "DedicatedWorkerGlobalScope::postMessage": 207,
+      "HandlePostMessage": 207,
+      "Receive mojo reply": 9,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isoloop-matched-1khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2400,
+      "SimpleWatcher::OnHandleReady": 2242,
+      "SerializedScriptValueFactory::create": 1790,
+      "SerializedScriptValueFactory::deserialize": 1692,
+      "MessagePort::Accept": 1583,
+      "DedicatedWorkerGlobalScope::postMessage": 206,
+      "HandlePostMessage": 206,
+      "Receive mojo reply": 8
+    }
+  },
+  "isoloop-matched-1khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2666,
+      "Receive mojo message": 2402,
+      "SerializedScriptValueFactory::create": 1802,
+      "SerializedScriptValueFactory::deserialize": 1698,
+      "MessagePort::Accept": 1595,
+      "DedicatedWorkerGlobalScope::postMessage": 207,
+      "HandlePostMessage": 207,
+      "Receive mojo reply": 11,
+      "Closed mojo endpoint": 1
+    }
+  },
+  "isoloop-matched-5khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2984,
+      "Receive mojo message": 2844,
+      "SerializedScriptValueFactory::create": 2608,
+      "MessagePort::Accept": 2403,
+      "SerializedScriptValueFactory::deserialize": 2379,
+      "DedicatedWorkerGlobalScope::postMessage": 205,
+      "HandlePostMessage": 205,
+      "Receive mojo reply": 7
+    }
+  },
+  "isoloop-matched-5khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 3150,
+      "Receive mojo message": 2891,
+      "SerializedScriptValueFactory::create": 2603,
+      "MessagePort::Accept": 2399,
+      "SerializedScriptValueFactory::deserialize": 2380,
+      "DedicatedWorkerGlobalScope::postMessage": 204,
+      "HandlePostMessage": 204,
+      "Receive mojo reply": 9
+    }
+  },
+  "isoloop-matched-5khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 3472,
+      "Receive mojo message": 2894,
+      "SerializedScriptValueFactory::create": 2613,
+      "MessagePort::Accept": 2403,
+      "SerializedScriptValueFactory::deserialize": 2392,
+      "DedicatedWorkerGlobalScope::postMessage": 210,
+      "HandlePostMessage": 210,
+      "Receive mojo reply": 15,
+      "Closed mojo endpoint": 1
+    }
+  },
+  "isoloop-matched-5khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 3588,
+      "Receive mojo message": 2900,
+      "SerializedScriptValueFactory::create": 2598,
+      "MessagePort::Accept": 2393,
+      "SerializedScriptValueFactory::deserialize": 2372,
+      "DedicatedWorkerGlobalScope::postMessage": 204,
+      "HandlePostMessage": 204,
+      "Receive mojo reply": 10
+    }
+  },
+  "isoloop-one-1khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2354,
+      "SimpleWatcher::OnHandleReady": 2233,
+      "SerializedScriptValueFactory::create": 1669,
+      "SerializedScriptValueFactory::deserialize": 1580,
+      "MessagePort::Accept": 1549,
+      "DedicatedWorkerGlobalScope::postMessage": 120,
+      "HandlePostMessage": 120,
+      "Receive mojo reply": 15,
+      "Closed mojo endpoint": 1
+    }
+  },
+  "isoloop-one-1khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2369,
+      "Receive mojo message": 2359,
+      "SerializedScriptValueFactory::create": 1670,
+      "SerializedScriptValueFactory::deserialize": 1563,
+      "MessagePort::Accept": 1555,
+      "DedicatedWorkerGlobalScope::postMessage": 115,
+      "HandlePostMessage": 115,
+      "Receive mojo reply": 8
+    }
+  },
+  "isoloop-one-1khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2392,
+      "SimpleWatcher::OnHandleReady": 2301,
+      "SerializedScriptValueFactory::create": 1654,
+      "SerializedScriptValueFactory::deserialize": 1564,
+      "MessagePort::Accept": 1539,
+      "DedicatedWorkerGlobalScope::postMessage": 114,
+      "HandlePostMessage": 114,
+      "Receive mojo reply": 11
+    }
+  },
+  "isoloop-one-1khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "Receive mojo message": 2389,
+      "SimpleWatcher::OnHandleReady": 2151,
+      "SerializedScriptValueFactory::create": 1655,
+      "SerializedScriptValueFactory::deserialize": 1569,
+      "MessagePort::Accept": 1541,
+      "DedicatedWorkerGlobalScope::postMessage": 114,
+      "HandlePostMessage": 114,
+      "Receive mojo reply": 9
+    }
+  },
+  "isoloop-one-5khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2812,
+      "Receive mojo message": 2803,
+      "SerializedScriptValueFactory::create": 2437,
+      "MessagePort::Accept": 2325,
+      "SerializedScriptValueFactory::deserialize": 2257,
+      "DedicatedWorkerGlobalScope::postMessage": 114,
+      "HandlePostMessage": 114,
+      "Receive mojo reply": 13
+    }
+  },
+  "isoloop-one-5khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2739,
+      "Receive mojo message": 2733,
+      "SerializedScriptValueFactory::create": 2418,
+      "MessagePort::Accept": 2300,
+      "SerializedScriptValueFactory::deserialize": 2252,
+      "DedicatedWorkerGlobalScope::postMessage": 115,
+      "HandlePostMessage": 115,
+      "Receive mojo reply": 10,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "isoloop-one-5khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2718,
+      "Receive mojo message": 2675,
+      "SerializedScriptValueFactory::create": 2429,
+      "MessagePort::Accept": 2313,
+      "SerializedScriptValueFactory::deserialize": 2264,
+      "DedicatedWorkerGlobalScope::postMessage": 116,
+      "HandlePostMessage": 116,
+      "Receive mojo reply": 10
+    }
+  },
+  "isoloop-one-5khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 2850,
+      "Receive mojo message": 2846,
+      "SerializedScriptValueFactory::create": 2451,
+      "MessagePort::Accept": 2336,
+      "SerializedScriptValueFactory::deserialize": 2253,
+      "DedicatedWorkerGlobalScope::postMessage": 115,
+      "HandlePostMessage": 115,
+      "Receive mojo reply": 13
+    }
+  },
+  "native-1khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 204,
+      "Receive mojo message": 180,
+      "MessagePort::Accept": 22,
+      "SerializedScriptValueFactory::create": 22,
+      "Receive mojo reply": 3,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "native-1khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 208,
+      "Receive mojo message": 182,
+      "SerializedScriptValueFactory::create": 21,
+      "MessagePort::Accept": 21,
+      "Receive mojo reply": 5,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "native-1khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 204,
+      "Receive mojo message": 182,
+      "MessagePort::Accept": 19,
+      "SerializedScriptValueFactory::create": 19,
+      "Receive mojo reply": 3,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "native-1khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 211,
+      "Receive mojo message": 182,
+      "SerializedScriptValueFactory::create": 26,
+      "MessagePort::Accept": 26,
+      "Receive mojo reply": 3
+    }
+  },
+  "native-5khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 212,
+      "Receive mojo message": 176,
+      "SerializedScriptValueFactory::create": 34,
+      "MessagePort::Accept": 34,
+      "Receive mojo reply": 3,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "native-5khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 215,
+      "Receive mojo message": 178,
+      "SerializedScriptValueFactory::create": 34,
+      "MessagePort::Accept": 34,
+      "Receive mojo reply": 3,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "native-5khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 199,
+      "Receive mojo message": 167,
+      "SerializedScriptValueFactory::create": 30,
+      "MessagePort::Accept": 30,
+      "Receive mojo reply": 2,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "native-5khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "SimpleWatcher::OnHandleReady": 211,
+      "Receive mojo message": 177,
+      "SerializedScriptValueFactory::create": 31,
+      "MessagePort::Accept": 31,
+      "Receive mojo reply": 3,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "native-workers-1khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "SerializedScriptValueFactory::create": 295,
+      "HandlePostMessage": 265,
+      "SerializedScriptValueFactory::deserialize": 265,
+      "DedicatedWorkerGlobalScope::postMessage": 257,
+      "SimpleWatcher::OnHandleReady": 216,
+      "Receive mojo message": 183,
+      "MessagePort::Accept": 30,
+      "Receive mojo reply": 3
+    }
+  },
+  "native-workers-1khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SerializedScriptValueFactory::create": 292,
+      "HandlePostMessage": 266,
+      "SerializedScriptValueFactory::deserialize": 266,
+      "DedicatedWorkerGlobalScope::postMessage": 258,
+      "SimpleWatcher::OnHandleReady": 212,
+      "Receive mojo message": 183,
+      "MessagePort::Accept": 27,
+      "Receive mojo reply": 3,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "native-workers-1khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "SerializedScriptValueFactory::create": 285,
+      "HandlePostMessage": 266,
+      "SerializedScriptValueFactory::deserialize": 266,
+      "DedicatedWorkerGlobalScope::postMessage": 258,
+      "SimpleWatcher::OnHandleReady": 206,
+      "Receive mojo message": 184,
+      "MessagePort::Accept": 19,
+      "Receive mojo reply": 3,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "native-workers-1khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "SerializedScriptValueFactory::create": 284,
+      "HandlePostMessage": 264,
+      "SerializedScriptValueFactory::deserialize": 264,
+      "DedicatedWorkerGlobalScope::postMessage": 256,
+      "SimpleWatcher::OnHandleReady": 204,
+      "Receive mojo message": 182,
+      "MessagePort::Accept": 19,
+      "Receive mojo reply": 2,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "native-workers-5khz-run1": {
+    "seconds": 10,
+    "perS": {
+      "SerializedScriptValueFactory::create": 421,
+      "HandlePostMessage": 389,
+      "SerializedScriptValueFactory::deserialize": 389,
+      "DedicatedWorkerGlobalScope::postMessage": 381,
+      "SimpleWatcher::OnHandleReady": 214,
+      "Receive mojo message": 179,
+      "MessagePort::Accept": 32,
+      "Receive mojo reply": 3,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "native-workers-5khz-run2": {
+    "seconds": 10,
+    "perS": {
+      "SerializedScriptValueFactory::create": 441,
+      "HandlePostMessage": 390,
+      "SerializedScriptValueFactory::deserialize": 390,
+      "DedicatedWorkerGlobalScope::postMessage": 382,
+      "SimpleWatcher::OnHandleReady": 233,
+      "Receive mojo message": 179,
+      "MessagePort::Accept": 51,
+      "Receive mojo reply": 3,
+      "Closed mojo endpoint": 0
+    }
+  },
+  "native-workers-5khz-run3": {
+    "seconds": 10,
+    "perS": {
+      "SerializedScriptValueFactory::create": 418,
+      "HandlePostMessage": 390,
+      "SerializedScriptValueFactory::deserialize": 390,
+      "DedicatedWorkerGlobalScope::postMessage": 382,
+      "SimpleWatcher::OnHandleReady": 211,
+      "Receive mojo message": 180,
+      "MessagePort::Accept": 28,
+      "Receive mojo reply": 3
+    }
+  },
+  "native-workers-5khz-run4": {
+    "seconds": 10,
+    "perS": {
+      "SerializedScriptValueFactory::create": 430,
+      "HandlePostMessage": 389,
+      "SerializedScriptValueFactory::deserialize": 389,
+      "DedicatedWorkerGlobalScope::postMessage": 382,
+      "SimpleWatcher::OnHandleReady": 222,
+      "Receive mojo message": 180,
+      "MessagePort::Accept": 40,
+      "Receive mojo reply": 2,
+      "Closed mojo endpoint": 0
+    }
+  }
+}

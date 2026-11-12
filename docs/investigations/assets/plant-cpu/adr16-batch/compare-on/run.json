@@ -1,0 +1,17 @@
+{
+  "started": "2026-11-11T14:45:48.530Z",
+  "args": {
+    "pair": ["native-workers=isoloop:matched", "native=isoloop:one"],
+    "rates": "5,1",
+    "rounds": "4",
+    "hold": "0",
+    "engines": "chromium",
+    "out": ".probe/compare-on",
+    "extra": [],
+    "warm": "6",
+    "window": "10",
+    "summary-only": false
+  },
+  "configs": ["native-workers", "isoloop:matched", "native", "isoloop:one"],
+  "cpus": "2,4,6,8"
+}
