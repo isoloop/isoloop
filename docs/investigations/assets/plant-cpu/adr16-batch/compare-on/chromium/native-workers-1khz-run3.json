@@ -14,13 +14,7 @@
   "framesLate": 0,
   "longTasks": 0,
   "typingMedianMs": 33,
-  "typing": [
-    37,
-    33,
-    31,
-    71,
-    32
-  ],
+  "typing": [37, 33, 31, 71, 32],
   "mainThreadCpuPct": 68.1,
   "rendererCpuPct": 83.4,
   "gpuCpuPct": 28.5,
