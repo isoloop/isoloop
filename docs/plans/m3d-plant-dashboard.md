@@ -24,7 +24,7 @@
    - **Slow signals** (temperatures, pressure, speed, power): one row per machine every 100–250 ms with all slow sensors in it.
    - That's about 200 records a second in total instead of more than 8,000. The native builds get identical chunks, so every build does the same work per record.
 5. **Topics.**
-   - `plant.<M>.vib` and `plant.<M>.scalars`: memory topics, so a restarted isolate catches up. Retention: the last 30 s of raw vibration (about 1 MB plant-wide at 1 kHz) and 5 min of slow signals.
+   - `plant.<M>.vib` and `plant.<M>.scalars`: memory topics, so a restarted isolate catches up. Retention: the last 30 s of raw vibration (about 1 MB plant-wide at 1 kHz) and 2 min of slow signals, the longest any reader keeps (the temperature trend and the fleet engine). It was 5 min until examples #64: a restarted `one` pool replayed the whole 5 minutes ahead of live data ([plant-one-pool](../investigations/plant-one-pool.md)).
    - `plant.<M>.spectrum` and `plant.<M>.health`: derived by the machine's data pool. The FFT uses a 1024-sample Hann window with a hop of 256 (75% overlap): about 4 spectra a second per machine at 1 kHz, scaling with the rate.
    - `plant.alarms` and `plant.events`: persistent topics in OPFS ([M2b](m2b-durable-log.md)), capped at 10,000 records each (oldest dropped), with a "clear history" button. Where OPFS isn't available, they fall back to memory topics and the page says so.
    - **The fleet engine subscribes only to derived topics** (`spectrum`, `health`, `scalars`), never to raw vibration.
