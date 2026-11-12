@@ -72,34 +72,34 @@ Group by what fails together: a pool is a unit of failure.
 
 ## When to pool, and when not to: the plant dashboard's figures
 
-The [plant dashboard](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant) (72 widgets, 8 machines) runs the same code in several placements, so it shows what each choice costs and contains. Unless a row says otherwise, figures are from its matched comparison on a dedicated machine ([`comparison/matched-q6/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched-q6)): Chromium, 4 physical cores fixed at 2.0 GHz, 1 kHz, medians of 5 rounds. Memory is after GC, 16 s after load. The per-pool costs come from the [plant memory investigation](https://github.com/isoloop/isoloop/pull/162).
+The [plant dashboard](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant) (72 widgets, 8 machines) runs the same code in several placements, so it shows what each choice costs and contains. Unless a row says otherwise, figures are from its latest matched comparison on a dedicated machine ([`comparison/matched-v2/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched-v2), `@isoloop/*@0.0.0-next.d028bc1`): Chromium, 4 physical cores fixed at 2.0 GHz, 1 kHz, medians of 5 rounds. Memory is after GC, 16 s after load. The per-pool costs come from the [plant memory investigation](../investigations/plant-memory.md).
 
 | Do | Don't | Why, measured |
 | --- | --- | --- |
 | Pool widgets that may stall together | Give each widget its own worker at dashboard scale | An own worker with one React widget costs about 4.4 MB; the same widget in a pool about 1.2 MB. In the plant, going from 9 visual pools to 3 saved 46 MB. `own` runs 105 workers, over the soft budget of 32. |
 | Pool small headless isolates | Give every feed and engine its own worker | A headless member in a pool costs about 0.2 MB, against 2.8 MB on its own worker. |
 | Keep data and widgets in separate pools when data must not stop | Put a machine's feed in its widgets' pool | Blocking one widget for 3 s: in `machine` (feed and widgets together) that machine lost 3.3 s of data. In `matched` and `split` (data apart) no machine lost any.¹ |
-| Split by failure domain | Put everything in one pool | In `one`, a 3 s block stalled every widget and cost every machine 3.3 s of data, as on a native page. After a 10-minute run it took 5.5 s to recover, against 3.4–3.5 s early in a run. |
-| Add pools for containment, knowing each one costs a thread | Add pools you don't need | CPU across threads rises with the number of workers: 88% in `one` (1 + bus), 102% in `matched` (10 + bus), 111% in `split` (18 + bus). Time to first data: 457, 559 and 857 ms. |
+| Split by failure domain | Put everything in one pool | In `one`, a 3 s block stalled every widget and cost every machine 3.3 s of data, as on a native page. After a 10-minute run it took 5.5 s to recover, against 3.4–3.5 s early in a run, because a restarted member that reads from `'earliest'` replays the retained history on the pool's one thread ([investigation](https://github.com/isoloop/isoloop/pull/172)). |
+| Add pools for containment, knowing each one costs a thread | Add pools you don't need | CPU across threads rises with the number of workers: 88% in `one` (1 + bus), 95% in `matched` (10 + bus), 110% in `split` (18 + bus). Time to first data: 512, 535 and 816 ms. |
 
 ¹ `machine` isn't in the matched comparison; this figure is from the first, local run ([`comparison/desktop-4core/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/desktop-4core)), which was on a different machine with an unfixed clock. Its data gaps don't depend on the machine; its CPU and memory figures aren't comparable with the table below.
 
 ### What each placement cost and contained
 
-Blocking one widget for 3 s, then letting its pool restart. Chromium, 1 kHz, from `matched-q6/` except where marked.
+Blocking one widget for 3 s, then letting its pool restart. Chromium, 1 kHz, from `matched-v2/` except where marked.
 
 | Placement | Workers | What the block stalls | Data lost | Recovery | CPU across threads | Memory after GC |
 | --- | --- | --- | --- | --- | --- | --- |
-| native | main thread only | the whole page | 3.8 s on every machine | 3.2 s | 77% | 156 MB |
-| native + workers | 9 | the whole page | none | 3.1 s | 83% | 191 MB |
-| `one` | 1 + bus | every widget, feed and engine | 3.3 s on every machine | 3.5 s | 88% | 188 MB |
-| `matched` | 10 + bus | all 72 widgets (one visual pool) | none | 2.8 s | 102% | 239 MB |
-| `split` (default) | 18 + bus | that machine's 8 widgets | none | 2.8 s | 111% | 287 MB |
+| native | main thread only | the whole page | 3.8 s on every machine | 3.2 s | 80% | 156 MB |
+| native + workers | 9 | the whole page | none | 3.1 s | 86% | 191 MB |
+| `one` | 1 + bus | every widget, feed and engine | 3.3 s on every machine | 3.4 s | 88% | 185 MB |
+| `matched` | 10 + bus | all 72 widgets (one visual pool) | none | 2.9 s | 95% | 239 MB |
+| `split` (default) | 18 + bus | that machine's 8 widgets | none | 3.3 s | 110% | 285 MB |
 | `machine`¹ | 10 + bus | that machine's widgets, feed and engines | 3.3 s on that machine | 3.4 s | – | – |
 | `shared-engines`¹ | 12 + bus | that machine's 8 widgets | none | 3.4 s | – | – |
 | `own`¹ | 105 + bus | that widget only | none | 2.4 s | – | – |
 
-In every Isoloop placement the main thread stayed at 23–29% CPU at 5 kHz, against 78–82% for the native builds, where both native builds slowed typing and Firefox dropped frames. That's a measured behaviour of this workload on this machine, not a guarantee.
+In every Isoloop placement the main thread stayed at 23–28% CPU at 5 kHz, against 80–82% for the native builds, where both native builds slowed typing and Firefox dropped frames. That's a measured behaviour of this workload on this machine, not a guarantee.
 
 ### For large desktop dashboards
 
