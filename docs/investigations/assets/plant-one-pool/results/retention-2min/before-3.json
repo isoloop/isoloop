@@ -1,0 +1,33 @@
+[
+  {
+    "placement": "one",
+    "hold": 300,
+    "recoveryMs": null,
+    "retained": {
+      "plant.t3.scalars": 1494,
+      "plant.t3.spectrum": 136,
+      "plant.t3.vib": 697,
+      "plant.t3.health": 298,
+      "plant.t3.stats": 64,
+      "plant.alarms": 4,
+      "plant.events": 8,
+      "plant.fleet": 297
+    },
+    "crashMs": 2060,
+    "crashed": 105,
+    "firstReadyMs": 2397,
+    "lastReadyMs": 2800,
+    "ready": 105,
+    "firstSpectrumMs": {
+      "T1": 5700,
+      "T2": 5703,
+      "T3": 5702,
+      "T4": 5703,
+      "T5": 5702,
+      "T6": 5703,
+      "T7": 5702,
+      "T8": 5701
+    },
+    "states": ["blocked", "crashed", "restarting", "loading", "running"]
+  }
+]

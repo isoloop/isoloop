@@ -105,3 +105,19 @@ What the figures show:
 - **App-only alternative:** shorten `scalars` and `health` retention to what the widgets show (2 minutes). That's smaller, has no library change, and keeps less history for every subscriber.
 - **Not proposed:** giving live records priority over replays inside a pool, so a restart's catch-up can't delay a feed. That would change the order in which the bus client hands a pool its deliveries, which is a larger change than the tail start, and the tail start removes most of the delay on its own.
 - **What stays inherent:** in `one`, a block stops and restarts every machine's feed and engines. That's the blast radius of putting everything in one pool. The comparison already reports it, as the data gap on every machine, which native has too.
+
+### The app-only fix, measured
+
+The user chose the app-only alternative: `scalars` and `health` keep 2 minutes, the longest window any reader needs (examples [#64](https://github.com/isoloop/examples/pull/64), `d5391e4`). Its `retention.test.ts` ties the retention to the trend's, the stats engine's and the fleet engine's windows, so it can't drop below them unnoticed. The library's tail start (`{ since }`) is left for M3e.
+
+Same probe and settings as above, on the benchmark server: 4 physical cores fixed at 2.0 GHz, `@isoloop/*@0.0.0-next.d028bc1`. The runs alternated between examples `origin/main` before the fix (`4614a4a`) and the fix branch (`41a3a75`), 3 rounds each, every run after a 5-minute hold. Times are from the click (`results/retention-2min/`, `retention-2min-run.sh.txt`).
+
+| | Pool killed | 105 members ready | Spectra resume (all 8 machines) | Kill → spectra | T3 scalars retained | T3 health retained |
+| --- | --- | --- | --- | --- | --- | --- |
+| Before (5 min) | 2.02–2.06 s | 2.43–2.80 s | 5.70–5.76 s | 3.6–3.7 s | 1,493–1,494 | 298 |
+| After (2 min) | 2.04–2.09 s | 2.48–2.66 s | 4.02–4.09 s | 1.9–2.0 s | 624–625 | 124–125 |
+
+- **Spectra resume about 1.7 s sooner,** 4.0–4.1 s against 5.7–5.8 s, as the estimate above expected. The rounds don't overlap.
+- **The restart itself is unchanged:** the kill comes at about 2.0–2.1 s, and all 105 members are ready again 0.35–0.75 s later.
+- **The replay is what shrank:** T3's retained `scalars` fell from about 1,494 rows to 624, and `health` from 298 to 125. That's the same for every machine.
+- **What's left** is mostly the FFT filling its 1,024-sample window (about 1 s at 1 kHz) and 2 minutes of replay. The tail start would take the stats engine down to 60 s of it.
