@@ -1,0 +1,188 @@
+[
+  {
+    "placement": "one",
+    "hold": 20,
+    "recoveryMs": null,
+    "retained": {
+      "plant.t3.scalars": 94,
+      "plant.t3.spectrum": 69,
+      "plant.t3.vib": 375,
+      "plant.t3.health": 18,
+      "plant.t3.stats": 18,
+      "plant.alarms": 8,
+      "plant.events": 8,
+      "plant.fleet": 17
+    },
+    "crashMs": 2031,
+    "crashed": 105,
+    "firstReadyMs": 2379,
+    "lastReadyMs": 2435,
+    "ready": 105,
+    "firstSpectrumMs": {
+      "T1": 3432,
+      "T2": 3449,
+      "T3": 3450,
+      "T4": 3449,
+      "T5": 3449,
+      "T6": 3449,
+      "T7": 3449,
+      "T8": 3449
+    },
+    "states": ["blocked", "crashed", "restarting", "loading", "running"]
+  },
+  {
+    "placement": "one",
+    "hold": 120,
+    "recoveryMs": null,
+    "retained": {
+      "plant.t3.scalars": 594,
+      "plant.t3.spectrum": 135,
+      "plant.t3.vib": 695,
+      "plant.t3.health": 118,
+      "plant.t3.stats": 64,
+      "plant.alarms": 14,
+      "plant.events": 14,
+      "plant.fleet": 117
+    },
+    "crashMs": 2068,
+    "crashed": 105,
+    "firstReadyMs": 2413,
+    "lastReadyMs": 2553,
+    "ready": 105,
+    "firstSpectrumMs": {
+      "T1": 4120,
+      "T2": 4121,
+      "T3": 4121,
+      "T4": 4120,
+      "T5": 4120,
+      "T6": 4119,
+      "T7": 4118,
+      "T8": 4121
+    },
+    "states": ["blocked", "crashed", "restarting", "loading", "running"]
+  },
+  {
+    "placement": "one",
+    "hold": 300,
+    "recoveryMs": null,
+    "retained": {
+      "plant.t3.scalars": 1493,
+      "plant.t3.spectrum": 136,
+      "plant.t3.vib": 695,
+      "plant.t3.health": 298,
+      "plant.t3.stats": 64,
+      "plant.alarms": 12,
+      "plant.events": 19,
+      "plant.fleet": 297
+    },
+    "crashMs": 2023,
+    "crashed": 105,
+    "firstReadyMs": 2369,
+    "lastReadyMs": 2430,
+    "ready": 105,
+    "firstSpectrumMs": {
+      "T1": 6053,
+      "T2": 6055,
+      "T3": 6055,
+      "T4": 6055,
+      "T5": 6055,
+      "T6": 6051,
+      "T7": 6055,
+      "T8": 6053
+    },
+    "states": ["blocked", "crashed", "restarting", "loading", "running"]
+  },
+  {
+    "placement": "one",
+    "hold": 600,
+    "recoveryMs": null,
+    "retained": {
+      "plant.t3.scalars": 1524,
+      "plant.t3.spectrum": 136,
+      "plant.t3.vib": 697,
+      "plant.t3.health": 305,
+      "plant.t3.stats": 64,
+      "plant.alarms": 69,
+      "plant.events": 75,
+      "plant.fleet": 304
+    },
+    "crashMs": 2069,
+    "crashed": 105,
+    "firstReadyMs": 2407,
+    "lastReadyMs": 2463,
+    "ready": 105,
+    "firstSpectrumMs": {
+      "T1": 6137,
+      "T2": 6138,
+      "T3": 6138,
+      "T4": 6138,
+      "T5": 6135,
+      "T6": 6138,
+      "T7": 6138,
+      "T8": 6137
+    },
+    "states": ["blocked", "crashed", "restarting", "loading", "running"]
+  },
+  {
+    "placement": "one",
+    "hold": 20,
+    "recoveryMs": null,
+    "retained": {
+      "plant.t3.scalars": 94,
+      "plant.t3.spectrum": 69,
+      "plant.t3.vib": 375,
+      "plant.t3.health": 18,
+      "plant.t3.stats": 18,
+      "plant.alarms": 0,
+      "plant.events": 0,
+      "plant.fleet": 17
+    },
+    "crashMs": 2071,
+    "crashed": 105,
+    "firstReadyMs": 2417,
+    "lastReadyMs": 2473,
+    "ready": 105,
+    "firstSpectrumMs": {
+      "T1": 3652,
+      "T2": 3653,
+      "T3": 3653,
+      "T4": 3652,
+      "T5": 3653,
+      "T6": 3652,
+      "T7": 3654,
+      "T8": 3650
+    },
+    "states": ["blocked", "crashed", "restarting", "loading", "running"]
+  },
+  {
+    "placement": "one",
+    "hold": 600,
+    "recoveryMs": null,
+    "retained": {
+      "plant.t3.scalars": 1524,
+      "plant.t3.spectrum": 135,
+      "plant.t3.vib": 695,
+      "plant.t3.health": 305,
+      "plant.t3.stats": 64,
+      "plant.alarms": 48,
+      "plant.events": 62,
+      "plant.fleet": 304
+    },
+    "crashMs": 2080,
+    "crashed": 105,
+    "firstReadyMs": 2426,
+    "lastReadyMs": 2483,
+    "ready": 105,
+    "firstSpectrumMs": {
+      "T1": 5885,
+      "T2": 5884,
+      "T3": 5885,
+      "T4": 5887,
+      "T5": 5887,
+      "T6": 5886,
+      "T7": 5887,
+      "T8": 5883
+    },
+    "states": ["blocked", "crashed", "restarting", "loading", "running"]
+  }
+]

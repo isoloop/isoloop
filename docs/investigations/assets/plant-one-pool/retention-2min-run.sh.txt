@@ -1,0 +1,28 @@
+#!/bin/bash
+# Before (origin/main) and after (the retention fix), interleaved: 3 rounds of a 5-minute hold each.
+set -euo pipefail
+for d in before after; do
+  (cd /$d && pnpm install --frozen-lockfile > /p/install-$d.log 2>&1 && cd apps/dashboards/plant && npx vite build > /p/build-$d.log 2>&1)
+done
+(cd /before/apps/dashboards/plant && npx vite preview --outDir dist --port 4792 --strictPort > /dev/null 2>&1 &)
+(cd /after/apps/dashboards/plant && npx vite preview --outDir dist --port 4793 --strictPort > /dev/null 2>&1 &)
+sleep 6
+cp /p/restart-probe.mjs /after/apps/dashboards/plant/
+cd /after/apps/dashboards/plant
+for r in 1 2 3; do
+  BASE=http://localhost:4792 HOLDS=300 PLACEMENT=one OUT=/p/before-$r.json node restart-probe.mjs
+  BASE=http://localhost:4793 HOLDS=300 PLACEMENT=one OUT=/p/after-$r.json node restart-probe.mjs
+done
+rm -f restart-probe.mjs
+echo done
+#!/bin/bash
+# Waits for the bench lock, then runs the retention recovery probe with bench mode on.
+exec 9>~/bench/.lock
+flock 9
+echo "lock $(date -u +%FT%TZ)"
+sudo -n bench-mode on
+trap "sudo -n bench-mode off; echo off \$(date -u +%FT%TZ)" EXIT
+docker run --rm --init --name plant-ret --cpuset-cpus=2,4,6,8 --shm-size=2g \
+  -v ~/bench/ret/before:/before -v ~/bench/ret/examples:/after -v ~/bench/ret/probe:/p \
+  plant-compare bash /p/run.sh
+echo "finished $(date -u +%FT%TZ)"

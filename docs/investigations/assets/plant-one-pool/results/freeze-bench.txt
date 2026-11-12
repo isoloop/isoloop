@@ -1,0 +1,18 @@
+# Server, 4 physical cores at 2.0 GHz, Chromium 156 (Playwright 1.64.1), one worker.
+# Run 1: plain vs full freeze, 60 s simulated after 60 s warm-up, 8 rounds interleaved.
+freeze=false rate=5kHz: median 2519 ms for 60 s of 8 machines (42.0 ms per simulated s), range 2506–2527
+freeze=true rate=5kHz: median 5938 ms for 60 s of 8 machines (99.0 ms per simulated s), range 5912–5954
+ratio frozen/plain: 2.36
+freeze=false rate=1kHz: median 550 ms for 60 s of 8 machines (9.2 ms per simulated s), range 548–554
+freeze=true rate=1kHz: median 1377 ms for 60 s of 8 machines (22.9 ms per simulated s), range 1374–1380
+ratio frozen/plain: 2.50
+
+# Run 2: variants, 30 s simulated after 30 s warm-up, 5 rounds interleaved, 5 kHz.
+5 kHz | plain                                | 39.5 ms per simulated s | ×1.00 | 1183–1189 ms
+5 kHz | full                                 | 61.0 ms per simulated s | ×1.54 | 1820–1835 ms
+5 kHz | freeze, no accessors                 | 39.5 ms per simulated s | ×1.00 | 1184–1188 ms
+5 kHz | accessors only, no freeze            | 61.1 ms per simulated s | ×1.55 | 1816–1841 ms
+5 kHz | accessors on Array.prototype only    | 60.0 ms per simulated s | ×1.52 | 1790–1813 ms
+5 kHz | accessors on Map/Set only            | 39.6 ms per simulated s | ×1.00 | 1184–1191 ms
+5 kHz | accessors on typed arrays only       | 39.6 ms per simulated s | ×1.00 | 1184–1190 ms
+5 kHz | accessors on Object/Function only    | 39.5 ms per simulated s | ×1.00 | 1185–1189 ms
