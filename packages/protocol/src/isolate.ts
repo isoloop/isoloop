@@ -32,6 +32,8 @@ export type InitPayload = {
    * subscriptions start from `committed` instead, so it replays what it missed.
    */
   wake?: boolean;
+  /** `KernelConfig.bus.commitIntervalMs` (ADR 0016, decision 1). Default 100. */
+  commitIntervalMs?: number;
 };
 
 /** What a beat says about whether the isolate could be suspended (ADR 0001). */
