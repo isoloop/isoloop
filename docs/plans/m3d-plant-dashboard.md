@@ -60,41 +60,60 @@
 
 ## Findings so far
 
-In isoloop/examples, `apps/dashboards/plant/comparison/` [`matched/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched) (with the bus retention fix) and [`matched-q6/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched-q6) (after the app's own timings stopped going over the bus). Chromium, 4 cores at 2.0 GHz, medians of 5 rounds (3 for the 10-minute rows), figures from `matched-q6/` unless noted.
+In isoloop/examples, `apps/dashboards/plant/comparison/`:
+- [`matched/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched): the first server run, with the bus retention fix.
+- [`matched-q6/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched-q6) and [`cpu-baseline/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/cpu-baseline): after the app's own timings and metrics sampler stopped costing Isoloop extra.
+- [`matched-v2/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched-v2): the current figures, with `@isoloop/*@0.0.0-next.d028bc1`. That's every fix above, plus combined commits ([ADR 0016](../adr/0016-fewer-messages-per-record.md)) and synchronous handlers that don't yield per record (isoloop#169).
+
+Figures below are from `matched-v2/`: Chromium, 4 cores at 2.0 GHz, medians of 5 rounds (3 for the 10-minute rows).
 
 **What it costs**, Isoloop minus its matched native build:
 
 | | native → `one` | native + workers → `matched` |
 | --- | --- | --- |
 | Threads | main → main + 1 + bus | main + 9 → main + 10 + bus |
-| CPU across threads, 1 kHz / 5 kHz | +11 / +16 pp | +13 / +22 pp |
-| Memory after GC, 16 s | +36 MB | +47 MB |
-| Memory after GC, 10 min | +39 MB | +21 MB |
-| Memory as read, 10 min | +106 MB | +202 MB |
-| First data | +159 ms | +242 ms |
+| CPU across threads, 1 kHz / 5 kHz | +9 / +17 pp | +10 / +18 pp |
+| Memory after GC, 16 s | +30 MB | +47 MB |
+| Memory after GC, 10 min | +30 MB | +19 MB |
+| Memory as read, 10 min | +59 MB | +155 MB |
+| First data, 1 kHz | +264 ms | +229 ms |
 
 **What the main thread does,** Isoloop against its matched native build:
 
 | | native → `one` | native + workers → `matched` |
 | --- | --- | --- |
-| Main-thread CPU, 5 kHz | −59 pp (23% against 82%) | −51 pp (27% against 78%) |
-| Typing, Chromium 5 kHz | −52 ms | −41 ms |
-| Late frames, Firefox 5 kHz | −123 | −86 |
+| Main-thread CPU, 5 kHz | −59 pp (23% against 82%) | −54 pp (26% against 80%) |
+| Typing, Chromium 5 kHz | −45 ms (22 against 68 ms) | −28 ms (25 against 51 ms) |
+| Late frames, Firefox 5 kHz | −122 | −83 |
 
 At 1 kHz in Chromium every build types within noise of the others; the main-thread differences show under the heavier loads on this fixed-clock machine. An earlier unfixed run on a faster desktop CPU kept 60 fps in every build at every rate.
 
-**What a 3 s block takes down** (from `matched/`): native and native + workers stall the whole page; native loses 3.8 s of data on every machine, native + workers none. `one` stalls everything and loses 3.3 s of data on every machine. `matched` stalls the widgets' pool and loses no data. `split` loses no data. Recovery is 2.9–3.7 s in every build, Chromium and Firefox.
+**What a 3 s block takes down:**
+- **native and native + workers:** the whole page stalls. Native loses 3.8 s of data on every machine; native + workers loses none.
+- **`one`:** everything stalls, and every machine loses 3.3 s of data.
+- **`matched`:** the widgets' pool stalls; no data is lost.
+- **`split`:** no data is lost.
+
+Recovery takes about 2.9–3.7 s in every build, Chromium and Firefox.
 
 **Where the cost goes:**
-- **Memory** ([isoloop#162](https://github.com/isoloop/isoloop/pull/162)): after GC, each visual pool's own copy of the framework, runtime, document and plant code (about 7.7 MB per plant pool), and the bus worker. As read, mostly garbage not yet collected, which follows how much is allocated per record. A bus retention bug kept expired records for up to 17 minutes; it's fixed ([isoloop#163](https://github.com/isoloop/isoloop/pull/163)), and Isoloop's memory no longer grows faster than native's over 10 minutes.
-- **CPU** ([isoloop#165](https://github.com/isoloop/isoloop/pull/165)): most of the gap is moving records between threads, a fixed cost per `MessagePort` message (+101 ms/s in the browser and +45 ms/s in Isoloop's own messaging code, of a +180 ms/s gap for `matched` at 5 kHz). The demo's own metrics sampler was another +23 ms/s; it now samples once a second (examples#61).
-- **Fewer messages** ([ADR 0016](https://github.com/isoloop/isoloop/pull/164), proposed): combined commits cut port messages by 20% and the browser's messaging work by 8–14 ms/s, with the renderer total within the spread. Batching per port cut messages by 3–5% and moved no CPU figure beyond the spread. Every record still crosses threads at least twice (producer → bus → subscriber, [ADR 0005](../adr/0005-bus-topology-message-channels.md)), which is the remaining cost of having a broker.
-- **WebKit** ([isoloop#161](https://github.com/isoloop/isoloop/pull/161)): Playwright's WebKit on Linux stops the Isoloop page when workers present many canvas frames. Safari 26.5 on an iPad held 60 fps at every load in the standalone repro, so the limit is Playwright's headless, software-rendered WebKit, not Safari.
+- **Memory** ([plant memory investigation](../investigations/plant-memory.md)):
+  - **After GC,** it's each visual pool's own copy of the framework, runtime, document and plant code (about 7.7 MB per plant pool), plus the bus worker.
+  - **As read,** it's mostly garbage not yet collected, which follows how much is allocated per record. Fewer messages lowered it: `matched`'s as-read gap at 10 minutes went from +220 MB in `matched/` to +155 MB, the one change since `matched/` beyond the round spread.
+  - **The bus retention bug,** which kept expired records for up to 17 minutes, is fixed (isoloop#163). Isoloop's memory no longer grows faster than native's over 10 minutes.
+- **CPU** ([plant CPU investigation](../investigations/plant-cpu.md)): most of the gap is moving records between threads, a fixed cost per `MessagePort` message. That was +101 ms/s in the browser and +45 ms/s in Isoloop's own messaging code, of a +180 ms/s gap for `matched` at 5 kHz, before the fixes. The demo's own metrics sampler was another +23 ms/s; it now samples once a second (examples#61). In `matched-v2/` the messaging gap is 10–15 ms/s smaller at 5 kHz.
+- **Fewer messages** ([ADR 0016](../adr/0016-fewer-messages-per-record.md), accepted as decision 1 only):
+  - **Combined commits** cut port messages by 20% and the browser's messaging work by 8–14 ms/s; the renderer total stayed within the spread.
+  - **Batching per port** was built as an opt-in and measured: messages fell by 3–5% and no CPU figure moved beyond the spread, so it was removed.
+  - **Answering memory-topic publishes only on failure** (the proposed decision 2) wasn't taken: its saving would be of the same small size, and it would change `publish`'s behaviour.
+  - Every record still crosses threads at least twice (producer → bus → subscriber, [ADR 0005](../adr/0005-bus-topology-message-channels.md)). That's the remaining cost of having a broker.
+- **WebKit** ([engine constraint 2](../investigations/engine-constraints.md)): Playwright's WebKit on Linux stops the Isoloop page when workers present many canvas frames. Safari 26.5 on an iPad held 60 fps at every load in the standalone repro, so the limit is Playwright's headless, software-rendered WebKit, not Safari.
 
 **Open:**
-- `one` recovers more slowly after the 10-minute hold (5.5 s, with a 5.6–5.9 s data gap) than early in a run (3.4–3.5 s). The other placements don't change. Not yet looked into.
-- In `one` at 5 kHz the app's own feeds and engines take 96 ms/s of CPU, against 62 on native's main thread; in `matched` they're equal (57 and 57). Not yet explained (isoloop#165, "Not explained yet").
-- The plant itself hasn't been recorded on an iPad or phone yet; it's deployed at `plant-v0.1.0-rc.2`, and each page has a "Record 10 s" panel.
+- **`one` recovers slowly after the 10-minute hold:** 5.5 s, with a 5.6 s data gap, against 3.4–3.5 s early in a run. The other placements don't change. The cause is the catch-up replay: after a restart, members that subscribe from `'earliest'` receive the whole retained `scalars` and `health` history again on the single thread, ahead of their live data (isoloop#172). Examples#64 cuts that retention to 2 minutes, the longest any reader needs. Its effect on recovery hasn't been measured yet.
+- **`one`'s app code is slower than native's:** at 5 kHz the app's own feeds and engines take 96 ms/s of CPU in `one`, against 62 on native's main thread. In `matched` they're equal (57 and 57). Isoloop#172 traces this to the pool's override taming: the accessor on `Array.prototype[Symbol.iterator]` takes V8 off its fast path for `for…of`, spread and destructuring. Narrowing the taming is in progress: an ADR 0001 amendment (isoloop#174) and its code (isoloop#173).
+- **Canvas raster in `matched` at 5 kHz varies between runs, for reasons not yet known.** The widgets' pool worker spent 370–532 ms/s on canvas raster and present across `cpu-baseline/` and `matched-v2/`, and that swings the renderer gap from +168 to +294 ms/s.
+- **The plant itself hasn't been recorded on an iPad or phone yet.** It's deployed at `plant-v0.1.0-rc.2`, and each page has a "Record 10 s" panel.
 
 ## Tasks
 
@@ -140,10 +159,10 @@ All in `isoloop/examples`, `apps/dashboards/plant`, unless a task says otherwise
 - Isoloop's input budget asserted in the default placement at each rate (decision 12); medians and ratios in the test report.
 
 ### 11. The comparison
-- **Built:** `comparison/run.ts` (`compare:pairs`) runs decision 7's pairs interleaved, in Playwright's Docker image ([`comparison/Dockerfile`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison)), and writes each run's JSON and a summary with per-round gaps and their spread. The CPU probe is in [`docs/investigations/assets/plant-cpu/`](../investigations/assets/plant-cpu/) (isoloop#165).
-- **Recorded:** `matched/` and `matched-q6/` (above).
+- **Built:** `comparison/run.ts` (`compare:pairs`) runs decision 7's pairs interleaved, in Playwright's Docker image ([`comparison/Dockerfile`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison)), and writes each run's JSON and a summary with per-round gaps and their spread. The CPU probe is in [`docs/investigations/assets/plant-cpu/`](../investigations/assets/plant-cpu/).
+- **Recorded:** `matched/`, `matched-q6/`, `cpu-baseline/` and `matched-v2/` (above).
 - **Remaining:**
-  - Re-record `matched/` once the library changes in flight are released (the bus retention fix is in; ADR 0016 decision 1 waits for approval), so the shipped figures match the shipped libraries.
+  - Re-record once the open items above that change the libraries (isoloop#173) are released, so the shipped figures match the shipped libraries.
   - The behaviour table of decision 10, from the E2E fault tests and the comparison's fault columns.
   - The plant on an iPad or phone, recorded with its model and browser.
 - **Acceptance:** results kept with decision 10's two questions answered against them.
