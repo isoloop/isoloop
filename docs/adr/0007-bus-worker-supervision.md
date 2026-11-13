@@ -43,7 +43,7 @@ The `LogEngine` stays the broker's only interface. Durability is a `LogStorage` 
 ### 4. Reattach, not restart, after a bus crash
 
 1. The supervisor starts a new bus worker, which loads persistent topics and their offsets from OPFS.
-2. The kernel gives every running isolate a new bus port via `reattach`. **Isolates keep running.**
+2. The kernel gives every running isolate a new bus port via `reattach`. **Isolates keep running.** This happens as soon as the new worker is booted, without waiting for it to report `ready`: the new bus buffers each port's publishes and subscriptions while it loads contracts and storage ([ADR 0003](0003-schema-format-standard-schema.md), decision 8), so isolates don't wait on the restore (clarified 2026-11-13, as built in `packages/host/src/bus/controller.ts`).
 3. Each isolate's `BusClient` re-sends its subscriptions:
    - **persistent topics** resume after the committed offset, with no gap, whatever `from` the subscription asked for; one that never committed starts at its `from` (made explicit 2026-11-07, M2b: a reattached `from: 'earliest'` subscription first replayed the whole log);
    - **memory topics** answer with `reset { topic, reason: 'bus_restart' }`. Adapters clear their topic state and replay from `earliest` (for example, `useTopic` empties and refills). Plain `subscribe` callers get an `onReset` callback.
