@@ -1,6 +1,6 @@
 # M3d: Plant dashboard
 
-**Status:** in progress. Planned 2026-11-08; tasks 1–11 built 2026-11-09 and 2026-11-10; decisions 6, 7, 10 and 11 revised 2026-11-11 after the first results. Fourth epic of the [M3 initiative](m3-adapters-dashboard.md), and the heavy-workload study [M3c](m3c-dashboard-sizes.md) left as an open question.
+**Status:** built; ships as `plant-v0.1.0`, on the user's word. Planned 2026-11-08; tasks 1–11 built 2026-11-09 and 2026-11-10; decisions 6, 7, 10 and 11 revised 2026-11-11 after the first results, decision 6's default revised 2026-11-13; final figures and write-up 2026-11-13 ([README](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant)). Fourth epic of the [M3 initiative](m3-adapters-dashboard.md), and the heavy-workload study [M3c](m3c-dashboard-sizes.md) left as an open question.
 
 **Goal:** a second, larger example: a telemetry dashboard for a fictional plant of eight machines, 72 widgets, with sensor data heavy enough to matter. It's built three ways, including a native build that uses hand-written workers, and the Isoloop build can place its isolates several ways. It's measured so readers can see what Isoloop costs against matched native builds under a realistic heavy workload, and what they get for that cost.
 
@@ -58,35 +58,43 @@
 12. **CI checks Isoloop, not native** (M3c decision 11): Isoloop's input budget asserted (200 ms × `PERF_BUDGET_SCALE`), ratios reported, WebKit handled as in M3c (report-only where it varies). Full-scope runs are sharded as in the markets app. The recorded comparisons come from the dedicated machine (decision 11), not from CI runners.
 13. **Where it lives:** `apps/dashboards/plant` in `isoloop/examples`, URL `/dashboards/plant/`, listed on the `/dashboards/` index, tags `plant-v*`.
 
-## Findings so far
+## Results
 
-In isoloop/examples, `apps/dashboards/plant/comparison/`:
-- [`matched/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched): the first server run, with the bus retention fix.
-- [`matched-q6/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched-q6) and [`cpu-baseline/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/cpu-baseline): after the app's own timings and metrics sampler stopped costing Isoloop extra.
-- [`matched-v2/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched-v2): the current figures, with `@isoloop/*@0.0.0-next.d028bc1`. That's every fix above, plus combined commits ([ADR 0016](../adr/0016-fewer-messages-per-record.md)) and synchronous handlers that don't yield per record (isoloop#169).
+The write-up is the plant's [README](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant). In isoloop/examples, `apps/dashboards/plant/comparison/`:
+- [`final/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/final): the figures that ship, on `@isoloop/*@0.0.0-next.b8ffdcf`. That's every fix below, plus protected built-ins in pools ([ADR 0001 amendment](../adr/0001-one-worker-per-isolate.md), isoloop#173).
+- [`matched-v2/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched-v2): the 10-minute memory figures, on `0.0.0-next.d028bc1`.
+- [`matched/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched), [`matched-q6/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched-q6) and [`cpu-baseline/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/cpu-baseline): the runs before, as each fix landed.
+- [`phone/ikko-mindone-focus156/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/phone/ikko-mindone-focus156) and [`phone/galaxy-fold6-chrome157/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/phone/galaxy-fold6-chrome157): the two phones.
 
-Figures below are from `matched-v2/`: Chromium, 4 cores at 2.0 GHz, medians of 5 rounds (3 for the 10-minute rows).
+Server figures are Chromium, 4 cores at 2.0 GHz, medians of 5 rounds (3 for the 10-minute rows).
 
-**What it costs**, Isoloop minus its matched native build:
+**What it costs**, Isoloop minus its matched native build (`final/`; 10-minute rows from `matched-v2/`):
 
 | | native → `one` | native + workers → `matched` |
 | --- | --- | --- |
 | Threads | main → main + 1 + bus | main + 9 → main + 10 + bus |
-| CPU across threads, 1 kHz / 5 kHz | +9 / +17 pp | +10 / +18 pp |
-| Memory after GC, 16 s | +30 MB | +47 MB |
+| CPU across threads, 1 kHz / 5 kHz | +7 / +11 pp | +11 / +19 pp |
+| Memory after GC, 16 s | +36 MB | +41 MB |
 | Memory after GC, 10 min | +30 MB | +19 MB |
 | Memory as read, 10 min | +59 MB | +155 MB |
-| First data, 1 kHz | +264 ms | +229 ms |
+| First data, 1 kHz | +305 ms | +307 ms |
+| First data on the mid-range phone | 1.2–1.8 s against 0.4–0.9 s | 1.4–2.0 s against 0.7–0.9 s |
 
 **What the main thread does,** Isoloop against its matched native build:
 
 | | native → `one` | native + workers → `matched` |
 | --- | --- | --- |
-| Main-thread CPU, 5 kHz | −59 pp (23% against 82%) | −54 pp (26% against 80%) |
-| Typing, Chromium 5 kHz | −45 ms (22 against 68 ms) | −28 ms (25 against 51 ms) |
-| Late frames, Firefox 5 kHz | −122 | −83 |
+| Main-thread CPU, server 5 kHz | −60 pp (23% against 84%) | −53 pp (27% against 79%) |
+| Typing, server Chromium 5 kHz | −55 ms (21 against 82 ms) | −28 ms (41 against 62 ms) |
+| Late frames, server Firefox 5 kHz | −126 | −89 |
+| Frames/s, mid-range phone, 1 and 5 kHz | 80–84 against 45–56 | 68–77 against 47–54 |
+| Typing median, mid-range phone | 15–18 against 32–64 ms | 19–23 against 33–57 ms |
 
-At 1 kHz in Chromium every build types within noise of the others; the main-thread differences show under the heavier loads on this fixed-clock machine. An earlier unfixed run on a faster desktop CPU kept 60 fps in every build at every rate.
+The three devices play different roles:
+- **The mid-range phone** (MediaTek MT8781V, 8 cores, 8 GB, Firefox 156) is where native's main thread runs short at both rates and Isoloop's design shows. Chrome on it is untested; earlier failures there came from our tooling, not the page.
+- **The server's fixed 2.0 GHz clock** shows the same under the heavier load, and gives the CPU and memory cost. At 1 kHz in Chromium every build keeps up.
+- **The flagship phone** (Snapdragon 8 Gen 3 for Galaxy, Chrome 157) has headroom: every build held 60 frames/s with typing at 9–13 ms, so only the cost differs.
+- **An iPad with Apple M2, in Safari,** was observed but not recorded: `split` and `matched` at 5 kHz both filled, kept updating and showed a steady 60 fps.
 
 **What a 3 s block takes down:**
 - **native and native + workers:** the whole page stalls. Native loses 3.8 s of data on every machine; native + workers loses none.
@@ -94,7 +102,7 @@ At 1 kHz in Chromium every build types within noise of the others; the main-thre
 - **`matched`:** the widgets' pool stalls; no data is lost.
 - **`split`:** no data is lost.
 
-Recovery takes about 2.9–3.7 s in every build, Chromium and Firefox.
+Recovery takes about 2.7–3.7 s in every build, Chromium and Firefox (`final/`).
 
 **Where the cost goes:**
 - **Memory** ([plant memory investigation](../investigations/plant-memory.md)):
@@ -107,13 +115,13 @@ Recovery takes about 2.9–3.7 s in every build, Chromium and Firefox.
   - **Batching per port** was built as an opt-in and measured: messages fell by 3–5% and no CPU figure moved beyond the spread, so it was removed.
   - **Answering memory-topic publishes only on failure** (the proposed decision 2) wasn't taken: its saving would be of the same small size, and it would change `publish`'s behaviour.
   - Every record still crosses threads at least twice (producer → bus → subscriber, [ADR 0005](../adr/0005-bus-topology-message-channels.md)). That's the remaining cost of having a broker.
-- **WebKit** ([engine constraint 2](../investigations/engine-constraints.md)): Playwright's WebKit on Linux stops the Isoloop page when workers present many canvas frames. Safari 26.5 on an iPad held 60 fps at every load in the standalone repro, so the limit is Playwright's headless, software-rendered WebKit, not Safari.
+- **The app's own code in pools** ([plant-one-pool](../investigations/plant-one-pool.md)): the pool's override taming took V8 off its fast path for array iteration. With protected built-ins (isoloop#173), `one`'s feeds and engines at 5 kHz take 50.9 ms/s, against 95.3 before and 61.6 on native's main thread (`final/`).
+- **WebKit** ([engine constraint 2](../investigations/engine-constraints.md)): Playwright's WebKit on Linux stops the Isoloop page in `split` when workers present many canvas frames; in `matched` it ran on the CI runner and stopped on a 32-core local machine, so CI reports it rather than asserting it. Safari on an iPad (Apple M2) ran both placements at a steady 60 fps, as observed by hand, matching the standalone repro (Safari 26.5, 60 fps at every load). The limit is Playwright's headless, software-rendered WebKit, not Safari.
 
-**Open:**
-- **`one` recovers slowly after the 10-minute hold:** 5.5 s, with a 5.6 s data gap, against 3.4–3.5 s early in a run. The other placements don't change. The cause is the catch-up replay: after a restart, members that subscribe from `'earliest'` receive the whole retained `scalars` and `health` history again on the single thread, ahead of their live data (isoloop#172). Examples#64 cuts that retention to 2 minutes, the longest any reader needs. Its effect on recovery hasn't been measured yet.
-- **`one`'s app code is slower than native's:** at 5 kHz the app's own feeds and engines take 96 ms/s of CPU in `one`, against 62 on native's main thread. In `matched` they're equal (57 and 57). Isoloop#172 traces this to the pool's override taming: the accessor on `Array.prototype[Symbol.iterator]` takes V8 off its fast path for `for…of`, spread and destructuring. Narrowing the taming is in progress: an ADR 0001 amendment (isoloop#174) and its code (isoloop#173).
-- **Canvas raster in `matched` at 5 kHz varies between runs, for reasons not yet known.** The widgets' pool worker spent 370–532 ms/s on canvas raster and present across `cpu-baseline/` and `matched-v2/`, and that swings the renderer gap from +168 to +294 ms/s.
-- **The plant itself hasn't been recorded on an iPad or phone yet.** It's deployed at `plant-v0.1.0-rc.2`, and each page has a "Record 10 s" panel.
+**Resolved or still open:**
+- **`one`'s slow recovery after a long hold:** cut. Examples#64 keeps 2 minutes of slow signals, the longest any reader needs, and after a 5-minute hold the first spectrum comes back 1.9–2.0 s after the kill, against 3.6–3.7 s before ([plant-one-pool](../investigations/plant-one-pool.md)).
+- **`one`'s slow app code:** fixed by isoloop#173 (above).
+- **Canvas raster in `matched` at 5 kHz still varies, for reasons not yet known.** In `final/` it read 389–408 ms/s in rounds 1–4 and 457–473 ms/s in two extra rounds run as a second probe call. It moves the renderer total, not the messaging or app buckets.
 
 ## Tasks
 
@@ -160,18 +168,15 @@ All in `isoloop/examples`, `apps/dashboards/plant`, unless a task says otherwise
 
 ### 11. The comparison
 - **Built:** `comparison/run.ts` (`compare:pairs`) runs decision 7's pairs interleaved, in Playwright's Docker image ([`comparison/Dockerfile`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison)), and writes each run's JSON and a summary with per-round gaps and their spread. The CPU probe is in [`docs/investigations/assets/plant-cpu/`](../investigations/assets/plant-cpu/).
-- **Recorded:** `matched/`, `matched-q6/`, `cpu-baseline/` and `matched-v2/` (above).
-- **Remaining:**
-  - Re-record once the open items above that change the libraries (isoloop#173) are released, so the shipped figures match the shipped libraries.
-  - The behaviour table of decision 10, from the E2E fault tests and the comparison's fault columns.
-  - The plant on an iPad or phone, recorded with its model and browser.
+- **Recorded:** `matched/`, `matched-q6/`, `cpu-baseline/`, `matched-v2/` and `final/` on the server; a mid-range and a flagship phone by hand; an iPad observed (above).
+- **Done 2026-11-13:** the final re-record on the shipped libraries, and decision 10's behaviour table in the plant's README, from the E2E fault tests and the comparison's fault columns.
 - **Acceptance:** results kept with decision 10's two questions answered against them.
 
 ### 12. When to pool, and when not to
 - `docs/guide/pools.md` in the main repo, written from task 11's measurements: a table of pool / don't pool / why, each row backed by a plant figure, and what each placement cost and contained. The demo's About panel links it. It feeds the M4 docs site.
 
 ### 13. Ship
-- README and write-up led by what the package gives (decision 10's behaviour table), with its cost against the matched native builds stated plainly. Plans index updated. Released as `plant-v0.1.0`, tagged by the user or on the user's word.
+- README and write-up led by what the package gives (decision 10's behaviour table), with its cost against the matched native builds stated plainly: done ([README](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant)). Plans index updated. Released as `plant-v0.1.0`, tagged by the user or on the user's word.
 
 ## Open risks
 
@@ -179,5 +184,4 @@ All in `isoloop/examples`, `apps/dashboards/plant`, unless a task says otherwise
 - **72 widgets on a 4-core CI runner** is heavy; full-scope E2E is sharded, and recorded comparisons come from the dedicated machine.
 - **Memory** with about 105 workers in the `own` placement; recorded as a cost. On a phone it may not run at all (decision 6).
 - **WebKit** in Playwright stops the Isoloop page under many canvas presents ([engine constraint 2](../investigations/engine-constraints.md)); Safari on an iPad doesn't. CI keeps WebKit Isoloop page tests skipped or report-only.
-- **The phone or iPad run** of the plant is manual and depends on a device being available.
 - **Follow-up: [M3e](README.md), the live widget creator,** builds on this dashboard: M3d's topics and its generic widgets (charts, tables, gauges) should stay reusable by user-composed widgets, so keep them free of plant-specific assumptions where it costs nothing.
