@@ -93,13 +93,29 @@ Blocking one widget for 3 s, then letting its pool restart. Chromium, 1 kHz, fro
 | native | main thread only | the whole page | 3.8 s on every machine | 3.2 s | 80% | 156 MB |
 | native + workers | 9 | the whole page | none | 3.1 s | 86% | 191 MB |
 | `one` | 1 + bus | every widget, feed and engine | 3.3 s on every machine | 3.4 s | 88% | 185 MB |
-| `matched` | 10 + bus | all 72 widgets (one visual pool) | none | 2.9 s | 95% | 239 MB |
-| `split` (default) | 18 + bus | that machine's 8 widgets | none | 3.3 s | 110% | 285 MB |
+| `matched` (default) | 10 + bus | all 72 widgets (one visual pool) | none | 2.9 s | 95% | 239 MB |
+| `split` | 18 + bus | that machine's 8 widgets | none | 3.3 s | 110% | 285 MB |
 | `machine`¹ | 10 + bus | that machine's widgets, feed and engines | 3.3 s on that machine | 3.4 s | – | – |
 | `shared-engines`¹ | 12 + bus | that machine's 8 widgets | none | 3.4 s | – | – |
 | `own`¹ | 105 + bus | that widget only | none | 2.4 s | – | – |
 
 In every Isoloop placement the main thread stayed at 23–28% CPU at 5 kHz, against 80–82% for the native builds, where both native builds slowed typing and Firefox dropped frames. That's a measured behaviour of this workload on this machine, not a guarantee.
+
+### On a mid-range phone
+
+On a mid-range phone (MediaTek MT8781V, 8 cores, 8 GB, 96 Hz screen, Android 15, Firefox 156; [`comparison/phone/ikko-mindone-focus156/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/phone/ikko-mindone-focus156)), the number of workers decided the result more than anything else. Two rounds each, 96 frames/s at most:
+
+| Placement | Workers | Frames/s, 1 and 5 kHz | Late frames | Typing median |
+| --- | --- | --- | --- | --- |
+| `one` | 1 + bus | 80–84 | 1–3 | 15–18 ms |
+| `matched` | 10 + bus | 68–77 | 4–23 | 19–23 ms |
+| `split` | 18 + bus | 31–48 | 92–156 | 43–199 ms |
+| `own` (5 kHz, once) | 105 + bus | 24 | 133 | 222 ms |
+| native, for reference | main thread only | 45–56 | 32–56 | 32–64 ms |
+
+That's why the plant's default is `matched`: on this phone `split` was the slowest build, and on the desktop machine `matched` used 8 fewer workers, 46–48 MB less memory after GC and 14–15 points less CPU across threads than `split`, with the same frames (0 late) and typing within noise (28 against 33 ms at 1 kHz, 25 against 31 ms at 5 kHz).
+
+**Choose `split` when per-machine widget containment matters more than its cost:** a widget that blocks then stalls only its machine's 8 widgets, where in `matched` it stalls all 72. Data keeps flowing in both. On desktops the extra 8 workers cost 46–48 MB and about 15 points of CPU; on a mid-range phone they cost most of the frame rate.
 
 ### For large desktop dashboards
 
