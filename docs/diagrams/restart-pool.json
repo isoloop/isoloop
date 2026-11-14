@@ -1,0 +1,234 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Pool: a member restarts alone, or the pool restarts together",
+    "output": ".archify/sequence-restart-pool-20261113-175141/restart-pool.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "repository": {
+      "url": "https://github.com/isoloop/isoloop",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "f825ffbd1ac8b9c01a82a791fb01ccd62bcbbc05"
+    }
+  },
+  "participants": [
+    {
+      "id": "pool",
+      "type": "frontend",
+      "label": "Pool worker",
+      "sublabel": "members A, B, C",
+      "sources": [
+        {
+          "path": "packages/runtime/src/bootstrap.ts",
+          "line": 92,
+          "end_line": 112,
+          "label": "a member leaves, the worker stays"
+        },
+        {
+          "path": "packages/runtime/src/bootstrap.ts",
+          "line": 70,
+          "end_line": 90,
+          "label": "one beat per worker"
+        }
+      ]
+    },
+    {
+      "id": "kernel",
+      "type": "backend",
+      "label": "Kernel",
+      "sublabel": "supervisor + loader",
+      "sources": [
+        {
+          "path": "packages/host/src/kernel.ts",
+          "line": 673,
+          "end_line": 694,
+          "label": "pool fate"
+        },
+        {
+          "path": "packages/host/src/loader.ts",
+          "line": 105,
+          "end_line": 148,
+          "label": "join the pool, leave it"
+        }
+      ]
+    },
+    {
+      "id": "bus",
+      "type": "messagebus",
+      "label": "Bus worker",
+      "sublabel": "a port per member",
+      "sources": [
+        {
+          "path": "packages/host/src/bus/controller.ts",
+          "line": 381,
+          "end_line": 395,
+          "label": "attach a new port"
+        },
+        {
+          "path": "packages/host/src/bus/controller.ts",
+          "line": 440,
+          "end_line": 448,
+          "label": "detach keeps offsets"
+        }
+      ]
+    },
+    {
+      "id": "fresh",
+      "type": "frontend",
+      "label": "Pool worker",
+      "sublabel": "new worker",
+      "sources": [
+        {
+          "path": "packages/runtime/src/bootstrap.ts",
+          "line": 199,
+          "end_line": 220,
+          "label": "built-ins frozen before the first member"
+        }
+      ]
+    }
+  ],
+  "segments": [
+    { "from": 150, "to": 384, "label": "A member's own error: B restarts alone" },
+    { "from": 400, "to": 720, "label": "The worker fails: every member restarts" }
+  ],
+  "messages": [
+    {
+      "id": "a-err",
+      "from": "pool",
+      "to": "kernel",
+      "y": 172,
+      "label": "error {isolate: B, fatal}",
+      "variant": "security"
+    },
+    {
+      "id": "a-leave",
+      "from": "kernel",
+      "to": "pool",
+      "y": 206,
+      "label": "shutdown {isolate: B}",
+      "note": "B leaves; A and C keep the worker"
+    },
+    {
+      "id": "a-detach",
+      "from": "kernel",
+      "to": "bus",
+      "y": 252,
+      "label": "detach B {keepOffsets: true}"
+    },
+    {
+      "id": "a-attach",
+      "from": "kernel",
+      "to": "bus",
+      "y": 282,
+      "label": "attach B (new port)",
+      "note": "after B's backoff"
+    },
+    {
+      "id": "a-init",
+      "from": "kernel",
+      "to": "pool",
+      "y": 330,
+      "label": "init {isolate: B}",
+      "note": "same worker, same realm"
+    },
+    {
+      "id": "a-sub",
+      "from": "pool",
+      "to": "bus",
+      "y": 360,
+      "label": "B subscribes from committed",
+      "variant": "emphasis"
+    },
+    {
+      "id": "b-dead",
+      "from": "pool",
+      "to": "kernel",
+      "y": 422,
+      "label": "no beat 10 s or worker error",
+      "variant": "security",
+      "note": "every member crashes with that reason"
+    },
+    {
+      "id": "b-term",
+      "from": "kernel",
+      "to": "pool",
+      "y": 470,
+      "label": "terminate()",
+      "variant": "security",
+      "note": "when its last member leaves"
+    },
+    {
+      "id": "b-detach",
+      "from": "kernel",
+      "to": "bus",
+      "y": 518,
+      "label": "detach A, B, C {keepOffsets: true}"
+    },
+    {
+      "id": "b-attach",
+      "from": "kernel",
+      "to": "bus",
+      "y": 548,
+      "label": "attach A, B, C (new ports)"
+    },
+    {
+      "id": "b-init",
+      "from": "kernel",
+      "to": "fresh",
+      "y": 578,
+      "label": "new Worker + init per member",
+      "note": "built-ins frozen before the first member loads"
+    },
+    {
+      "id": "b-sub",
+      "from": "fresh",
+      "to": "bus",
+      "y": 626,
+      "label": "each subscribes from committed",
+      "variant": "emphasis"
+    },
+    {
+      "id": "b-deliver",
+      "from": "bus",
+      "to": "fresh",
+      "y": 656,
+      "label": "deliver from committed + 1",
+      "variant": "emphasis"
+    },
+    {
+      "id": "b-ready",
+      "from": "fresh",
+      "to": "kernel",
+      "y": 688,
+      "label": "ready per member",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    { "participant": "pool", "from": 166, "to": 476, "type": "frontend" },
+    { "participant": "kernel", "from": 166, "to": 698, "type": "backend" },
+    { "participant": "bus", "from": 246, "to": 666, "type": "messagebus" },
+    { "participant": "fresh", "from": 572, "to": 698, "type": "frontend" }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Whose fault decides",
+      "items": [
+        "A member's own fatal error, ready timeout or version mismatch is its own: it restarts alone, back into the running worker.",
+        "A missed heartbeat or a worker error is the worker's: every member crashes and they restart together in a new worker.",
+        "A handler that throws is not a crash: it reports isolate:error and stops that subscription's commits."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Replay is per member",
+      "items": [
+        "Each member keeps its own bus port, subscriptions and committed offsets, so each replays from its own commits.",
+        "Up to one commit interval of handled records can come back; persistent topics also replay across a page reload."
+      ]
+    }
+  ]
+}
