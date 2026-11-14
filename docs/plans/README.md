@@ -16,11 +16,12 @@ One plan per milestone of [RFC 0001](../rfcs/0001-threaded-runtime.md#mvp-roadma
 | ↳ M3c Dashboard sizes (epic) | [m3c-dashboard-sizes.md](m3c-dashboard-sizes.md) | Full | Done (`markets-v0.2.0`) | Lite, Normal and Heavy sizes on every build; the comparison across sizes recorded, whatever it shows |
 | ↳ M3d Plant dashboard (epic) | [m3d-plant-dashboard.md](m3d-plant-dashboard.md) | Full | Done (`plant-v0.1.0`, 2026-11-14) | 72-widget plant dashboard on three builds and six placements: what the whole package costs against matched native builds, and what it gives |
 | ↳ M3e Live widget creator (epic) | (plan after M3d is under way) | — | Not started | Users compose a widget from a JSON spec (source topic → fixed operators: filter/window/aggregate/combine → view) and add it at runtime; the pipeline runs in a new isolate placed in its own worker or a chosen pool; specs persist in a persistent topic; no user code/eval; measured: creator responsiveness while an expensive custom view computes, on native, native + workers and Isoloop |
+| Website (in `isoloop/web`) | [site.md](https://github.com/isoloop/web/blob/main/docs/plans/site.md) | Full | Not started | `isoloop.dev` serves the landing page, how it works and the examples hub, with basic embedded live (`site-v0.1.0`); decisions in `isoloop/web` [ADRs 0001–0003](https://github.com/isoloop/web/tree/main/docs/adr) |
 | M4 Devtools + 0.1 | [m4-devtools-release.md](m4-devtools-release.md) | Outline | Not started | `0.1.0` on npm with a launch post |
 | M5 Shared-memory engine | [m5-shared-memory-engine.md](m5-shared-memory-engine.md) | Outline | Not started | Benchmark results published, whichever engine wins |
 | M5b Delivery batching (spike) | [m5b-delivery-batching.md](m5b-delivery-batching.md) | Outline | Not started | Findings written up; ADR amending §6.3 or a recalibrated §9 budget accepted |
 
-An outline gets its full task list when it's next to start, so the list reflects what was learned. M3d (the plant dashboard) shipped as `plant-v0.1.0` on 2026-11-14, which also completed M2d. Next: M3e (the live widget creator), then M4 (0.1). Decided 2026-11-08: pools come before 0.1 so the plant dashboard can use them. M5 and M5b come after 0.1.
+An outline gets its full task list when it's next to start, so the list reflects what was learned. M3d (the plant dashboard) shipped as `plant-v0.1.0` on 2026-11-14, which also completed M2d. Next: the website (decided 2026-11-14; it lives in `isoloop/web`, renamed from `isoloop/examples`, and is planned there), then M3e (the live widget creator), then M4 (0.1). Decided 2026-11-08: pools come before 0.1 so the plant dashboard can use them. M5 and M5b come after 0.1.
 
 ```mermaid
 flowchart LR
