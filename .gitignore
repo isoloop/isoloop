@@ -28,3 +28,8 @@ bench-results/
 
 # Adapter E2E fixtures, built by e2e/build-adapters.ts
 /e2e/isolates/adapter-*.js
+
+# Claude Code (local)
+/.claude/worktrees/
+/.claude/settings.local.json
+/.claude/.cc-writes/
