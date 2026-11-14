@@ -348,36 +348,30 @@ importers:
         specifier: 'catalog:'
         version: 8.3.7(@types/node@26.6.6)
 
-  examples/four-loops:
+  e2e/isolates/loops:
     dependencies:
       '@isoloop/bus':
         specifier: workspace:*
-        version: link:../../packages/bus
-      '@isoloop/host':
-        specifier: workspace:*
-        version: link:../../packages/host
+        version: link:../../../packages/bus
       '@isoloop/preact':
         specifier: workspace:*
-        version: link:../../packages/preact
+        version: link:../../../packages/preact
+      '@isoloop/protocol':
+        specifier: workspace:*
+        version: link:../../../packages/protocol
       '@isoloop/react':
         specifier: workspace:*
-        version: link:../../packages/react
+        version: link:../../../packages/react
       '@isoloop/runtime':
         specifier: workspace:*
-        version: link:../../packages/runtime
+        version: link:../../../packages/runtime
       zod:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
-      '@isoloop/vite':
-        specifier: workspace:*
-        version: link:../../packages/vite
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
-      vite:
-        specifier: 'catalog:'
-        version: 8.3.7(@types/node@26.6.6)
 
   packages/bus:
     dependencies:

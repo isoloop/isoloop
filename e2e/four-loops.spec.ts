@@ -1,52 +1,59 @@
 /// <reference lib="dom" />
 import { expect, test, type Page } from '@playwright/test';
 import './harness-types';
+import {
+  ALL,
+  expectRestarts,
+  expectState,
+  mountLoops,
+  openLoops,
+  pane,
+  snapshotOf,
+  stateOf,
+} from './loops';
 
-// The proof of concept's guarantees, checked against the built demo. These
-// become the I2/I3 regression tests in M1 (plan m0-foundations, task 8).
+// The proof of concept's guarantees, checked against its isolates mounted on
+// the harness (e2e/loops.ts). These became the I2/I3 regression tests in M1
+// (plan m0-foundations, task 8). The demo itself moved to isoloop/web as basic.
 
-const pane = (page: Page, id: string) => page.locator(`section[data-isolate="${id}"]`);
-const status = (page: Page, id: string) => pane(page, id).locator('.status');
 const counter = (page: Page) => pane(page, 'A').locator('.big');
 const seconds = async (page: Page): Promise<number> =>
   Number.parseFloat((await pane(page, 'B').locator('.big').textContent()) ?? '');
 
-const ALL = ['A', 'B', 'C', 'D'];
-
 test.beforeEach(async ({ page }) => {
-  await page.goto('/');
-  await Promise.all(
-    ALL.map((id) => expect(status(page, id)).toContainText('loop ok', { timeout: 10_000 })),
-  );
+  await openLoops(page);
 });
 
-test('(a) all four isolates reach loop ok', async ({ page }) => {
-  await Promise.all(
-    ALL.flatMap((id) => [
-      expect(status(page, id)).toHaveText(/^loop ok · lag \d+ms$/),
-      expect(pane(page, id).locator('.restarts')).toHaveText(''),
-    ]),
-  );
+test('(a) all four isolates reach running, with a measured lag and no restarts', async ({
+  page,
+}) => {
+  for (const id of ALL) {
+    // oxlint-disable-next-line no-await-in-loop -- one snapshot per isolate
+    const s = await snapshotOf(page, id);
+    expect(s?.state).toBe('running');
+    expect(s?.restarts).toBe(0);
+    expect(s?.lagMs).toBeGreaterThanOrEqual(0);
+  }
 });
 
 test('(b) blocking C leaves B ticking and A responsive', async ({ page }) => {
   await pane(page, 'C').getByRole('button', { name: 'Block this loop 3s' }).click();
-  await expect(status(page, 'C')).toContainText('blocked', { timeout: 2_000 });
+  await expectState(page, 'C', 'blocked', 2_000);
 
   const before = await seconds(page);
   await pane(page, 'A').getByRole('button', { name: 'Increment' }).click();
   await expect(counter(page)).toHaveText('1', { timeout: 1_000 });
   await expect.poll(() => seconds(page), { timeout: 2_000 }).toBeGreaterThan(before + 0.5);
-  await expect(status(page, 'C')).toContainText('blocked');
+  expect(await stateOf(page, 'C')).toBe('blocked');
 
   // C comes back on its own and gets what queued up while it was blocked.
-  await expect(status(page, 'C')).toContainText('loop ok', { timeout: 5_000 });
+  await expectState(page, 'C', 'running');
   await expect(pane(page, 'C')).toContainText('blocked for 3000 ms');
   await expect(pane(page, 'C')).toContainText('Last count from A: 1.');
 });
 
 const crashC = async (page: Page) => {
-  await expect(status(page, 'C')).toContainText('loop ok', { timeout: 5_000 });
+  await expectState(page, 'C', 'running');
   await pane(page, 'C').getByRole('button', { name: 'Crash' }).click();
 };
 
@@ -54,16 +61,17 @@ test('(c) a crash in C restarts it after the backoff; the others never notice', 
   page,
 }) => {
   await crashC(page);
-  await expect(pane(page, 'C').locator('.restarts')).toHaveText('restarts: 1', { timeout: 3_000 });
-  await expect(status(page, 'C')).toContainText('loop ok', { timeout: 5_000 });
-  await expect(pane(page, 'C').locator('.crash-overlay')).toBeHidden();
+  await expectRestarts(page, 'C', 1, 3_000);
+  await expectState(page, 'C', 'running');
+  // A fresh C: its first render again, and the kernel's fallback never shown.
   await expect(pane(page, 'C')).toContainText('nothing yet');
-  await Promise.all(
-    ['A', 'B', 'D'].flatMap((id) => [
-      expect(status(page, id)).toContainText('loop ok'),
-      expect(pane(page, id).locator('.restarts')).toHaveText(''),
-    ]),
-  );
+  await expect(pane(page, 'C').locator('.iso-fallback')).toBeHidden();
+  for (const id of ['A', 'B', 'D']) {
+    // oxlint-disable-next-line no-await-in-loop -- one snapshot per isolate
+    const s = await snapshotOf(page, id);
+    expect(s?.state).toBe('running');
+    expect(s?.restarts).toBe(0);
+  }
 });
 
 test('(d) a note typed in D appears in A', async ({ page }) => {
@@ -104,20 +112,19 @@ test('(e) the fourth crash within 60 s fails C and shows the fallback; Retry bri
     // oxlint-disable-next-line no-await-in-loop
     await crashC(page);
     // oxlint-disable-next-line no-await-in-loop
-    await expect(pane(page, 'C').locator('.restarts')).toHaveText(`restarts: ${i}`, {
-      timeout: 5_000,
-    });
+    await expectRestarts(page, 'C', i);
   }
   await crashC(page);
-  await expect(status(page, 'C')).toHaveText('failed', { timeout: 3_000 });
+  await expectState(page, 'C', 'failed', 3_000);
   const fallback = pane(page, 'C').locator('.iso-fallback');
   await expect(fallback).toBeVisible();
   await expect(fallback).toContainText('"C" stopped working');
   await expect(fallback).toContainText('Isolate C threw on purpose');
-  await Promise.all(['A', 'B', 'D'].map((id) => expect(status(page, id)).toContainText('loop ok')));
+  const others = await Promise.all(['A', 'B', 'D'].map((id) => stateOf(page, id)));
+  expect(others).toEqual(['running', 'running', 'running']);
 
   await fallback.getByRole('button', { name: 'Retry' }).click();
-  await expect(status(page, 'C')).toContainText('loop ok', { timeout: 5_000 });
+  await expectState(page, 'C', 'running');
   await expect(fallback).toBeHidden();
 });
 
@@ -132,7 +139,9 @@ test('(g) P (Preact) and R (React) share vote.v1, and a crashed R replays the ta
   await expect(tally('P')).toHaveText('1 : 2');
   await expect(tally('R')).toHaveText('1 : 2');
   await pane(page, 'R').locator('.crash').click();
-  await expect(pane(page, 'R').locator('.restarts')).toHaveText('restarts: 1');
+  await expectRestarts(page, 'R', 1);
+  // The new R, not the old surface: it replays the tally from the log.
+  await expectState(page, 'R', 'running');
   await expect(tally('R')).toHaveText('1 : 2');
   await pane(page, 'R').locator('.vote').click();
   await expect(tally('P')).toHaveText('1 : 3');
@@ -159,17 +168,16 @@ test('(h) the persistent topics outlive a bus crash and a reload; memory ones st
   await expect(tally).toHaveText('1 : 0');
 
   // The bus dies: nothing on the persistent topics is lost, and no isolate restarts.
-  await page.getByRole('button', { name: 'Crash the bus' }).click();
+  await page.evaluate(() => window.kernel.debug.crashBus());
   await inc.click();
   await expect(counter(page)).toHaveText('4');
   await expect(store).toHaveText('store: count 4, notes 1');
-  await expect(pane(page, 'A').locator('.restarts')).toHaveText('');
+  expect((await snapshotOf(page, 'A'))?.restarts).toBe(0);
 
   // A reload: the old page's bus lets go of the files a moment later.
   await page.reload();
-  await Promise.all(
-    ALL.map((id) => expect(status(page, id)).toContainText('loop ok', { timeout: 10_000 })),
-  );
+  await mountLoops(page);
+  await Promise.all(ALL.map((id) => expectState(page, id, 'running', 10_000)));
   await expect(counter(page)).toHaveText('4', { timeout: 10_000 });
   await expect(store).toHaveText('store: count 4, notes 1');
   await expect(pane(page, 'D').locator('.log')).toContainText('D note: kept');

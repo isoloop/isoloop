@@ -34,7 +34,7 @@
     // For window.postMessage. Isoloop posts to workers and ports, which take no
     // targetOrigin, so every hit would be a false positive.
     "unicorn/require-post-message-target-origin": "off",
-    // The E2E test hook four-loops puts on window (invariant I7).
+    // The E2E test hook e2e/loops.ts puts on window (invariant I7).
     "no-underscore-dangle": ["error", { "allow": ["__isoloop"] }]
   },
   // Dependency rules (system design §2). Each package lists the @isoloop/*

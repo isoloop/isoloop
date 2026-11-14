@@ -2,7 +2,7 @@
 // log, so a crashed and restarted R shows the same tally again.
 import { defineIsolate, useIsolate, usePublish } from '@isoloop/react';
 import { useEffect, useState } from 'react';
-import { vote } from '../topics';
+import { vote } from './topics';
 
 function Votes() {
   const { bus } = useIsolate();

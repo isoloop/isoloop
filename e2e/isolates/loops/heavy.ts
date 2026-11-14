@@ -1,5 +1,5 @@
 import { defineIsolate } from '@isoloop/runtime';
-import { count as countTopic, primes as primesTopic } from '../topics';
+import { count as countTopic, primes as primesTopic } from './topics';
 import { el } from './dom';
 
 // C · Heavy work

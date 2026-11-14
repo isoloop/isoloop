@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 // The slice of the kernel the E2E tests use, from e2e/harness/src/main.ts's
-// window.harness and four-loops' window.kernel, typed here so the Node-side
+// window.harness and the kernels tests put on window, typed here so the Node-side
 // tests don't depend on @isoloop/host. The callbacks passed to page.evaluate
 // run in the page.
 type HarnessKernel = {
@@ -37,6 +37,7 @@ type HarnessKernel = {
     id: string;
     state: string;
     restarts: number;
+    lagMs: number;
     pool?: string;
     surface?: { queued: number; applied: number };
   }[];
@@ -65,9 +66,9 @@ declare global {
       createKernel(config?: HarnessConfig): HarnessKernel;
       createBusKernel(contractsUrl: string, config?: HarnessConfig): Promise<HarnessKernel>;
     };
-    /** four-loops' kernel (examples/four-loops/src/main.ts). */
+    /** The kernel a suite created, for later page.evaluate calls (e2e/loops.ts and others). */
     kernel: HarnessKernel;
-    /** four-loops' test hook: main-thread message counts by type (I7). */
+    /** The loops' test hook: main-thread message counts by type (I7, e2e/loops.ts). */
     __isoloop: HarnessKernel['debug'];
     /** The durable suite's kernel and what it saw (e2e/durable.spec.ts). */
     durable?: { kernel: HarnessKernel; degraded: string[] };

@@ -1,25 +1,20 @@
 {
-  "name": "four-loops",
+  "name": "e2e-loops",
   "private": true,
   "type": "module",
-  "description": "The proof of concept: four isolates, four event loops, one page.",
+  "description": "The four-loops isolates and contracts, built into E2E fixtures by e2e/build-adapters.ts and spawned on the harness page.",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@isoloop/bus": "workspace:*",
-    "@isoloop/host": "workspace:*",
     "@isoloop/preact": "workspace:*",
+    "@isoloop/protocol": "workspace:*",
     "@isoloop/react": "workspace:*",
     "@isoloop/runtime": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@isoloop/vite": "workspace:*",
-    "typescript": "catalog:",
-    "vite": "catalog:"
+    "typescript": "catalog:"
   }
 }

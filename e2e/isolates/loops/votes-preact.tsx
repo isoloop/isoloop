@@ -3,7 +3,7 @@
 // log, so a crashed and restarted P shows the same tally again.
 import { defineIsolate, useIsolate, usePublish } from '@isoloop/preact';
 import { useEffect, useState } from 'preact/hooks';
-import { vote } from '../topics';
+import { vote } from './topics';
 
 function Votes() {
   const { bus } = useIsolate();

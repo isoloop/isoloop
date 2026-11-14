@@ -1,20 +1,15 @@
 /// <reference lib="dom" />
 import { expect, test, type Page } from '@playwright/test';
 import './harness-types';
+import { expectRestarts, expectState, openLoops, pane, stateOf, type LoopsOptions } from './loops';
 import { HARNESS, ISOLATES_CORS } from './servers';
 
 // The M1 done-criterion (plan m1-kernel, task 12): a blocked or crashed
-// isolate never affects the others. Invariants from design §8.
+// isolate never affects the others. Invariants from design §8. The first
+// three run against the four-loops isolates mounted on the harness (e2e/loops.ts).
 
-const ALL = ['A', 'B', 'C', 'D'];
-const pane = (page: Page, id: string) => page.locator(`section[data-isolate="${id}"]`);
-const status = (page: Page, id: string) => pane(page, id).locator('.status');
-
-async function open(page: Page, query = ''): Promise<void> {
-  await page.goto(`/${query}`);
-  await Promise.all(
-    ALL.map((id) => expect(status(page, id)).toContainText('loop ok', { timeout: 10_000 })),
-  );
+async function open(page: Page, opts: LoopsOptions = {}): Promise<void> {
+  await openLoops(page, opts);
   // Every first render has been painted: nothing left in any compositor queue.
   await expect
     .poll(() =>
@@ -75,7 +70,7 @@ test.describe('four-loops', () => {
     await pane(page, 'C').getByRole('button', { name: 'Block this loop 3s' }).click();
     // Sample for 2.8 s while C is blocked.
     const during = await sample(2800);
-    await expect(status(page, 'C')).toContainText('blocked');
+    expect(await stateOf(page, 'C')).toBe('blocked');
     expect(during.advanced).toBeGreaterThanOrEqual(2.5);
     // I2 asks for 55 fps. Some headless engines on CI runners can't reach 60
     // with nothing blocked; there, blocking C must not cost more than 10 %.
@@ -110,17 +105,15 @@ test.describe('four-loops', () => {
 
     for (let i = 1; i <= 4; i++) {
       // oxlint-disable-next-line no-await-in-loop -- each crash waits for the restart
-      await expect(status(page, 'C')).toContainText('loop ok', { timeout: 5_000 });
+      await expectState(page, 'C', 'running');
       // oxlint-disable-next-line no-await-in-loop
       await pane(page, 'C').getByRole('button', { name: 'Crash' }).click();
       if (i < 4) {
         // oxlint-disable-next-line no-await-in-loop
-        await expect(pane(page, 'C').locator('.restarts')).toHaveText(`restarts: ${i}`, {
-          timeout: 5_000,
-        });
+        await expectRestarts(page, 'C', i);
       }
     }
-    await expect(status(page, 'C')).toHaveText('failed', { timeout: 3_000 });
+    await expectState(page, 'C', 'failed', 3_000);
     await expect(pane(page, 'C').locator('.iso-fallback')).toBeVisible();
 
     const writes: unknown = await page.evaluate((): unknown =>
@@ -162,18 +155,16 @@ test.describe('four-loops', () => {
   test('kill path: C in an infinite loop is killed after killAfterMs and restarted', async ({
     page,
   }) => {
-    await open(page, '?killAfterMs=1500');
+    await open(page, { killAfterMs: 1500 });
     await page.evaluate(() => {
       const crashes: { id: string; reason: string }[] = [];
       window.kernel.on('isolate:crash', ({ id, reason }) => crashes.push({ id, reason }));
       Object.assign(window, { crashes });
     });
     await pane(page, 'C').getByRole('button', { name: 'Hang' }).click();
-    await expect(status(page, 'C')).toContainText('blocked', { timeout: 2_000 });
-    await expect(pane(page, 'C').locator('.restarts')).toHaveText('restarts: 1', {
-      timeout: 5_000,
-    });
-    await expect(status(page, 'C')).toContainText('loop ok', { timeout: 5_000 });
+    await expectState(page, 'C', 'blocked', 2_000);
+    await expectRestarts(page, 'C', 1);
+    await expectState(page, 'C', 'running');
     const crashes = await page.evaluate(() => Reflect.get(window, 'crashes') as unknown);
     expect(crashes).toEqual([{ id: 'C', reason: 'unresponsive' }]);
     expect((await statesOf(page)).filter((e) => e.id !== 'C')).toEqual([]);

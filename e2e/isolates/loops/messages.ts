@@ -1,5 +1,5 @@
 import { defineIsolate } from '@isoloop/runtime';
-import { count, note, primes, store } from '../topics';
+import { count, note, primes, store } from './topics';
 import { el } from './dom';
 
 // D · Messages. Its log is built only from the bus, read from `earliest`, so

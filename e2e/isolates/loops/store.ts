@@ -1,5 +1,5 @@
 import { defineIsolate } from '@isoloop/runtime';
-import { count, note, store } from '../topics';
+import { count, note, store } from './topics';
 
 // S · Store, headless (ADR 0008): folds the command topics into one state
 // and publishes it to the compacted store.v1 topic. It keeps nothing of its

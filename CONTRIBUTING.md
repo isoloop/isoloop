@@ -21,9 +21,9 @@ Isoloop is a pnpm monorepo. The tools, and the rules around them, are in [ADR 00
 
    Playwright may ask for system libraries the first time; `pnpm exec playwright install-deps` installs them (needs sudo).
 
-4. **Run the demo:** `pnpm dev`, then open the URL Vite prints.
+4. **Run an example:** the examples live in [isoloop/web](https://github.com/isoloop/web), which installs the `@isoloop` prereleases from npm. Here, `pnpm e2e` runs the E2E suites against the harness.
 
-Nothing has to be built first. Each package's `exports` has an `@isoloop/source` condition pointing at `src`, so type checking, lint, tests and the demo all read the source.
+Nothing has to be built first. Each package's `exports` has an `@isoloop/source` condition pointing at `src`, so type checking, lint, tests and the E2E harness all read the source.
 
 ## Scripts
 
@@ -36,13 +36,14 @@ Tools are only called through these root scripts, never as binaries ([ADR 0009](
 | `pnpm lint` | oxlint, type-aware. Every rule is an error or off. |
 | `pnpm typecheck` | TypeScript 7, `tsc --noEmit` in every package and for the root config and e2e files. |
 | `pnpm test` | Vitest: `protocol` and `bus` in Node; `dom`, `host` and `runtime` in Chromium; the bus worker and its storage (`*.browser.test.ts`) in Chromium, Firefox and WebKit. `test:node` and `test:browser` run each half. |
-| `pnpm e2e` | Playwright against the built demo in all three engines. `pnpm e2e --project=webkit` runs one. |
+| `pnpm e2e` | Playwright against the E2E harness and isolate servers in all three engines. `pnpm e2e --project=webkit` runs one. |
 | `pnpm bench` | Node micro-benches (`bench/**/*.bench.ts`, e.g. the log engine), kept out of `pnpm test`. |
 | `pnpm bench:click-to-paint` / `pnpm bench:throughput` / `pnpm bench:memory` | Playwright benches in the browser: click-to-paint latency in all three engines, bus throughput and memory per idle isolate in Chromium. Report only; results go to `bench-results/`. |
 | `pnpm bench:codec` | The codec evaluation (`bench/codec`, [investigation](docs/investigations/codec.md)) in all three engines: our codec against MessagePack, CBOR and JSON. Report only, in the log. `pnpm bench` runs its Node half, with bundle sizes. |
 | `pnpm test:install-browsers` | Installs Chromium, Firefox and WebKit for Playwright. |
-| `pnpm build` | tsdown for the packages, Vite for the demo. |
-| `pnpm dev` | The four-loops demo with Vite's dev server. |
+| `pnpm build` | tsdown for the packages, Vite for the E2E harness and the bench apps. |
+
+The runnable examples (basic, the dashboards) live in [isoloop/web](https://github.com/isoloop/web), where `pnpm --filter basic dev` starts the smallest one.
 
 There are no git hooks. CI is the only gate.
 

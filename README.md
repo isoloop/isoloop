@@ -8,16 +8,14 @@ Status: **M0–M2, M2b and M3a done, pre-release.** The kernel (loader, supervis
 
 ## Run the demo
 
-**Live:** [isoloop.github.io/isoloop](https://isoloop.github.io/isoloop/). Four visual isolates, each on its own event loop, plus a headless store: block one, crash one, or block the main thread, and watch what keeps running. The isolates talk only through Zod-typed topics on the bus; crash D (Messages) and it replays its log from the bus when it restarts.
+**Live:** [isoloop.dev/examples/basic](https://isoloop.dev/examples/basic/). Four isolates on three event loops: A and B on their own workers, C and D sharing a pool. Block one, crash one, or block the main thread, and watch what keeps running. Blocking C stalls D too, since a pool is a unit of failure; crash D and it rebuilds its log from the bus when it restarts.
 
-Locally, with Node 26 and pnpm 12 ([setup](CONTRIBUTING.md#setup)):
+The source is in [`apps/basic`](https://github.com/isoloop/web/tree/060c6318108d0fce4ddf319093a2e7c0cb2c3c62/apps/basic) in [isoloop/web](https://github.com/isoloop/web), the repo for the website and every example, which installs Isoloop from npm the way any app would. Locally, from a clone of that repo:
 
 ```sh
 pnpm install
-pnpm dev
+pnpm --filter basic dev
 ```
-
-The source is in [`examples/four-loops`](examples/four-loops): each pane is an isolate module in `src/isolates/`, spawned by [`@isoloop/host`](packages/host) into a shadow-DOM surface; `store.ts` is the headless one, and `src/contracts.ts` defines the topics.
 
 ## The comparison
 
@@ -167,17 +165,16 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 
 ## Repo layout
 
-Plain pnpm workspaces. Today: `protocol`, `dom`, `host`, `runtime` and `bus`, plus the `four-loops` example; the rest arrives with its milestone.
+Plain pnpm workspaces. Today: `protocol`, `dom`, `host`, `runtime`, `bus`, `codec`, `react`, `preact` and `vite`; the rest arrives with its milestone.
 
 ```text
 packages/  protocol · dom · host · runtime · bus · codec (M2b) · bus-wasm (M5) · react, preact (M3) · devtools (M4)
-examples/  four-loops (minimal; the E2E suites run against it)
-e2e/       Playwright suites and their harness page
+e2e/       Playwright suites, their harness page and the isolates they spawn (the four-loops ones included)
 docs/      rfcs · design · adr · plans · guide · investigations · posts
 bench/     click-to-paint, throughput
 ```
 
-The markets dashboard (M3b) goes in a separate `isoloop/examples` repository ([M3b plan](docs/plans/m3b-dashboard.md)).
+The examples (basic and the dashboards) and the website live in [isoloop/web](https://github.com/isoloop/web), served at [isoloop.dev](https://isoloop.dev/).
 
 ## Non-goals (v1)
 

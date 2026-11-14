@@ -1,6 +1,8 @@
-# Deploys examples/four-loops to GitHub Pages, so the README can link a live
-# demo (plan m0-foundations, task 9). It deploys on `v*` tags or by hand, not
-# on every push to main (decided 2026-11-07).
+# Deploys a redirect to GitHub Pages: isoloop.github.io/isoloop/ used to serve
+# the four-loops demo, and every address there now sends the visitor to
+# isoloop.dev, where isoloop/web serves the site and the examples
+# (scripts/pages-redirect). It deploys on `v*` tags or by hand, not on every
+# push to main (decided 2026-11-07).
 name: Pages
 
 on:
@@ -22,17 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter four-loops build
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: examples/four-loops/dist
+          path: scripts/pages-redirect
 
   deploy:
     needs: build

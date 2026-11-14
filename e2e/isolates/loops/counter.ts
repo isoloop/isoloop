@@ -1,5 +1,5 @@
 import { defineIsolate } from '@isoloop/runtime';
-import { count, note as noteTopic } from '../topics';
+import { count, note as noteTopic } from './topics';
 import { el } from './dom';
 
 // A · Counter. count.v1 is persistent, so A picks its value up from the log
