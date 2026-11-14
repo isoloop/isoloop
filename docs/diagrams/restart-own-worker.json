@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Own worker: crash → restart → replay",
+    "output": ".archify/sequence-restart-own-worker-20261113-175141/restart-own-worker.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "repository": {
+      "url": "https://github.com/isoloop/isoloop",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "f825ffbd1ac8b9c01a82a791fb01ccd62bcbbc05"
+    }
+  },
+  "participants": [
+    {
+      "id": "old",
+      "type": "frontend",
+      "label": "Isolate C",
+      "sublabel": "old worker",
+      "sources": [
+        {
+          "path": "packages/runtime/src/bootstrap.ts",
+          "line": 115,
+          "end_line": 124,
+          "label": "init, protocol check, heartbeat"
+        }
+      ]
+    },
+    {
+      "id": "kernel",
+      "type": "backend",
+      "label": "Kernel",
+      "sublabel": "supervisor + loader",
+      "sources": [
+        {
+          "path": "packages/host/src/supervisor/machine.ts",
+          "line": 303,
+          "end_line": 345,
+          "label": "crash, backoff, spawn"
+        },
+        {
+          "path": "packages/host/src/kernel.ts",
+          "line": 907,
+          "end_line": 932,
+          "label": "attach before init"
+        },
+        {
+          "path": "packages/host/src/kernel.ts",
+          "line": 833,
+          "end_line": 850,
+          "label": "ready: format and version check"
+        }
+      ]
+    },
+    {
+      "id": "bus",
+      "type": "messagebus",
+      "label": "Bus worker",
+      "sublabel": "broker + log",
+      "sources": [
+        {
+          "path": "packages/host/src/bus/controller.ts",
+          "line": 381,
+          "end_line": 395,
+          "label": "attach a new port"
+        },
+        {
+          "path": "packages/host/src/bus/controller.ts",
+          "line": 440,
+          "end_line": 448,
+          "label": "detach keeps offsets"
+        }
+      ]
+    },
+    {
+      "id": "new",
+      "type": "frontend",
+      "label": "Isolate C",
+      "sublabel": "new worker",
+      "sources": [
+        {
+          "path": "packages/runtime/src/bus-client.ts",
+          "line": 6,
+          "end_line": 13,
+          "label": "at least once, commits per interval"
+        }
+      ]
+    }
+  ],
+  "segments": [
+    { "from": 150, "to": 246, "label": "Crash" },
+    { "from": 262, "to": 372, "label": "Respawn" },
+    { "from": 386, "to": 640, "label": "Replay and first paint" }
+  ],
+  "messages": [
+    {
+      "id": "m-crash",
+      "from": "old",
+      "to": "kernel",
+      "y": 172,
+      "label": "fatal error or worker error",
+      "variant": "security"
+    },
+    {
+      "id": "m-term",
+      "from": "kernel",
+      "to": "old",
+      "y": 200,
+      "label": "terminate()",
+      "variant": "security"
+    },
+    {
+      "id": "m-detach",
+      "from": "kernel",
+      "to": "bus",
+      "y": 228,
+      "label": "detach {keepOffsets: true}",
+      "note": "committed offsets survive the restart"
+    },
+    {
+      "id": "m-attach",
+      "from": "kernel",
+      "to": "bus",
+      "y": 290,
+      "label": "attach {isolateId, grants, port}",
+      "note": "after the backoff; the bus port exists before the worker"
+    },
+    {
+      "id": "m-init",
+      "from": "kernel",
+      "to": "new",
+      "y": 346,
+      "label": "new Worker + init {busPort, commitIntervalMs}"
+    },
+    {
+      "id": "m-sub",
+      "from": "new",
+      "to": "bus",
+      "y": 408,
+      "label": "subscribe {from: 'committed'}",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m-deliver",
+      "from": "bus",
+      "to": "new",
+      "y": 440,
+      "label": "deliver from committed + 1",
+      "variant": "emphasis",
+      "note": "up to one commit interval of handled records comes back"
+    },
+    {
+      "id": "m-ready",
+      "from": "new",
+      "to": "kernel",
+      "y": 502,
+      "label": "ready {renderFmt, requires}",
+      "variant": "return",
+      "note": "outside [FLOOR, VERSION] or wrong format: failed, no restart"
+    },
+    {
+      "id": "m-patch",
+      "from": "new",
+      "to": "kernel",
+      "y": 562,
+      "label": "patch (first paint)",
+      "variant": "return"
+    },
+    {
+      "id": "m-commits",
+      "from": "new",
+      "to": "bus",
+      "y": 594,
+      "label": "commits {offsets}",
+      "note": "at most once per 100 ms"
+    }
+  ],
+  "activations": [
+    { "participant": "old", "from": 164, "to": 206, "type": "frontend" },
+    { "participant": "kernel", "from": 164, "to": 572, "type": "backend" },
+    { "participant": "bus", "from": 222, "to": 604, "type": "messagebus" },
+    { "participant": "new", "from": 340, "to": 604, "type": "frontend" }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "One-for-one, for an own worker",
+      "items": [
+        "Only isolate C restarts; every other isolate keeps running and painting.",
+        "Backoff 250 ms × 2ⁿ, at most 4 s; a 4th crash within 60 s fails it with a fallback."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Why replay works",
+      "items": [
+        "Offsets belong to the consumer (the isolate id or its group), not to the worker.",
+        "Commits go out at most once per commit interval, so a crash can redeliver up to that interval: handlers must be idempotent.",
+        "Persistent topics also replay this way across a page reload."
+      ]
+    }
+  ]
+}

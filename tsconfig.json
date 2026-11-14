@@ -16,7 +16,8 @@
     "e2e/harness/*.config.ts",
     "e2e",
     "scripts",
-    "bench/click-to-paint"
+    "bench/click-to-paint",
+    "docs/diagrams"
   ],
   // The harness page and the adapter fixtures have their own DOM tsconfigs.
   "exclude": ["e2e/harness/src", "e2e/isolates/adapters"]

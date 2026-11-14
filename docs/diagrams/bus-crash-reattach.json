@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Bus worker crash → restart → reattach",
+    "output": ".archify/sequence-bus-crash-reattach-20261113-175141/bus-crash-reattach.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "repository": {
+      "url": "https://github.com/isoloop/isoloop",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "f825ffbd1ac8b9c01a82a791fb01ccd62bcbbc05"
+    }
+  },
+  "participants": [
+    {
+      "id": "iso",
+      "type": "frontend",
+      "label": "Isolate",
+      "sublabel": "keeps running",
+      "sources": [
+        {
+          "path": "packages/runtime/src/bus-client.ts",
+          "line": 14,
+          "end_line": 20,
+          "label": "reattach: re-subscribe, re-send"
+        },
+        {
+          "path": "packages/runtime/src/bus-client.ts",
+          "line": 343,
+          "end_line": 369,
+          "label": "reattach in order"
+        }
+      ]
+    },
+    {
+      "id": "kernel",
+      "type": "backend",
+      "label": "Kernel",
+      "sublabel": "bus controller",
+      "sources": [
+        {
+          "path": "packages/host/src/bus/controller.ts",
+          "line": 300,
+          "end_line": 338,
+          "label": "new bus, safe mode, reattach"
+        },
+        {
+          "path": "packages/host/src/kernel.ts",
+          "line": 999,
+          "end_line": 1007,
+          "label": "ready again: wake headless"
+        },
+        {
+          "path": "packages/host/src/kernel.ts",
+          "line": 1048,
+          "end_line": 1059,
+          "label": "a new port per isolate"
+        }
+      ]
+    },
+    {
+      "id": "old",
+      "type": "messagebus",
+      "label": "Bus worker",
+      "sublabel": "old",
+      "sources": [
+        {
+          "path": "packages/bus/src/server.ts",
+          "line": 339,
+          "end_line": 346,
+          "label": "the bus beats"
+        }
+      ]
+    },
+    {
+      "id": "fresh",
+      "type": "messagebus",
+      "label": "Bus worker",
+      "sublabel": "new",
+      "sources": [
+        {
+          "path": "packages/bus/src/server.ts",
+          "line": 408,
+          "end_line": 436,
+          "label": "boot: lock, OPFS or memory"
+        },
+        {
+          "path": "packages/bus/src/broker.ts",
+          "line": 958,
+          "end_line": 961,
+          "label": "one reset per memory topic"
+        }
+      ]
+    },
+    {
+      "id": "opfs",
+      "type": "database",
+      "label": "OPFS",
+      "sublabel": "persistent topics",
+      "sources": [
+        {
+          "path": "packages/bus/src/storage/lock.ts",
+          "line": 1,
+          "end_line": 10,
+          "label": "isoloop-bus Web Lock"
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 270,
+      "label": "The bus fails; isolates keep running"
+    },
+    {
+      "from": 284,
+      "to": 516,
+      "label": "New bus, ports moved at once"
+    },
+    {
+      "from": 530,
+      "to": 730,
+      "label": "Restore and resume"
+    }
+  ],
+  "messages": [
+    {
+      "id": "pub-lost",
+      "from": "iso",
+      "to": "old",
+      "y": 172,
+      "label": "publish (never answered)",
+      "variant": "dashed",
+      "note": "the client keeps it; past 1,000 waiting, calls reject with bus_unavailable"
+    },
+    {
+      "id": "dead",
+      "from": "old",
+      "to": "kernel",
+      "y": 228,
+      "label": "no beat or worker error",
+      "variant": "security"
+    },
+    {
+      "id": "term",
+      "from": "kernel",
+      "to": "old",
+      "y": 256,
+      "label": "terminate()",
+      "variant": "security"
+    },
+    {
+      "id": "boot",
+      "from": "kernel",
+      "to": "fresh",
+      "y": 306,
+      "label": "new Worker + boot {restart}",
+      "note": "after 2 crashes while loading: safeMode, newest segment set aside"
+    },
+    {
+      "id": "attach",
+      "from": "kernel",
+      "to": "fresh",
+      "y": 376,
+      "label": "attach {reattach: true, port}",
+      "note": "right away: the new bus buffers until it is ready"
+    },
+    {
+      "id": "reattach",
+      "from": "kernel",
+      "to": "iso",
+      "y": 404,
+      "label": "reattach {busPort}"
+    },
+    {
+      "id": "resub",
+      "from": "iso",
+      "to": "fresh",
+      "y": 432,
+      "label": "subscribe again",
+      "variant": "emphasis",
+      "note": "pending commits dropped: up to one interval repeats"
+    },
+    {
+      "id": "resend",
+      "from": "iso",
+      "to": "fresh",
+      "y": 486,
+      "label": "re-send unanswered publishes",
+      "note": "persistent: (producer, epoch, seq) answers with the old offset"
+    },
+    {
+      "id": "lock",
+      "from": "fresh",
+      "to": "opfs",
+      "y": 540,
+      "label": "Web Lock (waits ≤ 2 s), restore",
+      "note": "no lock or no sync handles: memory, bus:durability-degraded"
+    },
+    {
+      "id": "restored",
+      "from": "opfs",
+      "to": "fresh",
+      "y": 598,
+      "label": "segments restored",
+      "variant": "return"
+    },
+    {
+      "id": "reset",
+      "from": "fresh",
+      "to": "iso",
+      "y": 626,
+      "label": "reset (memory topics)",
+      "note": "persistent topics resume from committed instead"
+    },
+    {
+      "id": "ready",
+      "from": "fresh",
+      "to": "kernel",
+      "y": 680,
+      "label": "ready {restored}",
+      "variant": "return"
+    },
+    {
+      "id": "wake",
+      "from": "kernel",
+      "to": "iso",
+      "y": 708,
+      "label": "wake suspended headless",
+      "variant": "dashed"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "iso",
+      "from": 166,
+      "to": 718,
+      "type": "frontend"
+    },
+    {
+      "participant": "kernel",
+      "from": 222,
+      "to": 718,
+      "type": "backend"
+    },
+    {
+      "participant": "old",
+      "from": 166,
+      "to": 262,
+      "type": "messagebus"
+    },
+    {
+      "participant": "fresh",
+      "from": 300,
+      "to": 690,
+      "type": "messagebus"
+    },
+    {
+      "participant": "opfs",
+      "from": 534,
+      "to": 604,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Isolates aren't restarted",
+      "items": [
+        "A bus crash restarts only the bus worker: each isolate gets a new port and keeps its state (ADR 0007).",
+        "An isolate whose manifest sets bus.onReset: 'restart' is restarted instead.",
+        "Past the restart limit the bus is failed: isolates keep running and their bus calls reject with bus_unavailable. A contracts error fails every isolate at once, with no retry."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "What comes back",
+      "items": [
+        "Persistent topics resume from their committed offsets; a re-sent publish already on disk isn't appended twice.",
+        "Memory topics are gone: each subscription gets one reset, and adapters clear and refill from earliest.",
+        "The new bus starts with an empty route topic; the kernel publishes the current route again."
+      ]
+    }
+  ]
+}

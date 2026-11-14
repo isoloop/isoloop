@@ -1,0 +1,498 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Isoloop runtime topology",
+    "subtitle": "Main thread, an own worker, a pool worker and the bus worker",
+    "output": ".archify/architecture-runtime-topology-20261113-175141/runtime-topology.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "frontend": {
+          "label": "Page code on the main thread"
+        },
+        "security": {
+          "label": "Kernel (main thread)"
+        },
+        "backend": {
+          "label": "Isolate, or a group of isolates (count shown)"
+        },
+        "messagebus": {
+          "label": "Bus worker internals"
+        },
+        "cloud": {
+          "label": "Bus topic"
+        },
+        "database": {
+          "label": "Durable log (OPFS)"
+        },
+        "external": {
+          "label": "Outside Isoloop"
+        }
+      }
+    },
+    "repository": {
+      "url": "https://github.com/isoloop/isoloop",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "f825ffbd1ac8b9c01a82a791fb01ccd62bcbbc05"
+    }
+  },
+  "components": [
+    {
+      "id": "app",
+      "type": "frontend",
+      "label": "Host app",
+      "sublabel": "createKernel() checks",
+      "pos": [40, 40],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/kernel.ts",
+          "line": 470,
+          "end_line": 476,
+          "label": "unsupported_browser"
+        },
+        {
+          "path": "packages/host/src/features.ts",
+          "line": 45,
+          "end_line": 74,
+          "label": "the features checked"
+        }
+      ]
+    },
+    {
+      "id": "sup",
+      "type": "security",
+      "label": "Supervisor",
+      "sublabel": "beats \u00b7 restarts \u00b7 fate",
+      "pos": [275, 40],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/supervisor/machine.ts",
+          "line": 175,
+          "end_line": 301,
+          "label": "state machine"
+        },
+        {
+          "path": "packages/host/src/kernel.ts",
+          "line": 673,
+          "end_line": 694,
+          "label": "pool fate"
+        }
+      ]
+    },
+    {
+      "id": "comp",
+      "type": "security",
+      "label": "Compositor",
+      "sublabel": "one rAF, frame budget",
+      "pos": [510, 40],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/compositor.ts",
+          "line": 1,
+          "end_line": 9,
+          "label": "applies batches per frame"
+        }
+      ]
+    },
+    {
+      "id": "surfaces",
+      "type": "frontend",
+      "label": "Surfaces",
+      "sublabel": "<iso-surface> per visual",
+      "pos": [745, 40],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/compositor.ts",
+          "line": 6,
+          "end_line": 8,
+          "label": "shadow host per surface"
+        }
+      ]
+    },
+    {
+      "id": "busctl",
+      "type": "security",
+      "label": "Bus controller",
+      "sublabel": "ports \u00b7 supervises bus",
+      "pos": [980, 40],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/bus/controller.ts",
+          "line": 1,
+          "end_line": 10,
+          "label": "starts and supervises the bus"
+        },
+        {
+          "path": "packages/host/src/bus/controller.ts",
+          "line": 381,
+          "end_line": 395,
+          "label": "attach: a port per isolate"
+        }
+      ]
+    },
+    {
+      "id": "hostconn",
+      "type": "security",
+      "label": "Host connection",
+      "sublabel": "isoloop:host:<n>",
+      "pos": [1215, 40],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/bus/controller.ts",
+          "line": 477,
+          "end_line": 479,
+          "label": "kernel.subscribe's own port"
+        }
+      ]
+    },
+    {
+      "id": "modules",
+      "type": "external",
+      "label": "Isolate modules",
+      "sublabel": "import(init.src)",
+      "pos": [40, 270],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/runtime/src/bootstrap.ts",
+          "line": 134,
+          "end_line": 140,
+          "label": "imports the isolate module"
+        }
+      ]
+    },
+    {
+      "id": "own",
+      "type": "backend",
+      "label": "1 isolate",
+      "sublabel": "own realm and document",
+      "pos": [275, 270],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/loader.ts",
+          "line": 84,
+          "end_line": 103,
+          "label": "own worker"
+        },
+        {
+          "path": "packages/runtime/src/worker.ts",
+          "line": 1,
+          "end_line": 33,
+          "label": "tiny worker entry"
+        }
+      ]
+    },
+    {
+      "id": "poolvis",
+      "type": "backend",
+      "label": "2 visual members",
+      "sublabel": "a root each, 1 document",
+      "pos": [745, 270],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/loader.ts",
+          "line": 105,
+          "end_line": 148,
+          "label": "members join one worker"
+        },
+        {
+          "path": "packages/runtime/src/render/index.ts",
+          "line": 54,
+          "end_line": 66,
+          "label": "one document, a root per member"
+        }
+      ]
+    },
+    {
+      "id": "poolhead",
+      "type": "backend",
+      "label": "1 headless member",
+      "sublabel": "same thread, no surface",
+      "pos": [510, 270],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/runtime/src/bootstrap.ts",
+          "line": 199,
+          "end_line": 220,
+          "label": "pool init, built-ins frozen first"
+        },
+        {
+          "path": "packages/runtime/src/freeze.ts",
+          "line": 1,
+          "end_line": 60,
+          "label": "frozen built-ins"
+        }
+      ]
+    },
+    {
+      "id": "topics",
+      "type": "cloud",
+      "label": "Topic logs",
+      "sublabel": "memory \u00b7 persistent",
+      "pos": [745, 500],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/protocol/src/control.ts",
+          "line": 15,
+          "end_line": 26,
+          "label": "retention and durability per topic"
+        }
+      ]
+    },
+    {
+      "id": "engine",
+      "type": "messagebus",
+      "label": "LogEngine + codec",
+      "sublabel": "evicts above 8 MiB",
+      "pos": [980, 500],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/bus/src/engine/ts-engine.ts",
+          "line": 21,
+          "end_line": 30,
+          "label": "resident bytes, page() back"
+        },
+        {
+          "path": "packages/bus/src/broker.ts",
+          "line": 833,
+          "end_line": 857,
+          "label": "persistent values must encode"
+        }
+      ]
+    },
+    {
+      "id": "broker",
+      "type": "messagebus",
+      "label": "Broker",
+      "sublabel": "grants \u00b7 schema \u00b7 dedup",
+      "pos": [1215, 500],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/bus/src/broker.ts",
+          "line": 707,
+          "end_line": 763,
+          "label": "publish gates"
+        },
+        {
+          "path": "packages/bus/src/broker.ts",
+          "line": 795,
+          "end_line": 827,
+          "label": "dedup, check, append, fan out"
+        },
+        {
+          "path": "packages/bus/src/server.ts",
+          "line": 339,
+          "end_line": 346,
+          "label": "the bus worker's beat"
+        }
+      ]
+    },
+    {
+      "id": "opfs",
+      "type": "database",
+      "label": "OPFS segments",
+      "sublabel": "isoloop-bus Web Lock",
+      "pos": [980, 690],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/bus/src/server.ts",
+          "line": 422,
+          "end_line": 436,
+          "label": "OPFS or the memory fallback"
+        },
+        {
+          "path": "packages/bus/src/storage/lock.ts",
+          "line": 1,
+          "end_line": 10,
+          "label": "one tab writes the files"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Main thread",
+      "wraps": ["app", "sup", "comp", "surfaces", "busctl", "hostconn"],
+      "pad": 12
+    },
+    {
+      "kind": "region",
+      "label": "Own worker \u00b7 1 thread \u00b7 1 isolate",
+      "wraps": ["own"],
+      "pad": 12
+    },
+    {
+      "kind": "region",
+      "label": "Pool worker \u00b7 1 thread \u00b7 3 isolates",
+      "wraps": ["poolvis", "poolhead"],
+      "pad": 12
+    },
+    {
+      "kind": "region",
+      "label": "Bus worker \u00b7 1 thread \u00b7 no isolates",
+      "wraps": ["topics", "engine", "broker"],
+      "pad": 12
+    }
+  ],
+  "connections": [
+    {
+      "id": "spawn",
+      "from": "app",
+      "to": "sup",
+      "label": "spawn",
+      "variant": "emphasis"
+    },
+    {
+      "id": "start-own",
+      "from": "sup",
+      "to": "own",
+      "label": "new Worker + init",
+      "variant": "emphasis"
+    },
+    {
+      "id": "start-pool",
+      "from": "sup",
+      "to": "poolvis",
+      "label": "init per member"
+    },
+    {
+      "id": "import",
+      "from": "modules",
+      "to": "own",
+      "label": "import()",
+      "variant": "dashed"
+    },
+    {
+      "id": "patch-own",
+      "from": "own",
+      "to": "comp",
+      "label": "patches"
+    },
+    {
+      "id": "patch-pool",
+      "from": "poolvis",
+      "to": "comp",
+      "label": "patches per member"
+    },
+    {
+      "id": "apply",
+      "from": "comp",
+      "to": "surfaces",
+      "label": "apply"
+    },
+    {
+      "id": "beat-pool",
+      "from": "poolhead",
+      "to": "sup",
+      "label": "one beat per worker",
+      "variant": "dashed"
+    },
+    {
+      "id": "attach",
+      "from": "busctl",
+      "to": "broker",
+      "label": "attach a port"
+    },
+    {
+      "id": "bus-beat",
+      "from": "broker",
+      "to": "busctl",
+      "label": "beat \u00b7 metrics",
+      "variant": "dashed"
+    },
+    {
+      "id": "host-sub",
+      "from": "hostconn",
+      "to": "broker",
+      "label": "kernel.subscribe"
+    },
+    {
+      "id": "port-own",
+      "from": "own",
+      "to": "broker",
+      "label": "own bus port",
+      "variant": "emphasis"
+    },
+    {
+      "id": "port-pool",
+      "from": "poolhead",
+      "to": "broker",
+      "label": "a port per member",
+      "variant": "emphasis"
+    },
+    {
+      "id": "append",
+      "from": "broker",
+      "to": "engine",
+      "label": "append"
+    },
+    {
+      "id": "logs",
+      "from": "engine",
+      "to": "topics",
+      "label": "logs"
+    },
+    {
+      "id": "persist",
+      "from": "engine",
+      "to": "opfs",
+      "label": "persistent topics"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "How to read it",
+      "items": [
+        "A box is a thread: the main thread, an own worker, a pool's worker or the bus worker. A card inside a worker is one isolate or a group of them, with the count on the card.",
+        "Every isolate talks to the bus worker over its own MessageChannel port, never through the main thread (ADR 0005).",
+        "The main thread only applies patches and runs the kernel; isolate code never runs there."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Ports",
+      "items": [
+        "Isolate port: init, event, result, shutdown, reattach in; ready, patch, call, beat, error, bye out. In a pool every message names its member, except beat, which is the worker's.",
+        "Bus port: publish, subscribe, unsubscribe, commits, request, reply in; deliver, reset, result out. commits carries every subscription's settled offset, at most once per commitIntervalMs (ADR 0016).",
+        "Control port: boot, attach, detach, publish, flush, drop in; ready, beat, wake, metrics, result, seed, error out."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Start-up",
+      "items": [
+        "createKernel throws unsupported_browser when module workers, MessageChannel, adopted stylesheets or OPFS are missing.",
+        "A worker's entry is tiny and imports the bootstrap, which starts once per worker even if WebKit evaluates the entry twice.",
+        "A pool freezes the built-ins before its first member loads, leaving the properties V8 protects as plain data (ADR 0001 amendment)."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "The bus worker",
+      "items": [
+        "Started before any isolate and supervised like one: beats, restarts, and after two crashes while loading, a safe-mode boot that sets the newest segment aside.",
+        "After a restart, isolates get a new port (reattach) and keep running. Past the restart limit the bus is failed: isolates keep running and their bus calls reject with bus_unavailable.",
+        "Persistent topics need the isoloop-bus Web Lock and sync access handles; without them they run in memory and the kernel emits bus:durability-degraded."
+      ]
+    }
+  ]
+}

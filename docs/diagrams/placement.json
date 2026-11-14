@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Placement: own workers against one pool",
+    "subtitle": "The same 3 isolates on 3 threads or on 1",
+    "output": ".archify/architecture-placement-20261113-175141/placement.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "security": { "label": "Kernel (main thread)" },
+        "backend": { "label": "Isolate" },
+        "messagebus": { "label": "Bus worker" }
+      }
+    },
+    "repository": {
+      "url": "https://github.com/isoloop/isoloop",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "f825ffbd1ac8b9c01a82a791fb01ccd62bcbbc05"
+    }
+  },
+  "components": [
+    {
+      "id": "kernel",
+      "type": "security",
+      "label": "Kernel",
+      "sublabel": "manifest.pool decides",
+      "pos": [470, 40],
+      "size": [170, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/loader.ts",
+          "line": 150,
+          "end_line": 155,
+          "label": "own worker or pool member"
+        },
+        {
+          "path": "packages/host/src/loader.ts",
+          "line": 1,
+          "end_line": 9,
+          "label": "a pool's worker lives with its members"
+        }
+      ]
+    },
+    {
+      "id": "own-a",
+      "type": "backend",
+      "label": "Isolate A (visual)",
+      "sublabel": "own realm and document",
+      "pos": [60, 230],
+      "size": [170, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/loader.ts",
+          "line": 84,
+          "end_line": 103,
+          "label": "one worker per isolate"
+        }
+      ]
+    },
+    {
+      "id": "own-b",
+      "type": "backend",
+      "label": "Isolate B (visual)",
+      "sublabel": "own realm and document",
+      "pos": [60, 360],
+      "size": [170, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/loader.ts",
+          "line": 84,
+          "end_line": 103,
+          "label": "one worker per isolate"
+        }
+      ]
+    },
+    {
+      "id": "own-c",
+      "type": "backend",
+      "label": "Isolate C (headless)",
+      "sublabel": "own realm, no document",
+      "pos": [60, 490],
+      "size": [170, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/loader.ts",
+          "line": 84,
+          "end_line": 103,
+          "label": "one worker per isolate"
+        }
+      ]
+    },
+    {
+      "id": "pool-a",
+      "type": "backend",
+      "label": "Member A (visual)",
+      "sublabel": "its root in the document",
+      "pos": [880, 230],
+      "size": [170, 66],
+      "sources": [
+        {
+          "path": "packages/runtime/src/render/index.ts",
+          "line": 54,
+          "end_line": 66,
+          "label": "one document, a root per member"
+        }
+      ]
+    },
+    {
+      "id": "pool-b",
+      "type": "backend",
+      "label": "Member B (visual)",
+      "sublabel": "its root in the document",
+      "pos": [880, 360],
+      "size": [170, 66],
+      "sources": [
+        {
+          "path": "packages/runtime/src/render/index.ts",
+          "line": 54,
+          "end_line": 66,
+          "label": "one document, a root per member"
+        }
+      ]
+    },
+    {
+      "id": "pool-c",
+      "type": "backend",
+      "label": "Member C (headless)",
+      "sublabel": "mixed pool, no root",
+      "pos": [880, 490],
+      "size": [170, 66],
+      "sources": [
+        {
+          "path": "packages/runtime/src/bootstrap.ts",
+          "line": 199,
+          "end_line": 220,
+          "label": "a pool takes one init per member"
+        },
+        {
+          "path": "packages/runtime/src/freeze.ts",
+          "line": 1,
+          "end_line": 60,
+          "label": "frozen built-ins, protected properties"
+        }
+      ]
+    },
+    {
+      "id": "bus",
+      "type": "messagebus",
+      "label": "Bus worker",
+      "sublabel": "a port per isolate",
+      "pos": [470, 680],
+      "size": [170, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/bus/controller.ts",
+          "line": 381,
+          "end_line": 395,
+          "label": "a MessageChannel per isolate"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Main thread", "wraps": ["kernel"], "pad": 12 },
+    {
+      "kind": "region",
+      "label": "Own workers · 3 threads · 3 isolates",
+      "wraps": ["own-a", "own-b", "own-c"],
+      "pad": 14
+    },
+    {
+      "kind": "region",
+      "label": "Pool \"charts\" · 1 thread · 3 isolates",
+      "wraps": ["pool-a", "pool-b", "pool-c"],
+      "pad": 14
+    },
+    { "kind": "region", "label": "Bus worker · 1 thread", "wraps": ["bus"], "pad": 12 }
+  ],
+  "connections": [
+    {
+      "id": "spawn-own",
+      "from": "kernel",
+      "to": "own-a",
+      "label": "3 workers, 1 init each",
+      "variant": "emphasis"
+    },
+    {
+      "id": "spawn-pool",
+      "from": "kernel",
+      "to": "pool-a",
+      "label": "1 worker, 3 inits",
+      "variant": "emphasis"
+    },
+    { "id": "port-own", "from": "own-c", "to": "bus", "label": "3 bus ports" },
+    { "id": "port-pool", "from": "pool-c", "to": "bus", "label": "still 3 bus ports" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "How to read it",
+      "items": [
+        "A box is a thread. The same three isolates run on the left in three own workers and on the right as members of one pool.",
+        "Placement is the host manifest's choice alone: the isolate's code is the same either way (ADR 0001, ADR 0015)."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "What a pool saves",
+      "items": [
+        "20 headless isolates in one worker: 71–86% less memory and 2–3× faster start-up than 20 own workers (ADR 0001 gate).",
+        "8 React widgets in one worker: 35–64% less memory, with the same p95 from publish to applied patch (ADR 0015 gate)."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What members share",
+      "items": [
+        "One event loop and its timers: a member that blocks stalls the others.",
+        "globalThis and the built-ins, frozen before the first member loads; the properties V8 protects stay plain data (ADR 0001 amendment).",
+        "One isoloop-dom document, a root per visual member: members can read each other's DOM and input (ADR 0015).",
+        "Fate: a worker error or a missed heartbeat restarts every member together in a new worker; a member's own fatal error restarts only that member."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "What stays per isolate",
+      "items": [
+        "Its bus port, grants, subscriptions and committed offsets.",
+        "Its surface, compositor queue and frame budget.",
+        "Its supervisor state and restart count."
+      ]
+    }
+  ]
+}

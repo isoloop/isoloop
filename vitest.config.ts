@@ -80,6 +80,14 @@ export default defineConfig({
       node('codec'),
       node('bus'),
       node('vite'),
+      // The core diagrams' drift test (docs/diagrams/README.md).
+      {
+        test: {
+          name: 'diagrams',
+          include: ['docs/diagrams/**/*.test.ts'],
+          environment: 'node',
+        },
+      },
       // OPFS differs by engine (M2b), so the bus worker's tests run in all three.
       browser('bus-browser', 'packages/bus/src/**/*.browser.test.ts', [
         'chromium',

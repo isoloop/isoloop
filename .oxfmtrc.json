@@ -5,5 +5,12 @@
   "printWidth": 100,
   "trailingComma": "all",
   "sortPackageJson": false,
-  "ignorePatterns": ["pnpm-lock.yaml", "**/*.md", ".claude/", ".mcp.json"]
+  "ignorePatterns": [
+    "pnpm-lock.yaml",
+    "**/*.md",
+    ".claude/",
+    ".mcp.json",
+    "docs/diagrams/*.html",
+    "docs/diagrams/viewer-*"
+  ]
 }

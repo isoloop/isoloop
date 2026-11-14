@@ -284,5 +284,10 @@
       }
     }
   ],
-  "ignorePatterns": ["**/dist/**", "**/coverage/**"]
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/coverage/**",
+    "docs/diagrams/viewer-*.js",
+    "docs/diagrams/*.mjs"
+  ]
 }
