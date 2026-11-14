@@ -9,18 +9,18 @@ One plan per milestone of [RFC 0001](../rfcs/0001-threaded-runtime.md#mvp-roadma
 | M2 Bus | [m2-bus.md](m2-bus.md) | Full | Done | A restarted isolate rebuilds its state from the log in a test |
 | M2b Durable log | [m2b-durable-log.md](m2b-durable-log.md) | Full | Done | A persistent topic loses no acknowledged record across a bus crash or a page reload |
 | M2c Worker pools (headless) | [m2c-worker-pools.md](m2c-worker-pools.md) | Full | Done (2026-11-09) | Pooled and own-worker isolates run side by side; a pool crash restarts only that pool |
-| M2d Visual pools | [m2d-visual-pools.md](m2d-visual-pools.md) | Full | Built (2026-11-09); done when M3d ships | The plant dashboard ships with 72 widgets in 9 visual pools |
-| M3 Adapters + dashboard (initiative) | [m3-adapters-dashboard.md](m3-adapters-dashboard.md) | Overview | M3a, M3b and M3c done; M3d built, ships as `plant-v0.1.0` | Dashboard live on a public URL; recorded comparison in the README |
+| M2d Visual pools | [m2d-visual-pools.md](m2d-visual-pools.md) | Full | Done (2026-11-14, with `plant-v0.1.0`) | The plant dashboard ships with 72 widgets in 9 visual pools |
+| M3 Adapters + dashboard (initiative) | [m3-adapters-dashboard.md](m3-adapters-dashboard.md) | Overview | M3a, M3b, M3c and M3d done; M3e next | Dashboard live on a public URL; recorded comparison in the README |
 | ↳ M3a Adapters (epic) | [m3a-adapters.md](m3a-adapters.md) | Full | Done | Both adapters pass the adapter conformance suite on every supported major |
 | ↳ M3b Dashboard (epic) | [m3b-dashboard.md](m3b-dashboard.md) | Full | Done (live since `markets-v0.1.0`) | The M3 done-when |
 | ↳ M3c Dashboard sizes (epic) | [m3c-dashboard-sizes.md](m3c-dashboard-sizes.md) | Full | Done (`markets-v0.2.0`) | Lite, Normal and Heavy sizes on every build; the comparison across sizes recorded, whatever it shows |
-| ↳ M3d Plant dashboard (epic) | [m3d-plant-dashboard.md](m3d-plant-dashboard.md) | Full | Built; ships as `plant-v0.1.0` | 72-widget plant dashboard on three builds and six placements: what the whole package costs against matched native builds, and what it gives |
+| ↳ M3d Plant dashboard (epic) | [m3d-plant-dashboard.md](m3d-plant-dashboard.md) | Full | Done (`plant-v0.1.0`, 2026-11-14) | 72-widget plant dashboard on three builds and six placements: what the whole package costs against matched native builds, and what it gives |
 | ↳ M3e Live widget creator (epic) | (plan after M3d is under way) | — | Not started | Users compose a widget from a JSON spec (source topic → fixed operators: filter/window/aggregate/combine → view) and add it at runtime; the pipeline runs in a new isolate placed in its own worker or a chosen pool; specs persist in a persistent topic; no user code/eval; measured: creator responsiveness while an expensive custom view computes, on native, native + workers and Isoloop |
 | M4 Devtools + 0.1 | [m4-devtools-release.md](m4-devtools-release.md) | Outline | Not started | `0.1.0` on npm with a launch post |
 | M5 Shared-memory engine | [m5-shared-memory-engine.md](m5-shared-memory-engine.md) | Outline | Not started | Benchmark results published, whichever engine wins |
 | M5b Delivery batching (spike) | [m5b-delivery-batching.md](m5b-delivery-batching.md) | Outline | Not started | Findings written up; ADR amending §6.3 or a recalibrated §9 budget accepted |
 
-An outline gets its full task list when it's next to start, so the list reflects what was learned. M3d (the plant dashboard) is built and ships as `plant-v0.1.0` on the user's word, which also completes M2d's done-when. Next: M3e (the live widget creator), then M4 (0.1). Decided 2026-11-08: pools come before 0.1 so the plant dashboard can use them. M5 and M5b come after 0.1.
+An outline gets its full task list when it's next to start, so the list reflects what was learned. M3d (the plant dashboard) shipped as `plant-v0.1.0` on 2026-11-14, which also completed M2d. Next: M3e (the live widget creator), then M4 (0.1). Decided 2026-11-08: pools come before 0.1 so the plant dashboard can use them. M5 and M5b come after 0.1.
 
 ```mermaid
 flowchart LR
