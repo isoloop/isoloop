@@ -10,7 +10,7 @@ They were drawn from the code at `f825ffb` (`meta.repository.revision` in each J
 | 2 | `placement` | The same three isolates in three own workers or in one pool, and what a pool saves and shares |
 | 3 | `bus-publish` | A record through the bus: grants and size, schema, duplicates, the log, delivery and commits |
 | 4 | `isolate-lifecycle` | The supervisor's states and transitions, with the default timings |
-| 5 | `restart-own-worker` | An own worker crashes, restarts and replays from its committed offset |
+| 5 | `restart-own-worker` | An own worker crashes and restarts; a subscription with `from: 'committed'` replays from its committed offset |
 | 6 | `restart-pool` | A member restarts alone after its own error, or the whole pool restarts after a worker failure |
 | 7 | `bus-crash-reattach` | The bus worker crashes, a new one starts, and the isolates reattach |
 

@@ -581,7 +581,7 @@ sequenceDiagram
   K->>K: restarting → loading → running
 ```
 
-Commits go out at most once per commit interval, so up to one interval of records C had already handled comes back. In a pool, a member that crashes on its own rejoins the running worker the same way; a crash that is the worker's restarts every member together in a new worker, each from its own committed offsets (§4.3). Persistent topics replay the same way across a page reload.
+Commits go out at most once per commit interval, so up to one interval of records C had already handled comes back. In a pool, a member that crashes on its own rejoins the running worker the same way; a crash that is the worker's restarts every member together in a new worker (§4.3). In both cases each subscription starts where its `from` says: `committed` as above, `earliest` from the oldest retained record, and `latest`, the default, at new records only. Persistent topics replay the same way across a page reload.
 
 ### 7.5 Blocked → recovered or killed
 
