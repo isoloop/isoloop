@@ -1,11 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 import { HARNESS, ISOLATES_CORS, ISOLATES_NO_CORS } from './e2e/servers';
 
-// E2E against the built demo, in the three engines Playwright ships (ADR 0009).
-// The ports avoid Vite's default 4173 so a local preview elsewhere doesn't clash.
-// The harness is a blank page for tests that bring their own isolates; the two
-// isolate servers are other origins, with and without CORS.
-const port = 4791;
+// E2E in the three engines Playwright ships (ADR 0009). The harness is a blank
+// page for tests that bring their own isolates (the four-loops ones included,
+// e2e/loops.ts); the two isolate servers are other origins, with and without
+// CORS. The ports avoid Vite's default 4173 so a local preview elsewhere doesn't clash.
 const ci = Boolean(process.env['CI']);
 
 export default defineConfig({
@@ -17,7 +16,7 @@ export default defineConfig({
   ...(ci ? { workers: 1 } : {}),
   reporter: ci ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: `http://localhost:${port}/`,
+    baseURL: HARNESS,
     trace: 'retain-on-failure',
   },
   projects: [
@@ -27,19 +26,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `pnpm --filter four-loops build && pnpm --filter four-loops preview --port ${port} --strictPort`,
-      url: `http://localhost:${port}/`,
-      reuseExistingServer: !ci,
-      timeout: 60_000,
-    },
-    {
       command: `pnpm --filter e2e-harness build && pnpm --filter e2e-harness preview --port 4794 --strictPort`,
       url: HARNESS,
       reuseExistingServer: !ci,
       timeout: 60_000,
     },
     {
-      // The adapter fixtures are built first (M3a task 13); the server serves them.
+      // The adapter and four-loops fixtures are built first; the server serves them.
       command: 'node e2e/build-adapters.ts && node e2e/isolate-server.ts 4795 --cors',
       url: ISOLATES_CORS,
       reuseExistingServer: !ci,

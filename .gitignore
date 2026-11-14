@@ -28,6 +28,8 @@ bench-results/
 
 # Adapter E2E fixtures, built by e2e/build-adapters.ts
 /e2e/isolates/adapter-*.js
+# The four-loops fixtures, built by the same script
+/e2e/isolates/loops-*.js
 
 # Claude Code (local)
 /.claude/worktrees/

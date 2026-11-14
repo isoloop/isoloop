@@ -23,7 +23,6 @@
     "bench:memory": "playwright test --config bench/memory-per-isolate/playwright.config.ts",
     "test:install-browsers": "playwright install chromium firefox webkit",
     "build": "pnpm -r build",
-    "dev": "pnpm --filter four-loops dev",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "bench:pools": "playwright test --config bench/pools/playwright.config.ts",
     "bench:visual-pools": "playwright test --config bench/visual-pools/playwright.config.ts"

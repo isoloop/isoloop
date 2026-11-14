@@ -17,7 +17,7 @@ The bus runs in its own worker, which the kernel starts before any isolate ([ADR
 
 Give both or neither. One without the other makes `createKernel` throw `invalid_config`. With neither there is no bus: isolates still run, but `kernel.publish` rejects with `bus_unavailable`.
 
-With Vite, `@isoloop/vite` provides both URLs as `virtual:isoloop/workers`, as in [four-loops](../../examples/four-loops/src/main.ts). The contracts module comes in through the example's `?isolate` plugin, so it's emitted as its own chunk:
+With Vite, `@isoloop/vite` provides both URLs as `virtual:isoloop/workers`, as in [basic](https://github.com/isoloop/web/blob/060c6318108d0fce4ddf319093a2e7c0cb2c3c62/apps/basic/src/app.ts), the smallest example in `isoloop/web`. The contracts module comes in through the example's `?isolate` plugin, so it's emitted as its own chunk:
 
 ```ts
 // vite.config.ts: plugins: [isoloop()]

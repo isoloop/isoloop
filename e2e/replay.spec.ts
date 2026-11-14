@@ -1,21 +1,16 @@
 /// <reference lib="dom" />
 import { expect, test, type Page } from '@playwright/test';
 import './harness-types';
+import { expectRestarts, expectState, openLoops, pane } from './loops';
 
 // The M2 done-criterion (RFC 0001): a restarted isolate rebuilds its state
-// from the log. Plan m2-bus task 12, against the four-loops demo.
+// from the log. Plan m2-bus task 12, against the four-loops isolates mounted
+// on the harness (e2e/loops.ts).
 
-const pane = (page: Page, id: string) => page.locator(`section[data-isolate="${id}"]`);
-const status = (page: Page, id: string) => pane(page, id).locator('.status');
 const d = (page: Page, cls: string) => pane(page, 'D').locator(`.${cls}`);
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/');
-  await Promise.all(
-    ['A', 'B', 'C', 'D'].map((id) =>
-      expect(status(page, id)).toContainText('loop ok', { timeout: 10_000 }),
-    ),
-  );
+  await openLoops(page);
   await expect
     .poll(() => page.evaluate(() => window.kernel.isolates().find((s) => s.id === 'S')?.state))
     .toBe('running');
@@ -45,8 +40,8 @@ test('a crashed D replays its log and shows the same history, with no new events
 }) => {
   const before = await d(page, 'log').textContent();
   await pane(page, 'D').getByRole('button', { name: 'Crash' }).click();
-  await expect(pane(page, 'D').locator('.restarts')).toHaveText('restarts: 1', { timeout: 3_000 });
-  await expect(status(page, 'D')).toContainText('loop ok', { timeout: 5_000 });
+  await expectRestarts(page, 'D', 1, 3_000);
+  await expectState(page, 'D', 'running');
   // The new D read exactly the seven records from the log, nothing new.
   await expect(d(page, 'replayed')).toHaveText('7 records read');
   await expect(d(page, 'log')).toHaveText(before ?? '');

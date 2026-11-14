@@ -1,9 +1,9 @@
 packages:
   - packages/*
   - packages/react/majors/*
-  - examples/*
   - bench
   - e2e/harness
+  - e2e/isolates/loops
 
 # Every tool version lives here, pinned exactly (ADR 0009, rule 8).
 # Packages reference them with "catalog:".
