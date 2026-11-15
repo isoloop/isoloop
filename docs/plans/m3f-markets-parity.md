@@ -1,6 +1,6 @@
 # M3f: Markets parity
 
-**Status:** planned 2026-11-15 (grilled the same day). The last epic of the [M3 initiative](m3-adapters-dashboard.md): M3 is done when this ships. M3e, the live widget creator, moved out of the initiative on 2026-11-15 and is a standalone epic before M4.
+**Status:** done; ships as `markets-v0.3.0`, tagged by the user. Planned, built and measured 2026-11-15: tasks 2–4 in isoloop/web #98–#101, the write-up in #102 ([final run](https://github.com/isoloop/web/tree/main/apps/dashboards/markets/comparison/final)). The last epic of the [M3 initiative](m3-adapters-dashboard.md): M3 is done when this ships. M3e, the live widget creator, moved out of the initiative on 2026-11-15 and is a standalone epic before M4.
 
 **Goal:** the markets dashboard gets what the plant has, a native + workers build and pooled placements, and is measured head to head with the plant's matched method, so its figures can go back on the website.
 

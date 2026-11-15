@@ -4,7 +4,9 @@
 
 **Done when** (RFC 0001): the dashboard is live on a public URL and a recorded comparison is in the README.
 
-M3 is an initiative with four epics: M3a, M3b and M3c are done (M3c on 2026-11-08); M3d, the plant dashboard, follows the worker pools (M2c, M2d). Each has its own done-when, demo and write-up.
+**Status:** done on 2026-11-15, when M3f shipped as `markets-v0.3.0`.
+
+M3 is an initiative with five epics, all done: M3a, M3b, M3c (2026-11-08), M3d, the plant dashboard (`plant-v0.1.0`, 2026-11-14), and M3f, markets parity (`markets-v0.3.0`, 2026-11-15). Each has its own done-when, demo and write-up. M3e, the live widget creator, was planned as a sixth epic; on 2026-11-15 it moved out of the initiative and is a standalone epic before M4 ([plans](README.md)).
 
 | Epic | Plan | Done when |
 | --- | --- | --- |
@@ -12,6 +14,7 @@ M3 is an initiative with four epics: M3a, M3b and M3c are done (M3c on 2026-11-0
 | M3b Dashboard | [m3b-dashboard.md](m3b-dashboard.md) | The initiative's done-when above |
 | M3c Dashboard sizes | [m3c-dashboard-sizes.md](m3c-dashboard-sizes.md) | Lite, Normal and Heavy on every build; the comparison across sizes recorded |
 | M3d Plant dashboard | [m3d-plant-dashboard.md](m3d-plant-dashboard.md) | 72 widgets on three builds (including native with hand-written workers) and four Isoloop placements; the comparison on desktop and a phone recorded |
+| M3f Markets parity | [m3f-markets-parity.md](m3f-markets-parity.md) | Markets on native, native + workers and three Isoloop placements, measured in matched pairs on the bench server; ships as `markets-v0.3.0` |
 
 M3a comes first; M3b's data pipeline (feeds, replay, aggregator, alerts) only needs the vanilla API and can start during M3a. [M2b](m2b-durable-log.md) runs in parallel with both, and M4 needs M3 and M2b.
 
