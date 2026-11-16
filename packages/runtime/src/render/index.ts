@@ -98,7 +98,7 @@ export function createRender(
       queueMicrotask(flush);
       return;
     }
-    busy.report(member);
+    busy.report(member, owner.life);
     nativeQueueMicrotask(() => {
       busy.run(owner, flush, undefined, []);
     });

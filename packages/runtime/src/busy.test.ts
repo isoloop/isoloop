@@ -83,7 +83,7 @@ describe('the busy ledger', () => {
     let second = busy.capture();
     let third = busy.capture();
     busy.run(
-      { key: null },
+      { key: null, life: null },
       () => {
         first = busy.capture();
         busy.report('a');
@@ -110,7 +110,7 @@ describe('the busy ledger', () => {
   it('bills nobody for a frame owned by nobody that reports no root', () => {
     const c = clock();
     const busy = createBusy(c.now);
-    busy.run({ key: null }, () => c.spend(10), undefined, []);
+    busy.run({ key: null, life: null }, () => c.spend(10), undefined, []);
     expect(busy.take(undefined)).toBe(0);
   });
 
@@ -133,5 +133,40 @@ describe('the busy ledger', () => {
     }
     const truth = n * each;
     expect(Math.abs(busy.take('a') - truth) / truth).toBeLessThan(0.05);
+  });
+
+  it('gives a callback the life of the member it is billed to, and a restart a new one', () => {
+    const c = clock();
+    const busy = createBusy(c.now);
+    const first = busy.begin('a');
+    let viaFrame = busy.capture();
+    let viaRoot = busy.capture();
+    busy.run(
+      busy.of('a'),
+      () => {
+        viaFrame = busy.capture();
+      },
+      undefined,
+      [],
+    );
+    busy.run(
+      busy.of('scheduler', null),
+      () => {
+        viaRoot = busy.capture();
+        busy.report('a');
+      },
+      undefined,
+      [],
+    );
+    expect(viaFrame.life).toBe(first);
+    expect(viaRoot.life).toBe(first);
+    const second = busy.begin('a');
+    busy.end(first);
+    expect(first.ended).toBe(true);
+    expect(second.ended).toBe(false);
+    // Ending the old instance after the new one began leaves the new one current.
+    expect(busy.of('a').life).toBe(second);
+    busy.end(second);
+    expect(busy.of('a').life).toBe(null);
   });
 });

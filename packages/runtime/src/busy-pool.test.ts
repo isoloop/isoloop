@@ -91,3 +91,100 @@ describe('busy time in the beat', () => {
     expect(w.take().get('(own)') ?? 0).toBeGreaterThan(80);
   });
 });
+
+/** A pool the test drives member by member: ticks, busy time, stops and inits. */
+function pool() {
+  const worker = new Worker(new URL('./bootstrap.ts', import.meta.url), { type: 'module' });
+  workers.push(worker);
+  const ticks = new Map<string, number>();
+  const sums = new Map<string, number>();
+  const byes = new Map<string, () => void>();
+  worker.addEventListener('message', (e: MessageEvent<unknown>) => {
+    const d = e.data;
+    if (typeof d !== 'object' || d === null) return;
+    const t: unknown = Reflect.get(d, 't');
+    if (t === 'tick') {
+      const name = String(Reflect.get(d, 'name'));
+      ticks.set(name, (ticks.get(name) ?? 0) + 1);
+    } else if (isBeat(d)) {
+      for (const [name, r] of Object.entries(d.p.members ?? {}))
+        if (r.busyMs !== undefined) sums.set(name, (sums.get(name) ?? 0) + r.busyMs);
+    } else if (t === 'bye') byes.get(String(Reflect.get(d, 'isolate')))?.();
+  });
+  return {
+    init(name: string, config: unknown): void {
+      const { port2 } = new MessageChannel();
+      const init: HostToIsolate = {
+        v: 1,
+        t: 'init',
+        isolate: name,
+        p: {
+          isolateId: name,
+          protocol: { min: 1, max: 1 },
+          renderFmt: 'none',
+          config,
+          grants: { publish: [], subscribe: [] },
+          busPort: port2,
+          heartbeatMs: 100,
+          src,
+        },
+      };
+      worker.postMessage(init, [port2]);
+    },
+    /** Stops `name` and resolves on its `bye`. */
+    stop(name: string): Promise<void> {
+      const bye = new Promise<void>((r) => byes.set(name, r));
+      const msg: HostToIsolate = {
+        v: 1,
+        t: 'shutdown',
+        isolate: name,
+        p: { reason: 'stop', graceMs: 200 },
+      };
+      worker.postMessage(msg);
+      return bye;
+    },
+    ticks: (name: string): number => ticks.get(name) ?? 0,
+    /** Busy time since the last call. */
+    take(): Map<string, number> {
+      const out = new Map(sums);
+      sums.clear();
+      return out;
+    },
+  };
+}
+
+describe('a stopped pool member (ADR 0015, decision 9)', () => {
+  for (const via of ['timeout', 'interval', 'raf', 'port'] as const) {
+    it(`never runs its ${via} callbacks again, while a neighbour keeps running`, async () => {
+      const p = pool();
+      p.init('gone', { via, burnMs: 1, tick: 'gone' });
+      p.init('stays', { via: 'interval', burnMs: 0, tick: 'stays' });
+      await wait(400);
+      expect(p.ticks('gone')).toBeGreaterThan(5);
+      await p.stop('gone');
+      const gone = p.ticks('gone');
+      const stays = p.ticks('stays');
+      await wait(500);
+      expect(p.ticks('gone')).toBe(gone);
+      expect(p.ticks('stays')).toBeGreaterThan(stays + 10);
+    });
+  }
+
+  it('bills nothing of its old copy to a member restarted under the same name', async () => {
+    const p = pool();
+    // A neighbour keeps the pool open: it closes after its last member.
+    p.init('other', { via: 'interval', burnMs: 0 });
+    p.init('task', { via: 'interval', burnMs: 3 });
+    await wait(400);
+    await p.stop('task');
+    // The same name again, with no work: only its own (near-zero) time counts.
+    p.init('task', { via: 'interval', burnMs: 0 });
+    await wait(400);
+    p.take();
+    await wait(1000);
+    const got = p.take();
+    // The beat reports it again: it did restart.
+    expect(got.has('task')).toBe(true);
+    expect(got.get('task') ?? 0).toBeLessThan(30);
+  });
+});

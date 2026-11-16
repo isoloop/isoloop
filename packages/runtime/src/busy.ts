@@ -22,6 +22,13 @@
  * outside any frame), module evaluation, other schedulers, and work shared by
  * the worker (garbage collection). That time shows only in the worker's
  * `lagMs`.
+ *
+ * Each member instance holds a *life* (ADR 0015, decision 9, amended): a
+ * callback carries the life of the member it was billed to, and once that
+ * life ends (the member stopped, its `onShutdown` handlers settled) the
+ * callback no longer runs. The gating is lazy: an interval clears itself and
+ * a port closes the next time they fire; a pending timeout keeps its closure
+ * until then. A restart under the same name begins a new life.
  */
 
 /** A member, by its `isolate` name; `undefined` is an own worker's isolate. */
@@ -30,8 +37,14 @@ export type MemberKey = string | undefined;
 /** Not yet known: a callback registered in a frame that may still report a root. */
 const PENDING: unique symbol = Symbol('pending');
 
-/** Who a callback is billed to. `null`: nobody (registered outside any frame). */
-export type Owner = { key: MemberKey | null | typeof PENDING };
+/** One member instance's lifetime: its callbacks stop running once it ends. */
+export type Life = { readonly key: MemberKey; ended: boolean };
+
+/**
+ * Who a callback is billed to. `key` `null`: nobody (registered outside any
+ * frame). `life`: the member instance, when known; `null` is never gated.
+ */
+export type Owner = { key: MemberKey | null | typeof PENDING; life: Life | null };
 
 type Frame = {
   owner: Owner;
@@ -56,24 +69,33 @@ export type Busy = {
   ): T;
   /** The owner a callback registered now belongs to. */
   capture(): Owner;
-  /** An owner fixed to `key`. */
-  of(key: MemberKey): Owner;
+  /** An owner fixed to `key`, in `life` (by default the key's current one). */
+  of(key: MemberKey, life?: Life | null): Owner;
+  /** A new member instance of `key` begins: its callbacks run until `end`. */
+  begin(key: MemberKey): Life;
+  /** The instance stopped: callbacks registered as it no longer run. */
+  end(life: Life): void;
   /** `fn` run as the owner that is current now, for schedulers the runtime can't see (Preact's). */
   bind<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R;
-  /** A root of `key` did work in the current frame. A no-op outside any frame. */
-  report(key: MemberKey): void;
+  /** A root of `key` (in `life`, by default its current one) did work in the current frame. A no-op outside any frame. */
+  report(key: MemberKey, life?: Life | null): void;
   /** The milliseconds billed to `key` since the last call, then zero. */
   take(key: MemberKey): number;
   /** Maps a render container to the member it belongs to (React's commit hook names containers). */
   claim(container: object, key: MemberKey): void;
   /** The member a container was claimed for, if any. */
   keyOf(container: unknown): MemberKey | null;
+  /** The member and its life a container was claimed for, if any. */
+  rootOf(container: unknown): { key: MemberKey; life: Life | null } | null;
 };
 
 export function createBusy(now: () => number = () => performance.now()): Busy {
   let frame: Frame | null = null;
   const spent = new Map<MemberKey, number>();
-  const containers = new WeakMap<object, MemberKey>();
+  const containers = new WeakMap<object, { key: MemberKey; life: Life | null }>();
+  /** Each key's current life. */
+  const lives = new Map<MemberKey, Life>();
+  const lifeOf = (key: MemberKey): Life | null => lives.get(key) ?? null;
 
   const bill = (key: MemberKey, ms: number): void => {
     spent.set(key, (spent.get(key) ?? 0) + ms);
@@ -81,7 +103,11 @@ export function createBusy(now: () => number = () => performance.now()): Busy {
 
   const settle = (f: Frame): void => {
     const fallback = f.owner.key === PENDING ? null : f.owner.key;
-    if (f.pending) for (const o of f.pending) o.key = fallback;
+    if (f.pending)
+      for (const o of f.pending) {
+        o.key = fallback;
+        o.life = f.owner.life;
+      }
     if (f.roots && f.roots.length > 0) {
       const unique = [...new Set(f.roots)];
       const share = f.spent / unique.length;
@@ -108,22 +134,38 @@ export function createBusy(now: () => number = () => performance.now()): Busy {
     },
     capture() {
       const f = frame;
-      if (!f) return { key: null };
-      const o: Owner = { key: PENDING };
+      if (!f) return { key: null, life: null };
+      const o: Owner = { key: PENDING, life: null };
       (f.pending ??= []).push(o);
       return o;
     },
-    of: (key) => ({ key }),
+    of: (key, life) => ({ key, life: life === undefined ? lifeOf(key) : life }),
+    begin(key) {
+      const life: Life = { key, ended: false };
+      lives.set(key, life);
+      return life;
+    },
+    end(life) {
+      life.ended = true;
+      if (lives.get(life.key) === life) {
+        lives.delete(life.key);
+        spent.delete(life.key);
+      }
+    },
     bind(fn) {
       const owner = busy.capture();
       return (...args) => busy.run(owner, fn, undefined, args);
     },
-    report(key) {
+    report(key, life) {
       const f = frame;
       if (!f) return;
       (f.roots ??= []).push(key);
       if (f.pending) {
-        for (const o of f.pending) o.key = key;
+        const l = life === undefined ? lifeOf(key) : life;
+        for (const o of f.pending) {
+          o.key = key;
+          o.life = l;
+        }
         f.pending = null;
       }
     },
@@ -133,11 +175,14 @@ export function createBusy(now: () => number = () => performance.now()): Busy {
       return ms;
     },
     claim(container, key) {
-      containers.set(container, key);
+      containers.set(container, { key, life: lifeOf(key) });
     },
     keyOf(container) {
+      return busy.rootOf(container)?.key ?? null;
+    },
+    rootOf(container) {
       if (typeof container !== 'object' || container === null) return null;
-      return containers.has(container) ? (containers.get(container) ?? undefined) : null;
+      return containers.get(container) ?? null;
     },
   };
   return busy;
@@ -162,10 +207,16 @@ function callable(f: unknown): Callback | null {
  * `cb` run as `owner` when the scheduler calls it, with the scheduler's `this`
  * and arguments. Always in a frame, even for nobody: a shared framework's
  * task (React's scheduler port, set up while its module loaded) still splits
- * among the roots it reports.
+ * among the roots it reports. Once the owner's life ended it doesn't run;
+ * `stale` gets the scheduler's `this` instead, to stop what would call it
+ * again (ADR 0015, decision 9).
  */
-function billed(busy: Busy, owner: Owner, cb: Callback): Callback {
+function billed(busy: Busy, owner: Owner, cb: Callback, stale?: (self: unknown) => void): Callback {
   return function (this: unknown, ...args: unknown[]): unknown {
+    if (owner.life?.ended === true) {
+      stale?.(this);
+      return undefined;
+    }
     return busy.run(owner, cb, this, args);
   };
 }
@@ -178,10 +229,24 @@ function billed(busy: Busy, owner: Owner, cb: Callback): Callback {
 function wrapScheduler(scope: object, name: string, busy: Busy): void {
   const native: unknown = Reflect.get(scope, name);
   if (typeof native !== 'function') return;
+  // An interval keeps calling: once its member stopped, it clears itself.
+  const clear = name === 'setInterval' ? callable(Reflect.get(scope, 'clearInterval')) : null;
   const wrapper = like(function (this: unknown, ...args: unknown[]): unknown {
     const cb = callable(args[0]);
-    if (cb) args[0] = billed(busy, busy.capture(), cb);
+    let id: unknown;
+    if (cb)
+      args[0] = billed(
+        busy,
+        busy.capture(),
+        cb,
+        clear
+          ? () => {
+              clear.call(scope, id);
+            }
+          : undefined,
+      );
     const r: unknown = Reflect.apply(native, this ?? scope, args);
+    id = r;
     return r;
   }, native);
   Reflect.set(scope, name, wrapper);
@@ -217,6 +282,12 @@ function wrapPorts(scope: object, busy: Busy): void {
   const proto: unknown = Reflect.get(Port, 'prototype');
   if (typeof proto !== 'object' || proto === null) return;
 
+  // A port its stopped member listened on closes on its next message.
+  const close = callable(Reflect.get(proto, 'close'));
+  const shut = (port: unknown): void => {
+    if (close && typeof port === 'object' && port !== null) close.call(port);
+  };
+
   const on = Object.getOwnPropertyDescriptor(proto, 'onmessage');
   const get = callable(on ? Reflect.get(on, 'get') : undefined);
   const set = callable(on ? Reflect.get(on, 'set') : undefined);
@@ -234,7 +305,7 @@ function wrapPorts(scope: object, busy: Busy): void {
       set: like(function (this: unknown, fn: unknown): void {
         if (typeof this === 'object' && this !== null) assigned.set(this, fn);
         const cb = callable(fn);
-        set.call(this, cb ? billed(busy, busy.capture(), cb) : fn);
+        set.call(this, cb ? billed(busy, busy.capture(), cb, shut) : fn);
       }, set),
     });
   }
@@ -270,7 +341,7 @@ function wrapPorts(scope: object, busy: Busy): void {
           if (fn) return fn.call(this, e);
           return callable(Reflect.get(listener, 'handleEvent'))?.call(listener, e);
         };
-        wrapper = billed(busy, busy.capture(), call);
+        wrapper = billed(busy, busy.capture(), call, shut);
         byCapture.set(capture, wrapper);
       }
       return add.apply(this, [type, wrapper, ...args.slice(2)]);
@@ -307,8 +378,8 @@ function installReactHook(scope: object, busy: Busy): void {
   let renderers = 0;
   const committed = (_renderer: unknown, root: unknown): void => {
     if (typeof root !== 'object' || root === null) return;
-    const key = busy.keyOf(Reflect.get(root, 'containerInfo'));
-    if (key !== null) busy.report(key);
+    const at = busy.rootOf(Reflect.get(root, 'containerInfo'));
+    if (at !== null) busy.report(at.key, at.life);
   };
   Reflect.set(scope, KEY, {
     supportsFiber: true,
