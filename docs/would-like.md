@@ -27,6 +27,12 @@ The main thread shows everything isolates render ([engine constraints](investiga
 
 - **Attribute errors per member in a pool with `AsyncContext`.** Today an error thrown from a shared framework scheduler or a timer in a pooled worker can't be traced to a member, so the whole pool restarts. `AsyncContext` would carry the member across `await` and timers, so such errors could stay the member's own. Waits on browsers shipping it. ([ADR 0015](adr/0015-visual-pools.md))
 
+## Supervision
+
+- **Restart settings per isolate.** Today `KernelConfig.supervisor` (`strategy`, `maxRestarts`, `withinMs`, `backoff`) applies to every isolate in a kernel, so a feed that should always restart and a third-party widget that should hit the crash-loop guard share one policy. A `supervisor` field on the spawn manifest would override the kernel's defaults for that isolate. Pool members are already counted one by one, so it fits pools. It's new public API, so it needs an ADR 0001 amendment. Raised from the website's crash-loop demo, where the kernel-wide setting was judged enough for now. ([system design §4.3](design/system-design.md#43-supervisor))
+- **Validate the supervisor settings.** `createKernel` accepts any numbers: `maxRestarts: NaN` silently means "always restart", and a negative or zero `withinMs` breaks the sliding window. Reject them with `invalid_config`, as `bus.commitIntervalMs` already is.
+- **Document "always restart".** `maxRestarts: Infinity` restarts every time in today's code (the check `restarts >= Infinity` is never true), and the backoff (250 ms × 2ⁿ, capped at 4 s by default) is then the only brake on a crash loop. Say so in the guide, or add an explicit `strategy: 'always'`.
+
 ## Storage
 
 - **IndexedDB storage when OPFS sync access is missing.** Today such a tab falls back to memory topics with `bus:durability-degraded` (`no-sync-access`). A second storage engine is worth it only if a major browser lacks sync access in normal browsing. ([ADR 0007](adr/0007-bus-worker-supervision.md), M2b task 15)
