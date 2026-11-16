@@ -53,6 +53,15 @@ The main thread shows everything isolates render ([engine constraints](investiga
 
 - **A browser extension.** M4's devtools are a panel in the page, drawn by an isolate ([M4](plans/m4-devtools-release.md#devtools-decisions-2026-11-16)). An extension would give devtools on a site without changing its code, and space outside the page. It would be one more client of `kernel.inspect()`, like the panel and the dev MCP, so it needs no new kernel work. Worth it once other people run Isoloop apps in production. It can't reach phones, and Safari needs an Xcode build and a paid Apple developer account.
 
+## Widget creator
+
+From the [M3e](plans/m3e-live-widget-creator.md) grilling, 2026-11-16.
+
+- **`combine`.** A widget with a second source, merged into time buckets. Left out of v1: two sources need two grants and a time-alignment rule, and it's the hardest operator to explain in a form or to an agent.
+- **An expression syntax.** `price > 100 && region == "EU"`, parsed by our own parser, next to the structured predicates. Structured JSON is what agents write reliably and what validates field by field, so v1 has only that.
+- **Reordering widgets.** Move left and right buttons on each widget. Drag and drop isn't possible in the DOM subset.
+- **Packing back.** Once [M3h](plans/m3h-auto-placement.md) moves heavy widgets apart, moving quiet ones back into pools to save workers.
+
 ## Isoloop Builder
 
 These move to `isoloop/builder` when that repo is created, with the [decisions so far](plans/builder.md).

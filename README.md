@@ -4,7 +4,7 @@
 
 **A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-Status: **M0–M3 and M2b–M2d done, pre-release.** The kernel (loader, supervisor, frame-batched compositor on our own render bridge), the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension, persistent topics in OPFS), worker pools for headless and visual isolates, and the Preact and React adapters, with CI on Chromium, Firefox and WebKit. Prereleases are on npm under the `next` tag; there's no stable release yet. Next: M3e (the live widget creator), M3g (a federated native comparison), then M4 (devtools and 0.1); after 0.1, the Vue, Svelte and Solid adapters (M6), a WebMCP spike (M7) and the shared-memory engine (M5). The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
+Status: **M0–M3 and M2b–M2d done, pre-release.** The kernel (loader, supervisor, frame-batched compositor on our own render bridge), the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension, persistent topics in OPFS), worker pools for headless and visual isolates, and the Preact and React adapters, with CI on Chromium, Firefox and WebKit. Prereleases are on npm under the `next` tag; there's no stable release yet. Next: M3e (the live widget creator), M3h (auto placement), M3g (a federated native comparison), then M4 (devtools and 0.1); after 0.1, the Vue, Svelte and Solid adapters (M6), a WebMCP spike (M7) and the shared-memory engine (M5). The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
 
 ## Run the demo
 
@@ -167,16 +167,17 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 
 **Before 0.1**
 
-9. **M3e Live widget creator:** users compose a widget from a JSON spec (a source, fixed operators, a view) and add it while the app runs; sources include CSV or JSON uploads and polled URLs. No user code.
-10. **M3g Federated comparison:** a native build of the markets dashboard's React + Preact version, with the Preact part shipped apart and loaded at run time the way teams combine parts today, measured against Isoloop's.
-11. **M4 Devtools and 0.1:** a devtools panel that is itself an isolate (a floating button that opens isolates, bus and live-log panels), docs site, CLI, npm release with a launch post; a dev-only MCP server for agents, if time allows.
+9. **M3e Live widget creator:** an interactive mode for the plant and markets dashboards: add, edit and delete widgets while the page runs, each a JSON spec (a dashboard topic, fixed operators, a view) running as its own isolate, placed by hand. No user code. Measured both ways against native: what the drawer's work does to the dashboard, and what the dashboard's load does to the drawer.
+10. **M3h Auto placement:** a balancer that decides whether a new isolate joins a pool or gets a worker apart, from measured usage and topic subscriptions.
+11. **M3g Federated comparison:** a native build of the markets dashboard's React + Preact version, with the Preact part shipped apart and loaded at run time the way teams combine parts today, measured against Isoloop's.
+12. **M4 Devtools and 0.1:** a devtools panel that is itself an isolate (a floating button that opens isolates, bus and live-log panels), docs site, CLI, npm release with a launch post; a dev-only MCP server for agents, if time allows.
 
 **After 0.1**
 
-12. **M6 Vue, Svelte and Solid adapters:** Vue 3 (starting with a spike), Svelte 5 and Solid 1, with the HTML parsing and `cloneNode` they need, and no change to the render format.
-13. **M7 WebMCP (spike):** whether isolates should expose tools to browser agents through WebMCP.
-14. **M5 Shared-memory engine:** opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
-15. **M5b Delivery batching (spike):** whether batching bus traffic across tasks gets the TS engine from 45.5k to its 50k records/s budget.
+13. **M6 Vue, Svelte and Solid adapters:** Vue 3 (starting with a spike), Svelte 5 and Solid 1, with the HTML parsing and `cloneNode` they need, and no change to the render format.
+14. **M7 WebMCP (spike):** whether isolates should expose tools to browser agents through WebMCP.
+15. **M5 Shared-memory engine:** opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
+16. **M5b Delivery batching (spike):** whether batching bus traffic across tasks gets the TS engine from 45.5k to its 50k records/s budget.
 
 **Separately**
 
