@@ -191,7 +191,7 @@ kernel.spawn({
 kernel.on('isolate:crash', ({ id, reason, message }) => report(id, reason, message));
 ```
 
-**Isolate (React adapter, planned for M3)**
+**Isolate (React adapter, built in M3a)**
 
 ```tsx
 import { defineIsolate, useTopic, usePublish } from '@isoloop/react';
