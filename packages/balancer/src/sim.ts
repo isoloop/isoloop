@@ -87,14 +87,26 @@ export class SimKernel implements KernelLike {
     clearInterval(this.#timer);
   }
 
-  /** As the host will: `balancer-*` pools only through the claim, one claim per kernel. */
-  claimPools(_owner: 'balancer'): { spawn(manifest: ManifestLike): void } {
+  /** As the host does: `balancer-*` pools only through the claim, one claim at a time. */
+  claimPools(_owner: 'balancer'): { spawn(manifest: ManifestLike): void; release(): void } {
     if (this.#claimed)
       throw Object.assign(new Error('this kernel already has a balancer'), {
         code: 'balancer_exists',
       });
     this.#claimed = true;
-    return { spawn: (m) => this.#spawn(m) };
+    let released = false;
+    return {
+      spawn: (m) => {
+        if (released)
+          throw Object.assign(new Error('this claim was released'), { code: 'reserved_pool' });
+        this.#spawn(m);
+      },
+      release: () => {
+        if (released) return;
+        released = true;
+        this.#claimed = false;
+      },
+    };
   }
 
   spawn(manifest: ManifestLike): void {

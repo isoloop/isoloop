@@ -425,6 +425,21 @@ describe('one balancer per kernel', () => {
     expect(() => createBalancer(sim)).toThrow(expect.objectContaining({ code: 'balancer_exists' }));
   });
 
+  it('allows a new balancer once the first is disposed; the old one spawns nothing', async () => {
+    start({}, new SimKernel());
+    const first = balancer;
+    first.spawn({ id: 'a' });
+    first.dispose();
+    first.dispose(); // twice is harmless
+    expect(() => first.spawn({ id: 'b' })).toThrow(/disposed/);
+    // The kernel's claim is free again.
+    balancer = createBalancer(sim, { maxWorkers: 10 });
+    expect(() => balancer.spawn({ id: 'c' })).not.toThrow();
+    // And held again by the new one.
+    expect(() => createBalancer(sim)).toThrow(expect.objectContaining({ code: 'balancer_exists' }));
+    await wait(100);
+  });
+
   it("rejects a kernel that has no claim of its own and isn't the host's", () => {
     start();
     const plain = {

@@ -162,7 +162,7 @@ export type KernelErrorCode =
   | 'bus_failed'
   /** A `pool` name starting `balancer-`: those belong to `@isoloop/balancer` (ADR 0017). */
   | 'reserved_pool'
-  /** `claimPools` called a second time for the same kernel: one balancer per kernel (ADR 0017). */
+  /** `claimPools` called while the kernel's claim is held: one balancer per kernel at a time (ADR 0017). */
   | 'balancer_exists';
 
 /** An error the kernel API throws, with a code to branch on. */
@@ -1509,23 +1509,26 @@ export function createKernel(config: KernelConfig): Kernel {
   return kernel;
 }
 
-/** Each kernel's spawn that may use reserved pools, handed out once by `claimPools`. */
+/** Each kernel's spawn that may use reserved pools, handed out by `claimPools`, one claim at a time. */
 const reservedSpawns = new WeakMap<Kernel, (manifest: IsolateManifest) => IsolateHandle>();
 const claimed = new WeakSet<Kernel>();
 
 /**
  * Claims a kernel's reserved pools (`balancer-…`) for `@isoloop/balancer`
  * (ADR 0017). The returned `spawn` is `kernel.spawn` that may also name those
- * pools; a plain `kernel.spawn` with one throws `reserved_pool`. A kernel can
- * be claimed once, so it has one balancer: a second claim throws
- * `balancer_exists`.
+ * pools; a plain `kernel.spawn` with one throws `reserved_pool`. A kernel has
+ * one claim at a time, so one balancer: a second claim throws
+ * `balancer_exists` until the first is released. `release()` gives the claim
+ * back (the balancer's `dispose`): its `spawn` then throws `reserved_pool`,
+ * isolates already in reserved pools keep running, and the kernel can be
+ * claimed again.
  *
  * @internal Used by `@isoloop/balancer`; not part of the public API.
  */
 export function claimPools(
   kernel: Kernel,
   prefix: 'balancer',
-): { spawn: (manifest: IsolateManifest) => IsolateHandle } {
+): { spawn: (manifest: IsolateManifest) => IsolateHandle; release: () => void } {
   if (`${prefix}-` !== RESERVED_POOL_PREFIX)
     throw new KernelError('invalid_config', `claimPools: unknown prefix ${JSON.stringify(prefix)}`);
   const spawn = reservedSpawns.get(kernel);
@@ -1533,5 +1536,16 @@ export function claimPools(
   if (claimed.has(kernel))
     throw new KernelError('balancer_exists', 'claimPools: this kernel already has a balancer');
   claimed.add(kernel);
-  return { spawn };
+  let released = false;
+  return {
+    spawn: (manifest) => {
+      if (released) throw new KernelError('reserved_pool', 'claimPools: this claim was released');
+      return spawn(manifest);
+    },
+    release: () => {
+      if (released) return;
+      released = true;
+      claimed.delete(kernel);
+    },
+  };
 }
