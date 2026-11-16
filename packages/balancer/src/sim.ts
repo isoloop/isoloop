@@ -18,6 +18,8 @@ export class SimKernel implements KernelLike {
   #isos = new Map<string, Iso>();
   /** Steady busy share of a beat, 0–100, per isolate id. */
   #load = new Map<string, number>();
+  /** Busy share the worker spends for `id` that its `busyMs` doesn't show. */
+  #hidden = new Map<string, number>();
   /** One-off busy milliseconds added to the next beat. */
   #burst = new Map<string, number>();
   #blocking = new Set<string>();
@@ -34,6 +36,11 @@ export class SimKernel implements KernelLike {
   /** Sets `id`'s steady load, as a share of one core. */
   load(id: string, pct: number): void {
     this.#load.set(id, pct);
+  }
+
+  /** `id` costs its worker `pct` of each beat that `busyMs` doesn't attribute. */
+  hidden(id: string, pct: number): void {
+    this.#hidden.set(id, pct);
   }
 
   /** `id` runs one long task of `ms` before its worker's next beat. */
@@ -145,7 +152,7 @@ export class SimKernel implements KernelLike {
       for (const i of isos) {
         i.busyMs = ((this.#load.get(i.id) ?? 1) * BEAT_MS) / 100 + (this.#burst.get(i.id) ?? 0);
         this.#burst.delete(i.id);
-        total += i.busyMs;
+        total += i.busyMs + ((this.#hidden.get(i.id) ?? 0) * BEAT_MS) / 100;
       }
       const lagMs = Math.max(0, total - 60) * 3;
       for (const i of isos) {

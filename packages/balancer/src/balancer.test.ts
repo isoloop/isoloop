@@ -220,6 +220,81 @@ describe('a pool killed for blocking', () => {
   });
 });
 
+describe('when busyMs explains too little', () => {
+  it('bisects instead of moving the busiest member, and keeps the others away from the culprit', async () => {
+    start({ loads: memoryLoads({ a: 1, b: 1, c: 1, d: 1 }) });
+    for (const id of ['a', 'b', 'c', 'd']) {
+      sim.load(id, 5);
+      balancer.spawn({ id });
+    }
+    // a looks busiest, but c costs its worker 70 % that busyMs doesn't show.
+    sim.load('a', 8);
+    sim.hidden('c', 70);
+    await wait(8_000);
+    expect(moves.length).toBeGreaterThan(0);
+    expect(moves[0]?.reason).toBe('bisect');
+    expect(moves.some((m) => m.reason === 'sustained' && m.id === 'a')).toBe(false);
+    await wait(300_000);
+    const cPool = where('c')?.pool;
+    for (const id of ['a', 'b', 'd']) {
+      expect(where(id)?.state).toBe('placed');
+      expect(where(id)?.pool).not.toBe(cPool);
+    }
+  });
+
+  it('bisects on a spike that busyMs does not explain', async () => {
+    start({ loads: memoryLoads({ a: 1, b: 1, c: 1, d: 1 }) });
+    for (const id of ['a', 'b', 'c', 'd']) {
+      sim.load(id, 5);
+      balancer.spawn({ id });
+    }
+    await wait(1_000);
+    sim.hidden('d', 200);
+    await wait(150);
+    sim.hidden('d', 0);
+    await wait(500);
+    expect(moves.map((m) => m.reason)).toEqual(['bisect', 'bisect']);
+  });
+});
+
+describe('after a move', () => {
+  it("moves the next-heaviest member when the source pool's lag doesn't fall", async () => {
+    const ids = ['h1', 'h2', 'l1', 'l2', 'l3', 'l4', 'l5', 'l6', 'l7'];
+    start({ loads: memoryLoads(Object.fromEntries(ids.map((id) => [id, 1]))) });
+    for (const id of ids) balancer.spawn({ id });
+    // 12 + 11 + 7 × 9.5 = 89.5 % of a beat: over the sustained threshold, under a spike.
+    sim.load('h1', 12);
+    sim.load('h2', 11);
+    for (const id of ids.slice(2)) sim.load(id, 9.5);
+    await wait(5_000);
+    expect(moves).toEqual([{ id: 'h1', from: 'auto-1', to: 'auto-2', reason: 'sustained' }]);
+    // Without h1, auto-1 is still at 77.5 %: the next window moves h2.
+    await wait(5_000);
+    expect(moves).toEqual([
+      { id: 'h1', from: 'auto-1', to: 'auto-2', reason: 'sustained' },
+      { id: 'h2', from: 'auto-1', to: 'auto-2', reason: 'sustained' },
+    ]);
+    await wait(60_000);
+    expect(moves).toHaveLength(2);
+  });
+
+  it('after a move that did not help, a held heaviest member no longer blocks the next one', async () => {
+    const ids = ['h1', 'h2', 'h3', 'l1', 'l2', 'l3', 'l4', 'l5', 'l6'];
+    start({ loads: memoryLoads(Object.fromEntries(ids.map((id) => [id, 1]))) });
+    for (const id of ids) balancer.spawn({ id });
+    sim.load('h1', 13);
+    sim.load('h2', 12);
+    sim.load('h3', 11);
+    // 13 + 12 + 11 + 6 × 9.2 = 91.2 %; without h1, 78.2 %: still over.
+    for (const id of ids.slice(3)) sim.load(id, 9.2);
+    await wait(5_000);
+    expect(moves.map((m) => m.id)).toEqual(['h1']);
+    balancer.hold('h2');
+    await wait(5_000);
+    expect(moves.map((m) => m.id)).toEqual(['h1', 'h3']);
+  });
+});
+
 describe('what it leaves alone', () => {
   it('never moves isolates spawned through the kernel, nor one on hold', async () => {
     start({ loads: memoryLoads({ a: 5, h: 5 }) });

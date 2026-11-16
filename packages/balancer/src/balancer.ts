@@ -24,6 +24,14 @@ const QUARANTINE = 'auto-quarantine';
 
 const now = (): number => performance.now();
 
+/**
+ * `busyMs` is approximate: shared framework work is split between members and
+ * promise continuations go unattributed. When the members' busy time explains
+ * less than this share of the interval, the lag isn't pinned on the busiest
+ * member; the balancer bisects instead, as on a kill.
+ */
+const ATTRIBUTED_PCT = 50;
+
 /** Kernel states in which an isolate still holds a worker. */
 const LIVE = new Set(['loading', 'running', 'blocked', 'crashed', 'restarting']);
 
@@ -58,6 +66,8 @@ type Pool = {
   lastBeatAt: number | undefined;
   /** When the membership last changed: a full window must follow before it moves anyone. */
   since: number;
+  /** A member moved out: its next full window must show the lag fell, or the next-heaviest goes too. */
+  watch: boolean;
 };
 
 const defaultMaxWorkers = (): number => {
@@ -114,7 +124,7 @@ export function createBalancer<M extends ManifestLike>(
   const pool = (name: string): Pool => {
     let p = pools.get(name);
     if (!p) {
-      p = { lags: [], lastBeatAt: undefined, since: now() };
+      p = { lags: [], lastBeatAt: undefined, since: now(), watch: false };
       pools.set(name, p);
     }
     return p;
@@ -225,6 +235,7 @@ export function createBalancer<M extends ManifestLike>(
     // doesn't pick the same fresh name.
     m.pool = to;
     changed(from);
+    pool(from).watch = true;
     void kernel.stop(id).then(
       () => {
         if (disposed || members.get(id) !== m) return;
@@ -285,6 +296,12 @@ export function createBalancer<M extends ManifestLike>(
     }
     // A spike (Q6′): the member that was busiest in that beat goes to quarantine at once.
     for (const [name, beat] of fresh) {
+      const dur = Math.max(...beat.map((m) => m.beats.at(-1)?.dur ?? 0));
+      const busy = beat.reduce((sum, m) => sum + (m.beats.at(-1)?.busy ?? 0), 0);
+      if (dur > 0 && (busy / dur) * 100 < ATTRIBUTED_PCT) {
+        search(name, 'spike');
+        continue;
+      }
       const culprit = beat
         .filter((m) => m.beats.length > 0)
         .toSorted((a, b) => (b.beats.at(-1)?.busy ?? 0) - (a.beats.at(-1)?.busy ?? 0))[0];
@@ -301,7 +318,12 @@ export function createBalancer<M extends ManifestLike>(
 
   // ---- deciding ----
 
-  const onKill = (name: string): void => {
+  /**
+   * Finds the member behind a pool's trouble when the kernel or `busyMs`
+   * can't name it (Q20): the heavier half of the suspects moves, and
+   * whichever half acts up again holds the culprit.
+   */
+  const search = (name: string, reason: 'spike' | 'sustained' | 'crash'): void => {
     const here = membersOf(name).filter((m) => m.holds === 0);
     if (here.length === 0) return;
     const ids = new Set(here.map((m) => m.manifest.id));
@@ -311,16 +333,17 @@ export function createBalancer<M extends ManifestLike>(
       const culprit = members.get(suspects[0] ?? '');
       bisect = undefined;
       if (!culprit) return;
+      // Alone and never quarantined: a lag of its own hurts nobody else.
+      if (reason !== 'crash' && membersOf(name).length === 1 && culprit.offences === 0) return;
       // Found: a worker of its own in quarantine when the cap allows (Q18),
       // so it stops taking the other suspects down with it.
       if (membersOf(name).length > 1 && roomForPool()) {
         culprit.offences++;
         culprit.lastSpikeAt = culprit.quarantinedAt = now();
-        move(culprit, freshName(QUARANTINE, 2), 'crash', stateFor(culprit));
-      } else quarantine(culprit, 'crash', true);
+        move(culprit, freshName(QUARANTINE, 2), reason, stateFor(culprit));
+      } else quarantine(culprit, reason, true);
       return;
     }
-    // Q20: the heavier half moves; whichever half kills its pool again holds the culprit.
     const sorted = suspects
       .map((id) => members.get(id))
       .filter((m): m is Member<M> => m !== undefined)
@@ -345,18 +368,31 @@ export function createBalancer<M extends ManifestLike>(
 
   const decide = (): void => {
     const t = now();
-    for (const name of killed) onKill(name);
+    for (const name of killed) search(name, 'crash');
     killed.clear();
     if (bisect && t - bisect.at > steadyMs * 2) bisect = undefined;
 
     // Sustained (Q6′, Q18): the heaviest member moves somewhere with room.
+    // After a move out, the same check on the pool's next full window is the
+    // follow-up: if the lag didn't fall, the next-heaviest goes too.
     for (const name of new Set([...members.values()].map((m) => m.pool))) {
       const here = membersOf(name);
-      if (here.length < 2 || !windowFull(name)) continue;
-      if (median(pool(name).lags.map((l) => l.lagMs)) <= sustainedLag) continue;
-      // On hold or already moving: wait, rather than move a lighter one that
-      // wouldn't relieve the pool.
-      const heaviest = here.toSorted((a, b) => (loadOf(b) ?? 0) - (loadOf(a) ?? 0))[0];
+      if (!windowFull(name)) continue;
+      const p = pool(name);
+      if (median(p.lags.map((l) => l.lagMs)) <= sustainedLag) {
+        p.watch = false;
+        continue;
+      }
+      if (here.length < 2) continue;
+      if (here.reduce((sum, m) => sum + (loadOf(m) ?? 0), 0) < ATTRIBUTED_PCT) {
+        search(name, 'sustained');
+        continue;
+      }
+      const byLoad = here.toSorted((a, b) => (loadOf(b) ?? 0) - (loadOf(a) ?? 0));
+      // At first, a heaviest member on hold means wait: moving a lighter one
+      // wouldn't relieve the pool. After a move that didn't help, the
+      // next-heaviest that can move goes.
+      const heaviest = p.watch ? byLoad.find(movable) : byLoad[0];
       if (!heaviest || !movable(heaviest)) continue;
       if (isQuarantine(name)) {
         if (roomForPool()) move(heaviest, freshName(QUARANTINE, 2), 'sustained', heaviest.state);
