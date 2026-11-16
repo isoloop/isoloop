@@ -79,6 +79,7 @@ export default defineConfig({
       node('protocol'),
       node('codec'),
       node('bus'),
+      node('balancer'),
       node('vite'),
       // The core diagrams' drift test (docs/diagrams/README.md).
       {
@@ -96,6 +97,7 @@ export default defineConfig({
       ]),
       browser('dom'),
       browser('host'),
+      browser('balancer-browser', 'packages/balancer/src/**/*.browser.test.ts'),
       browser('runtime'),
       preact(10),
       preact(11),

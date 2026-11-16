@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.lib.json",
+  "compilerOptions": {
+    // DOM: the balancer runs on the main thread, next to the kernel. ES2023
+    // for `toSorted` (Safari 16, below the 16.4 floor).
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["src"]
+}

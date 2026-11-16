@@ -1,0 +1,41 @@
+{
+  "name": "@isoloop/balancer",
+  "version": "0.0.0",
+  "description": "Experimental automatic placement for Isoloop isolates: joins a pool or keeps apart from measured load, quarantines what blocks.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isoloop/isoloop.git",
+    "directory": "packages/balancer"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "@isoloop/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown --platform browser --dts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@isoloop/host": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

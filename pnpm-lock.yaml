@@ -373,6 +373,16 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
 
+  packages/balancer:
+    dependencies:
+      '@isoloop/host':
+        specifier: workspace:*
+        version: link:../host
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
   packages/bus:
     dependencies:
       '@isoloop/codec':
