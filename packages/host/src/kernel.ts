@@ -159,7 +159,11 @@ export type KernelErrorCode =
   | 'invalid_manifest'
   | 'invalid_config'
   /** The bus couldn't load its contracts, so nothing can start (ADR 0003, decision 7). */
-  | 'bus_failed';
+  | 'bus_failed'
+  /** A `pool` name starting `balancer-`: those belong to `@isoloop/balancer` (ADR 0017). */
+  | 'reserved_pool'
+  /** `claimPools` called a second time for the same kernel: one balancer per kernel (ADR 0017). */
+  | 'balancer_exists';
 
 /** An error the kernel API throws, with a code to branch on. */
 export class KernelError extends Error {
@@ -445,7 +449,10 @@ function scrollOptions(x: unknown): ScrollIntoViewOptions {
   return out;
 }
 
-function validate(m: IsolateManifest): void {
+/** Pool names `@isoloop/balancer` owns (ADR 0017); only a `claimPools` spawn may use them. */
+const RESERVED_POOL_PREFIX = 'balancer-';
+
+function validate(m: IsolateManifest, reservedOk: boolean): void {
   if (typeof m.id !== 'string' || m.id === '' || typeof m.src !== 'string' || m.src === '')
     throw new KernelError('invalid_manifest', 'A manifest needs a non-empty `id` and `src`');
   if (m.id.startsWith(HOST_CONNECTION_PREFIX))
@@ -456,6 +463,11 @@ function validate(m: IsolateManifest): void {
   if (m.pool !== undefined) {
     if (typeof m.pool !== 'string' || m.pool === '')
       throw new KernelError('invalid_manifest', `"${m.id}": \`pool\` must be a non-empty string`);
+    if (!reservedOk && m.pool.startsWith(RESERVED_POOL_PREFIX))
+      throw new KernelError(
+        'reserved_pool',
+        `"${m.id}": pool names starting ${RESERVED_POOL_PREFIX} belong to @isoloop/balancer`,
+      );
   }
   const s = m.suspend;
   if (s !== undefined && s !== 'never' && s !== 'when-idle') {
@@ -1279,9 +1291,11 @@ export function createKernel(config: KernelConfig): Kernel {
     };
   };
 
+  // Set only for the length of a `claimPools` spawn, which may use reserved pools.
+  let reservedOk = false;
   const kernel: Kernel = {
     spawn(manifest) {
-      validate(manifest);
+      validate(manifest, reservedOk);
       if (contractsFailed)
         throw new KernelError(
           'bus_failed',
@@ -1454,5 +1468,40 @@ export function createKernel(config: KernelConfig): Kernel {
       controller?.destroy();
     },
   };
+  reservedSpawns.set(kernel, (manifest) => {
+    reservedOk = true;
+    try {
+      return kernel.spawn(manifest);
+    } finally {
+      reservedOk = false;
+    }
+  });
   return kernel;
+}
+
+/** Each kernel's spawn that may use reserved pools, handed out once by `claimPools`. */
+const reservedSpawns = new WeakMap<Kernel, (manifest: IsolateManifest) => IsolateHandle>();
+const claimed = new WeakSet<Kernel>();
+
+/**
+ * Claims a kernel's reserved pools (`balancer-…`) for `@isoloop/balancer`
+ * (ADR 0017). The returned `spawn` is `kernel.spawn` that may also name those
+ * pools; a plain `kernel.spawn` with one throws `reserved_pool`. A kernel can
+ * be claimed once, so it has one balancer: a second claim throws
+ * `balancer_exists`.
+ *
+ * @internal Used by `@isoloop/balancer`; not part of the public API.
+ */
+export function claimPools(
+  kernel: Kernel,
+  prefix: 'balancer',
+): { spawn: (manifest: IsolateManifest) => IsolateHandle } {
+  if (`${prefix}-` !== RESERVED_POOL_PREFIX)
+    throw new KernelError('invalid_config', `claimPools: unknown prefix ${JSON.stringify(prefix)}`);
+  const spawn = reservedSpawns.get(kernel);
+  if (!spawn) throw new KernelError('invalid_config', 'claimPools: not a kernel from createKernel');
+  if (claimed.has(kernel))
+    throw new KernelError('balancer_exists', 'claimPools: this kernel already has a balancer');
+  claimed.add(kernel);
+  return { spawn };
 }
