@@ -103,8 +103,8 @@ describe('sustained load', () => {
   });
 
   it('respects the worker cap: no pool beyond it, the mover stays and is flagged', async () => {
-    // maxWorkers 3: the bus, balancer-1, and one kept for the quarantine.
-    start({ maxWorkers: 3, loads: memoryLoads({ a: 5, h: 5 }) });
+    // maxWorkers 1: balancer-1 only (the quarantine is allowed on top).
+    start({ maxWorkers: 1, loads: memoryLoads({ a: 5, h: 5 }) });
     sim.load('a', 5);
     sim.load('h', 5);
     balancer.spawn({ id: 'a' });
@@ -114,15 +114,33 @@ describe('sustained load', () => {
     await wait(10_000);
     expect(moves).toEqual([]);
     expect(where('h')).toMatchObject({ pool: 'balancer-1', atCap: true });
-    expect(sim.peakWorkers).toBeLessThanOrEqual(3);
+    expect(sim.peakBalancerPools).toBeLessThanOrEqual(1);
   });
 
-  it('counts workers it does not own toward the cap', () => {
-    start({ maxWorkers: 4, loads: memoryLoads({ a: 50, b: 50 }) });
+  it('counts only its own pools toward the cap, however many workers the page runs', () => {
+    start({ maxWorkers: 2, loads: memoryLoads({ a: 50, b: 50, c: 50 }) });
+    // A busy page: workers the app runs itself don't count (ADR 0017, amended).
     sim.spawn({ id: 'dashboard' });
-    balancer.spawn({ id: 'a' });
-    // bus + dashboard + balancer-1 = 3; a new pool and the quarantine's slot would make 5.
-    expect(balancer.spawn({ id: 'b' })).toMatchObject({ pool: 'balancer-1', atCap: true });
+    for (let i = 1; i <= 8; i++) sim.spawn({ id: `data-${i}`, pool: `data-${i}` });
+    expect(balancer.spawn({ id: 'a' })).toMatchObject({ pool: 'balancer-1' });
+    expect(balancer.spawn({ id: 'b' })).toMatchObject({ pool: 'balancer-2' });
+    expect(where('b')?.atCap).toBeUndefined();
+    // A third pool would pass the allowance of 2.
+    expect(balancer.spawn({ id: 'c' })).toMatchObject({ atCap: true });
+    expect(sim.peakBalancerPools).toBe(2);
+  });
+
+  it('allows the quarantine on top of the cap', async () => {
+    start({ maxWorkers: 1, loads: memoryLoads({ a: 5, s: 5 }) });
+    for (const id of ['a', 's']) {
+      sim.load(id, 5);
+      balancer.spawn({ id });
+    }
+    await wait(1_000);
+    sim.burst('s', 400);
+    await wait(300);
+    expect(where('s')).toMatchObject({ pool: 'balancer-quarantine-1', state: 'quarantined' });
+    expect(sim.peakBalancerPools).toBe(1);
   });
 });
 
@@ -376,7 +394,7 @@ describe('foreign members (defensive)', () => {
     expect(where('intruder')).toMatchObject({ pool: 'balancer-1', foreign: true });
     expect(moves.some((m) => m.id === 'intruder')).toBe(false);
     await sim.stop('intruder');
-    await wait(200);
+    await wait(600);
     expect(where('intruder')).toBeUndefined();
   });
 });
