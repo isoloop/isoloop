@@ -234,6 +234,15 @@ export type KernelEvents = {
   /** Past the restart limit, or strategy `never`: the isolate stays down. */
   'isolate:failed': { id: string; reason: CrashReason; message: string; pool?: string };
   'isolate:error': { id: string; message: string };
+  /**
+   * One isolate's heartbeat, as it arrives (ADR 0017): its worker's `lagMs`
+   * and, from runtimes that report it, its own `busyMs` for the interval the
+   * beat covers. A pool's beat gives one event per member. `at` is the host's
+   * `performance.now()` on receipt. Emitted only while someone listens, so
+   * apps without a listener pay nothing. `@isoloop/balancer` reads every beat
+   * through it rather than polling `isolates()`, which keeps only the latest.
+   */
+  'isolate:beat': { id: string; pool?: string; lagMs: number; busyMs?: number; at: number };
   /** More live workers than `workers.budget`. Emitted once per kernel. */
   'workers:budget': { live: number; budget: number };
   /** The bus worker loaded its contracts. `first` is false after a restart. */
@@ -526,6 +535,7 @@ export function createKernel(config: KernelConfig): Kernel {
     'isolate:crash': new Set(),
     'isolate:failed': new Set(),
     'isolate:error': new Set(),
+    'isolate:beat': new Set(),
     'workers:budget': new Set(),
     'bus:ready': new Set(),
     'bus:crash': new Set(),
@@ -885,7 +895,21 @@ export function createKernel(config: KernelConfig): Kernel {
               `[isoloop] "${id}" has held keepAwake() for over 10 minutes; it can't be suspended (ADR 0001).`,
             );
           }
-          feed(slot, { k: 'beat', at: performance.now(), lagMs: msg.p.lagMs });
+          {
+            const at = performance.now();
+            feed(slot, { k: 'beat', at, lagMs: msg.p.lagMs });
+            if (listeners['isolate:beat'].size > 0) {
+              const pool = slot.manifest.pool;
+              const busyMs = slot.idle?.busyMs;
+              emit('isolate:beat', {
+                id,
+                ...(pool === undefined ? {} : { pool }),
+                lagMs: msg.p.lagMs,
+                ...(busyMs === undefined ? {} : { busyMs }),
+                at,
+              });
+            }
+          }
           return;
         case 'patch':
           if (slot.fmt !== undefined && slot.fmt !== 'none' && msg.p.fmt === slot.fmt)
