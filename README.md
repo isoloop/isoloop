@@ -169,7 +169,7 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 
 9. **M3e Live widget creator:** an interactive mode for the plant and markets dashboards: add, edit and delete widgets while the page runs, each a JSON spec (a dashboard topic, fixed operators, a view) running as its own isolate, placed by hand. No user code. Measured both ways against native: what the drawer's work does to the dashboard, and what the dashboard's load does to the drawer.
 10. **M3g Federated comparison** ([write-up](https://github.com/isoloop/web/tree/main/apps/dashboards/markets/comparison/federated)): a native build of the markets dashboard's React + Preact version, with the Preact part shipped apart and loaded at run time the way teams combine parts today, measured against Isoloop's, with a pool per team (`markets-v0.5.0`).
-11. **M3h Auto placement:** a balancer that decides whether a new isolate joins a pool or gets a worker apart, from measured usage and topic subscriptions.
+11. **M3h Auto placement:** `@isoloop/balancer` (experimental, [guide](docs/guide/balancer.md)) places isolates by measured load, moves one out of a pool that lags or is full, and quarantines one that blocks or crashes; shown on the processor example's Playground.
 12. **M4 Devtools and 0.1:** a devtools panel that is itself an isolate (a floating button that opens isolates, bus and live-log panels), docs site, CLI, npm release with a launch post; a dev-only MCP server for agents, if time allows.
 
 **After 0.1**
@@ -185,10 +185,10 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 
 ## Repo layout
 
-Plain pnpm workspaces. Today: `protocol`, `dom`, `host`, `runtime`, `bus`, `codec`, `react`, `preact` and `vite`; the rest arrives with its milestone.
+Plain pnpm workspaces. Today: `protocol`, `dom`, `host`, `runtime`, `bus`, `codec`, `react`, `preact`, `vite` and the experimental `balancer`; the rest arrives with its milestone.
 
 ```text
-packages/  protocol · dom · host · runtime · bus · codec (M2b) · react, preact (M3) · vite · devtools (M4) · vue, svelte, solid (M6) · bus-wasm (M5)
+packages/  protocol · dom · host · runtime · bus · codec (M2b) · react, preact (M3) · vite · balancer (M3h) · devtools (M4) · vue, svelte, solid (M6) · bus-wasm (M5)
 e2e/       Playwright suites, their harness page and the isolates they spawn (the four-loops ones included)
 docs/      rfcs · design · adr · plans · guide · investigations · posts
 bench/     click-to-paint, throughput
@@ -206,6 +206,7 @@ Parallel painting of DOM surfaces (canvas isolates painting through `OffscreenCa
 - [System design](docs/design/system-design.md): packages, interfaces, sequences and invariants
 - [Architecture decision records](docs/adr/README.md)
 - [Implementation plans](docs/plans/README.md), one per milestone
+- Guides: [hosting](docs/guide/hosting.md), [worker pools](docs/guide/pools.md), [automatic placement (balancer)](docs/guide/balancer.md)
 - [Contributing](CONTRIBUTING.md): setup, scripts, editors and conventions
 - [Would like](docs/would-like.md): ideas deferred or to explore, not planned
 - [Should do](docs/should-do.md): committed work waiting on a package or milestone
