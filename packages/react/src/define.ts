@@ -43,6 +43,16 @@ class Boundary extends ComponentBase<BoundaryProps, { failed: boolean }> {
   }
 }
 
+/** The runtime's internal hook on a context (ADR 0017), by its `Symbol.for` key. */
+const BUSY = Symbol.for('isoloop.busy');
+
+function claimRoot(ctx: IsolateContext, container: object): void {
+  const hook: unknown = Reflect.get(ctx, BUSY);
+  const claim: unknown =
+    typeof hook === 'object' && hook !== null ? Reflect.get(hook, 'claim') : undefined;
+  if (typeof claim === 'function') Reflect.apply(claim, hook, [container]);
+}
+
 export function defineIsolate(Component: ComponentType<IsolateProps>): IsolateDefinition {
   return {
     // The version this isolate was built against (ADR 0012), as runtime's `defineIsolate` stamps it.
@@ -53,6 +63,10 @@ export function defineIsolate(Component: ComponentType<IsolateProps>): IsolateDe
       if (!(container instanceof Element)) {
         throw new Error(`defineIsolate (React): "${ctx.id}" is headless; React needs a surface`);
       }
+      // Names the container to the runtime, so a commit of this root, in a
+      // scheduler task shared by a pool's members, counts as this member's
+      // busy time (ADR 0017). Absent under a runtime before it (ADR 0012).
+      claimRoot(ctx, container);
       const root = createRoot(container);
       root.render(
         createElement(

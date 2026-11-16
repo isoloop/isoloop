@@ -192,6 +192,11 @@ export type IsolateSnapshot = {
   dropped: number;
   /** Open `ctx.keepAwake()` holds, from the last beat (devtools). */
   holds?: { ageMs: number; stack?: string }[];
+  /**
+   * Milliseconds its worker spent running its code during the last beat's
+   * interval (ADR 0017); see `IdleReport.busyMs`. Absent before its first beat.
+   */
+  busyMs?: number;
 };
 
 /** A named pool (M2c, ADR 0001), for devtools. */
@@ -1288,6 +1293,7 @@ export function createKernel(config: KernelConfig): Kernel {
       ...(error === undefined ? {} : { error }),
       ...(surface === undefined ? {} : { surface }),
       ...(slot.idle && slot.idle.holds.length > 0 ? { holds: slot.idle.holds } : {}),
+      ...(slot.idle?.busyMs === undefined ? {} : { busyMs: slot.idle.busyMs }),
     };
   };
 

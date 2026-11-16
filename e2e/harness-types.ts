@@ -40,6 +40,8 @@ type HarnessKernel = {
     lagMs: number;
     pool?: string;
     surface?: { queued: number; applied: number };
+    lastBeatAt: number;
+    busyMs?: number;
   }[];
   restart(id: string): Promise<void>;
   syncRoute(): void;

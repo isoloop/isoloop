@@ -13,6 +13,7 @@ import {
   type ShutdownReason,
 } from '@isoloop/protocol';
 import { createBusClient, type BusClient } from './bus-client';
+import { BUSY, busy, type BusyHook, type MemberKey } from './busy';
 import { createHostCalls, type HostApi } from './host-calls';
 import { createKeepAwake } from './keep-awake';
 import { WNode } from '@isoloop/dom/worker';
@@ -119,8 +120,10 @@ export function createVanillaIsolate(
   scope: object,
   /** A pool member: a visual one gets its own root in the worker's shared document (ADR 0015). */
   pooled = false,
+  /** The member it is, for busy time (ADR 0017); `null` outside the bootstrap. */
+  member: MemberKey | null = null,
 ): VanillaRuntime {
-  const render = init.renderFmt === 'none' ? null : createRender(post, scope, pooled);
+  const render = init.renderFmt === 'none' ? null : createRender(post, scope, pooled, member);
   const calls = createHostCalls({
     post,
     beforeCall: () => render?.flush(),
@@ -173,6 +176,18 @@ export function createVanillaIsolate(
     },
     keepAwake: () => awake.hold(),
   };
+
+  // For adapters (ADR 0017): React names the container it renders, Preact
+  // binds its render batches. Not enumerable, like the portal root.
+  if (member !== null) {
+    const hook: BusyHook = {
+      claim: (container) => {
+        busy.claim(container, member);
+      },
+      bind: (fn) => busy.bind(fn),
+    };
+    Object.defineProperty(ctx, BUSY, { value: hook, enumerable: false });
+  }
 
   // Made on first read. Not enumerable, so code that walks the context's
   // properties (React's dev tooling reads props) doesn't make it early.

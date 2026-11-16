@@ -171,6 +171,7 @@
                   "!@isoloop/protocol",
                   "!@isoloop/runtime",
                   "!@isoloop/runtime/testing",
+                  "!@isoloop/runtime/bootstrap",
                   "!@isoloop/dom/worker",
                   "!@isoloop/dom/testing",
                   "!@isoloop/dom/testing/worker"

@@ -16,6 +16,7 @@ import {
   type WorkerDom,
 } from '@isoloop/dom/worker';
 import type { IsolateToHost, SerializedEvent } from '@isoloop/protocol';
+import { busy, nativeQueueMicrotask, type MemberKey } from '../busy';
 
 export { ISOLOOP_DOM_FMT };
 
@@ -83,7 +84,25 @@ export function createRender(
   post: (msg: IsolateToHost) => void,
   scope?: object,
   pooled = false,
+  /** The member it renders, for busy time (ADR 0017); `null` bills nobody. */
+  member: MemberKey | null = null,
 ): Render {
+  /*
+   * A root's first change since its last flush tells the current frame this
+   * member's root did work (a shared framework's render splits by it), and
+   * the flush itself is billed to this member, whoever's frame changed it.
+   */
+  const owner = member === null ? null : busy.of(member);
+  const schedule = (flush: () => void): void => {
+    if (owner === null || member === null) {
+      queueMicrotask(flush);
+      return;
+    }
+    busy.report(member);
+    nativeQueueMicrotask(() => {
+      busy.run(owner, flush, undefined, []);
+    });
+  };
   let pendingStyles: string[] = [];
   let pendingHead: string[] = [];
   /** Head tags already reported: each goes to the host once. */
@@ -123,19 +142,19 @@ export function createRender(
   };
   let target: Target;
   if (pooled) {
-    const member = sharedDom(scope).addRoot({ onBatch: postPatch });
+    const own = sharedDom(scope).addRoot({ onBatch: postPatch, schedule });
     headListeners.add(onHead);
     target = {
-      ...member,
+      ...own,
       dispose() {
         headListeners.delete(onHead);
-        member.dispose();
+        own.dispose();
       },
     };
   } else {
     const dom = createDom({
       onBatch: postPatch,
-      schedule: (flush) => queueMicrotask(flush),
+      schedule,
       onHead,
     });
     if (scope) install(dom, scope);

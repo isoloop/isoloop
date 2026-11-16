@@ -1,0 +1,33 @@
+/*
+ * Busy time for Preact members in a pool (ADR 0017): Preact's render queue is
+ * shared by the pool's members. The adapter runs each batch as the code that
+ * scheduled it (`options.debounceRendering`), and the batch is split among
+ * the members whose roots it changed.
+ */
+import { afterEach, expect, it } from 'vitest';
+import { busyWorker, stopBusyWorkers } from './__fixtures__/busy-worker';
+
+afterEach(() => {
+  stopBusyWorkers();
+});
+
+it("bills a heavy Preact member's renders to it, not its light neighbour", async () => {
+  const w = busyWorker(
+    new Worker(new URL('./__fixtures__/busy-bootstrap.worker.ts', import.meta.url), {
+      type: 'module',
+    }),
+    new URL('./__fixtures__/busy-member.tsx', import.meta.url).href,
+    [
+      { name: 'heavy', config: { burnMs: 3, everyMs: 23 } },
+      { name: 'light', config: { burnMs: 0, everyMs: 17 } },
+    ],
+  );
+  await w.settle(600);
+  const sums = await w.sum(1500);
+  const heavy = sums.get('heavy') ?? 0;
+  const light = sums.get('light') ?? 0;
+  // About 65 renders of 3 ms each. A task that renders both (when their
+  // updates land together, more often on a loaded machine) splits equally.
+  expect(heavy).toBeGreaterThan(60);
+  expect(light).toBeLessThan(heavy / 2);
+});
