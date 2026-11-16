@@ -79,6 +79,7 @@ export default defineConfig({
       node('protocol'),
       node('codec'),
       node('bus'),
+      node('balancer'),
       node('vite'),
       // The core diagrams' drift test (docs/diagrams/README.md).
       {

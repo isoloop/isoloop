@@ -90,6 +90,22 @@
       }
     },
     {
+      "files": ["packages/balancer/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/**", "!@isoloop/host"],
+                "message": "balancer works on the kernel's public API, through its own KernelLike; it may import host's types only (M3h)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["packages/host/**"],
       "rules": {
         "no-restricted-imports": [
