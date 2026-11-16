@@ -166,7 +166,7 @@
 ### The processor example (added 2026-11-16)
 
 24. **Why a new example.** Plant's widgets are mostly light and its page already runs about 13 workers, so it leaves little to show. Headless processors do heavy, varied CPU work, a move costs them no surface, and the bus's consumer groups (`subscribe({ group })`, offsets kept per group) hand a stopped member's unfinished jobs to the group again, so the example shows containment, the bus, restart and placement together.
-25. **One app, two pages.** `apps/processor` in `isoloop/web`, deployed at `/processor/`, with a React UI on the main thread and every task or processor a headless isolate. The **Playground** comes first; the **File processor** follows.
+25. **One app, two pages.** `apps/processor` in `isoloop/web`, deployed at `/examples/processor/` like the other apps, with a React UI on the main thread and every task or processor a headless isolate. The **Playground** comes first; the **File processor** follows.
 26. **The Playground's controls.**
     - **Add task** spawns a headless task isolate through the balancer, up to 24.
     - Each task has a **CPU slider from 0 to 100 %**, burning that share of its time in slices of the page's **Work chunk** setting, and **Block 2 s**, **Crash** and **Remove** buttons. A slider's value is the task's starting load (Q16).
