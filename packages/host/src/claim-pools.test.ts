@@ -84,6 +84,29 @@ describe('reserved pools (ADR 0017)', () => {
     expect(() => claimPools(kernel(), 'balancer')).not.toThrow();
   });
 
+  it('can be claimed again once released, and a released claim spawns nothing', async () => {
+    const k = kernel();
+    const first = claimPools(k, 'balancer');
+    first.spawn({ id: 'A', src: counter, pool: 'balancer-1' });
+    await waitFor(() => running(k, ['A']));
+    first.release();
+    first.release(); // twice is harmless
+    expect(codeOf(() => first.spawn({ id: 'B', src: counter, pool: 'balancer-1' }))).toBe(
+      'reserved_pool',
+    );
+    // What it placed keeps running.
+    expect(running(k, ['A'])).toBe(true);
+    // The kernel can be claimed again, and the new claim joins the old pools.
+    const second = claimPools(k, 'balancer');
+    second.spawn({ id: 'C', src: counter, pool: 'balancer-1' });
+    await waitFor(() => running(k, ['A', 'C']));
+    expect(k.debug.workers().pools).toEqual({ 'balancer-1': ['A', 'C'] });
+    expect(codeOf(() => claimPools(k, 'balancer'))).toBe('balancer_exists');
+    // Releasing the old claim again doesn't free the new one.
+    first.release();
+    expect(codeOf(() => claimPools(k, 'balancer'))).toBe('balancer_exists');
+  });
+
   it('rejects an object that is not a kernel', () => {
     const fake = { ...kernel() };
     expect(codeOf(() => claimPools(fake, 'balancer'))).toBe('invalid_config');

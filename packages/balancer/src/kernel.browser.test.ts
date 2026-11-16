@@ -48,3 +48,27 @@ it('spawns into its own pools on a real kernel, and allows one balancer per kern
     b.dispose();
   }
 });
+
+it('gives the kernel back on dispose: a new balancer can claim it', async () => {
+  const k = kernel();
+  const first = createBalancer(k, { loads: { get: () => 5, set: () => {} } });
+  first.spawn({ id: 'a', src: counter });
+  first.dispose();
+  expect(() => first.spawn({ id: 'b', src: counter })).toThrow(/disposed/);
+  const second = createBalancer(k, { loads: { get: () => 5, set: () => {} } });
+  try {
+    // The old balancer's pool still holds an isolate the new one didn't place,
+    // so the new one opens a pool of its own.
+    const pool = second.spawn({ id: 'c', src: counter }).pool;
+    expect(pool).toMatch(/^balancer-(?!1$)/);
+    await vi.waitFor(() => {
+      const pools = Object.fromEntries(
+        k.isolates().map((s) => [s.id, `${s.state}:${s.pool ?? ''}`]),
+      );
+      // What the first placed keeps running where it is.
+      expect(pools).toMatchObject({ a: 'running:balancer-1', c: `running:${pool}` });
+    });
+  } finally {
+    second.dispose();
+  }
+});

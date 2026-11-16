@@ -126,7 +126,8 @@ export function createBalancer<M extends ManifestLike>(
   kernel: KernelLike<M>,
   opts: BalancerOptions = {},
 ): Balancer<M> {
-  // One balancer per kernel; throws `balancer_exists` for a second.
+  // One balancer per kernel at a time; throws `balancer_exists` for a second
+  // until the first is disposed.
   const claim = claimPools(kernel, 'balancer');
   const maxWorkers = Math.max(1, opts.maxWorkers ?? defaultMaxWorkers());
   const spikeLag = opts.spike?.lagMs ?? 100;
@@ -562,6 +563,7 @@ export function createBalancer<M extends ManifestLike>(
 
   return {
     spawn(manifest) {
+      if (disposed) throw new TypeError('balancer.spawn: this balancer was disposed');
       if (manifest.pool !== undefined)
         throw new TypeError(`balancer.spawn: "${manifest.id}" names a pool; the balancer picks it`);
       if (members.has(manifest.id))
@@ -631,7 +633,9 @@ export function createBalancer<M extends ManifestLike>(
       return () => void set.delete(fn);
     },
     dispose() {
+      if (disposed) return;
       disposed = true;
+      claim.release();
       clearInterval(timer);
       if (judging !== undefined) clearTimeout(judging);
       for (const off of offs) off();

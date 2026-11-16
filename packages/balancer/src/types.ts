@@ -15,7 +15,7 @@ export interface KernelLike<M extends ManifestLike = ManifestLike> {
    * the claim of the `balancer-*` pools, as the host's `claimPools` gives it.
    * The host's `Kernel` has none; the balancer then calls the host's.
    */
-  claimPools?(owner: 'balancer'): { spawn(manifest: M): unknown };
+  claimPools?(owner: 'balancer'): { spawn(manifest: M): unknown; release?(): void };
 }
 
 /** What the balancer reads from an isolate manifest: its id, and the pool it sets. */
@@ -136,6 +136,10 @@ export interface Balancer<M extends ManifestLike = ManifestLike> {
   /** Leaves `id` where it is until the returned function is called (a widget open for editing). */
   hold(id: string): () => void;
   on<E extends keyof BalancerEvents>(event: E, fn: (e: BalancerEvents[E]) => void): () => void;
-  /** Stops watching; isolates keep running where they are. */
+  /**
+   * Stops watching and gives back the kernel's claim, so another balancer
+   * can be created on it; isolates keep running where they are. `spawn`
+   * throws afterwards.
+   */
   dispose(): void;
 }
