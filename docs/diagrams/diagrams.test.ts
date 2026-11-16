@@ -81,6 +81,17 @@ describe('core diagrams', () => {
     for (const name of NAMES) expect(existsSync(new URL(`${name}.html`, dir))).toBe(true);
   });
 
+  // In SVG, <link> isn't a void element: one inside an <svg> becomes the parent
+  // of everything after it, and none of that is drawn (externalize.mjs).
+  it('keeps every <link> out of the <svg> it would swallow', () => {
+    for (const name of NAMES) {
+      const html = readFileSync(new URL(`${name}.html`, dir), 'utf8');
+      for (const [svg] of html.matchAll(/<svg[\s>][\s\S]*?<\/svg>/g)) {
+        expect(svg, `${name}.html has a <link> inside an <svg>`).not.toMatch(/<link[\s>]/);
+      }
+    }
+  });
+
   it('cites only files that still exist', () => {
     const root = new URL('../../', import.meta.url);
     for (const name of NAMES) {
