@@ -1,6 +1,6 @@
 # M3h: Auto placement
 
-**Status:** planned (grilled 2026-11-16; [ADR 0017](../adr/0017-opt-in-balancer.md) accepted the same day). The library half (`busyMs`, the reserved pool prefix, `@isoloop/balancer`) is built in `isoloop/isoloop` and can start alongside M3e. The interactive-page half is built in `isoloop/web` after M3e's drawer. A new example, `apps/processor` (decisions 24–30, added 2026-11-16), is the balancer's main demo and its measurement. It ships as `next` prereleases, then the next free `plant-v*` and `markets-v*` minors and `processor-v0.1.0`, tagged by the user.
+**Status:** built (2026-11-17). [ADR 0017](../adr/0017-opt-in-balancer.md) was accepted on 2026-11-16 and amended the same day. The library half is merged in `isoloop/isoloop` and on npm as `next`. The plant and markets interactive pages and `apps/processor` are merged in `isoloop/web`, and the File processor is measured on the bench server ([write-up](https://github.com/isoloop/web/tree/main/apps/processor/comparison)). Left: the user's review of the write-up (task 13), then the tags (task 14): `processor-v0.1.0` and the next free `plant-v*` and `markets-v*` minors, tagged by the user.
 
 **Goal:** a widget spec can say `placement: { "mode": "auto" }`, and Isoloop decides whether the isolate joins a pool or gets a worker apart, from its measured load. A widget that blocks is moved out of a shared pool before it can keep slowing its neighbours.
 
@@ -184,18 +184,18 @@
 | 2 | ADR 0017: the opt-in balancer, `busyMs`, the reserved prefix, the triggers, quarantine and bisect, the cap, the API; amendments to ADR 0001 and ADR 0015 (decisions 1–18). Amended 2026-11-16: `isolate:beat` and the balancer's own allowance | isoloop | User (accepted 2026-11-16; the amendment goes to the user) |
 | 3 | `busyMs`: in `@isoloop/runtime`, the wrapped timers, rAF, `queueMicrotask`, `requestIdleCallback` and member ports in every worker, with a conformance test against native behaviour; the minimal React DevTools hook (with a test that production React calls it) and the Preact `options` hooks, through the adapters; the equal split; `IdleReport.busyMs` in `@isoloop/protocol` and `IsolateSnapshot.busyMs` in `@isoloop/host`; a coarse-clock test; pool and own-worker tests; a `next` prerelease (decision 8) | isoloop | Done (#198) |
 | 4 | The reserved pool prefix in `@isoloop/host`: `reserved_pool` for `balancer-` pools on `kernel.spawn`, the `@internal` `claimPools(kernel, 'balancer') → { spawn }` (once per kernel, else `balancer_exists`), tests; a `next` prerelease (decision 3) | isoloop | Done (#197) |
-| 5 | `@isoloop/balancer`: the API (`hold`, `measure`, `atCap` included), the load rings and fixed constants, the three triggers and the lone-member rule, predicted-load placement, the quarantine and its windows, bisect (including when `busyMs` can't explain the lag), the check after a move, the cap, hysteresis; unit tests on a simulated kernel with scripted beats for spike, sustained, crash, kill and hold (decisions 3, 7, 9–18) | isoloop | Self-merge on green (#196) |
-| 6 | `isolate:beat` in `@isoloop/host`: a public `KernelEvents` entry `{ id, pool?, lagMs, busyMs, at }`, emitted per member on every heartbeat only while someone listens, with tests (decision 9) | isoloop | Self-merge on green |
-| 7 | The balancer listens to `isolate:beat` instead of polling, and `maxWorkers` counts only its own pools, with the quarantine on top; tests updated (decisions 7, 9) | isoloop | Self-merge on green, after tasks 5 and 6 |
-| 8 | The creator on plant: `auto` in the spec, the placement field, the badge, the "Moving…" overlay, the toolbar placement log, `hold` while the drawer is open, `measure` + `loads.set` on Save, the `creator.placement.v1` loads store, `?chaos` and `burn`; plant E2E (decisions 5, 12, 19–22) | web | Self-merge on green (web#127), after the prerelease with tasks 5–7 |
-| 9 | Markets: `auto` on its interactive page, E2E (decision 22) | web | Self-merge on green, after task 8 |
-| 10 | The processor's Playground: the app, tasks, sliders, Block/Crash/Remove, the placement switch, pool columns, move log, `playground.tasks`; E2E (decisions 25–28, 30) | web | Self-merge on green, after the prerelease with tasks 5–7. Built locally first so the user can look at it |
-| 11 | The processor's File processor: the seeded generator, the four kinds, job topics and consumer groups, `files.results`, the poison/heavy/corrupt dials, the UI; E2E (decision 29) | web | Self-merge on green, after task 10 |
-| 12 | The measured scenarios in `packages/compare` for the File processor, then the bench-server run (decision 23) | web | Self-merge on green, after task 11 |
+| 5 | `@isoloop/balancer`: the API (`hold`, `measure`, `atCap` included), the load rings and fixed constants, the three triggers and the lone-member rule, predicted-load placement, the quarantine and its windows, bisect (including when `busyMs` can't explain the lag), the check after a move, the cap, hysteresis; unit tests on a simulated kernel with scripted beats for spike, sustained, crash, kill and hold (decisions 3, 7, 9–18) | isoloop | Done (#196) |
+| 6 | `isolate:beat` in `@isoloop/host`: a public `KernelEvents` entry `{ id, pool?, lagMs, busyMs, at }`, emitted per member on every heartbeat only while someone listens, with tests (decision 9) | isoloop | Done (#201) |
+| 7 | The balancer listens to `isolate:beat` instead of polling, and `maxWorkers` counts only its own pools, with the quarantine on top; tests updated (decisions 7, 9) | isoloop | Done (#202; then #203 and #204, the full-pool trigger; #206, #208 and #209, fixes) |
+| 8 | The creator on plant: `auto` in the spec, the placement field, the badge, the "Moving…" overlay, the toolbar placement log, `hold` while the drawer is open, `measure` + `loads.set` on Save, the `creator.placement.v1` loads store, `?chaos` and `burn`; plant E2E (decisions 5, 12, 19–22) | web | Done (web#127) |
+| 9 | Markets: `auto` on its interactive page, E2E (decision 22) | web | Done (web#129) |
+| 10 | The processor's Playground: the app, tasks, sliders, Block/Crash/Remove, the placement switch, pool columns, move log, `playground.tasks`; E2E (decisions 25–28, 30) | web | Done (web#128) |
+| 11 | The processor's File processor: the seeded generator, the four kinds, job topics and consumer groups, `files.results`, the poison/heavy/corrupt dials, the UI; E2E (decision 29) | web | Done (web#130; the deploy on a `processor-v*` tag, web#131) |
+| 12 | The measured scenarios in `packages/compare` for the File processor, then the bench-server run (decision 23) | web | Done (web#132) |
 | 13 | The processor's write-up of the measurement, in the results page layout used by M3d–M3g (findings first, then the tables, then details), and `example.json` | web | User |
 | 14 | Roadmap: M3h done; the next free `plant-v*` and `markets-v*` minors, and `processor-v0.1.0` | isoloop, web | User pushes the tags |
 
-Tasks 3 and 4 are merged. Task 5 merges on green; tasks 6 and 7 follow it. The web tasks need a `next` prerelease with tasks 5–7, run by the user. Tasks 8–9 and 10–11 can run in parallel; task 12 needs task 11.
+Tasks 1–12 are done. The fixes in #206, #208 and #209 are on `main` but not yet on npm: the processor keeps its workarounds until the next `next` prerelease, run by the user.
 
 ## Risks
 
@@ -209,3 +209,8 @@ Tasks 3 and 4 are merged. Task 5 merges on green; tasks 6 and 7 follow it. The w
 
 - Topic affinity, a make-before-break `move()` and packing quiet widgets back into pools are in [would-like](../would-like.md).
 - [M4](m4-devtools-release.md)'s devtools panel shows `busyMs` per member and the balancer's placements, fed by `isolate:beat`.
+- **A group commit can lose a record** ([#211](https://github.com/isoloop/isoloop/issues/211), investigation in [#210](https://github.com/isoloop/isoloop/pull/210)): a commit in flight can cover a record that was redelivered meanwhile. The fix (a delivery sequence per subscription) needs an ADR 0016 amendment, decided by the user. Until then the processor subscribes `from: 'committed'`, commits below the lowest file it holds, and puts its held files back on the topic when it stops, which is why moves repeat work in the measurement.
+- **From the measurement** ([write-up](https://github.com/isoloop/web/tree/main/apps/processor/comparison)):
+  - On Firefox, with no faults, one pool did about 44 of 50 files a second and the balancer moved nothing. The run didn't record each processor's measured load, so the next run should, to tell whether the full-pool trigger wasn't reached or something else held it back.
+  - A processor that keeps getting corrupt files can use up the kernel's 3 restarts a minute, even after moving to the quarantine (1 run of 80).
+- **After the next prerelease:** the processor drops its `onShutdown` workaround and moves to the new `next`.

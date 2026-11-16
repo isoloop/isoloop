@@ -107,7 +107,7 @@ Quiet isolates are never packed back together to save workers; the balancer only
 
 A move is `stop`, then `spawn` again with the same id and the new pool. There's no way to start the new copy first, because ids are unique.
 
-- **State comes back from the bus,** within each topic's retention, as after any restart. Subscriptions start where their `from` says; give isolates that must not lose their place `from: 'committed'` or a compacted topic to read from `'earliest'`. A consumer group's records that a moved member hadn't committed go to the group's other members or come back to it.
+- **State comes back from the bus,** within each topic's retention, as after any restart. Subscriptions start where their `from` says; give isolates that must not lose their place `from: 'committed'` or a compacted topic to read from `'earliest'`. A consumer group's records that a moved member hadn't committed go to the group's other members or come back to it. A known bug can lose one of them: a commit in flight can cover a record redelivered meanwhile ([#211](https://github.com/isoloop/isoloop/issues/211)). Until it's fixed, the processor example subscribes `from: 'committed'`, commits only below the lowest record it still holds, and publishes its held records again when it stops; that repeats work, which a group's consumers must tolerate anyway, since delivery is at least once.
 - **A visual isolate goes blank until it redraws,** with a fresh surface. Show something meanwhile: the interactive dashboards put a "Moving…" overlay on the widget until it draws again.
 - **The old copy's timers don't follow it.** Once a pool member's `onShutdown` handlers settle, none of its timers, animation frames, idle callbacks, queued microtasks or port listeners run again ([ADR 0015](../adr/0015-visual-pools.md), decision 9), so a move doesn't leave work behind in the pool it left.
 
@@ -135,7 +135,7 @@ So `busyMs` is a placement guide, not a profiler.
 - **With it:** one listener on the beats (about 10 a second per worker) and a decision every 500 ms on the main thread, plus each move's restart.
 - **Workers:** up to `maxWorkers` pools of its own, plus the quarantine.
 
-M3h measures these with the balancer on and off on the processor example's File processor; the figures will be linked here when they're recorded.
+M3h measured these on the processor example's File processor, on 4 cores at 2.0 GHz: one pool with a balancer that watches every beat but never moves anything differs from one pool with no balancer by 0 to 1 point of CPU, a few MB and a few milliseconds of typing, within the rounds' spread. The figures, and what the balancer did with faults, are in the [File processor write-up](https://github.com/isoloop/web/tree/main/apps/processor/comparison).
 
 ## Inspecting it
 
