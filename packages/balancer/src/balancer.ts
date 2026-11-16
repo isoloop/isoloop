@@ -3,8 +3,8 @@ import type {
   Balancer,
   BalancerEvents,
   BalancerOptions,
+  BeatLike,
   CrashLike,
-  IsolateLike,
   KernelLike,
   ManifestLike,
   MoveReason,
@@ -12,8 +12,12 @@ import type {
   PlacementState,
 } from './types';
 
-/** How often the balancer reads the kernel's snapshots: once per default heartbeat. */
-const SAMPLE_MS = 100;
+/**
+ * A pool's beat reaches the balancer as one `isolate:beat` per member, all
+ * from the same worker message: events this close together are one beat.
+ * Beats are 100 ms apart by default.
+ */
+const BEAT_GAP_MS = 10;
 /** How often it decides. */
 const DECIDE_MS = 500;
 /** How often a changed load is written to the `loads` store. */
@@ -36,9 +40,6 @@ const now = (): number => performance.now();
  * member; the balancer bisects instead, as on a kill.
  */
 const ATTRIBUTED_PCT = 50;
-
-/** Kernel states in which an isolate still holds a worker. */
-const LIVE = new Set(['loading', 'running', 'blocked', 'crashed', 'restarting']);
 
 /** Worker crash reasons whose culprit the kernel can't name: every member of the pool crashes. */
 const POOL_KILL = new Set(['unresponsive', 'worker-error']);
@@ -65,10 +66,12 @@ type Member<M> = {
   atCap: boolean;
 };
 
-type Pool = {
+type Pool<M> = {
   /** Lag samples since the pool's membership last changed. */
   lags: Lag[];
-  lastBeatAt: number | undefined;
+  /** When the pool's latest beat arrived, and the members it reported. */
+  beatAt: number | undefined;
+  beat: Member<M>[];
   /** When the membership last changed: a full window must follow before it moves anyone. */
   since: number;
   /** A member moved out: its next full window must show the lag fell, or the next-heaviest goes too. */
@@ -105,10 +108,10 @@ const average = (beats: Beat[], windowMs: number, t: number): number | undefined
  *
  * @experimental The policy and its options may change before 1.0.
  *
- * It decides on the main thread, from the kernel's snapshots, and moves an
+ * It decides on the main thread, from every heartbeat (`isolate:beat`), and moves an
  * isolate by stopping it and spawning it again with another `pool`; the
  * kernel itself never pools on its own (ADR 0001). Isolates spawned with
- * `kernel.spawn` are never touched; they only count toward `maxWorkers`.
+ * `kernel.spawn` are never touched, and don't count toward `maxWorkers`.
  */
 export function createBalancer<M extends ManifestLike>(
   kernel: KernelLike<M>,
@@ -116,7 +119,7 @@ export function createBalancer<M extends ManifestLike>(
 ): Balancer<M> {
   // One balancer per kernel; throws `balancer_exists` for a second.
   const claim = claimPools(kernel, 'balancer');
-  const maxWorkers = opts.maxWorkers ?? defaultMaxWorkers();
+  const maxWorkers = Math.max(1, opts.maxWorkers ?? defaultMaxWorkers());
   const spikeLag = opts.spike?.lagMs ?? 100;
   const sustainedLag = opts.sustained?.lagMs ?? 50;
   const windowMs = opts.sustained?.forMs ?? 3000;
@@ -127,12 +130,12 @@ export function createBalancer<M extends ManifestLike>(
   const loads = opts.loads;
 
   const members = new Map<string, Member<M>>();
-  const pools = new Map<string, Pool>();
+  const pools = new Map<string, Pool<M>>();
   const listeners: { [E in keyof BalancerEvents]: Set<(e: BalancerEvents[E]) => void> } = {
     move: new Set(),
     foreign: new Set(),
   };
-  /** Beats of every isolate, for `measure` (previews included). */
+  /** Beats of isolates the balancer didn't place, for `measure` (previews included). */
   const seen = new Map<string, { lastBeatAt: number; beats: Beat[] }>();
   /** Isolates in our pools we didn't place, by id: their pool. */
   const foreign = new Map<string, string>();
@@ -140,15 +143,18 @@ export function createBalancer<M extends ManifestLike>(
   const killed = new Set<string>();
   /** An unfinished search for the member that kills its pool (Q20). */
   let bisect: { suspects: Set<string>; at: number } | undefined;
+  /** Pools whose latest beat spiked, judged once all its members' events are in. */
+  const spiked = new Set<string>();
+  let judging: ReturnType<typeof setTimeout> | undefined;
   let lastSave = -Infinity;
   let disposed = false;
 
   // ---- pools and loads ----
 
-  const pool = (name: string): Pool => {
+  const pool = (name: string): Pool<M> => {
     let p = pools.get(name);
     if (!p) {
-      p = { lags: [], lastBeatAt: undefined, since: now(), watch: false };
+      p = { lags: [], beatAt: undefined, beat: [], since: now(), watch: false };
       pools.set(name, p);
     }
     return p;
@@ -160,7 +166,8 @@ export function createBalancer<M extends ManifestLike>(
   const changed = (name: string): void => {
     const p = pool(name);
     p.lags = [];
-    p.lastBeatAt = undefined;
+    p.beatAt = undefined;
+    p.beat = [];
     p.since = now();
   };
 
@@ -177,21 +184,19 @@ export function createBalancer<M extends ManifestLike>(
     return last !== undefined && last.at - p.since >= windowMs;
   };
 
-  /** Every worker the page runs: the bus, own workers and running pools. */
-  const liveWorkers = (): number => {
-    const own = kernel.isolates().filter((i) => i.pool === undefined && LIVE.has(i.state)).length;
-    const running = kernel.pools().filter((p) => p.running).length;
-    return 1 + own + running;
-  };
+  /**
+   * Workers counted against `maxWorkers`: the balancer's pools and any
+   * quarantine worker beyond the first, which is allowed on top. Workers the
+   * app runs itself don't count (ADR 0017, amended).
+   */
+  const ownWorkers = (): number =>
+    kernel.pools().filter((p) => p.running && isOurs(p.name) && p.name !== QUARANTINE).length;
 
   const ownPools = (): string[] =>
     [...new Set([...members.values()].map((m) => m.pool))].filter((n) => !isQuarantine(n));
 
-  /** A new worker for a pool, leaving one for the quarantine while it isn't running. */
-  const roomForPool = (): boolean => {
-    const quarantineRuns = kernel.pools().some((p) => p.name === QUARANTINE && p.running);
-    return liveWorkers() + 1 + (quarantineRuns ? 0 : 1) <= maxWorkers;
-  };
+  /** Room for one more worker of the balancer's own. */
+  const roomForPool = (): boolean => ownWorkers() + 1 <= maxWorkers;
 
   const freshName = (prefix: string, first: number): string => {
     const taken = new Set(kernel.pools().map((p) => p.name));
@@ -287,72 +292,68 @@ export function createBalancer<M extends ManifestLike>(
 
   const movable = (m: Member<M>): boolean => m.state !== 'moving' && m.holds === 0;
 
-  // ---- sampling ----
+  // ---- beats ----
 
-  /** Beats of isolates the balancer doesn't place, for `measure`. */
-  const watchOthers = (all: readonly IsolateLike[]): void => {
-    const live = new Set<string>();
-    for (const s of all) {
-      if (members.has(s.id)) continue;
-      live.add(s.id);
-      const w = seen.get(s.id);
-      if (!w) {
-        seen.set(s.id, { lastBeatAt: s.lastBeatAt, beats: [] });
-        continue;
-      }
-      if (s.state !== 'running' || s.lastBeatAt === w.lastBeatAt) continue;
-      w.beats.push({ at: s.lastBeatAt, busy: s.busyMs ?? 0, dur: s.lastBeatAt - w.lastBeatAt });
-      w.lastBeatAt = s.lastBeatAt;
-      const cut = s.lastBeatAt - windowMs;
-      while ((w.beats[0]?.at ?? Infinity) <= cut) w.beats.shift();
-    }
-    for (const id of seen.keys()) if (!live.has(id)) seen.delete(id);
+  const trim = (beats: Beat[], at: number): void => {
+    const cut = at - windowMs;
+    while ((beats[0]?.at ?? Infinity) <= cut) beats.shift();
   };
 
-  /** Defensive: the host reserves our pools, so nobody else should be in them. */
-  const checkForeign = (): void => {
-    const present = new Map<string, string>();
-    for (const p of kernel.pools()) {
-      if (!isOurs(p.name)) continue;
-      for (const id of p.members) if (!members.has(id)) present.set(id, p.name);
+  /** A beat of an isolate the balancer doesn't place, for `measure`. */
+  const watchOther = (e: BeatLike): void => {
+    const w = seen.get(e.id);
+    if (!w) {
+      seen.set(e.id, { lastBeatAt: e.at, beats: [] });
+      return;
     }
-    for (const [id, name] of present) {
-      if (foreign.get(id) === name) continue;
-      foreign.set(id, name);
-      for (const fn of listeners.foreign) fn({ id, pool: name });
-    }
-    for (const id of foreign.keys()) if (!present.has(id)) foreign.delete(id);
+    w.beats.push({ at: e.at, busy: e.busyMs ?? 0, dur: e.at - w.lastBeatAt });
+    w.lastBeatAt = e.at;
+    trim(w.beats, e.at);
   };
 
-  const sample = (): void => {
-    const all = kernel.isolates();
-    watchOthers(all);
-    checkForeign();
-    const byId = new Map<string, IsolateLike>(all.map((i) => [i.id, i]));
-    const fresh = new Map<string, Member<M>[]>();
-    for (const m of members.values()) {
-      if (m.state === 'moving') continue;
-      const s = byId.get(m.manifest.id);
-      if (!s || s.state !== 'running' || s.lastBeatAt === m.lastBeatAt) continue;
-      if (m.lastBeatAt !== undefined) {
-        m.beats.push({ at: s.lastBeatAt, busy: s.busyMs ?? 0, dur: s.lastBeatAt - m.lastBeatAt });
-        const cut = s.lastBeatAt - windowMs;
-        while ((m.beats[0]?.at ?? Infinity) <= cut) m.beats.shift();
-      }
-      m.lastBeatAt = s.lastBeatAt;
-      const p = pool(m.pool);
-      if (p.lastBeatAt !== s.lastBeatAt) {
-        p.lastBeatAt = s.lastBeatAt;
-        p.lags.push({ at: s.lastBeatAt, lagMs: s.lagMs });
-        const cut = s.lastBeatAt - windowMs;
-        while ((p.lags[0]?.at ?? Infinity) <= cut) p.lags.shift();
-        if (s.lagMs > spikeLag) fresh.set(m.pool, []);
-      }
-      fresh.get(m.pool)?.push(m);
+  /**
+   * Every heartbeat, as the kernel reports it (`isolate:beat`). A pool's
+   * beat comes as one event per member; its lag is recorded once, and a
+   * spike is judged once all of them are in.
+   */
+  const onBeat = (e: BeatLike): void => {
+    if (disposed) return;
+    const m = members.get(e.id);
+    if (!m) {
+      watchOther(e);
+      return;
     }
-    // A spike (Q6′): the member that was busiest in that beat goes to quarantine at once.
-    for (const [name, beat] of fresh) {
-      const dur = Math.max(...beat.map((m) => m.beats.at(-1)?.dur ?? 0));
+    if (m.state === 'moving' || e.pool !== m.pool) return;
+    if (m.lastBeatAt !== undefined) {
+      m.beats.push({ at: e.at, busy: e.busyMs ?? 0, dur: e.at - m.lastBeatAt });
+      trim(m.beats, e.at);
+    }
+    m.lastBeatAt = e.at;
+    const p = pool(m.pool);
+    if (p.beatAt === undefined || e.at - p.beatAt > BEAT_GAP_MS) {
+      p.beatAt = e.at;
+      p.beat = [];
+      p.lags.push({ at: e.at, lagMs: e.lagMs });
+      const cut = e.at - windowMs;
+      while ((p.lags[0]?.at ?? Infinity) <= cut) p.lags.shift();
+      if (e.lagMs > spikeLag) {
+        spiked.add(m.pool);
+        // After the rest of this worker message's events, which run in the same task.
+        judging ??= setTimeout(judge, 0);
+      }
+    }
+    p.beat.push(m);
+  };
+
+  /** A spike (Q6′): the member that was busiest in that beat goes to quarantine at once. */
+  const judge = (): void => {
+    judging = undefined;
+    if (disposed) return;
+    for (const name of spiked) {
+      const beat = pool(name).beat.filter(
+        (m) => members.get(m.manifest.id) === m && m.pool === name && m.state !== 'moving',
+      );
+      const dur = Math.max(0, ...beat.map((m) => m.beats.at(-1)?.dur ?? 0));
       const busy = beat.reduce((sum, m) => sum + (m.beats.at(-1)?.busy ?? 0), 0);
       if (dur > 0 && (busy / dur) * 100 < ATTRIBUTED_PCT) {
         search(name, 'spike');
@@ -370,6 +371,22 @@ export function createBalancer<M extends ManifestLike>(
       // Alone in its pool and never quarantined: it hurts nobody else, and
       // nothing joins its pool while it spikes (`recentlySpiked`).
     }
+    spiked.clear();
+  };
+
+  /** Defensive: the host reserves our pools, so nobody else should be in them. */
+  const checkForeign = (): void => {
+    const present = new Map<string, string>();
+    for (const p of kernel.pools()) {
+      if (!isOurs(p.name)) continue;
+      for (const id of p.members) if (!members.has(id)) present.set(id, p.name);
+    }
+    for (const [id, name] of present) {
+      if (foreign.get(id) === name) continue;
+      foreign.set(id, name);
+      for (const fn of listeners.foreign) fn({ id, pool: name });
+    }
+    for (const id of foreign.keys()) if (!present.has(id)) foreign.delete(id);
   };
 
   // ---- deciding ----
@@ -424,6 +441,9 @@ export function createBalancer<M extends ManifestLike>(
 
   const decide = (): void => {
     const t = now();
+    checkForeign();
+    // Beats of isolates that stopped (a closed preview) are forgotten.
+    for (const [id, w] of seen) if (t - w.lastBeatAt > windowMs * 2) seen.delete(id);
     for (const name of killed) search(name, 'crash');
     killed.clear();
     if (bisect && t - bisect.at > steadyMs * 2) bisect = undefined;
@@ -492,8 +512,8 @@ export function createBalancer<M extends ManifestLike>(
     }
   };
 
-  const timers = [setInterval(sample, SAMPLE_MS), setInterval(decide, DECIDE_MS)];
-  const off = kernel.on('isolate:crash', onCrash);
+  const timer = setInterval(decide, DECIDE_MS);
+  const offs = [kernel.on('isolate:crash', onCrash), kernel.on('isolate:beat', onBeat)];
 
   const placement = (m: Member<M>): Placement => {
     const p: Placement = {
@@ -578,8 +598,9 @@ export function createBalancer<M extends ManifestLike>(
     },
     dispose() {
       disposed = true;
-      for (const t of timers) clearInterval(t);
-      off();
+      clearInterval(timer);
+      if (judging !== undefined) clearTimeout(judging);
+      for (const off of offs) off();
       listeners.move.clear();
       listeners.foreign.clear();
     },

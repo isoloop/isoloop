@@ -1,14 +1,15 @@
 /**
  * The part of the kernel the balancer uses: the public API only (`spawn`,
- * `stop`, `isolates`, `pools`, `on`), so `@isoloop/host`'s `Kernel` fits it
- * as is.
+ * `stop`, `pools`, and the `isolate:beat` and `isolate:crash` events), so
+ * `@isoloop/host`'s `Kernel` fits it as is.
  */
 export interface KernelLike<M extends ManifestLike = ManifestLike> {
   spawn(manifest: M): unknown;
   stop(id: string): Promise<void>;
-  isolates(): readonly IsolateLike[];
   pools(): readonly PoolLike[];
   on(event: 'isolate:crash', fn: (e: CrashLike) => void): () => void;
+  /** Every heartbeat as it arrives, once per member of a pool (ADR 0017). */
+  on(event: 'isolate:beat', fn: (e: BeatLike) => void): () => void;
   /**
    * Only for kernels not made by `createKernel` (a simulated one in tests):
    * the claim of the `balancer-*` pools, as the host's `claimPools` gives it.
@@ -20,21 +21,19 @@ export interface KernelLike<M extends ManifestLike = ManifestLike> {
 /** What the balancer reads from an isolate manifest: its id, and the pool it sets. */
 export type ManifestLike = { id: string; pool?: string };
 
-/** The fields of `IsolateSnapshot` the balancer reads. */
-export type IsolateLike = {
+/** The kernel's `isolate:beat` event (ADR 0017). */
+export type BeatLike = {
   id: string;
-  state: string;
   pool?: string;
-  /** `performance.now()` of the last beat. */
-  lastBeatAt: number;
-  /** The worker's lag at the last beat: the same for every member of a pool. */
+  /** The worker's lag at this beat: the same for every member of a pool. */
   lagMs: number;
   /**
-   * Time this isolate spent running in the last heartbeat interval (ADR
-   * 0017). Optional as in the host's snapshot, which has none before the
-   * first beat; the balancer only reads it from beats after that.
+   * Time this isolate spent running in the interval the beat covers.
+   * Absent from runtimes that don't report it; read as 0.
    */
   busyMs?: number;
+  /** The host's `performance.now()` on receipt. */
+  at: number;
 };
 
 /** The fields of `PoolSnapshot` the balancer reads. */
@@ -56,10 +55,11 @@ export interface LoadStore {
 
 export type BalancerOptions = {
   /**
-   * Most workers the page may run, counting every worker: the bus, own
-   * workers, manual pools and the balancer's. Default
-   * `max(2, navigator.hardwareConcurrency - 2)`. One is always kept for the
-   * quarantine, and one auto pool is always allowed.
+   * The balancer's own allowance of workers (ADR 0017, amended): its
+   * `balancer-N` pools, plus any quarantine worker beyond the first. The
+   * quarantine, `balancer-quarantine-1`, is allowed on top, and workers the
+   * app runs itself don't count; the kernel's budget stays the page-wide
+   * warning. Default `max(2, navigator.hardwareConcurrency - 2)`; at least 1.
    */
   maxWorkers?: number;
   /** One beat with the pool's `lagMs` above this moves its busiest member to quarantine. Default 100. */
