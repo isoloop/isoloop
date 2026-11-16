@@ -68,6 +68,7 @@ flowchart LR
   runtime --> dom
   react --> runtime
   preact --> runtime
+  balancer["balancer (experimental)"] --> host
   vite["vite (build plugin)"]
   devtools["devtools (M4)"] --> host
   devtools --> preact
@@ -84,6 +85,7 @@ flowchart LR
 | `@isoloop/host` | main thread | `protocol`, `dom/host` | `runtime`, `bus` source (it loads their bundles by URL) |
 | `@isoloop/runtime` | isolate worker | `protocol`, `dom/worker` | `host`, `bus` |
 | `@isoloop/react`, `@isoloop/preact` | isolate worker | `runtime`, the framework (peer dep) | `host` |
+| `@isoloop/balancer` (experimental) | main thread | `host` (the public kernel API and the internal `claimPools`) | `runtime`, `bus` ([ADR 0017](../adr/0017-opt-in-balancer.md)) |
 | `@isoloop/devtools` (M4) | main thread (the mount), isolate worker (the panel, a visual isolate) | `host` (mount); `preact` and `runtime` (panel) | `bus`; the mount must not depend on `runtime`, nor the panel on `host` |
 
 Enforced by pnpm's strict `node_modules` (a package can only import what its `package.json` lists) plus an oxlint `no-restricted-imports` rule per package ([ADR 0009](../adr/0009-toolchain.md)). `bus` builds with `lib: ["ES2022", "WebWorker"]` minus DOM, so a stray DOM type fails the build; its tests run in Node.
@@ -185,7 +187,7 @@ The source of truth is `packages/protocol/src` (`envelope.ts`, `isolate.ts`, `bu
 
 The package also exports `isEnvelope`, `assertNever`, the error-code list (`ERROR_CODES`), the `Grants` matchers (`matchTopic`, `matchAny`; topic globs like `catalog.*`), `BusError` (what `publish`, `request` and `reply` reject with), the system topics (`SYSTEM_TOPICS`, `systemTopic`), and the structural topic types host and runtime use so they never import `bus`: `TopicRef`, `TypedRecord`, `SchemaTypes`, `ContractsList` and `topicConfigOf`. It also exports `routeTopic` (`isoloop.route.v1`, value `{ href, pathname, path, search, hash, state }`, [ADR 0002](../adr/0002-host-owns-routing.md)). Routing error codes: `cross_origin`, `routing_disabled`, `navigate_failed`.
 
-Some codes never travel on a port: the host API throws them as a `KernelError`. `createKernel` throws `unsupported_browser`, with every missing feature named, when the browser lacks module workers, `MessageChannel`, adopted stylesheets on a `ShadowRoot`, or OPFS ([ADR 0009](../adr/0009-toolchain.md#rules) rule 7). `createKernel` also throws `invalid_config` for a malformed `components` entry. `spawn` throws `invalid_manifest` and `bus_failed` (§4.1).
+Some codes never travel on a port: the host API throws them as a `KernelError`. `createKernel` throws `unsupported_browser`, with every missing feature named, when the browser lacks module workers, `MessageChannel`, adopted stylesheets on a `ShadowRoot`, or OPFS ([ADR 0009](../adr/0009-toolchain.md#rules) rule 7). `createKernel` also throws `invalid_config` for a malformed `components` entry. `spawn` throws `invalid_manifest`, `bus_failed` (§4.1) and `reserved_pool` (a `pool` starting with `balancer-`, reserved for `@isoloop/balancer`). The `@internal` `claimPools(kernel, 'balancer')`, which hands the balancer a `spawn` that may use those pools, holds one claim per kernel at a time: a second claim throws `balancer_exists` until the first is released with the claim's `release()`, which the balancer's `dispose()` calls ([ADR 0017](../adr/0017-opt-in-balancer.md)).
 
 ## 4. `@isoloop/host`
 
@@ -222,8 +224,8 @@ interface Kernel {
   resume(id: string): Promise<void>;                   // wake a suspended isolate (ADR 0001); no-op unless suspended
   publish<In>(topic: TopicRef<In>, rec: { key?: string; value: In }): Promise<void>;   // rejects with a BusError
   subscribe<Out>(topic: TopicRef<unknown, Out>, fn: (r: TypedRecord<Out>) => void, opts?: { from?: StartPosition }): () => void;   // from 'latest' by default
-  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, workers:budget, bus:ready, bus:crash, bus:recovered, bus:durability-degraded, bus:quota, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
-  isolates(): IsolateSnapshot[];                                      // used by devtools; `pool` for pool members (M2c)
+  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, isolate:beat (ADR 0017: { id, pool?, lagMs, busyMs?, at } per member per beat, only while listened to), workers:budget, bus:ready, bus:crash, bus:recovered, bus:durability-degraded, bus:quota, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
+  isolates(): IsolateSnapshot[];                                      // used by devtools; `pool` for pool members (M2c); `lagMs`, and `busyMs` from the last beat (ADR 0017)
   pools(): PoolSnapshot[];                                            // M2c: members, worker running, effective grants (union); ADR 0015: sharesDocument, warning
   syncRoute(): void;                                   // host router changed the URL; republish isoloop.route.v1 if href/state differ (ADR 0002)
   dropTopic(name: string, o?: { force?: boolean }): Promise<void>;   // M2b: delete an orphaned persistent topic; seed_pending / force rules (ADR 0003)
@@ -374,6 +376,7 @@ The runtime that runs inside each isolate worker.
 - **Own worker or pool:** an `init` without `isolate` makes the worker an own worker, which takes one `init`; an `init` with `isolate` makes it a pool, which takes one per member. Before a pool's first member loads, the bootstrap freezes the built-ins, so one member can't patch them for the others; the properties V8 protects stay plain data so its fast paths survive ([ADR 0001](../adr/0001-one-worker-per-isolate.md), override taming, 2026-11-12). Visual members share one `isoloop-dom` document, each rendering into its own root ([ADR 0015](../adr/0015-visual-pools.md)).
 - **Bootstrap** (`@isoloop/runtime/bootstrap`): for each member, waits for `init`, checks the protocol range, installs the `isoloop-dom` DOM subset as `document` and the DOM globals if the isolate has a surface ([ADR 0010](../adr/0010-own-render-bridge.md); skipped when `renderFmt` is `'none'`), starts the heartbeat, connects the bus port, then `await import(init.src)`. The isolate module's default export is an `IsolateDefinition`, and the bootstrap calls `definition.start(ctx)`.
 - **Heartbeat:** one per worker, `setInterval(everyMs)`. `lagMs = max(0, now - last - everyMs)`. Adds `performance.memory.usedJSHeapSize` where available. A pool's beat carries each member's idle report.
+- **Busy time** ([ADR 0017](../adr/0017-opt-in-balancer.md)): before any member loads, every worker wraps `setTimeout`, `setInterval`, `requestAnimationFrame`, `queueMicrotask`, `requestIdleCallback` and the message ports members create, so each callback is billed to the member that registered it; React renders are timed through a minimal DevTools hook and Preact's through its public `options` hooks, a shared task split equally among its roots. Each idle report carries the member's `busyMs` for the interval. Each member instance holds a token from `init` to `bye`: once its `onShutdown` handlers settle, callbacks it registered no longer run and aren't billed ([ADR 0015](../adr/0015-visual-pools.md), decision 9).
 - **Errors:** `self.onerror` and `onunhandledrejection` post `error { fatal: false }`. A throw during `start` is fatal. The host also catches `Worker.onerror` for errors the runtime can't see.
 - **IsolateContext** (what adapters build on):
 

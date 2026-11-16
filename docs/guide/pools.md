@@ -10,7 +10,7 @@ kernel.spawn({ id: 'gauges-t1', src: gaugesUrl, surface: gaugesEl, pool: 'widget
 kernel.spawn({ id: 'login', src: loginUrl, surface: loginEl }); // its own worker
 ```
 
-Placement belongs to the host: the isolate's code is the same either way, and an isolate can't ask for a pool or refuse one. The pool's worker starts with its first member and goes away after its last.
+Placement belongs to the host: the isolate's code is the same either way, and an isolate can't ask for a pool or refuse one. The pool's worker starts with its first member and goes away after its last. To have the host place isolates by measured load instead of by name, use the opt-in [balancer](balancer.md); pool names starting with `balancer-` are reserved for it, and `kernel.spawn` rejects them with `reserved_pool`.
 
 ## What it saves
 
@@ -68,7 +68,7 @@ Most overlay libraries take a container option for the same purpose. The portal 
 | Isolates that belong together and can fail together (one machine's feeds, one feature) | Code you trust less than its neighbours, or from another team |
 | Many isolates that each do little, where the worker count adds up | Isolates whose crash must not take others down |
 
-Group by what fails together: a pool is a unit of failure.
+Group by what fails together: a pool is a unit of failure. When you can't know an isolate's cost in advance (user-added widgets, jobs of varying size), the [balancer](balancer.md) can place it by measured load and move it out when its pool lags or fills up.
 
 ## When to pool, and when not to: the plant dashboard's figures
 
@@ -125,6 +125,7 @@ That's why the plant's default is `matched`: on this phone `split` was the slowe
 
 ## Inspecting pools
 
-- `kernel.isolates()`: each member's `pool`.
+- `kernel.isolates()`: each member's `pool`, its worker's `lagMs`, and its own `busyMs`, the time the worker spent running that member's code in the last heartbeat interval ([ADR 0017](../adr/0017-opt-in-balancer.md)). `lagMs` is the same for every member of a pool; `busyMs` is what tells them apart.
+- `kernel.on('isolate:beat', fn)`: every heartbeat as it arrives, `{ id, pool?, lagMs, busyMs?, at }`, once per member. The kernel emits it only while something listens. What `busyMs` covers and its limits are in the [balancer guide](balancer.md#busyms-whats-measured).
 - `kernel.pools()`: each pool's members, whether its worker runs, its effective grants, and whether its members share a document (`sharesDocument`, with a `warning`).
 - A pool counts as one worker against `workers.budget`.
