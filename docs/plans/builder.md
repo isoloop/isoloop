@@ -21,3 +21,12 @@ The Builder is planned in its own repository, `isoloop/builder`, created once [M
 6. **Claude first, behind our own `Agent` interface** with conformance tests; other providers only if users ask.
 7. **Change sets, previewed and accepted.** The agent can add, edit and remove widgets and sources and change the layout. Each answer is a change set the user previews and accepts, and each accepted one is a record in a persistent topic, so undo is going back one record.
 8. **Saved in the browser:** a persistent topic in OPFS, with export and import as a file. No accounts or backend; an online platform to store and view dashboards is in would-like.
+
+## Ideas to grill when the Builder starts (2026-11-16)
+
+Raised by the maintainer; not decided yet.
+
+- **The Builder ships an application that runs locally,** not only a dashboard inside the Builder.
+- **Our own components as templates:** a set of ready widgets, and the user describes what they want.
+- **Drag and drop** to create and place widgets, next to the agent. ADR 0010 lists drag and drop among what isolates can't do with the DOM subset, so the editor's drag layer likely runs on the host or uses pointer events.
+- **A `.isoloop.json` file:** the config of everything the user defined, so it can be rendered anywhere. It may be the same thing as decision 8's export file, and it builds on M3e's spec format.
