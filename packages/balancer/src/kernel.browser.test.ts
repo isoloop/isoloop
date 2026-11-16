@@ -34,6 +34,16 @@ it('spawns into its own pools on a real kernel, and allows one balancer per kern
     expect(() => k.spawn({ id: 'x', src: counter, pool: 'balancer-1' })).toThrow(
       expect.objectContaining({ code: 'reserved_pool' }),
     );
+    // busyMs (#198) flows from the beats into measure().
+    await vi.waitFor(
+      () => {
+        const load = b.measure('w');
+        expect(load).toBeTypeOf('number');
+        expect(load).toBeGreaterThanOrEqual(0);
+        expect(load).toBeLessThan(50);
+      },
+      { timeout: 6000, interval: 200 },
+    );
   } finally {
     b.dispose();
   }

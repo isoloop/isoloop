@@ -1,8 +1,7 @@
 /**
  * The part of the kernel the balancer uses: the public API only (`spawn`,
  * `stop`, `isolates`, `pools`, `on`), so `@isoloop/host`'s `Kernel` fits it
- * as is. `busyMs` comes with the per-member load timing of M3h; without it
- * every member reads as idle and only spikes and crashes move anything.
+ * as is.
  */
 export interface KernelLike<M extends ManifestLike = ManifestLike> {
   spawn(manifest: M): unknown;
@@ -30,7 +29,11 @@ export type IsolateLike = {
   lastBeatAt: number;
   /** The worker's lag at the last beat: the same for every member of a pool. */
   lagMs: number;
-  /** Time this isolate spent running in the last heartbeat interval (M3h). */
+  /**
+   * Time this isolate spent running in the last heartbeat interval (ADR
+   * 0017). Optional as in the host's snapshot, which has none before the
+   * first beat; the balancer only reads it from beats after that.
+   */
   busyMs?: number;
 };
 
