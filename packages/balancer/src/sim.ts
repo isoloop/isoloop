@@ -131,9 +131,14 @@ export class SimKernel implements KernelLike {
     this.peakBalancerPools = Math.max(this.peakBalancerPools, ours);
   }
 
-  async stop(id: string): Promise<void> {
-    await Promise.resolve();
-    this.#isos.delete(id);
+  /** How long `stop` takes to settle, in ms; 0 settles on the next microtask. */
+  stopDelayMs = 0;
+
+  /** As the host's kernel: forgets the isolate at once, throws for an unknown one. */
+  stop(id: string): Promise<void> {
+    if (!this.#isos.delete(id)) throw new Error(`No isolate "${id}"`);
+    if (this.stopDelayMs === 0) return Promise.resolve();
+    return new Promise((resolve) => setTimeout(resolve, this.stopDelayMs));
   }
 
   pools(): PoolLike[] {
