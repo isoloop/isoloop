@@ -41,6 +41,7 @@ Staging:
   - **What it costs:** in strict code, overriding a protected property on an instance throws `TypeError` instead of defining an own property. For example `arr[Symbol.iterator] = f`, `promise.then = f` or `new String('x').toString = f`. Patching a built-in prototype still fails, which is what the freeze is for.
   - **Alternative not taken:** SES's default ("moderate") override list, as an allow-list. It breaks Preact in a pool, because Preact's `assign()` and `Object.assign({}, { constructor: x })` copy a record's own `constructor` key onto a plain object by assignment. An allow-list turns every such copy into a `TypeError`. Leaving out only the protected properties keeps every other override working.
 - **Visual pools (2026-11-09):** [ADR 0015](0015-visual-pools.md) lets visual isolates join a pool, alone or with headless members: one `isoloop-dom` document per worker and one render root per member. Built in [M2d](../plans/m2d-visual-pools.md), behind its own gate.
+- **An opt-in balancer (accepted 2026-11-16, [ADR 0017](0017-opt-in-balancer.md)):** the runtime still never pools isolates on its own, and the kernel has no placement policy. An app may opt in to `@isoloop/balancer`, a separate library that picks `pool` for the isolates spawned through it, from each member's measured `busyMs`, using the same `spawn`, `stop` and `pool` a developer uses by hand, in the `balancer-` pool names the host reserves for it (`reserved_pool`; one balancer per kernel). Placement stays the host's choice: opting in is that choice. The balancer's worker cap is its own option, so the kernel's budget below is unchanged.
 
 Nothing in the public API exposes worker identity:
 
@@ -85,7 +86,7 @@ Isoloop's guarantees stop where the browser's tab policy starts. Background tabs
 
 - **Own worker only, pools never:** simplest, but leaves no answer for apps with many small headless isolates (ADR 0008) beyond merging them by hand.
 - **Pools built in v1:** doubles the supervision cases while the bus and durable log are still being built. Reserving the field gives the same API stability for less work.
-- **Pool for "light" isolates chosen by heuristics:** surprising behaviour; rejected.
+- **Pool for "light" isolates chosen by heuristics:** surprising behaviour; rejected as a runtime default. An app can opt in to a library that places by measurement ([ADR 0017](0017-opt-in-balancer.md)).
 - **Automatic suspension when all subscriptions are durable:** saves memory without developer effort, but restarts become hard to predict and isolates with in-memory state would lose it silently. Rejected for v1.
 - **A snapshot API for suspended state:** a second source of state next to the log; rejected in favour of publishing to a compacted topic on shutdown.
 - **Waking every suspended isolate on any record:** wakes hidden visual isolates for records nobody can see; rejected, since they can catch up from the log when shown.
