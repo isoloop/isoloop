@@ -4,7 +4,7 @@
 
 **Done when:** an `@experimental` `@isoloop/balancer` package, with its own ADR accepted by the user, places `auto` widgets on the [M3e](m3e-live-widget-creator.md) interactive pages; a test with simulated load shows it separating a heavy widget and keeping light ones together; and a measurement compares it with a naive placement, reported whatever it shows.
 
-**Depends on:** [M3e](m3e-live-widget-creator.md) (the interactive pages are its demo and test bed). Comes before [M3g](README.md) and [M4](m4-devtools-release.md): the per-member load timing it needs changes the public API, which is better done before 0.1. Gets a full task list after its own grilling.
+**Depends on:** [M3e](m3e-live-widget-creator.md) (the interactive pages are its demo and test bed). Comes before [M4](m4-devtools-release.md): the per-member load timing it needs changes the public API, which is better done before 0.1. [M3g](m3g-federated-comparison.md) runs in parallel with M3e and doesn't wait for it. Gets a full task list after its own grilling.
 
 ## What's decided (M3e grilling, 2026-11-16)
 
