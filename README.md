@@ -4,7 +4,7 @@
 
 **A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-Status: **M0–M2, M2b and M3a done, pre-release.** The kernel (loader, supervisor, frame-batched compositor on our own render bridge), the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension, persistent topics in OPFS) and the Preact and React adapters run from the repo, with CI on Chromium, Firefox and WebKit; nothing is on npm yet. M3b (the dashboard) is next, then M4 (0.1); M2c and M5 come after 0.1. The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
+Status: **M0–M3 and M2b–M2d done, pre-release.** The kernel (loader, supervisor, frame-batched compositor on our own render bridge), the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension, persistent topics in OPFS), worker pools for headless and visual isolates, and the Preact and React adapters, with CI on Chromium, Firefox and WebKit. Prereleases are on npm under the `next` tag; there's no stable release yet. Next: M3e (the live widget creator), then M4 (devtools and 0.1); after 0.1, the Vue, Svelte and Solid adapters (M6), a WebMCP spike (M7) and the shared-memory engine (M5). The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
 
 ## Run the demo
 
@@ -44,6 +44,7 @@ Isoloop pays off when several independent pieces of code need the same data, and
 - **Plugin and extension hosts:** editors and design tools that run code from other teams or vendors against a shared document model.
 - **AI-generated or user-authored widgets:** code you've reviewed but don't fully trust to be fast or bug-free.
 - **Headless engines in heavy apps:** a sync engine, a search index and a state store working on the same entities, where a large merge or reindex shouldn't block input.
+- **Dev tools and heavy development libraries:** state inspectors, query devtools and profilers that read the app's data without slowing the app they inspect. Isoloop's own devtools are an isolate.
 - **Notebooks and reactive canvases:** cells that consume each other's outputs, where one runaway cell shouldn't take the session down, and a restarted cell rebuilds from the log.
 
 ### Where it doesn't
@@ -83,7 +84,7 @@ Isoloop runs in the browser tab, on today's browsers, with no server-side story.
 - **Pluggable log engine:** a TypeScript engine in v1; an opt-in Rust/WASM engine on `SharedArrayBuffer` later, for zero-copy reads on cross-origin-isolated pages, shipped only if benchmarks justify it.
 - **Parallel charts:** canvas widgets draw with `OffscreenCanvas` inside their own worker, never touching the main thread.
 - **Supervision:** heartbeats detect blocked isolates; crashed isolates restart one-for-one and replay their topics.
-- **Framework-agnostic:** plain JS works today; Preact and React adapters come in M3.
+- **Framework-agnostic:** plain JS, Preact and React today; Vue, Svelte and Solid after 0.1 (M6).
 
 ## API sketch
 
@@ -123,7 +124,7 @@ kernel.spawn({
 ```
 
 ```tsx
-// The React adapter is planned for M3
+// The React adapter (@isoloop/react)
 import { defineIsolate, useTopic, usePublish } from '@isoloop/react';
 
 export default defineIsolate(() => {
@@ -153,22 +154,39 @@ export default defineIsolate({
 
 Details, dependencies and task lists are in the [plans index](docs/plans/README.md).
 
+**Done**
+
 1. **M0 Foundations:** pnpm workspaces, TypeScript 7, OXC (oxlint, oxfmt, tsdown), Vite 8, Vitest, Playwright, GitHub Actions; protocol types; proof of concept ported to TypeScript.
-2. **M1 Kernel** (done; write-up: [Crashing an isolate on purpose](docs/posts/m1-crashing-an-isolate.md)): loader, supervisor, heartbeats, frame-batched compositor on our own render bridge.
-3. **M2 Bus** (done; write-up: [A Kafka-shaped bus in a Web Worker](docs/posts/m2-bus-in-a-worker.md)): topics, schemas, retention, offsets, replay, backpressure; bus worker with the TS log engine; opt-in suspension of idle isolates.
-4. **M2b Durable log:** persistent topics in OPFS that survive a bus crash or a page reload. Required for 0.1.
-5. **M2c Worker pools** (after 0.1): opt-in named pools for small headless isolates, if a benchmark shows they pay off.
-6. **M3 Adapters and dashboard sandbox**, in two epics: **M3a** Preact and React adapters (Preact 10 and 11, React 18 and 19); **M3b** a markets dashboard (live public exchange feeds, cross-market aggregates and alerts) that runs as an idiomatic native app or on Isoloop at the flip of a toggle, with live metrics (main-thread fps, long tasks, input latency, loop lag per worker, memory, bus throughput).
-7. **M4 Devtools and 0.1:** health and bus overlay, docs site, npm release.
-8. **M5 Shared-memory engine** (after 0.1): opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
-9. **M5b Delivery batching (spike):** whether batching bus traffic across tasks gets the TS engine from 45.5k to its 50k records/s budget.
+2. **M1 Kernel** (write-up: [Crashing an isolate on purpose](docs/posts/m1-crashing-an-isolate.md)): loader, supervisor, heartbeats, frame-batched compositor on our own render bridge.
+3. **M2 Bus** (write-up: [A Kafka-shaped bus in a Web Worker](docs/posts/m2-bus-in-a-worker.md)): topics, schemas, retention, offsets, replay, backpressure; bus worker with the TS log engine; opt-in suspension of idle isolates.
+4. **M2b Durable log:** persistent topics in OPFS that survive a bus crash or a page reload.
+5. **M2c Worker pools:** opt-in named pools for headless isolates, side by side with own-worker isolates; a pool crash restarts only that pool.
+6. **M2d Visual pools:** visual isolates in pools too (shipped with the plant dashboard, `plant-v0.1.0`).
+7. **M3 Adapters and dashboards** (initiative): **M3a** Preact and React adapters (Preact 10 and 11, React 18 and 19); **M3b** the markets dashboard, a native app or Isoloop at the flip of a toggle, with live metrics; **M3c** Lite, Normal and Heavy sizes; **M3d** the 72-widget plant dashboard, measured against matched native builds; **M3f** markets parity, with a native + workers build and pooled placements (`markets-v0.3.0`).
+8. **Website:** [isoloop.dev](https://isoloop.dev), with the landing page, how it works and the live examples (in [isoloop/web](https://github.com/isoloop/web)).
+
+**Before 0.1**
+
+9. **M3e Live widget creator:** users compose a widget from a JSON spec (a source, fixed operators, a view) and add it while the app runs; sources include CSV or JSON uploads and polled URLs. No user code.
+10. **M4 Devtools and 0.1:** a devtools panel that is itself an isolate (a floating button that opens isolates, bus and live-log panels), docs site, CLI, npm release with a launch post; a dev-only MCP server for agents, if time allows.
+
+**After 0.1**
+
+11. **M6 Vue, Svelte and Solid adapters:** Vue 3 (starting with a spike), Svelte 5 and Solid 1, with the HTML parsing and `cloneNode` they need, and no change to the render format.
+12. **M7 WebMCP (spike):** whether isolates should expose tools to browser agents through WebMCP.
+13. **M5 Shared-memory engine:** opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
+14. **M5b Delivery batching (spike):** whether batching bus traffic across tasks gets the TS engine from 45.5k to its 50k records/s budget.
+
+**Separately**
+
+- **Isoloop Builder** (its own repo, from when M3e ships): a non-technical user brings data and asks an agent for a dashboard; the agent writes M3e specs, never code, and the user previews and accepts each change.
 
 ## Repo layout
 
 Plain pnpm workspaces. Today: `protocol`, `dom`, `host`, `runtime`, `bus`, `codec`, `react`, `preact` and `vite`; the rest arrives with its milestone.
 
 ```text
-packages/  protocol · dom · host · runtime · bus · codec (M2b) · bus-wasm (M5) · react, preact (M3) · devtools (M4)
+packages/  protocol · dom · host · runtime · bus · codec (M2b) · react, preact (M3) · vite · devtools (M4) · vue, svelte, solid (M6) · bus-wasm (M5)
 e2e/       Playwright suites, their harness page and the isolates they spawn (the four-loops ones included)
 docs/      rfcs · design · adr · plans · guide · investigations · posts
 bench/     click-to-paint, throughput

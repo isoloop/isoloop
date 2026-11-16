@@ -70,6 +70,7 @@ flowchart LR
   preact --> runtime
   vite["vite (build plugin)"]
   devtools["devtools (M4)"] --> host
+  devtools --> preact
   host -. "starts (URL only)" .-> bus
   host -. "starts (URL only)" .-> runtime
 ```
@@ -83,7 +84,7 @@ flowchart LR
 | `@isoloop/host` | main thread | `protocol`, `dom/host` | `runtime`, `bus` source (it loads their bundles by URL) |
 | `@isoloop/runtime` | isolate worker | `protocol`, `dom/worker` | `host`, `bus` |
 | `@isoloop/react`, `@isoloop/preact` | isolate worker | `runtime`, the framework (peer dep) | `host` |
-| `@isoloop/devtools` (M4) | main thread | `host` | `runtime` |
+| `@isoloop/devtools` (M4) | main thread (the mount), isolate worker (the panel, a visual isolate) | `host` (mount); `preact` and `runtime` (panel) | `bus`; the mount must not depend on `runtime`, nor the panel on `host` |
 
 Enforced by pnpm's strict `node_modules` (a package can only import what its `package.json` lists) plus an oxlint `no-restricted-imports` rule per package ([ADR 0009](../adr/0009-toolchain.md)). `bus` builds with `lib: ["ES2022", "WebWorker"]` minus DOM, so a stray DOM type fails the build; its tests run in Node.
 
@@ -348,7 +349,7 @@ interface HostRenderBridge {
 - An event fires only if the isolate registered a listener for `(nodeId, type)` on the target or an ancestor. Those registrations travel in patches.
 - Serialized event: `{ type, target: nodeId, currentTargets: nodeId[], value?, checked?, key?, code?, mods, x?, y?, button?, scrollTop?, scrollLeft? }`.
 - **Default actions:** `submit` and with routing on, plain primary-button clicks on same-origin `<a>` (hash-only included) are always prevented on the host and go to `onNavigate` with `from` set to the isolate; they need no `navigate` grant. Clicks with a modifier key, a non-primary button, `target` other than `_self`, or `download` keep the browser's behaviour ([ADR 0002](../adr/0002-host-owns-routing.md)). Other defaults run normally. An isolate can't call `preventDefault` synchronously, so the docs list this limit.
-- **Host-owned inputs:** `input`, `textarea` and `select` keep their own value and caret on the host. The isolate gets `input` events with the value. A `value` from the isolate is applied only if it differs from the live value and the element isn't focused. A `force` option for focused inputs is planned for M3a ([task 6](../plans/m3a-adapters.md#6-force-for-host-owned-inputs)). That avoids caret jumps and the per-keystroke round trip.
+- **Host-owned inputs:** `input`, `textarea` and `select` keep their own value and caret on the host. The isolate gets `input` events with the value. A `value` from the isolate is applied only if it differs from the live value and the element isn't focused. A forced value (`ctx.setValue(node, value, { force: true })`, built in M3a [task 6](../plans/m3a-adapters.md#6-force-for-host-owned-inputs)) is applied even to a focused input, and the caret goes to its end. That avoids caret jumps and the per-keystroke round trip.
 
 ### 4.7 Host calls
 
@@ -700,7 +701,8 @@ The click-to-paint budget is one frame because a render through `postMessage` ca
 | Framework-agnostic isolates | §5, adapters | M3 |
 | Parallel canvas charts | §4.7 `requestCanvas` | M3 |
 | Routing | §4.1 `syncRoute`, §4.7 `navigate`, ADR 0002 | M2 |
-| Devtools | §6.3 metrics, `Kernel.isolates()`, compositor stats | M4 |
+| Devtools | §6.3 metrics, `Kernel.isolates()`, compositor stats; `kernel.inspect()` and the `inspect` grant (an M4 ADR) | M4 |
+| Vue, Svelte and Solid adapters | §5, ADR 0010 (amended 2026-11-16) | M6 |
 | Shared-memory engine | §6.2 `LogEngine` | M5 |
 
 Every wire message in RFC 0001 appears in §7 or nearby: `init`, `ready`, `patch`, `event`, `beat` (7.1–7.2); `publish`, `deliver`, `commits`, `result` (7.3); `subscribe`, `error` (7.4); `call`/`result` (§4.7); `shutdown` and `bye` (7.6); `reattach` and `reset` (7.7); `unsubscribe`, `request` and `reply` (§3, §6.3).

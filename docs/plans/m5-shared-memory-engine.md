@@ -4,7 +4,7 @@
 
 **Done when** (RFC 0001): benchmark results are published, whichever engine wins.
 
-Depends only on the `LogEngine` interface and the throughput bench, and reuses M2b's codec. Planned for after 0.1 (M4); it gets a full task list when it's next to start.
+Depends only on the `LogEngine` interface and the throughput bench, and reuses M2b's codec. Planned for after 0.1 (M4), [M6](m6-adapters.md) and [M7](m7-webmcp-spike.md) (decided 2026-11-16); it gets a full task list when it's next to start.
 
 ## Main work items
 
