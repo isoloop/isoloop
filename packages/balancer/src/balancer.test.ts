@@ -160,11 +160,23 @@ describe('a full pool (Q15)', () => {
     sim.load('h', 55);
     sim.hidden('h', -40); // keeps the simulated lag under the sustained threshold
     await wait(5_000);
-    expect(moves).toEqual([{ id: 'h', from: 'balancer-1', to: 'balancer-2', reason: 'sustained' }]);
+    expect(moves).toEqual([{ id: 'h', from: 'balancer-1', to: 'balancer-2', reason: 'full' }]);
     expect(where('a')?.pool).toBe('balancer-1');
     // Below 80 % now (a + b = 30 %): nothing else moves.
     await wait(60_000);
     expect(moves).toHaveLength(1);
+  });
+
+  it('reports a pool that is full and lagging as sustained', async () => {
+    start({ loads: memoryLoads({ a: 20, b: 20, h: 15 }) });
+    for (const id of ['a', 'b', 'h']) {
+      sim.load(id, 15);
+      balancer.spawn({ id });
+    }
+    await wait(2_000);
+    sim.load('h', 55); // 85 % in all, and the simulated lag goes over 50 ms
+    await wait(5_000);
+    expect(moves).toEqual([{ id: 'h', from: 'balancer-1', to: 'balancer-2', reason: 'sustained' }]);
   });
 
   it('leaves a full pool alone between 60 % and 80 %', async () => {

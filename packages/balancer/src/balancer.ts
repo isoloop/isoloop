@@ -500,7 +500,8 @@ export function createBalancer<M extends ManifestLike>(
       const to = target(loadOf(heaviest) ?? 0, name);
       if (to) {
         heaviest.atCap = false;
-        move(heaviest, to.pool, 'sustained', 'placed');
+        // A lagging pool is `sustained` even when it's also full; `full` is the low-lag case (Q19).
+        move(heaviest, to.pool, lagging ? 'sustained' : 'full', 'placed');
       } else heaviest.atCap = true;
     }
 

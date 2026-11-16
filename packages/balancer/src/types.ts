@@ -102,7 +102,13 @@ export type Placement = {
   foreign?: true;
 };
 
-export type MoveReason = 'spike' | 'sustained' | 'crash' | 'bisect' | 'steady';
+/**
+ * Why a member moved: `spike` (one long task), `sustained` (the pool's lag
+ * stayed high), `full` (the pool's members' busy time reached 80 % of a core,
+ * whatever its lag), `crash`, `bisect` (looking for a pool's unnamed
+ * culprit), or `steady` (back out of quarantine).
+ */
+export type MoveReason = 'spike' | 'sustained' | 'full' | 'crash' | 'bisect' | 'steady';
 
 export type MoveEvent = { id: string; from: string; to: string; reason: MoveReason };
 
