@@ -4,7 +4,7 @@
 
 **Done when** (RFC 0001): `0.1.0` is published with a launch post.
 
-Gets a full task list when it's next to start, after [M3e](README.md) lands ([M3](m3-adapters-dashboard.md) and [M2b](m2b-durable-log.md) are done). The `0.0.0-next` prerelease workflow from [M3b](m3b-dashboard.md) task 1 is replaced by the Changesets pipeline here.
+Gets a full task list when it's next to start, after [M3e](m3e-live-widget-creator.md), [M3h](m3h-auto-placement.md) and [M3g](README.md) land ([M3](m3-adapters-dashboard.md) and [M2b](m2b-durable-log.md) are done). The `0.0.0-next` prerelease workflow from [M3b](m3b-dashboard.md) task 1 is replaced by the Changesets pipeline here.
 
 ## Main work items
 
