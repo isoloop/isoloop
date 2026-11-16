@@ -1,4 +1,5 @@
 export {
+  claimPools,
   createKernel,
   KernelError,
   type KernelErrorCode,
