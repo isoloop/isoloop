@@ -64,18 +64,24 @@ export type BalancerOptions = {
   maxWorkers?: number;
   /** One beat with the pool's `lagMs` above this moves its busiest member to quarantine. Default 100. */
   spike?: { lagMs?: number };
-  /** The pool's median `lagMs` above `lagMs` over `forMs` moves its heaviest member out. Default 50 ms over 3,000 ms. */
+  /**
+   * The pool's median `lagMs` above `lagMs` over `forMs` moves its heaviest
+   * member out. Default 50 ms over 3,000 ms. So does a pool whose members'
+   * busy time adds up to 80 % of a core or more over the same window, whatever
+   * its lag (a fixed threshold, above `headroom`).
+   */
   sustained?: { lagMs?: number; forMs?: number };
   /** An isolate joins a pool only while pool load + its load stays under `loadPct`. Default 60. */
   headroom?: { loadPct?: number };
   /**
-   * Leaving quarantine: no spike for `steadyMs` (default 30,000 ms) and, for
-   * an isolate sent there for misbehaving, a load under `steadyLoadPct`
-   * (default 20). Each offence doubles the window (30, 60, 120 s); after
-   * `maxReturns` returns (default 3) the next offence keeps the isolate apart
-   * for good. An isolate only there to be measured just needs a measurement.
+   * Leaving quarantine: an isolate there only to be measured leaves once it
+   * has 3 s of beats there. An offender leaves after `steadyMs` (default
+   * 30,000 ms) with no spike and no crash, whatever its load; each offence
+   * doubles the window (30, 60, 120 s), and after `maxReturns` returns
+   * (default 3) the next offence keeps it apart for good. Either goes where
+   * the placement rule finds room, or stays, flagged `atCap`, until there is.
    */
-  quarantine?: { steadyMs?: number; steadyLoadPct?: number; maxReturns?: number };
+  quarantine?: { steadyMs?: number; maxReturns?: number };
   loads?: LoadStore;
 };
 

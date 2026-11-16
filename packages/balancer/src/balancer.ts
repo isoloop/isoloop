@@ -41,6 +41,15 @@ const now = (): number => performance.now();
  */
 const ATTRIBUTED_PCT = 50;
 
+/**
+ * A pool whose members' busy time adds up to this share of a core over the
+ * window is full (Q15), whatever its lag: work that yields often keeps the lag
+ * low while the members starve each other. Placement stops adding at
+ * `headroom` (60 by default); moving starts here, and the gap is the
+ * hysteresis.
+ */
+const FULL_PCT = 80;
+
 /** Worker crash reasons whose culprit the kernel can't name: every member of the pool crashes. */
 const POOL_KILL = new Set(['unresponsive', 'worker-error']);
 
@@ -125,7 +134,6 @@ export function createBalancer<M extends ManifestLike>(
   const windowMs = opts.sustained?.forMs ?? 3000;
   const headroom = opts.headroom?.loadPct ?? 60;
   const steadyMs = opts.quarantine?.steadyMs ?? 30_000;
-  const steadyLoad = opts.quarantine?.steadyLoadPct ?? 20;
   const maxReturns = opts.quarantine?.maxReturns ?? 3;
   const loads = opts.loads;
 
@@ -142,7 +150,12 @@ export function createBalancer<M extends ManifestLike>(
   /** Pools the kernel killed since the last decision (an unnamed culprit). */
   const killed = new Set<string>();
   /** An unfinished search for the member that kills its pool (Q20). */
-  let bisect: { suspects: Set<string>; at: number } | undefined;
+  /**
+   * `suspects` narrows with each step; `moved` is everyone it has moved so
+   * far, kept in quarantine until it ends so a culprit that only shows with
+   * company still meets the members it was moved with.
+   */
+  let bisect: { suspects: Set<string>; moved: Set<string>; at: number } | undefined;
   /** Pools whose latest beat spiked, judged once all its members' events are in. */
   const spiked = new Set<string>();
   let judging: ReturnType<typeof setTimeout> | undefined;
@@ -365,7 +378,8 @@ export function createBalancer<M extends ManifestLike>(
       if (!culprit) continue;
       culprit.lastSpikeAt = now();
       if (!movable(culprit)) continue;
-      if (isQuarantine(name)) quarantine(culprit, 'spike', false);
+      // In quarantine already: one there only to be measured is now an offender.
+      if (isQuarantine(name)) quarantine(culprit, 'spike', culprit.offences === 0);
       else if (membersOf(name).length > 1 || culprit.offences > 0)
         quarantine(culprit, 'spike', true);
       // Alone in its pool and never quarantined: it hurts nobody else, and
@@ -422,7 +436,11 @@ export function createBalancer<M extends ManifestLike>(
       .filter((m): m is Member<M> => m !== undefined)
       .toSorted((a, b) => (loadOf(b) ?? 0) - (loadOf(a) ?? 0));
     const half = sorted.slice(0, Math.ceil(sorted.length / 2));
-    bisect = { suspects: new Set(suspects), at: now() };
+    bisect = {
+      suspects: new Set(suspects),
+      moved: new Set([...(bisect?.moved ?? []), ...half.map((m) => m.manifest.id)]),
+      at: now(),
+    };
     const to = isQuarantine(name)
       ? roomForPool()
         ? freshName(QUARANTINES, 2)
@@ -448,19 +466,24 @@ export function createBalancer<M extends ManifestLike>(
     killed.clear();
     if (bisect && t - bisect.at > steadyMs * 2) bisect = undefined;
 
-    // Sustained (Q6′, Q18): the heaviest member moves somewhere with room.
-    // After a move out, the same check on the pool's next full window is the
-    // follow-up: if the lag didn't fall, the next-heaviest goes too.
+    // Sustained (Q6′, Q18) or full (Q15): the heaviest member moves
+    // somewhere with room. After a move out, the same check on the pool's
+    // next full window is the follow-up: if the pool is still over, the
+    // next-heaviest goes too.
     for (const name of new Set([...members.values()].map((m) => m.pool))) {
       const here = membersOf(name);
       if (!windowFull(name)) continue;
       const p = pool(name);
-      if (median(p.lags.map((l) => l.lagMs)) <= sustainedLag) {
+      const lagging = median(p.lags.map((l) => l.lagMs)) > sustainedLag;
+      const busy = here.reduce((sum, m) => sum + (loadOf(m) ?? 0), 0);
+      // The quarantine is never "full": it holds suspects, and its own split below is by lag.
+      const full = !isQuarantine(name) && busy >= FULL_PCT;
+      if (!lagging && !full) {
         p.watch = false;
         continue;
       }
       if (here.length < 2) continue;
-      if (here.reduce((sum, m) => sum + (loadOf(m) ?? 0), 0) < ATTRIBUTED_PCT) {
+      if (lagging && !full && busy < ATTRIBUTED_PCT) {
         search(name, 'sustained');
         continue;
       }
@@ -481,17 +504,27 @@ export function createBalancer<M extends ManifestLike>(
       } else heaviest.atCap = true;
     }
 
-    // Steady (Q19): back out of quarantine once quiet for long enough. An
-    // offender must also be light; an isolate only there to be measured
-    // (never measured, or moved there by a bisect) just needs a measurement,
-    // and the headroom rule places it.
+    // Out of quarantine (Q18, Q19): an isolate only there to be measured
+    // (never measured, or moved there by a bisect that has ended) leaves as
+    // soon as it has a measurement taken there. An offender leaves after its quiet window (no
+    // spike, no crash), whatever its load. Either goes where the placement
+    // rule finds room; with none, it stays, flagged at the cap.
     for (const m of members.values()) {
       if (m.state !== 'quarantined' || !movable(m)) continue;
-      if (t - Math.max(m.quarantinedAt, m.lastSpikeAt) < steadyFor(m)) continue;
-      const load = loadOf(m);
-      if (load === undefined || (m.offences > 0 && load >= steadyLoad)) continue;
+      const fresh = average(m.beats, windowMs, t);
+      if (m.offences === 0) {
+        // Members a bisect moved stay until it ends (culprit found, or
+        // expired): "whichever half acts up again" needs them kept together.
+        if (fresh === undefined || bisect?.moved.has(m.manifest.id)) continue;
+      } else if (t - Math.max(m.quarantinedAt, m.lastSpikeAt) < steadyFor(m)) continue;
+      const load = fresh ?? m.knownLoad;
+      if (load === undefined) continue;
       const to = target(load, m.pool);
-      if (!to || to.atCap) continue;
+      if (!to || to.atCap) {
+        m.atCap = true;
+        continue;
+      }
+      m.atCap = false;
       move(m, to.pool, 'steady', 'placed');
     }
 

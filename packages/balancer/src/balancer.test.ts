@@ -57,7 +57,7 @@ describe('placement', () => {
     expect(where('h')?.pool).toBe('balancer-2');
   });
 
-  it('starts a never-measured isolate in quarantine, then places it once measured', async () => {
+  it('starts a never-measured isolate in quarantine, and places it as soon as it is measured', async () => {
     const loads = memoryLoads({ a: 5 });
     start({ loads });
     sim.load('a', 5);
@@ -67,9 +67,11 @@ describe('placement', () => {
       pool: 'balancer-quarantine-1',
       state: 'quarantined',
     });
-    await wait(29_000);
-    expect(where('n')?.state).toBe('quarantined');
+    // Under 3 s of beats: no measurement yet.
     await wait(2_000);
+    expect(where('n')?.state).toBe('quarantined');
+    // Measured: it leaves at the next decision, with no 30 s steady window (Q5).
+    await wait(2_500);
     expect(moves).toEqual([
       { id: 'n', from: 'balancer-quarantine-1', to: 'balancer-1', reason: 'steady' },
     ]);
@@ -144,6 +146,41 @@ describe('sustained load', () => {
   });
 });
 
+describe('a full pool (Q15)', () => {
+  it('moves the heaviest member out of a pool at 80 % or more, even with no lag', async () => {
+    // Work that yields often: the pool is full, but its lag stays low.
+    start({ loads: memoryLoads({ a: 20, b: 20, h: 15 }) });
+    for (const id of ['a', 'b', 'h']) {
+      sim.load(id, 15);
+      balancer.spawn({ id });
+    }
+    expect(new Set(balancer.placements().map((p) => p.pool))).toEqual(new Set(['balancer-1']));
+    await wait(5_000);
+    expect(moves).toEqual([]);
+    sim.load('h', 55);
+    sim.hidden('h', -40); // keeps the simulated lag under the sustained threshold
+    await wait(5_000);
+    expect(moves).toEqual([{ id: 'h', from: 'balancer-1', to: 'balancer-2', reason: 'sustained' }]);
+    expect(where('a')?.pool).toBe('balancer-1');
+    // Below 80 % now (a + b = 30 %): nothing else moves.
+    await wait(60_000);
+    expect(moves).toHaveLength(1);
+  });
+
+  it('leaves a full pool alone between 60 % and 80 %', async () => {
+    start({ loads: memoryLoads({ a: 20, b: 20 }) });
+    for (const id of ['a', 'b']) {
+      sim.load(id, 20);
+      balancer.spawn({ id });
+    }
+    await wait(2_000);
+    sim.load('a', 35);
+    sim.load('b', 35);
+    await wait(30_000);
+    expect(moves).toEqual([]);
+  });
+});
+
 describe('spikes and quarantine', () => {
   it('quarantines a spiking member at once, and lets it back once steady', async () => {
     start({ loads: memoryLoads({ a: 5, s: 5 }) });
@@ -165,6 +202,47 @@ describe('spikes and quarantine', () => {
       to: 'balancer-1',
       reason: 'steady',
     });
+  });
+
+  it('lets a heavy offender out after its quiet window, whatever its load (Q18)', async () => {
+    start({ loads: memoryLoads({ a: 5, s: 5 }) });
+    sim.load('a', 5);
+    sim.load('s', 5);
+    balancer.spawn({ id: 'a' });
+    balancer.spawn({ id: 's' });
+    await wait(1_000);
+    sim.burst('s', 300);
+    await wait(300);
+    expect(where('s')?.state).toBe('quarantined');
+    // Heavy but quiet: no spike, no crash.
+    sim.load('s', 45);
+    await wait(31_000);
+    expect(moves.at(-1)).toMatchObject({
+      id: 's',
+      from: 'balancer-quarantine-1',
+      reason: 'steady',
+    });
+    expect(where('s')?.state).toBe('placed');
+  });
+
+  it('keeps a quiet offender in quarantine, flagged at the cap, until a pool has room', async () => {
+    start({ maxWorkers: 1, loads: memoryLoads({ a: 50, s: 5 }) });
+    sim.load('a', 50);
+    sim.load('s', 5);
+    balancer.spawn({ id: 'a' });
+    balancer.spawn({ id: 's' });
+    await wait(1_000);
+    sim.burst('s', 300);
+    await wait(300);
+    expect(where('s')?.state).toBe('quarantined');
+    sim.load('s', 30);
+    await wait(31_000);
+    // 50 + 30 is over the 60 % headroom, and maxWorkers 1 allows no second pool.
+    expect(where('s')).toMatchObject({ pool: 'balancer-quarantine-1', atCap: true });
+    sim.load('a', 10);
+    await wait(5_000);
+    expect(where('s')).toMatchObject({ pool: 'balancer-1', state: 'placed' });
+    expect(where('s')?.atCap).toBeUndefined();
   });
 
   it('doubles the steady window on each re-offence, then keeps a repeat offender apart', async () => {
@@ -262,7 +340,11 @@ describe('when busyMs explains too little', () => {
     expect(moves.length).toBeGreaterThan(0);
     expect(moves[0]?.reason).toBe('bisect');
     expect(moves.some((m) => m.reason === 'sustained' && m.id === 'a')).toBe(false);
-    await wait(300_000);
+    // Quiet is enough to leave quarantine (Q18), so c comes back after each
+    // window (30, 60, 120 s), is found again, and the fourth time stays apart.
+    await wait(600_000);
+    expect(where('c')?.state).toBe('kept-apart');
+    expect(where('c')?.pool).toMatch(/^balancer-quarantine-/);
     const cPool = where('c')?.pool;
     for (const id of ['a', 'b', 'd']) {
       expect(where(id)?.state).toBe('placed');
