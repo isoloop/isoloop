@@ -4,6 +4,7 @@ export type {
   BalancerEvents,
   BalancerOptions,
   CrashLike,
+  ForeignEvent,
   IsolateLike,
   KernelLike,
   LoadStore,

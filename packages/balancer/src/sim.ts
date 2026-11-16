@@ -27,6 +27,7 @@ export class SimKernel implements KernelLike {
   #crash = new Set<(e: CrashLike) => void>();
   #timer: ReturnType<typeof setInterval>;
   #killAfterMs: number;
+  #claimed = false;
 
   constructor(opts: SimOptions = {}) {
     this.#killAfterMs = opts.killAfterMs ?? 600;
@@ -75,7 +76,28 @@ export class SimKernel implements KernelLike {
     clearInterval(this.#timer);
   }
 
+  /** As the host will: `balancer-*` pools only through the claim, one claim per kernel. */
+  claimPools(_owner: 'balancer'): { spawn(manifest: ManifestLike): void } {
+    if (this.#claimed)
+      throw Object.assign(new Error('this kernel already has a balancer'), {
+        code: 'balancer_exists',
+      });
+    this.#claimed = true;
+    return { spawn: (m) => this.#spawn(m) };
+  }
+
   spawn(manifest: ManifestLike): void {
+    if (manifest.pool?.startsWith('balancer-'))
+      throw Object.assign(new Error(`"${manifest.pool}" is reserved`), { code: 'reserved_pool' });
+    this.#spawn(manifest);
+  }
+
+  /** Skips the reservation, to test the balancer's defensive check. */
+  spawnAnywhere(manifest: ManifestLike): void {
+    this.#spawn(manifest);
+  }
+
+  #spawn(manifest: ManifestLike): void {
     if (this.#isos.has(manifest.id)) throw new Error(`"${manifest.id}" exists`);
     this.spawned.push(manifest);
     const iso: Iso = {

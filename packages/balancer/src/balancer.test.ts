@@ -39,7 +39,11 @@ describe('placement', () => {
       sim.load(id, 5);
       balancer.spawn({ id });
     }
-    expect(balancer.placements().map((p) => p.pool)).toEqual(['auto-1', 'auto-1', 'auto-1']);
+    expect(balancer.placements().map((p) => p.pool)).toEqual([
+      'balancer-1',
+      'balancer-1',
+      'balancer-1',
+    ]);
     await wait(60_000);
     expect(moves).toEqual([]);
     expect(balancer.placements().every((p) => p.state === 'placed')).toBe(true);
@@ -49,8 +53,8 @@ describe('placement', () => {
     start({ loads: memoryLoads({ a: 5, h: 70 }) });
     balancer.spawn({ id: 'a' });
     balancer.spawn({ id: 'h' });
-    expect(where('a')?.pool).toBe('auto-1');
-    expect(where('h')?.pool).toBe('auto-2');
+    expect(where('a')?.pool).toBe('balancer-1');
+    expect(where('h')?.pool).toBe('balancer-2');
   });
 
   it('starts a never-measured isolate in quarantine, then places it once measured', async () => {
@@ -60,14 +64,16 @@ describe('placement', () => {
     sim.load('n', 10);
     balancer.spawn({ id: 'a' });
     expect(balancer.spawn({ id: 'n' })).toMatchObject({
-      pool: 'auto-quarantine',
+      pool: 'balancer-quarantine-1',
       state: 'quarantined',
     });
     await wait(29_000);
     expect(where('n')?.state).toBe('quarantined');
     await wait(2_000);
-    expect(moves).toEqual([{ id: 'n', from: 'auto-quarantine', to: 'auto-1', reason: 'steady' }]);
-    expect(where('n')).toMatchObject({ pool: 'auto-1', state: 'placed' });
+    expect(moves).toEqual([
+      { id: 'n', from: 'balancer-quarantine-1', to: 'balancer-1', reason: 'steady' },
+    ]);
+    expect(where('n')).toMatchObject({ pool: 'balancer-1', state: 'placed' });
     await wait(20_000);
     expect(loads.all.get('n')).toBeCloseTo(10, 0);
   });
@@ -88,16 +94,16 @@ describe('sustained load', () => {
     await wait(5_000);
     sim.load('h', 70);
     await wait(5_000);
-    expect(moves).toEqual([{ id: 'h', from: 'auto-1', to: 'auto-2', reason: 'sustained' }]);
-    expect(where('a')?.pool).toBe('auto-1');
-    expect(where('b')?.pool).toBe('auto-1');
+    expect(moves).toEqual([{ id: 'h', from: 'balancer-1', to: 'balancer-2', reason: 'sustained' }]);
+    expect(where('a')?.pool).toBe('balancer-1');
+    expect(where('b')?.pool).toBe('balancer-1');
     // No flapping: the heavy one stays apart and nothing else moves.
     await wait(120_000);
     expect(moves).toHaveLength(1);
   });
 
   it('respects the worker cap: no pool beyond it, the mover stays and is flagged', async () => {
-    // maxWorkers 3: the bus, auto-1, and one kept for the quarantine.
+    // maxWorkers 3: the bus, balancer-1, and one kept for the quarantine.
     start({ maxWorkers: 3, loads: memoryLoads({ a: 5, h: 5 }) });
     sim.load('a', 5);
     sim.load('h', 5);
@@ -107,7 +113,7 @@ describe('sustained load', () => {
     sim.load('h', 75);
     await wait(10_000);
     expect(moves).toEqual([]);
-    expect(where('h')).toMatchObject({ pool: 'auto-1', atCap: true });
+    expect(where('h')).toMatchObject({ pool: 'balancer-1', atCap: true });
     expect(sim.peakWorkers).toBeLessThanOrEqual(3);
   });
 
@@ -115,8 +121,8 @@ describe('sustained load', () => {
     start({ maxWorkers: 4, loads: memoryLoads({ a: 50, b: 50 }) });
     sim.spawn({ id: 'dashboard' });
     balancer.spawn({ id: 'a' });
-    // bus + dashboard + auto-1 = 3; a new pool and the quarantine's slot would make 5.
-    expect(balancer.spawn({ id: 'b' })).toMatchObject({ pool: 'auto-1', atCap: true });
+    // bus + dashboard + balancer-1 = 3; a new pool and the quarantine's slot would make 5.
+    expect(balancer.spawn({ id: 'b' })).toMatchObject({ pool: 'balancer-1', atCap: true });
   });
 });
 
@@ -130,13 +136,15 @@ describe('spikes and quarantine', () => {
     await wait(1_000);
     sim.burst('s', 300);
     await wait(300);
-    expect(moves).toEqual([{ id: 's', from: 'auto-1', to: 'auto-quarantine', reason: 'spike' }]);
-    expect(where('a')?.pool).toBe('auto-1');
+    expect(moves).toEqual([
+      { id: 's', from: 'balancer-1', to: 'balancer-quarantine-1', reason: 'spike' },
+    ]);
+    expect(where('a')?.pool).toBe('balancer-1');
     await wait(31_000);
     expect(moves.at(-1)).toEqual({
       id: 's',
-      from: 'auto-quarantine',
-      to: 'auto-1',
+      from: 'balancer-quarantine-1',
+      to: 'balancer-1',
       reason: 'steady',
     });
   });
@@ -166,7 +174,7 @@ describe('spikes and quarantine', () => {
     expect(backAfter[2]).toBeGreaterThanOrEqual(120);
     sim.burst('s', 300);
     await wait(300);
-    expect(where('s')).toMatchObject({ pool: 'auto-quarantine', state: 'kept-apart' });
+    expect(where('s')).toMatchObject({ pool: 'balancer-quarantine-1', state: 'kept-apart' });
     await wait(600_000);
     expect(where('s')?.state).toBe('kept-apart');
   });
@@ -183,7 +191,7 @@ describe('spikes and quarantine', () => {
     sim.burst('n', 300);
     await wait(5_000);
     expect(moves).toEqual([]);
-    expect(where('a')?.pool).toBe('auto-1');
+    expect(where('a')?.pool).toBe('balancer-1');
   });
 
   it('quarantines a member whose own fatal error crashed it', async () => {
@@ -191,9 +199,11 @@ describe('spikes and quarantine', () => {
     balancer.spawn({ id: 'a' });
     balancer.spawn({ id: 'e' });
     // The real kernel emits this when the isolate sends a fatal `error`.
-    sim.crash({ id: 'e', reason: 'error', pool: 'auto-1' });
+    sim.crash({ id: 'e', reason: 'error', pool: 'balancer-1' });
     await wait(100);
-    expect(moves).toEqual([{ id: 'e', from: 'auto-1', to: 'auto-quarantine', reason: 'crash' }]);
+    expect(moves).toEqual([
+      { id: 'e', from: 'balancer-1', to: 'balancer-quarantine-1', reason: 'crash' },
+    ]);
   });
 });
 
@@ -216,7 +226,7 @@ describe('a pool killed for blocking', () => {
     sim.unblock('c');
     await wait(400_000);
     for (const id of ['a', 'b', 'd']) expect(where(id)?.state).toBe('placed');
-    expect(where('c')?.pool).toMatch(/^auto-quarantine/);
+    expect(where('c')?.pool).toMatch(/^balancer-quarantine/);
   });
 });
 
@@ -267,12 +277,14 @@ describe('after a move', () => {
     sim.load('h2', 11);
     for (const id of ids.slice(2)) sim.load(id, 9.5);
     await wait(5_000);
-    expect(moves).toEqual([{ id: 'h1', from: 'auto-1', to: 'auto-2', reason: 'sustained' }]);
-    // Without h1, auto-1 is still at 77.5 %: the next window moves h2.
+    expect(moves).toEqual([
+      { id: 'h1', from: 'balancer-1', to: 'balancer-2', reason: 'sustained' },
+    ]);
+    // Without h1, balancer-1 is still at 77.5 %: the next window moves h2.
     await wait(5_000);
     expect(moves).toEqual([
-      { id: 'h1', from: 'auto-1', to: 'auto-2', reason: 'sustained' },
-      { id: 'h2', from: 'auto-1', to: 'auto-2', reason: 'sustained' },
+      { id: 'h1', from: 'balancer-1', to: 'balancer-2', reason: 'sustained' },
+      { id: 'h2', from: 'balancer-1', to: 'balancer-2', reason: 'sustained' },
     ]);
     await wait(60_000);
     expect(moves).toHaveLength(2);
@@ -295,6 +307,81 @@ describe('after a move', () => {
   });
 });
 
+describe('one balancer per kernel', () => {
+  it('a second balancer on the same kernel throws balancer_exists', () => {
+    start();
+    expect(() => createBalancer(sim)).toThrow(expect.objectContaining({ code: 'balancer_exists' }));
+  });
+
+  it('also without the host claim (the adapter)', () => {
+    start();
+    const plain = {
+      spawn: () => {},
+      stop: async () => {},
+      isolates: () => [],
+      pools: () => [],
+      on: () => () => {},
+    };
+    createBalancer(plain).dispose();
+    expect(() => createBalancer(plain)).toThrow(
+      expect.objectContaining({ code: 'balancer_exists' }),
+    );
+  });
+
+  it("names its pools balancer-N and its quarantines balancer-quarantine-N, which plain spawn can't use", () => {
+    start({ loads: memoryLoads({ a: 5, h: 70 }) });
+    balancer.spawn({ id: 'a' });
+    balancer.spawn({ id: 'h' });
+    balancer.spawn({ id: 'n' });
+    expect(balancer.placements().map((p) => p.pool)).toEqual([
+      'balancer-1',
+      'balancer-2',
+      'balancer-quarantine-1',
+    ]);
+    expect(() => sim.spawn({ id: 'x', pool: 'balancer-1' })).toThrow(
+      expect.objectContaining({ code: 'reserved_pool' }),
+    );
+  });
+});
+
+describe('measure', () => {
+  it("measures any isolate's load over the last 3 s, a preview's included", async () => {
+    start({ loads: memoryLoads({ a: 5 }) });
+    sim.load('a', 5);
+    balancer.spawn({ id: 'a' });
+    sim.spawn({ id: 'preview' });
+    sim.load('preview', 35);
+    expect(balancer.measure('preview')).toBeUndefined();
+    await wait(1_000);
+    expect(balancer.measure('preview')).toBeUndefined();
+    await wait(3_000);
+    expect(balancer.measure('preview')).toBeCloseTo(35, 0);
+    expect(balancer.measure('a')).toBeCloseTo(5, 0);
+    sim.load('preview', 10);
+    await wait(3_100);
+    expect(balancer.measure('preview')).toBeCloseTo(10, 0);
+    expect(balancer.measure('nobody')).toBeUndefined();
+  });
+});
+
+describe('foreign members (defensive)', () => {
+  it('flags an isolate it did not place in one of its pools, emits foreign once, never moves it', async () => {
+    start({ loads: memoryLoads({ a: 5 }) });
+    const seen: unknown[] = [];
+    balancer.on('foreign', (e) => seen.push(e));
+    balancer.spawn({ id: 'a' });
+    sim.spawnAnywhere({ id: 'intruder', pool: 'balancer-1' });
+    sim.load('intruder', 90);
+    await wait(10_000);
+    expect(seen).toEqual([{ id: 'intruder', pool: 'balancer-1' }]);
+    expect(where('intruder')).toMatchObject({ pool: 'balancer-1', foreign: true });
+    expect(moves.some((m) => m.id === 'intruder')).toBe(false);
+    await sim.stop('intruder');
+    await wait(200);
+    expect(where('intruder')).toBeUndefined();
+  });
+});
+
 describe('what it leaves alone', () => {
   it('never moves isolates spawned through the kernel, nor one on hold', async () => {
     start({ loads: memoryLoads({ a: 5, h: 5 }) });
@@ -311,6 +398,6 @@ describe('what it leaves alone', () => {
     expect(sim.poolOf('manual-1')).toBe('creator-pool-1');
     release();
     await wait(5_000);
-    expect(moves).toEqual([{ id: 'h', from: 'auto-1', to: 'auto-2', reason: 'sustained' }]);
+    expect(moves).toEqual([{ id: 'h', from: 'balancer-1', to: 'balancer-2', reason: 'sustained' }]);
   });
 });

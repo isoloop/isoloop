@@ -10,6 +10,12 @@ export interface KernelLike<M extends ManifestLike = ManifestLike> {
   isolates(): readonly IsolateLike[];
   pools(): readonly PoolLike[];
   on(event: 'isolate:crash', fn: (e: CrashLike) => void): () => void;
+  /**
+   * Stand-in for the host's `claimPools(kernel, 'balancer')` until it lands:
+   * the spawn that may use `balancer-*` pools; throws `balancer_exists` the
+   * second time.
+   */
+  claimPools?(owner: 'balancer'): { spawn(manifest: M): unknown };
 }
 
 /** What the balancer reads from an isolate manifest: its id, and the pool it sets. */
@@ -80,19 +86,38 @@ export type Placement = {
   loadPct: number | undefined;
   /** No pool had room and the worker cap was reached: placed anyway, or left where it is. */
   atCap?: true;
+  /**
+   * In one of the balancer's pools, but not placed by it. The host reserves
+   * `balancer-*` pools, so this shouldn't happen; it is never moved.
+   */
+  foreign?: true;
 };
 
 export type MoveReason = 'spike' | 'sustained' | 'crash' | 'bisect' | 'steady';
 
 export type MoveEvent = { id: string; from: string; to: string; reason: MoveReason };
 
-export type BalancerEvents = { move: MoveEvent };
+/** An isolate the balancer didn't place turned up in one of its pools (see `Placement.foreign`). */
+export type ForeignEvent = { id: string; pool: string };
 
+export type BalancerEvents = { move: MoveEvent; foreign: ForeignEvent };
+
+/**
+ * Pools are named `balancer-1`, `balancer-2`…; the quarantine is
+ * `balancer-quarantine-1`, and `-2`, `-3`… when a suspect needs a worker of
+ * its own. `createBalancer` throws `balancer_exists` if the kernel has one.
+ */
 export interface Balancer<M extends ManifestLike = ManifestLike> {
   /** Like `kernel.spawn`, but the balancer picks `pool`; `manifest.pool` must be absent. */
   spawn(manifest: M): Placement;
   stop(id: string): Promise<void>;
   placements(): Placement[];
+  /**
+   * `id`'s load over the last 3 s, as a share of one core (0–100), whether
+   * the balancer placed it or not: a preview's, for `loads.set` on Save.
+   * `undefined` until 3 s of beats have been seen.
+   */
+  measure(id: string): number | undefined;
   /** Leaves `id` where it is until the returned function is called (a widget open for editing). */
   hold(id: string): () => void;
   on<E extends keyof BalancerEvents>(event: E, fn: (e: BalancerEvents[E]) => void): () => void;

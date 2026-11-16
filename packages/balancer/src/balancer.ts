@@ -1,3 +1,4 @@
+import { claimPools } from './claim';
 import type {
   Balancer,
   BalancerEvents,
@@ -20,7 +21,11 @@ const SAVE_MS = 10_000;
 /** A load is written again only once it moved by this much. */
 const SAVE_DELTA_PCT = 5;
 
-const QUARANTINE = 'auto-quarantine';
+/** Pool names: `balancer-1`, `balancer-2`…, reserved by the host for the balancer. */
+const POOLS = 'balancer';
+/** The quarantine, and `-2`, `-3`… for suspects given a worker of their own. */
+const QUARANTINES = 'balancer-quarantine';
+const QUARANTINE = `${QUARANTINES}-1`;
 
 const now = (): number => performance.now();
 
@@ -82,8 +87,18 @@ const median = (xs: number[]): number => {
   return s.length % 2 === 1 ? (s[mid] ?? 0) : ((s[mid - 1] ?? 0) + (s[mid] ?? 0)) / 2;
 };
 
-const isQuarantine = (pool: string): boolean =>
-  pool === QUARANTINE || pool.startsWith(`${QUARANTINE}-`);
+const isQuarantine = (pool: string): boolean => pool.startsWith(`${QUARANTINES}-`);
+
+const isOurs = (pool: string): boolean => pool.startsWith(`${POOLS}-`);
+
+/** Load as a share of one core over `beats`, if they cover at least 90 % of `windowMs`. */
+const average = (beats: Beat[], windowMs: number, t: number): number | undefined => {
+  const recent = beats.filter((b) => b.at > t - windowMs);
+  const dur = recent.reduce((s, b) => s + b.dur, 0);
+  if (dur < windowMs * 0.9) return undefined;
+  const busy = recent.reduce((s, b) => s + b.busy, 0);
+  return Math.min(100, (busy / dur) * 100);
+};
 
 /**
  * Automatic placement for isolates spawned through it (M3h, ADR 0017).
@@ -99,6 +114,8 @@ export function createBalancer<M extends ManifestLike>(
   kernel: KernelLike<M>,
   opts: BalancerOptions = {},
 ): Balancer<M> {
+  // One balancer per kernel; throws `balancer_exists` for a second.
+  const claim = claimPools(kernel, 'balancer');
   const maxWorkers = opts.maxWorkers ?? defaultMaxWorkers();
   const spikeLag = opts.spike?.lagMs ?? 100;
   const sustainedLag = opts.sustained?.lagMs ?? 50;
@@ -111,7 +128,14 @@ export function createBalancer<M extends ManifestLike>(
 
   const members = new Map<string, Member<M>>();
   const pools = new Map<string, Pool>();
-  const listeners = new Set<(e: BalancerEvents['move']) => void>();
+  const listeners: { [E in keyof BalancerEvents]: Set<(e: BalancerEvents[E]) => void> } = {
+    move: new Set(),
+    foreign: new Set(),
+  };
+  /** Beats of every isolate, for `measure` (previews included). */
+  const seen = new Map<string, { lastBeatAt: number; beats: Beat[] }>();
+  /** Isolates in our pools we didn't place, by id: their pool. */
+  const foreign = new Map<string, string>();
   /** Pools the kernel killed since the last decision (an unnamed culprit). */
   const killed = new Set<string>();
   /** An unfinished search for the member that kills its pool (Q20). */
@@ -141,14 +165,8 @@ export function createBalancer<M extends ManifestLike>(
   };
 
   /** Measured load over the last window, or the last one known. */
-  const loadOf = (m: Member<M>): number | undefined => {
-    const t = now();
-    const recent = m.beats.filter((b) => b.at > t - windowMs);
-    const dur = recent.reduce((s, b) => s + b.dur, 0);
-    if (dur < windowMs * 0.9) return m.knownLoad;
-    const busy = recent.reduce((s, b) => s + b.busy, 0);
-    return Math.min(100, (busy / dur) * 100);
-  };
+  const loadOf = (m: Member<M>): number | undefined =>
+    average(m.beats, windowMs, now()) ?? m.knownLoad;
 
   const poolLoad = (name: string): number =>
     membersOf(name).reduce((s, m) => s + (loadOf(m) ?? 0), 0);
@@ -166,7 +184,7 @@ export function createBalancer<M extends ManifestLike>(
     return 1 + own + running;
   };
 
-  const autoPools = (): string[] =>
+  const ownPools = (): string[] =>
     [...new Set([...members.values()].map((m) => m.pool))].filter((n) => !isQuarantine(n));
 
   /** A new worker for a pool, leaving one for the quarantine while it isn't running. */
@@ -194,26 +212,26 @@ export function createBalancer<M extends ManifestLike>(
    * there's nowhere better than `except`.
    */
   const target = (load: number, except?: string): { pool: string; atCap: boolean } | undefined => {
-    const candidates = autoPools()
+    const candidates = ownPools()
       .filter((n) => n !== except && !recentlySpiked(n))
       .map((n) => ({ n, load: poolLoad(n) }))
       .filter((c) => c.load + load < headroom)
       .toSorted((a, b) => a.load - b.load);
     const best = candidates[0];
     if (best) return { pool: best.n, atCap: false };
-    if (autoPools().length === 0 || roomForPool())
-      return { pool: freshName('auto', 1), atCap: false };
+    if (ownPools().length === 0 || roomForPool())
+      return { pool: freshName(POOLS, 1), atCap: false };
     if (except !== undefined) return undefined;
-    const least = autoPools()
+    const least = ownPools()
       .map((n) => ({ n, load: poolLoad(n) }))
       .toSorted((a, b) => a.load - b.load)[0];
-    return least ? { pool: least.n, atCap: true } : { pool: freshName('auto', 1), atCap: true };
+    return least ? { pool: least.n, atCap: true } : { pool: freshName(POOLS, 1), atCap: true };
   };
 
   // ---- moves ----
 
   const emit = (e: BalancerEvents['move']): void => {
-    for (const fn of listeners) fn(e);
+    for (const fn of listeners.move) fn(e);
   };
 
   const save = (m: Member<M>): void => {
@@ -240,7 +258,7 @@ export function createBalancer<M extends ManifestLike>(
       () => {
         if (disposed || members.get(id) !== m) return;
         changed(to);
-        kernel.spawn({ ...m.manifest, pool: to });
+        claim.spawn({ ...m.manifest, pool: to });
         m.state = state;
         emit({ id, from, to, reason });
       },
@@ -271,8 +289,46 @@ export function createBalancer<M extends ManifestLike>(
 
   // ---- sampling ----
 
+  /** Beats of isolates the balancer doesn't place, for `measure`. */
+  const watchOthers = (all: readonly IsolateLike[]): void => {
+    const live = new Set<string>();
+    for (const s of all) {
+      if (members.has(s.id)) continue;
+      live.add(s.id);
+      const w = seen.get(s.id);
+      if (!w) {
+        seen.set(s.id, { lastBeatAt: s.lastBeatAt, beats: [] });
+        continue;
+      }
+      if (s.state !== 'running' || s.lastBeatAt === w.lastBeatAt) continue;
+      w.beats.push({ at: s.lastBeatAt, busy: s.busyMs ?? 0, dur: s.lastBeatAt - w.lastBeatAt });
+      w.lastBeatAt = s.lastBeatAt;
+      const cut = s.lastBeatAt - windowMs;
+      while ((w.beats[0]?.at ?? Infinity) <= cut) w.beats.shift();
+    }
+    for (const id of seen.keys()) if (!live.has(id)) seen.delete(id);
+  };
+
+  /** Defensive: the host reserves our pools, so nobody else should be in them. */
+  const checkForeign = (): void => {
+    const present = new Map<string, string>();
+    for (const p of kernel.pools()) {
+      if (!isOurs(p.name)) continue;
+      for (const id of p.members) if (!members.has(id)) present.set(id, p.name);
+    }
+    for (const [id, name] of present) {
+      if (foreign.get(id) === name) continue;
+      foreign.set(id, name);
+      for (const fn of listeners.foreign) fn({ id, pool: name });
+    }
+    for (const id of foreign.keys()) if (!present.has(id)) foreign.delete(id);
+  };
+
   const sample = (): void => {
-    const byId = new Map<string, IsolateLike>(kernel.isolates().map((i) => [i.id, i]));
+    const all = kernel.isolates();
+    watchOthers(all);
+    checkForeign();
+    const byId = new Map<string, IsolateLike>(all.map((i) => [i.id, i]));
     const fresh = new Map<string, Member<M>[]>();
     for (const m of members.values()) {
       if (m.state === 'moving') continue;
@@ -340,7 +396,7 @@ export function createBalancer<M extends ManifestLike>(
       if (membersOf(name).length > 1 && roomForPool()) {
         culprit.offences++;
         culprit.lastSpikeAt = culprit.quarantinedAt = now();
-        move(culprit, freshName(QUARANTINE, 2), reason, stateFor(culprit));
+        move(culprit, freshName(QUARANTINES, 2), reason, stateFor(culprit));
       } else quarantine(culprit, reason, true);
       return;
     }
@@ -352,7 +408,7 @@ export function createBalancer<M extends ManifestLike>(
     bisect = { suspects: new Set(suspects), at: now() };
     const to = isQuarantine(name)
       ? roomForPool()
-        ? freshName(QUARANTINE, 2)
+        ? freshName(QUARANTINES, 2)
         : undefined
       : QUARANTINE;
     if (to === undefined) return;
@@ -395,7 +451,7 @@ export function createBalancer<M extends ManifestLike>(
       const heaviest = p.watch ? byLoad.find(movable) : byLoad[0];
       if (!heaviest || !movable(heaviest)) continue;
       if (isQuarantine(name)) {
-        if (roomForPool()) move(heaviest, freshName(QUARANTINE, 2), 'sustained', heaviest.state);
+        if (roomForPool()) move(heaviest, freshName(QUARANTINES, 2), 'sustained', heaviest.state);
         continue;
       }
       const to = target(loadOf(heaviest) ?? 0, name);
@@ -476,7 +532,7 @@ export function createBalancer<M extends ManifestLike>(
       };
       members.set(manifest.id, m);
       changed(dest.pool);
-      kernel.spawn({ ...manifest, pool: dest.pool });
+      claim.spawn({ ...manifest, pool: dest.pool });
       return placement(m);
     },
     async stop(id) {
@@ -488,7 +544,15 @@ export function createBalancer<M extends ManifestLike>(
       await kernel.stop(id);
     },
     placements() {
-      return [...members.values()].map(placement);
+      const ours = [...members.values()].map(placement);
+      const others = [...foreign].map(([id, name]): Placement => ({
+        id,
+        pool: name,
+        state: 'placed',
+        loadPct: average(seen.get(id)?.beats ?? [], windowMs, now()),
+        foreign: true,
+      }));
+      return [...ours, ...others];
     },
     hold(id) {
       const m = members.get(id);
@@ -501,16 +565,23 @@ export function createBalancer<M extends ManifestLike>(
         m.holds--;
       };
     },
+    measure(id) {
+      const m = members.get(id);
+      if (m) return average(m.beats, windowMs, now());
+      const s = seen.get(id);
+      return s && average(s.beats, windowMs, now());
+    },
     on(event, fn) {
-      if (event !== 'move') return () => {};
-      listeners.add(fn);
-      return () => listeners.delete(fn);
+      const set = listeners[event] as Set<typeof fn>;
+      set.add(fn);
+      return () => void set.delete(fn);
     },
     dispose() {
       disposed = true;
       for (const t of timers) clearInterval(t);
       off();
-      listeners.clear();
+      listeners.move.clear();
+      listeners.foreign.clear();
     },
   };
 }
