@@ -44,6 +44,15 @@ export type IdleReport = {
   inFlight: number;
   /** Open `ctx.keepAwake()` holds: age and where they were taken. */
   holds: { ageMs: number; stack?: string }[];
+  /**
+   * Milliseconds the worker spent running this isolate's code since the last
+   * beat (ADR 0017): what the runtime dispatched to it and the callbacks it
+   * registered. A pool's shared framework render is split equally among the
+   * members whose roots it touched. Promise continuations, other schedulers
+   * and the worker's shared work (garbage collection) aren't counted; they
+   * show only in `lagMs`. Absent from runtimes before it.
+   */
+  busyMs?: number;
 };
 
 /** Isolate port: host → isolate. */

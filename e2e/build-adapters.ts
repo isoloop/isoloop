@@ -1,7 +1,9 @@
 // Builds the adapter conformance fixtures (M3a task 13), one self-contained
 // ES module per framework major, into e2e/isolates/adapter-<fw>-<major>.js,
 // and the visual pools suite's widget (M2d task 6) on the newest major of each
-// framework, into e2e/isolates/adapter-pool-widget-<fw>.js, and the four-loops
+// framework, into e2e/isolates/adapter-pool-widget-<fw>.js, the busy-time
+// widget (ADR 0017) on each React major, into
+// e2e/isolates/adapter-busy-widget-react-<major>.js, and the four-loops
 // fixtures (the proof of concept's isolates and contracts, from
 // e2e/isolates/loops) into e2e/isolates/loops-<name>.js, where the isolate
 // servers serve them. `node e2e/build-adapters.ts`.
@@ -24,6 +26,14 @@ const builds: Build[] = [
     major,
     entry: `e2e/isolates/adapters/${fw}/app.tsx`,
     out: `adapter-${fw}-${major}.js`,
+  })),
+  // The busy-time suite's widget (ADR 0017), on each React major: production
+  // react-dom has to call the runtime's commit hook.
+  ...MAJORS.filter(([fw]) => fw === 'react').map(([fw, major]) => ({
+    fw,
+    major,
+    entry: `e2e/isolates/adapters/react/busy-widget.tsx`,
+    out: `adapter-busy-widget-react-${major}.js`,
   })),
   ...NEWEST.map(([fw, major]) => ({
     fw,

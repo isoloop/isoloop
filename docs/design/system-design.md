@@ -168,7 +168,7 @@ export type InitPayload = {
   commitIntervalMs?: number;      // KernelConfig.bus.commitIntervalMs, default 100 (ADR 0016)
 };
 
-export type IdleReport = { sinceDeliveryMs: number; inFlight: number; holds: { ageMs: number; stack?: string }[] };
+export type IdleReport = { sinceDeliveryMs: number; inFlight: number; holds: { ageMs: number; stack?: string }[]; busyMs?: number };   // busyMs: ms running this isolate's code since the last beat (ADR 0017)
 export type ErrorPayload = { message: string; stack?: string; fatal: boolean; code?: ErrorCode };
 
 export type BusRecord = { offset: number; key?: string; value: unknown; ts: number; producer: string; req?: { from: string; id: string } };   // req: set on bus.request records

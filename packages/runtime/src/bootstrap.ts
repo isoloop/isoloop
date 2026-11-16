@@ -20,6 +20,7 @@ import {
   type IsolateToHost,
   type ShutdownReason,
 } from '@isoloop/protocol';
+import { busy, installBusy } from './busy';
 import { freezeBuiltins } from './freeze';
 import type { VanillaRuntime } from './vanilla';
 
@@ -95,7 +96,9 @@ function shutdownMember(m: Member, graceMs: number, reason: ShutdownReason): voi
   // restart) gets a fresh member while this one finishes.
   if (members.get(m.name) === m) members.delete(m.name);
   m.receive = null;
-  const done = m.shutdownHook?.(reason) ?? Promise.resolve();
+  const hook = m.shutdownHook;
+  const done =
+    (hook ? busy.run(busy.of(m.name), hook, undefined, [reason]) : undefined) ?? Promise.resolve();
   const grace = new Promise((r) => setTimeout(r, Math.max(0, graceMs - 50)));
   void Promise.race([done, grace]).finally(() => {
     m.post({ v: 1, t: 'bye', p: {} });
@@ -109,7 +112,7 @@ function route(msg: HostToIsolate): void {
   const m = members.get(mode === 'pool' ? msg.isolate : undefined);
   if (!m) return;
   if (msg.t === 'shutdown') shutdownMember(m, msg.p.graceMs, msg.p.reason);
-  else m.receive?.(msg);
+  else if (m.receive) busy.run(busy.of(m.name), m.receive, undefined, [msg]);
 }
 
 async function boot(m: Member, init: InitPayload): Promise<void> {
@@ -127,7 +130,15 @@ async function boot(m: Member, init: InitPayload): Promise<void> {
   // the isolate module loads: React checks for a DOM at load time (M3a).
   // Loaded on demand, so a worker's first beat doesn't wait for the subset.
   const { createVanillaIsolate } = await import('./vanilla');
-  const runtime = createVanillaIsolate(init, m.post, self, mode === 'pool');
+  // In the member's frame: what it registers while being built (its bus
+  // port's listener, among others) is billed to it (ADR 0017).
+  const runtime = busy.run(busy.of(m.name), createVanillaIsolate, undefined, [
+    init,
+    m.post,
+    self,
+    mode === 'pool',
+    m.name,
+  ]);
 
   let mod: unknown;
   try {
@@ -170,7 +181,7 @@ async function startIsolate(
     runtime.receive(msg);
   };
   m.shutdownHook = (reason) => runtime.shutdown(reason);
-  m.idleReport = () => runtime.idle();
+  m.idleReport = () => ({ ...runtime.idle(), busyMs: busy.take(m.name) });
   m.post({
     v: 1,
     t: 'ready',
@@ -182,7 +193,7 @@ async function startIsolate(
     },
   });
   try {
-    await start(runtime.ctx);
+    await busy.run(busy.of(m.name), start, undefined, [runtime.ctx]);
   } catch (err) {
     fatal(m, `start() threw: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -231,6 +242,9 @@ function onMessage(e: MessageEvent<unknown>): void {
 const STARTED = Symbol.for('isoloop.bootstrap');
 
 function startOnce(): void {
+  // Before any member loads and before a pool freezes the built-ins: every
+  // callback a member registers is billed to it (ADR 0017).
+  installBusy(self, busy);
   self.addEventListener('message', onMessage);
 }
 
