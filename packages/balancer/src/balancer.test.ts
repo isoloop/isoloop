@@ -313,7 +313,7 @@ describe('one balancer per kernel', () => {
     expect(() => createBalancer(sim)).toThrow(expect.objectContaining({ code: 'balancer_exists' }));
   });
 
-  it('also without the host claim (the adapter)', () => {
+  it("rejects a kernel that has no claim of its own and isn't the host's", () => {
     start();
     const plain = {
       spawn: () => {},
@@ -322,9 +322,8 @@ describe('one balancer per kernel', () => {
       pools: () => [],
       on: () => () => {},
     };
-    createBalancer(plain).dispose();
     expect(() => createBalancer(plain)).toThrow(
-      expect.objectContaining({ code: 'balancer_exists' }),
+      expect.objectContaining({ code: 'invalid_config' }),
     );
   });
 

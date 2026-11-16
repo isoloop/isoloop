@@ -97,6 +97,7 @@ export default defineConfig({
       ]),
       browser('dom'),
       browser('host'),
+      browser('balancer-browser', 'packages/balancer/src/**/*.browser.test.ts'),
       browser('runtime'),
       preact(10),
       preact(11),

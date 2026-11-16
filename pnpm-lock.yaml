@@ -374,10 +374,11 @@ importers:
         version: 7.0.2
 
   packages/balancer:
-    devDependencies:
+    dependencies:
       '@isoloop/host':
         specifier: workspace:*
         version: link:../host
+    devDependencies:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

@@ -1,30 +1,29 @@
-// One balancer per kernel (M3h). The host reserves `balancer-*` pools: only
-// the spawn `claimPools(kernel, 'balancer')` hands out may use them, plain
-// `kernel.spawn` with one throws `reserved_pool`, and a second claim throws
-// `balancer_exists`.
-//
-// Until that host export lands, this adapter stands in for it: a kernel that
-// offers `claimPools` (the simulated one in the tests) is asked directly,
-// anything else is claimed here, once per kernel, with its own `spawn`.
+// One balancer per kernel (ADR 0017). The host reserves `balancer-*` pools:
+// only the spawn `claimPools(kernel, 'balancer')` hands out may use them,
+// plain `kernel.spawn` with one throws `reserved_pool`, and a second claim
+// throws `balancer_exists`.
+import { claimPools as hostClaim, type IsolateManifest, type Kernel } from '@isoloop/host';
 import type { KernelLike, ManifestLike } from './types';
 
 export type PoolClaim<M extends ManifestLike> = { spawn(manifest: M): unknown };
 
-const claimed = new WeakSet<object>();
-
+/**
+ * The host's claim, for a kernel from `createKernel`. A `KernelLike` that
+ * offers `claimPools` itself (a simulated kernel in tests) is asked
+ * directly instead.
+ */
 export const claimPools = <M extends ManifestLike>(
   kernel: KernelLike<M>,
   owner: 'balancer',
 ): PoolClaim<M> => {
   if (kernel.claimPools) return kernel.claimPools(owner);
-  if (claimed.has(kernel)) throw balancerExists();
-  claimed.add(kernel);
-  return { spawn: (manifest) => kernel.spawn(manifest) };
+  // Without its own claimPools, a KernelLike must be the host's Kernel, whose
+  // manifests are IsolateManifest; the host throws `invalid_config` otherwise.
+  // oxlint-disable-next-line no-unsafe-type-assertion -- checked by the host: invalid_config if not its kernel
+  const claim = hostClaim(kernel as unknown as Kernel, owner);
+  return {
+    spawn: (manifest) =>
+      // oxlint-disable-next-line no-unsafe-type-assertion -- M is the host kernel's IsolateManifest here
+      claim.spawn(manifest as unknown as IsolateManifest),
+  };
 };
-
-/** The error the host's claim throws, in the same shape: `code` to branch on. */
-export const balancerExists = (): Error & { code: 'balancer_exists' } =>
-  Object.assign(new Error('this kernel already has a balancer'), {
-    name: 'KernelError',
-    code: 'balancer_exists' as const,
-  });

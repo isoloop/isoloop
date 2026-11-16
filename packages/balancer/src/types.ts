@@ -11,9 +11,9 @@ export interface KernelLike<M extends ManifestLike = ManifestLike> {
   pools(): readonly PoolLike[];
   on(event: 'isolate:crash', fn: (e: CrashLike) => void): () => void;
   /**
-   * Stand-in for the host's `claimPools(kernel, 'balancer')` until it lands:
-   * the spawn that may use `balancer-*` pools; throws `balancer_exists` the
-   * second time.
+   * Only for kernels not made by `createKernel` (a simulated one in tests):
+   * the claim of the `balancer-*` pools, as the host's `claimPools` gives it.
+   * The host's `Kernel` has none; the balancer then calls the host's.
    */
   claimPools?(owner: 'balancer'): { spawn(manifest: M): unknown };
 }

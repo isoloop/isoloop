@@ -32,8 +32,10 @@
     "build": "tsdown --platform browser --dts",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@isoloop/host": "workspace:*"
+  },
   "devDependencies": {
-    "@isoloop/host": "workspace:*",
     "typescript": "catalog:"
   }
 }
