@@ -20,7 +20,7 @@ import {
   type IsolateToHost,
   type ShutdownReason,
 } from '@isoloop/protocol';
-import { busy, installBusy } from './busy';
+import { busy, installBusy, type Life } from './busy';
 import { freezeBuiltins } from './freeze';
 import type { VanillaRuntime } from './vanilla';
 
@@ -40,6 +40,8 @@ let mode: Mode | null = null;
 type Member = {
   /** `isolate` on its envelopes; undefined on an own worker. */
   name: string | undefined;
+  /** This instance's life: its callbacks stop running when it ends (ADR 0015, decision 9). */
+  life: Life;
   post: (msg: IsolateToHost) => void;
   /** Set once it has started: runs its onShutdown handlers. */
   shutdownHook: ((reason: ShutdownReason) => Promise<void>) | null;
@@ -98,9 +100,13 @@ function shutdownMember(m: Member, graceMs: number, reason: ShutdownReason): voi
   m.receive = null;
   const hook = m.shutdownHook;
   const done =
-    (hook ? busy.run(busy.of(m.name), hook, undefined, [reason]) : undefined) ?? Promise.resolve();
+    (hook ? busy.run(busy.of(m.name, m.life), hook, undefined, [reason]) : undefined) ??
+    Promise.resolve();
   const grace = new Promise((r) => setTimeout(r, Math.max(0, graceMs - 50)));
   void Promise.race([done, grace]).finally(() => {
+    // Its handlers settled: what it registered no longer runs, so a stopped
+    // member doesn't keep working in the pool it left.
+    busy.end(m.life);
     m.post({ v: 1, t: 'bye', p: {} });
     // An own worker closes after its isolate; a pool after its last member.
     if (members.size === 0) self.close();
@@ -112,7 +118,7 @@ function route(msg: HostToIsolate): void {
   const m = members.get(mode === 'pool' ? msg.isolate : undefined);
   if (!m) return;
   if (msg.t === 'shutdown') shutdownMember(m, msg.p.graceMs, msg.p.reason);
-  else if (m.receive) busy.run(busy.of(m.name), m.receive, undefined, [msg]);
+  else if (m.receive) busy.run(busy.of(m.name, m.life), m.receive, undefined, [msg]);
 }
 
 async function boot(m: Member, init: InitPayload): Promise<void> {
@@ -132,7 +138,7 @@ async function boot(m: Member, init: InitPayload): Promise<void> {
   const { createVanillaIsolate } = await import('./vanilla');
   // In the member's frame: what it registers while being built (its bus
   // port's listener, among others) is billed to it (ADR 0017).
-  const runtime = busy.run(busy.of(m.name), createVanillaIsolate, undefined, [
+  const runtime = busy.run(busy.of(m.name, m.life), createVanillaIsolate, undefined, [
     init,
     m.post,
     self,
@@ -193,7 +199,7 @@ async function startIsolate(
     },
   });
   try {
-    await busy.run(busy.of(m.name), start, undefined, [runtime.ctx]);
+    await busy.run(busy.of(m.name, m.life), start, undefined, [runtime.ctx]);
   } catch (err) {
     fatal(m, `start() threw: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -220,6 +226,7 @@ function onMessage(e: MessageEvent<unknown>): void {
   if (members.has(name)) return;
   const m: Member = {
     name,
+    life: busy.begin(name),
     post: memberPost(name),
     shutdownHook: null,
     idleReport: null,
