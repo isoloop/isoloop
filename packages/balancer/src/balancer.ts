@@ -73,6 +73,8 @@ type Member<M> = {
   lastSpikeAt: number;
   holds: number;
   atCap: boolean;
+  /** While `moving`: settles once the kernel has stopped the old copy. */
+  stopping?: Promise<void>;
 };
 
 type Pool<M> = {
@@ -273,19 +275,29 @@ export function createBalancer<M extends ManifestLike>(
     m.pool = to;
     changed(from);
     pool(from).watch = true;
-    void kernel.stop(id).then(
+    let stopped: Promise<void>;
+    try {
+      stopped = kernel.stop(id);
+    } catch (error) {
+      // The host's kernel throws at once for an id it no longer has.
+      stopped = Promise.reject(error instanceof Error ? error : new Error(String(error)));
+    }
+    const settled = stopped.then(
       () => {
+        // Stopped by the app in the meantime (`stop`), or disposed: no respawn.
         if (disposed || members.get(id) !== m) return;
         changed(to);
         claim.spawn({ ...m.manifest, pool: to });
         m.state = state;
+        delete m.stopping;
         emit({ id, from, to, reason });
       },
       () => {
         // The kernel couldn't stop it (destroyed, most likely): forget it.
-        members.delete(id);
+        if (members.get(id) === m) members.delete(id);
       },
     );
+    m.stopping = settled;
   };
 
   const stateFor = (m: Member<M>): PlacementState =>
@@ -597,6 +609,9 @@ export function createBalancer<M extends ManifestLike>(
       save(m);
       members.delete(id);
       changed(m.pool);
+      // Mid-move the kernel has already stopped the old copy, and the
+      // respawn is cancelled by the member being gone: wait for the stop.
+      if (m.state === 'moving' && m.stopping) return m.stopping;
       await kernel.stop(id);
     },
     placements() {

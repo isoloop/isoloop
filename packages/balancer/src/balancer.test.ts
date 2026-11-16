@@ -527,3 +527,55 @@ describe('what it leaves alone', () => {
     expect(moves).toEqual([{ id: 'h', from: 'balancer-1', to: 'balancer-2', reason: 'sustained' }]);
   });
 });
+
+/** Starts `a` and `s`, then makes `s` spike so it is mid-move (stops take 200 ms). */
+const quarantineS = async (): Promise<void> => {
+  start({ loads: memoryLoads({ a: 5, s: 5 }) });
+  sim.load('a', 5);
+  sim.load('s', 5);
+  balancer.spawn({ id: 'a' });
+  balancer.spawn({ id: 's' });
+  await wait(1_000);
+  sim.stopDelayMs = 200;
+  sim.burst('s', 300);
+  await wait(300);
+};
+
+describe('stop during a move', () => {
+  it('cancels the move, respawns nothing and resolves', async () => {
+    await quarantineS();
+    expect(where('s')?.state).toBe('moving');
+    const spawnedBefore = sim.spawned.length;
+    const stopped = balancer.stop('s');
+    await wait(500);
+    await expect(stopped).resolves.toBeUndefined();
+    expect(sim.spawned.length).toBe(spawnedBefore);
+    expect(where('s')).toBeUndefined();
+    expect(sim.pools().flatMap((p) => p.members)).not.toContain('s');
+    expect(moves.filter((m) => m.id === 's')).toEqual([]);
+  });
+
+  it('cancels it while the member is held, and the release does nothing', async () => {
+    await quarantineS();
+    const release = balancer.hold('a');
+    expect(where('s')?.state).toBe('moving');
+    const releaseS = balancer.hold('s');
+    const stopped = balancer.stop('s');
+    await wait(500);
+    await stopped;
+    releaseS();
+    release();
+    expect(where('s')).toBeUndefined();
+    expect(sim.spawned.filter((m) => m.id === 's')).toHaveLength(1);
+  });
+
+  it('lets the same id be spawned again after the cancelled move', async () => {
+    await quarantineS();
+    const stopped = balancer.stop('s');
+    await wait(500);
+    await stopped;
+    balancer.spawn({ id: 's' });
+    expect(where('s')?.state).not.toBe('moving');
+    expect(sim.pools().flatMap((p) => p.members)).toContain('s');
+  });
+});
