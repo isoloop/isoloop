@@ -181,7 +181,7 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 
 **Separately**
 
-- **Isoloop Builder** (its own repo, from when M3e ships): a non-technical user brings data and asks an agent for a dashboard; the agent writes M3e specs, never code, and the user previews and accepts each change.
+- **Isoloop Builder** (its own repo, a separate app): a non-technical user defines a whole page, its data sources and topics included, by asking an agent; the agent writes specs, never code, and the user previews and accepts each change.
 
 ## Repo layout
 

@@ -66,7 +66,7 @@ From the [M3e](plans/m3e-live-widget-creator.md) grilling, 2026-11-16.
 
 These move to `isoloop/builder` when that repo is created, with the [decisions so far](plans/builder.md).
 
-- **Generated code in a sandbox.** Builder v1's agent writes M3e specs only, so it can do only what the fixed operators and views can. Letting it write code, run in a sandboxed isolate (perhaps the [system design §11](design/system-design.md) iframe tier), would cover the rest; a non-technical user can't review that code, so it needs its own design.
+- **Generated code in a sandbox.** Builder v1's agent writes specs only, so it can do only what the fixed operators and views can. Letting it write code, run in a sandboxed isolate (perhaps the [system design §11](design/system-design.md) iframe tier), would cover the rest; a non-technical user can't review that code, so it needs its own design.
 - **An online platform.** Builder dashboards are saved in the browser (a persistent topic in OPFS), with export and import as a file. A hosted place where people store and view them, across devices or shared with others, would need accounts and a backend, so it's outside the tab boundary and a separate product decision.
 
 ## Tooling

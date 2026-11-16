@@ -4,7 +4,7 @@
 
 **Goal:** show that the drawer that creates widgets and the dashboard it adds them to don't block each other, in either direction: heavy work in the drawer doesn't slow the dashboard, and a dashboard under load doesn't make the drawer lag.
 
-**Why:** M3b–M3f showed what a running dashboard gets from Isoloop. M3e shows the case where the page changes while it runs: the user adds, edits and removes widgets, each a new isolate, while the rest keeps drawing. It also defines the widget spec format the [Isoloop Builder](builder.md) builds on.
+**Why:** M3b–M3f showed what a running dashboard gets from Isoloop. M3e shows the case where the page changes while it runs: the user adds, edits and removes widgets, each a new isolate, while the rest keeps drawing.
 
 **Done when:** plant and markets in `isoloop/web` each have an interactive page, opened from their header, that starts with 4–8 starter widgets you can edit or delete, with an Add button that creates new ones from that dashboard's topics, placed manually in an existing pool or a new one. On plant at `?rate=5` both directions are measured against native on Chromium and Firefox and written up, whatever it shows. It ships as `plant-v0.2.0`, then `markets-v0.4.0`.
 
@@ -14,7 +14,7 @@
 
 ### Pages
 
-1. **An example, not a package.** M3e is an interactive mode for the existing example dashboards, built in `isoloop/web`. The [Isoloop Builder](builder.md) is a separate Isoloop app in its own repo.
+1. **An example, not a package.** M3e is an interactive mode for the existing example dashboards, built in `isoloop/web`. The [Isoloop Builder](builder.md) is unrelated: a separate app in its own repo, where a non-technical person defines a whole page, its sources and topics included. Here a developer builds the page, and its users can only consume the topics of an existing dashboard.
 2. **The current pages stay as they are.** Plant and markets keep every build, placement and control they have; each only gains an "Interactive mode" entry in its header. Their recorded figures, budgets and comparison specs don't change.
 3. **Interactive mode is its own page:** `/dashboards/plant/interactive/` and `/dashboards/markets/interactive/`, each with its own entry and its own contracts module, on the same simulator and topics as its dashboard.
 4. **The page starts with 4–8 starter widgets,** which are specs themselves, so they can be edited or deleted like the ones the user adds. Every widget has edit and delete buttons; Add opens the drawer. The page is always editable: there's no edit toggle.
@@ -35,7 +35,7 @@
     - **Edit:** a change to operators, view or title publishes the new spec, and the running widget reconfigures in place.
     - **Respawn:** a change to the source topic or the placement stops the widget and spawns it again, because grants and placement are fixed at spawn.
 11. **Two creator topics, declared at boot.** Contracts can't change at run time ([ADR 0003](../adr/0003-schema-format-standard-schema.md), decision 9), so each interactive page's contracts module declares `creator.specs.v1` and `creator.draft.v1` up front.
-12. **Persistence:** `creator.specs.v1` is compacted and persistent, keyed by widget id; a delete is a tombstone. When the topic is empty (a first visit), the starter specs are seeded. "Reset to starter" tombstones every widget and seeds again. There's no undo: the Builder will want change-set history, which a compacted topic doesn't keep, so it gets a topic of its own.
+12. **Persistence:** `creator.specs.v1` is compacted and persistent, keyed by widget id; a delete is a tombstone. When the topic is empty (a first visit), the starter specs are seeded. "Reset to starter" tombstones every widget and seeds again. There's no undo.
 
 ### Placement
 
@@ -70,7 +70,7 @@
 
 ### Sources left out
 
-21. **Dashboard topics only.** CSV and JSON uploads and polled URLs are dropped from M3e and move to the Builder ([builder.md](builder.md), decision 3), with the two questions they raise:
+21. **Dashboard topics only.** A widget consumes an existing topic of its dashboard; it can't bring data of its own, so CSV and JSON uploads and polled URLs are out of M3e. They are the [Builder](builder.md)'s (decision 3), with the two questions they raise:
     - **Uploads:** `File` objects never reach an isolate; forwarded events carry strings only. The host would attach the chosen `File`s to a forwarded `change` event of `<input type="file">`, which changes `isoloop-dom@1` events and needs an ADR.
     - **Network:** there's no `fetch` grant. Workers fetch freely and only the page's CSP `connect-src` limits them; a grant that wraps `fetch` could be bypassed with `XMLHttpRequest`, `WebSocket` or `EventSource`.
 
@@ -105,4 +105,3 @@ Tasks 2 and 3 run in parallel; 4 needs both; 5 needs 4; 6 needs 5; 7 and 9 need 
 ## Follow-ups
 
 - [M3h](m3h-auto-placement.md) adds automatic placement to the interactive pages.
-- The Builder takes the spec format out of `packages/creator` into a package when it starts.
