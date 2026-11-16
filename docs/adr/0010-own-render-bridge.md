@@ -1,6 +1,6 @@
 # ADR 0010: Our own render bridge (`isoloop-dom@1`)
 
-- **Status:** Accepted; amended 2026-11-07 (M3a, [below](#amended-in-m3a-2026-11-07))
+- **Status:** Accepted; amended 2026-11-07 (M3a, [below](#amended-in-m3a-2026-11-07)) and 2026-11-16 (the adapters after 0.1, [below](#amended-2026-11-16-adapters-after-01))
 - **Date:** 2026-11-05
 - **Supersedes:** [ADR 0006](0006-render-bridge-over-remote-dom.md) (Remote DOM behind a `RenderBridge`)
 - **Evidence:** the M1 task 4 spike, PR #23 (closed unmerged; its files hold `spikes/remote-dom/README.md` and the usage logs)
@@ -72,9 +72,19 @@ The maintainer's preference is to own the stack and keep dependencies to a minim
 - **v1 (0.1) supports plain JS, Preact `^10 || ^11` and React `^18 || ^19`.** The adapters declare those ranges as `peerDependencies`, so apps bring any release of a supported major.
 - **CI proves each major.** The catalog pins one exact version per major (for example `react18: npm:react@18.3.1`, per [ADR 0009](0009-toolchain.md) rule 8), the adapter tests run once per major, and Dependabot moves each forward weekly. A release that calls a member we lack shows up as a red update PR, not on `main`.
 - **Each major gets its own DOM usage log and smoke test,** because majors differ: React 19 hoists `<title>`, `<meta>` and `<link>` into `document.head`, which React 18 doesn't.
-- **Solid and Svelte come after 0.1, Vue is a later evaluation** ([would-like](../would-like.md)). All three compile markup to HTML strings, parse them once in a `<template>` and copy them with `cloneNode(true)` or `importNode`, so they need group 2's HTML parsing plus `cloneNode` first.
+- **Solid and Svelte come after 0.1, Vue is a later evaluation**. All three compile markup to HTML strings, parse them once in a `<template>` and copy them with `cloneNode(true)` or `importNode`, so they need group 2's HTML parsing plus `cloneNode` first. *(Amended 2026-11-16: all three are planned after 0.1 in [M6](../plans/m6-adapters.md), with a Vue spike first; see [below](#amended-2026-11-16-adapters-after-01).)*
 - **Web Components:** an isolate can render elements the **page** defines; the host creates them on the real DOM through the registry. Defining custom elements in the worker stays out.
 - **Angular** stays out of scope (it needs a real DOM at runtime).
+
+### Amended 2026-11-16: adapters after 0.1
+
+Decided in a roadmap grilling; planned as the [M6 initiative](../plans/m6-adapters.md).
+
+1. **Vue, Svelte and Solid all come after 0.1,** in M6. Vue is no longer a later evaluation: it starts with a spike, because Vue's own renderer (`createRenderer` from `@vue/runtime-core`) can build on the worker's nodes without HTML parsing. If that route passes the adapter conformance suite, Vue comes first; otherwise it uses `@vue/runtime-dom` on the subset and waits for group 2 like the others. Svelte comes before Solid.
+2. **Majors:** Vue `^3`, Svelte `^5` (runes; Svelte 4 isn't supported) and Solid `^1`, with Solid 2 added when it ships stable. The rules under *Frameworks and versions* apply unchanged.
+3. **Group 2's HTML parsing, `cloneNode` and `importNode` are built in M6** (epic M6b), because the frameworks need them, not only libraries. Point 7 still holds: each member comes with a conformance case.
+4. **No change to the `isoloop-dom@1` format.** Parsing and cloning happen in the worker and send ordinary insert records; the parser is our own, forgiving and sized for well-formed compiler output. Anything that needs a new host record goes to a new ADR.
+5. **Layout reads stay in group 3.** Vue's `<Transition>` and Svelte's transitions read layout and call `element.animate`. Missing members keep throwing `NotSupportedError`, with no fake values, and the docs list them on the "What Isoloop can't hide" page.
 
 ### Beyond the frameworks
 

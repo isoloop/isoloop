@@ -12,8 +12,9 @@ Ideas we've consciously deferred or want to explore later. None of them is plann
 
 ## Frameworks
 
-- **Solid and Svelte adapters.** Both compile markup to HTML strings, parse them in a `<template>` and copy them with `cloneNode(true)` or `importNode`, so they need HTML parsing and `cloneNode` in the `isoloop-dom` subset first (group 2). Next after 0.1. ([ADR 0010](adr/0010-own-render-bridge.md#frameworks-and-versions))
-- **Vue adapter.** Evaluate after Solid and Svelte: its runtime DOM renderer probably works on the same additions, or a custom renderer could target records directly. ([ADR 0010](adr/0010-own-render-bridge.md#frameworks-and-versions))
+Vue, Svelte and Solid left this list on 2026-11-16: they're planned after 0.1 in [M6](plans/m6-adapters.md).
+
+- **Svelte 4.** M6 supports Svelte 5 only; Svelte 4 compiles quite differently and would roughly double the work for an old major. Only if users ask. ([ADR 0010](adr/0010-own-render-bridge.md#amended-2026-11-16-adapters-after-01))
 
 ## Rendering
 
@@ -42,10 +43,21 @@ The main thread shows everything isolates render ([engine constraints](investiga
 - **Detecting host navigations without wiring.** Use the Navigation API's `currententrychange` where available, as an option on top of `kernel.syncRoute()`. ([ADR 0002](adr/0002-host-owns-routing.md))
 - **Isolates owning URL segments.** The micro-frontend router model. ([ADR 0002](adr/0002-host-owns-routing.md))
 
+## Devtools
+
+- **A browser extension.** M4's devtools are a panel in the page, drawn by an isolate ([M4](plans/m4-devtools-release.md#devtools-decisions-2026-11-16)). An extension would give devtools on a site without changing its code, and space outside the page. It would be one more client of `kernel.inspect()`, like the panel and the dev MCP, so it needs no new kernel work. Worth it once other people run Isoloop apps in production. It can't reach phones, and Safari needs an Xcode build and a paid Apple developer account.
+
+## Isoloop Builder
+
+These move to `isoloop/builder` when that repo is created, with the [decisions so far](plans/builder.md).
+
+- **Generated code in a sandbox.** Builder v1's agent writes M3e specs only, so it can do only what the fixed operators and views can. Letting it write code, run in a sandboxed isolate (perhaps the [system design §11](design/system-design.md) iframe tier), would cover the rest; a non-technical user can't review that code, so it needs its own design.
+- **An online platform.** Builder dashboards are saved in the browser (a persistent topic in OPFS), with export and import as a file. A hosted place where people store and view them, across devices or shared with others, would need accounts and a backend, so it's outside the tab boundary and a separate product decision.
+
 ## Tooling
 
 - **tsrs as the type checker.** The Rust port of the TS 7 checker (`oxc-project/tsrs`). Switch `typecheck` from `tsc` once tsrs has a stable release for the TypeScript version we're on and is at least 2× faster than `tsc` on this repo. It's one script change. ([ADR 0009](adr/0009-toolchain.md))
 
 ## Getting started
 
-- **A way in for new and existing apps.** Two shapes to weigh once 0.1 is out: a starter template (`npm create isoloop`) for new apps, and an agent skill that adapts an existing app to Isoloop, splitting it into isolates and contracts. They may share one source of truth for what an Isoloop app looks like. Whether the unscoped `isoloop` package also re-exports the main APIs, so users install one thing, is part of the same question; today it's planned as the CLI only ([ADR 0004](adr/0004-npm-name.md), M4).
+- **A way in for new and existing apps,** for developers (non-technical users get the [Isoloop Builder](plans/builder.md)). Two shapes to weigh once 0.1 is out: a starter template (`npm create isoloop`) for new apps, and an agent skill that adapts an existing app to Isoloop, splitting it into isolates and contracts. They may share one source of truth for what an Isoloop app looks like. Whether the unscoped `isoloop` package also re-exports the main APIs, so users install one thing, is part of the same question; today it's planned as the CLI only ([ADR 0004](adr/0004-npm-name.md), M4).

@@ -25,7 +25,7 @@ Today all the front-end code on a page (micro-frontends, widgets and headless en
 3. **Messages as the only contract:** isolates never import each other; they depend on versioned topic schemas.
 4. **Durable, replayable bus:** topics are append-only logs with retention and consumer offsets.
 5. **Supervision:** liveness heartbeats, crash detection and restart strategies, built in.
-6. **Framework-agnostic isolates:** an isolate can be written in React, Preact, Svelte, Solid or plain JS. v1 ships plain JS, Preact and React; Solid and Svelte follow after 0.1 ([ADR 0010](../adr/0010-own-render-bridge.md#frameworks-and-versions)).
+6. **Framework-agnostic isolates:** an isolate can be written in React, Preact, Svelte, Solid or plain JS. v1 ships plain JS, Preact and React; Vue, Svelte and Solid follow after 0.1, in M6 ([ADR 0010](../adr/0010-own-render-bridge.md#amended-2026-11-16-adapters-after-01)).
 
 **Non-goals for v1**
 
@@ -220,9 +220,9 @@ An adapter is a thin package that boots a framework inside the worker's `isoloop
 | Web Components | Partial | Rendering elements the page defines works; defining custom elements in the worker doesn't ([ADR 0010](../adr/0010-own-render-bridge.md#frameworks-and-versions)) |
 | Preact | Good | Small runtime; first adapter (M3), `^10 \|\| ^11` |
 | React | Good, heavier | The `isoloop-dom` subset covers what `react-dom` uses (smoke test in M3); bigger bundle per isolate; M3, `^18 \|\| ^19` |
-| Solid | Likely good | Fine-grained updates map well to small patches; needs HTML parsing and `cloneNode` in the subset; after 0.1 |
-| Svelte | Likely good | Compiled output uses plain DOM calls, plus template cloning (HTML parsing, `cloneNode`); after 0.1 |
-| Vue | Uncertain | Runtime DOM renderer probably works; custom renderer possible |
+| Solid | Likely good | Fine-grained updates map well to small patches; needs HTML parsing and `cloneNode` in the subset; M6, `^1` |
+| Svelte | Likely good | Compiled output uses plain DOM calls, plus template cloning (HTML parsing, `cloneNode`); M6, `^5` only |
+| Vue | Uncertain | Runtime DOM renderer probably works; a custom renderer (`createRenderer`) may skip HTML parsing; M6 starts with a spike to pick one, `^3` |
 | Angular | Poor | Assumes a real DOM and browser globals in many places; out of scope for v1 |
 
 **What no adapter can hide**
@@ -259,7 +259,7 @@ The biggest risk is input latency: if typing or clicking feels slower than a nor
 | Main thread still a single point of failure | Medium | Frame budget per isolate; document it honestly |
 | Same-origin workers are not a security boundary | High for untrusted code | An iframe tier later, with workers inside cross-origin iframes |
 | Maintaining our own DOM subset (`isoloop-dom`) as frameworks need more of the DOM | Medium | A conformance suite in `@isoloop/dom`; grow the subset only for what adapters need |
-| Scope creep: devtools, adapters, persistence | High for a solo maintainer | Strict MVP; adapters beyond Preact and React left to contributors |
+| Scope creep: devtools, adapters, persistence | High for a solo maintainer | Strict MVP; adapters beyond Preact and React after 0.1 (M6), one framework per epic |
 
 **Decided**
 
@@ -275,7 +275,7 @@ The biggest risk is input latency: if typing or clicking feels slower than a nor
 
 ## MVP roadmap and repo structure
 
-Nine milestones, each ending in something that can be demoed, released and written about (M5b is a spike). No dates yet; each is roughly 2 to 4 weeks of evenings. The [plans index](../plans/README.md) is the source of truth for milestone order, dependencies and task lists; this list is kept in sync with it.
+Eleven milestones, each ending in something that can be demoed, released and written about (M5b and M7 are spikes). No dates yet; each is roughly 2 to 4 weeks of evenings. The [plans index](../plans/README.md) is the source of truth for milestone order, dependencies and task lists; this list is kept in sync with it.
 
 1. **M0, foundations:** pnpm workspaces, TypeScript 7, the OXC tools (oxlint, oxfmt, tsdown), Vite 8, Vitest, Playwright and GitHub Actions ([ADR 0009](../adr/0009-toolchain.md)); the wire protocol types; the proof of concept ported to TypeScript. Done when the four-loops demo runs from the repo and CI is green.
 2. **M1, kernel:** loader, supervisor with one-for-one restarts, heartbeats, frame-batched compositor on our own render bridge (`isoloop-dom`, ADR 0010). Done when a blocked or crashed isolate never affects the others, proven by Playwright tests.
@@ -283,9 +283,11 @@ Nine milestones, each ending in something that can be demoed, released and writt
 4. **M2b, durable log:** topics with `durability: 'persistent'` written to OPFS, surviving a bus worker crash and a page reload, with flush on `freeze`/`pagehide` ([ADR 0007](../adr/0007-bus-worker-supervision.md)). Depends on M2; must land before the 0.1 release. Done when a persistent topic loses no acknowledged record across a bus crash or a page reload in an E2E test.
 5. **M2c, worker pools:** opt-in named pools for headless isolates (`manifest.pool`), supervised as a group, starting with a benchmark gate that can drop pools if they don't pay off ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). Depends on M2; not required for 0.1. Done when pooled and own-worker isolates run side by side and a pool crash restarts only that pool.
 6. **M3, adapters and dashboard sandbox:** Preact and React adapters with `useTopic` and `usePublish`, plus the flagship demo in a separate `isoloop/examples` repository: a backend-less markets dashboard with one headless feed isolate per exchange (public WebSocket feeds, or recorded ticks replayed for reproducible runs), an aggregator, an alerts isolate, 3 `OffscreenCanvas` charts, a virtualized trades table, a shared filter topic and stress controls per widget. A toggle switches between a native build of the dashboard (same logic, charts and widgets, on the main thread) and the Isoloop build, beside a live metrics panel: main-thread fps, long tasks, input latency, loop lag per worker, memory and bus throughput. Done when it's live on a public URL and a recorded comparison is in the README.
-7. **M4, devtools and 0.1 release:** an overlay showing each isolate's loop health and a live bus log with replay; docs site; npm publish. Done at `0.1.0` with a launch post.
-8. **M5, shared-memory engine:** the opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine. Done when the benchmark results are published, whichever engine wins.
-9. **M5b, delivery batching spike:** whether batching bus traffic across tasks gets the TS engine to its 50k records/s budget (M2 measured 45.5k on CI). Done when the findings are written up and an ADR or a recalibrated budget is accepted.
+7. **M4, devtools and 0.1 release:** a devtools panel, drawn by an isolate in its own worker, showing each isolate's loop health and a live bus log; docs site; npm publish; a dev-only MCP server for agents, if time allows. Done at `0.1.0` with a launch post.
+8. **M6, Vue, Svelte and Solid adapters:** after 0.1, with the HTML parsing and `cloneNode` the frameworks need, and no change to the render format. Done when each passes the adapter conformance suite on its major.
+9. **M7, WebMCP spike:** whether isolates should expose tools to browser agents. Done when the findings are written up, with an ADR if yes.
+10. **M5, shared-memory engine:** the opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine. Done when the benchmark results are published, whichever engine wins.
+11. **M5b, delivery batching spike:** whether batching bus traffic across tasks gets the TS engine to its 50k records/s budget (M2 measured 45.5k on CI). Done when the findings are written up and an ADR or a recalibrated budget is accepted.
 
 **Repo structure** (plain pnpm workspaces; Turborepo can be added later if builds slow down). The markets dashboard lives in the separate `isoloop/examples` repository from M3.
 
@@ -301,7 +303,8 @@ isoloop/
     bus-wasm/      (M5) Rust/WASM shared-memory log engine
     react/         (M3) adapter
     preact/        (M3) adapter
-    devtools/      (M4) overlay panel
+    devtools/      (M4) devtools panel, itself an isolate
+    vue/ svelte/ solid/  (M6) adapters
   examples/
     four-loops/    the minimal demo; the E2E suites run against it
   e2e/             Playwright suites and their harness page
