@@ -1,12 +1,12 @@
 # M3g: Federated comparison
 
-**Status:** planned (grilled 2026-11-16). Built in `isoloop/web`, in parallel with [M3e](m3e-live-widget-creator.md); ships as the next free `markets-v*` minor when it's tagged (`markets-v0.4.0` if it lands before M3e's markets page, `markets-v0.5.0` after), then a `site-v0.1.x`, tagged by the user.
+**Status:** done; shipped as `markets-v0.5.0` on 2026-11-16, then `site-v0.1.3`. Planned, built and measured the same day, in parallel with [M3e](m3e-live-widget-creator.md): tasks 2–4 in isoloop/web #111, #114, #115 and #117, the write-up in #120 ([federated run](https://github.com/isoloop/web/tree/main/apps/dashboards/markets/comparison/federated)).
 
 **Goal:** measure what Isoloop's React + Preact markets build (`mixed`) gives and costs against the way teams combine parts from several teams today: a native host that loads another team's part at run time.
 
 **Why:** the website lists "Apps built from many teams' parts" as a use with no figures behind it. `mixed` has no native counterpart today (`COUNTERPART.mixed` is `undefined`, so the header shows Native as unavailable on `/mixed`), so there's nothing to compare it with.
 
-**Done when:** `apps/dashboards/markets` in `isoloop/web` runs a `native-mixed` build and a `teams` placement on `mixed`; the pair and the placements measured alongside it are recorded on the bench server in `comparison/federated/`, with a write-up; the site's "many teams" use carries a measured sentence linking to it; and it ships as a `markets-v*` tag, then a `site-v0.1.x` tag, pushed by the user.
+**Done when:** `apps/dashboards/markets` in `isoloop/web` runs a `native-mixed` build and a `teams` placement on `mixed`; the pair and the placements measured alongside it are recorded on the bench server in `comparison/federated/`, with a write-up; the site's "many teams" use carries a measured sentence linking to it; and it ships as `markets-v0.5.0`, then `site-v0.1.3`.
 
 **Depends on:** [M3f](m3f-markets-parity.md) (the `native-workers` build, the placements, `packages/compare` and the matched method), [M3b](m3b-dashboard.md) task 16b (`mixed`, built apart per [ADR 0012](../adr/0012-isolates-built-apart.md)). Doesn't depend on M3e and touches none of its pages.
 
@@ -15,7 +15,7 @@
 ### The native build
 
 1. **`native-mixed`:** the `native-workers` build (the replay, the aggregator, alerts and the three engines in a worker each, the widgets on the main thread), with `filters` and `alerts-panel` on Preact, the same split as `mixed`. The two Preact parts are built and shipped apart, as another team's bundle, and the host loads them at run time with `import()`. It's built on `native-workers` rather than `native`, so the comparison doesn't mix the data leaving the main thread with the parts being loaded apart.
-2. **The contract between the host and a part:** each part exports `mount(el, host) → unmount`. `host` is a plain object over the native store, `subscribe(stream, cb)`, `get(stream)` and `set(stream, value)`, for the filters, the alert rules and the alerts. Its types live in `src/parts/contract.ts`, which both sides import as types only. No module instance (store, context, React) is shared between the bundles.
+2. **The contract between the host and a part:** each part exports `mount(el, host) → unmount`. `host` is a plain object over the native store, `subscribe(stream, cb, from)` and `publish(stream, value, key)`, for the filters, the alert rules and the alerts. (Planned as `subscribe`, `get` and `set`; built without `get`, since subscribing from `earliest` replays the current value, web#111.) Its types live in `src/parts/contract.ts`, which both sides import as types only. No module instance (store, context, React) is shared between the bundles.
 3. **Nothing shared at run time.** The Preact part carries its own Preact (and its own zod, if it uses it): no import map, no shared-dependency scope, no Module Federation plugin. That's what makes the second runtime a real cost, and it's what `mixed` loads too.
 4. **Our own manifest:** `parts/parts-manifest.json`, shaped `{ "parts": { "filters": { "entry": "…", "css": "…" } } }`, written from the build output by a few lines of Vite plugin. The host checks it with zod on load, as `mixed` checks `preact/isoloop-manifest.json`. Vite's internal `.vite/manifest.json` isn't read. A part's CSS is loaded next to its entry.
 5. **Native gets the containment teams usually write, nothing more:**
@@ -41,7 +41,7 @@
       - `crash`: what still updates afterwards, and whether the part comes back, and when
 
     M3f already measured blocking a React chart, so that isn't repeated.
-11. **The run,** with the M3f method on the bench server: the shared `packages/compare` runner, pairs interleaved one page at a time, the gap taken as B − A within each round. Normal and Heavy; Chromium and Firefox; 5 rounds; no 10-minute hold. About 80 runs, 1.5–2 hours. Not measured: WebKit, phones, Lite, the 10-minute hold, React-only or Preact-only builds. Reported as measured.
+11. **The run,** with the M3f method on the bench server: the shared `packages/compare` runner, pairs interleaved one page at a time, the gap taken as B − A within each round. Normal and Heavy; Chromium and Firefox; 5 rounds; no 10-minute hold. About 80 runs, 1.5–2 hours. Not measured: WebKit, phones, Lite, the 10-minute hold, React-only or Preact-only builds. Reported as measured. `comparison.yml` on GitHub's runners doesn't run these pairs; the bench server is their only source.
 
 ### Write-up and site
 
@@ -59,6 +59,6 @@
 | 4 | In `packages/compare`: JS bytes loaded and the two `alerts-panel` scenarios; the markets federated pairs; then the bench-server run into `comparison/federated/` (decisions 9–11) | web | Self-merge on green |
 | 5 | The write-up, the markets README section, `example.json` and the site sentence (decisions 12, 13) | web | User |
 | 6 | Roadmap: M3g done | isoloop | User |
-| 7 | The `markets-v*` tag after task 5, then `site-v0.1.x`, each on its own commit | web | User pushes the tags |
+| 7 | `markets-v0.5.0` after task 5, then `site-v0.1.3` | web | Pushed on the user's word |
 
 Tasks 2 and 3 run in sequence, since both touch the markets header and builds; 4 needs both.
