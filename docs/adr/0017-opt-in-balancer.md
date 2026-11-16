@@ -1,6 +1,6 @@
 # ADR 0017: An opt-in balancer, and a busy time per member
 
-- **Status:** Accepted (2026-11-16), after grilling, with decision 2's attribution and the final additions settled with the user the same day.
+- **Status:** Accepted (2026-11-16), after grilling, with decision 2's attribution and the final additions settled with the user the same day. Amended 2026-11-16 (proposed): the balancer listens to a new `isolate:beat` event instead of polling (decision 3), adds a full-pool trigger (decision 3), its cap counts only its own workers (decision 4), and quiet is enough to leave the quarantine (decision 5).
 - **Date:** 2026-11-16
 - **Amends:** [ADR 0001](0001-one-worker-per-isolate.md), who places isolates: the runtime still never pools on its own, but an app may opt in to a library that places through the kernel API, in pool names the host reserves for it. Also [ADR 0015](0015-visual-pools.md) decision 1, likewise.
 - **Plan:** [M3h](../plans/m3h-auto-placement.md), grilled 2026-11-16.
@@ -23,7 +23,7 @@ ADR 0001's alternatives rejected "a pool for light isolates chosen by heuristics
 
 ### 1. An opt-in, host-side balancer
 
-`@isoloop/balancer`, published `@experimental`, runs on the main thread beside the kernel. It uses the public kernel API (`stop`, `isolates()`, `pools()` and `on`), and spawns into its pools through the `@internal` `claimPools` (below).
+`@isoloop/balancer`, published `@experimental`, runs on the main thread beside the kernel. It uses the public kernel API (`stop`, `isolates()`, `pools()` and `on`, including the `isolate:beat` event of decision 3), and spawns into its pools through the `@internal` `claimPools` (below).
 
 ```ts
 const balancer = createBalancer(kernel, { maxWorkers?, spike?, sustained?, headroom?, quarantine?, loads? });
@@ -32,7 +32,7 @@ balancer.stop(id)
 balancer.hold(id)             // → release(); a held isolate is never moved (a widget open in the drawer)
 balancer.measure(id)          // → loadPct, averaged over the last 3 s
 balancer.placements()         // [{ id, pool, state: 'placed' | 'quarantined' | 'kept-apart' | 'moving', loadPct, atCap }]
-balancer.on('move', e => …)   // { id, from, to, reason: 'spike' | 'sustained' | 'crash' | 'bisect' | 'steady' }
+balancer.on('move', e => …)   // { id, from, to, reason: 'spike' | 'sustained' | 'full' | 'crash' | 'bisect' | 'steady' }
 balancer.dispose()
 ```
 
@@ -82,33 +82,37 @@ The runtime by itself sees only the callbacks it dispatches: bus deliveries, hos
 
 ### 3. When the balancer acts
 
-It reads `kernel.isolates()` and `kernel.pools()` every 100 ms into a 3 s ring (30 samples) of `lagMs` and `busyMs` per pool and member, and decides every 500 ms. A member's load is `busyMs` ÷ interval, and a pool's load is the sum over its members.
+It listens to the kernel's `isolate:beat` event and feeds every beat into a 3 s ring of `lagMs` and `busyMs` per pool and member, and decides every 500 ms.
+
+- **`isolate:beat`** (`@isoloop/host`, public): `{ id, pool?, lagMs, busyMs, at }`, emitted for each member on every heartbeat it reports (`at` is the host's receive time). The kernel emits it only while someone listens, so apps without a listener pay nothing. Devtools can use the same feed.
+- **Why not polling** (amended 2026-11-16): the first build read `kernel.isolates()` every 100 ms. A snapshot holds only each worker's latest beat, which the next beat replaces about 100 ms later, so the beat that carried a spike was usually gone before it was read. On plant's interactive page the runtime reported a blocker correctly (`lagMs` 392, `busyMs` ≈ 402, a neighbour ≈ 1), yet the balancer caught it within 30 s in only 5 of 6 runs. Polling also skipped or double-read `busyMs` intervals, so loads were approximate. With the event, every beat counts once. A member's load is `busyMs` ÷ interval, and a pool's load is the sum over its members.
 
 - **Spike:** a single `lagMs` over 100 ms (a long task). The member with the highest `busyMs` in that interval goes to the quarantine at once.
 - **Sustained:** `lagMs` over 50 ms across the 3 s window. The heaviest member moves to a balancer pool with room.
+- **Full** (amended 2026-11-16): the members' `busyMs` add up to 80 % of a core or more over the 3 s window, whatever the lag. The heaviest member moves to a pool that passes the 60 % rule (decision 4), or a new pool within `maxWorkers`; failing both, it's flagged `atCap`. Its move event carries the reason `full` (Q19); a pool that is full and also lagging reports `sustained`, so `full` marks the low-lag case. The same full window after a membership change and the same check after a move apply as for the sustained trigger. Placement stops adding at 60 % and moving starts at 80 %: the gap is the hysteresis. The quarantine is never "full". Found on the processor's playground: heavy tasks that yield often keep `lagMs` at 0–30 ms, so neither the spike nor the sustained trigger fired, while a pool at 88 % starved its members.
 - **Crash:** when a pool restarts after a member's error, that member goes to the quarantine.
 - **Killed, culprit unknown:** a member that blocks until the supervisor kills the pool never sends the beat that would name it. The balancer bisects: on restart, half the pool's members go to the quarantine, and whichever half blocks again holds the culprit. That takes about log₂(n) restarts, and healthy widgets are never all sent to the quarantine together. A bisect is forgotten 60 s after its last trigger. A blocker found by bisecting gets a quarantine worker of its own (`balancer-quarantine-2`…) if the cap allows.
 - **Alone in its pool:** a member that spikes while alone in its pool isn't moved unless it has offended before, since moving it can't spare anyone. Nothing joins that pool for 30 s.
 
 The thresholds, windows and the cap are options with these defaults. Fixed constants:
-- snapshot reads every 100 ms;
 - decisions every 500 ms;
 - loads saved every 10 s, only on a change of 5 points or more;
 - a bisect forgotten 60 s after its last trigger;
-- the bus counted as one worker toward the cap.
+- `kernel.pools()` read with each decision, for members and pools the balancer didn't place.
 
 ### 4. Where it places
 
 - **Predicted load.** An isolate joins or moves into a pool only if the pool's load plus its own stays under 60 % (`headroom`). If no balancer pool passes, it gets a new pool if the cap allows. Otherwise it stays where it is, and its placements report `atCap` ("over budget, at worker cap"). A move never lands in a pool that would then be over budget.
-- **Unmeasured isolates** (no `loads` entry) start in the quarantine, only to be measured. They leave once `measure` has 3 s of samples, with no steady window and no 20 % bar. On the interactive pages a new widget is measured in M3e's preview before Save (`measure`, then `loads.set`), so it arrives measured.
-- **Cap:** `maxWorkers`, default `max(2, navigator.hardwareConcurrency − 2)`. It counts every live worker on the page, the bus as one, keeps one slot for the quarantine and always allows one balancer pool. It is the balancer's own limit, in the balancer's options. The kernel's budget doesn't change and still only warns.
+- **Unmeasured isolates** (no `loads` entry) start in the quarantine, only to be measured. They leave as soon as they have 3 s of samples there, with no steady window. Members a bisect moved there are the exception: they stay until that bisect ends (culprit found, or forgotten), because "whichever half acts up again" needs them kept together. On the interactive pages a new widget is measured in M3e's preview before Save (`measure`, then `loads.set`), so it arrives measured.
+- **Cap:** `maxWorkers`, default `max(2, navigator.hardwareConcurrency − 2)`, counts only the balancer's own workers: its `balancer-N` pools, and any quarantine worker beyond the first (`balancer-quarantine-2`…). Only the first quarantine pool, `balancer-quarantine-1`, is allowed on top of it. The app can set it. It is the balancer's own allowance, in the balancer's options. The kernel's budget doesn't change and stays the page-wide warning.
+- **Why only its own workers** (amended 2026-11-16, replacing "counts every live worker on the page"): plant's interactive page already runs about 13 workers (the bus, 8 data pools, fleet, the drawer and the manual pools). Counted against `cores − 2`, that left the balancer at its cap from the start on almost any machine, so a steady heavy widget was never separated. An allowance of its own keeps it useful on a busy page; the app decides how much of the machine it gets.
 - **Load only.** Topic affinity isn't an input while delivery is per member. It's in would-like for when one delivery per pool worker exists.
 
 ### 5. The quarantine
 
-One shared pool, `balancer-quarantine-1`, outside normal placement. Suspects can slow each other there, but never a healthy pool. If it goes over budget with more than one member, its heaviest member gets a quarantine worker of its own (`balancer-quarantine-2`…), if the cap allows.
+One shared pool, `balancer-quarantine-1`, outside normal placement. Suspects can slow each other there, but never a healthy pool. If it goes over budget with more than one member, its heaviest member gets a quarantine worker of its own (`balancer-quarantine-2`…), if the cap allows: quarantine workers beyond the first count against `maxWorkers`, so the number of quarantine workers stays bounded.
 
-- **Leaving, for offenders:** after no spike and a load under 20 % for the steady window, the member moves to a pool that passes the 60 % rule. The 20 % bar applies to offenders only. A member that is there just to be measured leaves once measured (decision 4).
+- **Leaving, for offenders** (amended 2026-11-16): after its quiet window with no spike and no crash, whatever its load, the member goes where the placement rule finds room (the 60 % rule, or a new pool within `maxWorkers`). With no room anywhere it stays in the quarantine, flagged `atCap`, until there is. The earlier 20 % load bar is dropped: a heavy but well-behaved member is the full-pool trigger's business, not the quarantine's. A member that is there just to be measured leaves once measured (decision 4).
 - **Repeat offenders:** "three offences" means three returns, with steady windows of 30, 60 and 120 s. The fourth offence keeps the member in the quarantine as `kept-apart`.
 - **No other packing back.** Quiet members are not moved together to save workers (would-like).
 
@@ -138,6 +142,9 @@ One shared pool, `balancer-quarantine-1`, outside normal placement. Suspects can
 - **Several balancers per kernel:** they would contend for the same CPU, the same cap and the same quarantine slot, each blind to the others' moves. Rejected. Keeping groups of isolates apart is better served by placement groups inside one balancer (would-like).
 - **A balancer isolate with a spawn and stop grant:** fits M4's "devtools as an isolate" direction, but a grant to spawn and stop needs a security design of its own. Not taken for now.
 - **A device-based budget in the kernel:** still rejected (ADR 0001). The balancer's cap is its own option.
+- **A cap over every page worker** (the first decision): it left nothing on a page that already runs many workers. Replaced by an allowance for the balancer's own pools.
+- **A load bar for leaving the quarantine** (20 %, the first decision): it kept steady heavy members in the quarantine for good. Dropped; the full-pool trigger handles heavy members wherever they are.
+- **The host keeping the worst `lagMs` since the last read, for polling:** stateful per reader, and it still loses `busyMs` intervals. Replaced by the event.
 - **Placement by topic affinity:** saves nothing while delivery is per member. Deferred.
 - **One worker per suspect in the quarantine:** stronger isolation between suspects, at more workers. Not taken: the quarantine protects the healthy pools, and its heaviest member already gets a worker of its own when it's over budget.
 - **Quarantining every member of a killed pool:** converges at once, but punishes healthy widgets with a move each. Not taken in favour of bisecting.

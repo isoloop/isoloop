@@ -1,6 +1,6 @@
 # M3h: Auto placement
 
-**Status:** planned (grilled 2026-11-16; [ADR 0017](../adr/0017-opt-in-balancer.md) accepted the same day). The library half (`busyMs`, the reserved pool prefix, `@isoloop/balancer`) is built in `isoloop/isoloop` and can start alongside M3e. The interactive-page half is built in `isoloop/web` after M3e's drawer. It ships as `next` prereleases, then the next free `plant-v*` and `markets-v*` minors, tagged by the user.
+**Status:** planned (grilled 2026-11-16; [ADR 0017](../adr/0017-opt-in-balancer.md) accepted the same day). The library half (`busyMs`, the reserved pool prefix, `@isoloop/balancer`) is built in `isoloop/isoloop` and can start alongside M3e. The interactive-page half is built in `isoloop/web` after M3e's drawer. A new example, `apps/processor` (decisions 24–30, added 2026-11-16), is the balancer's main demo and its measurement. It ships as `next` prereleases, then the next free `plant-v*` and `markets-v*` minors and `processor-v0.1.0`, tagged by the user.
 
 **Goal:** a widget spec can say `placement: { "mode": "auto" }`, and Isoloop decides whether the isolate joins a pool or gets a worker apart, from its measured load. A widget that blocks is moved out of a shared pool before it can keep slowing its neighbours.
 
@@ -13,11 +13,11 @@
   - a widget that stays heavy;
   - a widget that crashes;
   - a widget that blocks until its pool is killed.
-- E2E tests show the same on plant with `?chaos`.
-- A measurement on the bench server compares it with `one` and `own`, and is reported whatever it shows.
+- E2E tests show the same on plant with `?chaos`, and on the processor's Playground.
+- A measurement of the processor's File processor on the bench server compares it with `one` and `own`, and is reported whatever it shows.
 
 **Depends on:**
-- [M3e](m3e-live-widget-creator.md): the interactive pages are the demo and the test bed. Integration needs its task 5 (drawer and manual placement), and the measurement needs M3e shipped.
+- [M3e](m3e-live-widget-creator.md): the interactive pages get `auto`. Integration needs its task 5 (drawer and manual placement).
 - [M2c](m2c-worker-pools.md) and [M2d](m2d-visual-pools.md): pools, headless and visual.
 
 **Comes before:** [M4](m4-devtools-release.md). `busyMs` changes the public API and the protocol, which is better done before 0.1, and M4's devtools reuse it.
@@ -39,7 +39,7 @@
    balancer.hold(id)             // → release(); a held isolate is never moved
    balancer.measure(id)          // → loadPct, averaged over the last 3 s
    balancer.placements()         // [{ id, pool, state: 'placed' | 'quarantined' | 'kept-apart' | 'moving', loadPct, atCap }]
-   balancer.on('move', e => …)   // { id, from, to, reason: 'spike' | 'sustained' | 'crash' | 'bisect' | 'steady' }
+   balancer.on('move', e => …)   // { id, from, to, reason: 'spike' | 'sustained' | 'full' | 'crash' | 'bisect' | 'steady' }
    balancer.dispose()
    ```
    - Every option defaults to the numbers in decisions 8–14.
@@ -64,9 +64,8 @@
 
 ### Workers
 
-7. **The balancer's own cap.** `maxWorkers` defaults to `max(2, navigator.hardwareConcurrency − 2)`.
-   - It counts every live worker on the page: the bus (as one worker), the dashboard's isolates, manual pools and balancer pools.
-   - At least one balancer pool is always allowed, and one slot is always kept for the quarantine.
+7. **The balancer's own allowance** (amended 2026-11-16). `maxWorkers` defaults to `max(2, navigator.hardwareConcurrency − 2)` and counts only the balancer's own workers: its `balancer-N` pools, and any quarantine worker beyond the first (`balancer-quarantine-2`…). Only the first quarantine pool, `balancer-quarantine-1`, is allowed on top. The app can set it; plant's interactive page passes a small number.
+   - The first decision counted every live worker on the page. Plant's interactive page already runs about 13 workers (the bus, 8 data pools, fleet, the drawer and the manual pools), which left the balancer at its cap from the start on almost any machine, so a steady heavy widget was never separated.
    - The kernel's soft budget (32, [ADR 0001](../adr/0001-one-worker-per-isolate.md)) is unchanged and still only warns; ADR 0001's rejection of a budget based on the device's core count is about the kernel, and stays.
 
 ### What it measures
@@ -90,18 +89,20 @@
    - **Known limits:** promise continuations, other libraries' own schedulers and the equal split are approximations. GC and anything else not traced shows up only in the worker's `lagMs`. `busyMs` is a placement guide, not a profiler.
    - The pages aren't cross-origin isolated, so `performance.now()` resolves to 100 µs. A single short callback reads as 0 or one tick, but over a heartbeat window the sum averages out to the true total. A runtime test checks the sums with a coarse clock.
    - The cost is two clock reads per attributed callback, a few thousand a second on plant at 5 kHz. The heartbeat already runs every 100 ms, so there are no new messages, only one more number per member.
-9. **The load figure.** A member's load is `busyMs` ÷ the interval, as a percentage. A pool's load is the sum over its members. The balancer reads `kernel.isolates()` and `kernel.pools()` every 100 ms into a 3 s ring (30 samples) per pool and member, and decides every 500 ms. Fixed constants, not options:
-   - snapshot reads every 100 ms;
+9. **The load figure.** A member's load is `busyMs` ÷ the interval, as a percentage. A pool's load is the sum over its members. The balancer listens to a new public kernel event, `isolate:beat` `{ id, pool?, lagMs, busyMs, at }`, emitted for each member on every heartbeat and only while someone listens. Every beat goes into a 3 s ring per pool and member, and it decides every 500 ms (amended 2026-11-16).
+   - The first build polled `kernel.isolates()` every 100 ms. A snapshot holds only each worker's latest beat, replaced by the next one about 100 ms later, so the beat that carried a spike was usually gone before it was read, and `busyMs` intervals were skipped or read twice. Found by the plant integration: the runtime reported a blocker correctly, but the balancer often missed it.
+
+   Fixed constants, not options:
    - decisions every 500 ms;
    - loads written back through `loads.set` every 10 s, only on a change of 5 points or more;
-   - a bisect forgotten 60 s after its last trigger;
-   - the bus counted as one worker.
+   - a bisect forgotten 60 s after its last trigger.
 
 ### When it acts
 
-10. **Three triggers:**
+10. **The triggers:**
     - **Spike:** a single `lagMs` over 100 ms, i.e. a long task. The member with the highest `busyMs` in that interval goes to the quarantine at once.
     - **Sustained:** `lagMs` over 50 ms across the 3 s window. The heaviest member moves to a normal balancer pool with room (decision 11).
+    - **Full** (added 2026-11-16, Q15): the members' `busyMs` add up to 80 % of a core or more over the 3 s window, whatever the lag. The heaviest auto member moves to a pool that passes decision 11, or a new pool within `maxWorkers`; failing both, it's flagged `atCap`. Its move event carries the reason `full` (Q19); a pool that is full and also lagging reports `sustained`, so `full` marks the low-lag case. Cooldowns and the check after a move apply as for the other triggers. 60 % (stop adding) against 80 % (start moving) is the hysteresis. Found on the playground: heavy tasks that yield often keep the lag at 0–30 ms, so neither the spike nor the sustained trigger fired, and a pool at 88 % starved its members.
     - **Crash:** when a pool restarts after a member's error, that member goes to the quarantine.
     - **Alone in its pool:** a widget that spikes while alone in its pool isn't moved unless it has offended before, since moving it spares no one. Nothing joins that pool for 30 s.
 11. **Place by predicted load.** A widget joins or moves into a pool only if *the pool's load + the widget's load* stays under 60 %.
@@ -110,10 +111,10 @@
     - A move never lands in a pool that would then be over budget.
 12. **New widgets arrive already measured.** M3e's preview runs the real widget on its own worker while it's being edited. On Save the creator calls `measure` on the preview, stores the figure with `loads.set`, and the balancer places the widget from it.
     - Measured loads are kept through the `loads` store. On the interactive pages that store is a persistent, compacted `creator.placement.v1` topic keyed by widget id, so a reload or a seeded starter is placed from history.
-    - A widget with no history (a first boot, or a widget never previewed) starts in the quarantine only to be measured. It leaves once `measure` has 3 s of samples, with no steady window and no 20 % bar.
-13. **The quarantine is one shared pool,** `balancer-quarantine-1`, outside normal placement. Suspects can slow each other there, but never a healthy pool. If the quarantine itself goes over budget with more than one member, its heaviest member gets a quarantine worker of its own (`balancer-quarantine-2`…), if the cap allows.
+    - A widget with no history (a first boot, or a widget never previewed) starts in the quarantine only to be measured. It leaves as soon as it has 3 s of samples there, with no steady window. Members a bisect moved there stay until that bisect ends (culprit found, or forgotten), so the bisect can still converge.
+13. **The quarantine is one shared pool,** `balancer-quarantine-1`, outside normal placement. Suspects can slow each other there, but never a healthy pool. If the quarantine itself goes over budget with more than one member, its heaviest member gets a quarantine worker of its own (`balancer-quarantine-2`…), if the cap allows: quarantine workers beyond the first count against `maxWorkers`, so the number of quarantine workers stays bounded.
 14. **Leaving the quarantine, and repeat offenders.**
-    - **Steady** means no spike and a load under 20 % for the steady window. The widget then moves back to a pool that passes decision 11. The 20 % bar applies to offenders only; a widget there just to be measured leaves once measured (decision 12).
+    - **Quiet is enough** (amended 2026-11-16, Q18): an offender leaves after its quiet window (no spike, no crash), whatever its load. It goes where decision 11 finds room; with none, it stays in the quarantine, flagged `atCap`, until there is. The earlier 20 % load bar is dropped. A widget there just to be measured leaves once measured (decision 12).
     - "Three offences" means three returns, with steady windows of 30, 60 and 120 s.
     - The fourth offence keeps it in the quarantine as `kept-apart`, and the widget shows "kept apart: repeated blocking".
     - Apart from this way out of the quarantine, nothing is packed back into pools to save workers ([would-like](../would-like.md)).
@@ -139,46 +140,62 @@
 20. **The placement field** gains "Automatic" and preselects it for new widgets.
     - While a widget is on auto, the field shows where it is now ("Automatic · in Auto 2").
     - After a move, the widget header shows a badge for a few seconds, for example "moved: Auto 1 was over budget".
-    - Every move goes into a placement log in the page's About panel.
+    - Every move goes into a placement log, a collapsible panel in the board's toolbar (the interactive page has no About panel).
     - On Native the field stays disabled with "Not used".
 21. **`?chaos` and the `burn` operator.** A test-only spec operator makes a widget misbehave on command:
     - `{ "op": "burn", "everyMs": 10000, "forMs": 500 }` blocks for `forMs` every `everyMs`;
     - `{ "op": "burn", "loadPct": 40 }` keeps a steady load.
 
     `validateSpec` rejects `burn` unless the page runs with `?chaos`, so real specs can't contain it, and the drawer only offers it then. Unit tests use a simulated kernel with scripted beats, and E2E and the measurement use `?chaos`.
-22. **Plant first, then markets.** Markets gets E2E tests only, as in M3e.
+22. **Plant first, then markets, both E2E only.** Plant's starter widgets keep their manual `pool-1` and `pool-2`, so M3e's measured setup doesn't change; only widgets added from now on default to Automatic. The measurement moves to the processor (decision 23).
 
 ### Measured
 
-23. **Against two naive placements,** `one` (every auto widget in one pool) and `own` (each in a worker of its own).
-    - **Setup:** plant at `?rate=5`, the starter widgets plus one heavy widget (M3e's heatmap or percentile preview) and, with `?chaos`, a `burn` widget.
+23. **Measured on the processor's File processor** (moved from plant, 2026-11-16), against two naive placements of the same processors: `one` (all in one pool) and `own` (a worker each). No native build: the question is placement.
     - **Method:** on the bench server, with `packages/compare`, on Chromium and Firefox, 5 rounds.
     - **Figures:**
-      - plant late frames
-      - drawer typing latency
-      - workers used
-      - time to separate the culprit
-      - the move gap
+      - jobs per second
+      - p50 and p95 latency per job
+      - the UI's input latency on the main thread
+      - workers used, and the number of moves
+      - jobs lost (expected 0) or duplicated
       - the balancer's own cost, measured with it on and off (main-thread ms/s, worker CPU)
 
     Reported as measured, whatever it shows.
+
+### The processor example (added 2026-11-16)
+
+24. **Why a new example.** Plant's widgets are mostly light and its page already runs about 13 workers, so it leaves little to show. Headless processors do heavy, varied CPU work, a move costs them no surface, and the bus's consumer groups (`subscribe({ group })`, offsets kept per group) hand a stopped member's unfinished jobs to the group again, so the example shows containment, the bus, restart and placement together.
+25. **One app, two pages.** `apps/processor` in `isoloop/web`, deployed at `/processor/`, with a React UI on the main thread and every task or processor a headless isolate. The **Playground** comes first; the **File processor** follows.
+26. **The Playground's controls.**
+    - **Add task** spawns a headless task isolate through the balancer, up to 24.
+    - Each task has a **CPU slider from 0 to 100 %**, burning that share of its time in slices of the page's **Work chunk** setting, and **Block 2 s**, **Crash** and **Remove** buttons. A slider's value is the task's starting load (Q16).
+    - Page-wide: a placement switch (**balancer / own / one**) that respawns every task, an **Add 5 light tasks** preset, and the `maxWorkers` value shown.
+27. **What the Playground shows.** One column per pool (`balancer-1…N`, then the quarantine), each with its live `lagMs` and lines at the 50 ms and 100 ms thresholds. Each task card shows its measured `busyMs` as a bar beside the slider's setting. A moved card slides to its new column with the reason. Below: a move log, and the workers in use out of the cap.
+28. **A moved task keeps its setting.** Slider values are published to a compacted `playground.tasks` topic keyed by task id; each task subscribes to its own key, so after a move it comes back with the same load.
+29. **The File processor.** A generator, seeded so runs repeat, emits synthetic "files" at a rate set by a dial. Each kind does real CPU work scaled by its size: **CSV** (parse and aggregate), **Image** (a resize-like pass over pixels), **Archive** (compress) and **Hash** (SHA-256 in JS). Each kind has its own job topic and a consumer group of headless processors; results go to `files.results`. The UI shows queue length, jobs per second, latency per job, each pool's load and where every processor sits, with each move. Three dials, each from zero up: **poison** files block for 2 s (spikes and quarantine), **heavy** files cost 10× (sustained load), **corrupt** files throw (crash). No real file uploads; those stay with the Builder.
+30. **Tests and release.** The Playground has E2E tests only, run in real time with no test-only speed-up in the balancer: a slider raised to 90 % is separated within about 5 s; Block puts the task in the quarantine at once and it returns after 30 s steady; Crash quarantines it; `own` and `one` never move anything. The File processor is measured (decision 23). The app ships as `processor-v0.1.0`, tagged by the user.
 
 ## Tasks
 
 | # | Task | Repo | Review |
 | --- | --- | --- | --- |
 | 1 | This plan, the roadmap row and the would-like entries | isoloop | User |
-| 2 | ADR 0017: the opt-in balancer, `busyMs`, the reserved prefix, the triggers, quarantine and bisect, the cap, the API; amendments to ADR 0001 and ADR 0015 (decisions 1–18) | isoloop | User (accepted 2026-11-16) |
-| 3 | `busyMs`: in `@isoloop/runtime`, the wrapped timers, rAF, `queueMicrotask`, `requestIdleCallback` and member ports in every worker, with a conformance test against native behaviour; the minimal React DevTools hook (with a test that production React calls it) and the Preact `options` hooks, through the adapters; the equal split; `IdleReport.busyMs` in `@isoloop/protocol` and `IsolateSnapshot.busyMs` in `@isoloop/host`; a coarse-clock test; pool and own-worker tests; a `next` prerelease (decision 8) | isoloop | Self-merge on green, after task 2 (accepted) |
-| 4 | The reserved pool prefix in `@isoloop/host`: `reserved_pool` for `balancer-` pools on `kernel.spawn`, the `@internal` `claimPools(kernel, 'balancer') → { spawn }` (once per kernel, else `balancer_exists`), tests; a `next` prerelease (decision 3) | isoloop | Self-merge on green |
-| 5 | `@isoloop/balancer`: the API (`hold`, `measure`, `atCap` included), the load rings and fixed constants, the three triggers and the lone-member rule, predicted-load placement, the quarantine and its windows, bisect (including when `busyMs` can't explain the lag), the check after a move, the cap, hysteresis; unit tests on a simulated kernel with scripted beats for spike, sustained, crash, kill and hold (decisions 3, 7, 9–18) | isoloop | Self-merge on green, after tasks 3 and 4. Its `next` prerelease waits for the user's first npm publish of `@isoloop/balancer` (pending from the user) |
-| 6 | The creator: `auto` in the spec, the placement field, the badge, the "Moving…" overlay, the About placement log, `hold` while the drawer is open, `measure` + `loads.set` on Save, the `creator.placement.v1` loads store, `?chaos` and `burn`; plant E2E (decisions 5, 12, 19–21) | web | Self-merge on green, after M3e task 5 and task 5 |
-| 7 | Markets: `creator.placement.v1` in its contracts, `auto` on its interactive page, E2E (decision 22) | web | Self-merge on green, after task 6 and M3e task 9 |
-| 8 | The measured scenarios in `packages/compare`, then the bench-server run (decision 23) | web | Self-merge on green, after M3e ships |
-| 9 | Plant's write-up of the measurement, in the results page layout used by M3d–M3g (findings first, then the tables, then details), and `example.json` | web | User |
-| 10 | Roadmap: M3h done; the next free `plant-v*` and `markets-v*` minors | isoloop, web | User pushes the tags |
+| 2 | ADR 0017: the opt-in balancer, `busyMs`, the reserved prefix, the triggers, quarantine and bisect, the cap, the API; amendments to ADR 0001 and ADR 0015 (decisions 1–18). Amended 2026-11-16: `isolate:beat` and the balancer's own allowance | isoloop | User (accepted 2026-11-16; the amendment goes to the user) |
+| 3 | `busyMs`: in `@isoloop/runtime`, the wrapped timers, rAF, `queueMicrotask`, `requestIdleCallback` and member ports in every worker, with a conformance test against native behaviour; the minimal React DevTools hook (with a test that production React calls it) and the Preact `options` hooks, through the adapters; the equal split; `IdleReport.busyMs` in `@isoloop/protocol` and `IsolateSnapshot.busyMs` in `@isoloop/host`; a coarse-clock test; pool and own-worker tests; a `next` prerelease (decision 8) | isoloop | Done (#198) |
+| 4 | The reserved pool prefix in `@isoloop/host`: `reserved_pool` for `balancer-` pools on `kernel.spawn`, the `@internal` `claimPools(kernel, 'balancer') → { spawn }` (once per kernel, else `balancer_exists`), tests; a `next` prerelease (decision 3) | isoloop | Done (#197) |
+| 5 | `@isoloop/balancer`: the API (`hold`, `measure`, `atCap` included), the load rings and fixed constants, the three triggers and the lone-member rule, predicted-load placement, the quarantine and its windows, bisect (including when `busyMs` can't explain the lag), the check after a move, the cap, hysteresis; unit tests on a simulated kernel with scripted beats for spike, sustained, crash, kill and hold (decisions 3, 7, 9–18) | isoloop | Self-merge on green (#196) |
+| 6 | `isolate:beat` in `@isoloop/host`: a public `KernelEvents` entry `{ id, pool?, lagMs, busyMs, at }`, emitted per member on every heartbeat only while someone listens, with tests (decision 9) | isoloop | Self-merge on green |
+| 7 | The balancer listens to `isolate:beat` instead of polling, and `maxWorkers` counts only its own pools, with the quarantine on top; tests updated (decisions 7, 9) | isoloop | Self-merge on green, after tasks 5 and 6 |
+| 8 | The creator on plant: `auto` in the spec, the placement field, the badge, the "Moving…" overlay, the toolbar placement log, `hold` while the drawer is open, `measure` + `loads.set` on Save, the `creator.placement.v1` loads store, `?chaos` and `burn`; plant E2E (decisions 5, 12, 19–22) | web | Self-merge on green (web#127), after the prerelease with tasks 5–7 |
+| 9 | Markets: `auto` on its interactive page, E2E (decision 22) | web | Self-merge on green, after task 8 |
+| 10 | The processor's Playground: the app, tasks, sliders, Block/Crash/Remove, the placement switch, pool columns, move log, `playground.tasks`; E2E (decisions 25–28, 30) | web | Self-merge on green, after the prerelease with tasks 5–7. Built locally first so the user can look at it |
+| 11 | The processor's File processor: the seeded generator, the four kinds, job topics and consumer groups, `files.results`, the poison/heavy/corrupt dials, the UI; E2E (decision 29) | web | Self-merge on green, after task 10 |
+| 12 | The measured scenarios in `packages/compare` for the File processor, then the bench-server run (decision 23) | web | Self-merge on green, after task 11 |
+| 13 | The processor's write-up of the measurement, in the results page layout used by M3d–M3g (findings first, then the tables, then details), and `example.json` | web | User |
+| 14 | Roadmap: M3h done; the next free `plant-v*` and `markets-v*` minors, and `processor-v0.1.0` | isoloop, web | User pushes the tags |
 
-Tasks 3 and 4 run alongside M3e and merge on green now that ADR 0017 is accepted. Task 5 needs task 3's types and task 4's `claimPools`; it merges on green, but its prerelease waits for the user's first npm publish of `@isoloop/balancer`. Task 6 needs task 5 and M3e task 5. Tasks 7 and 8 can run in parallel.
+Tasks 3 and 4 are merged. Task 5 merges on green; tasks 6 and 7 follow it. The web tasks need a `next` prerelease with tasks 5–7, run by the user. Tasks 8–9 and 10–11 can run in parallel; task 12 needs task 11.
 
 ## Risks
 
@@ -191,4 +208,4 @@ Tasks 3 and 4 run alongside M3e and merge on green now that ADR 0017 is accepted
 ## Follow-ups
 
 - Topic affinity, a make-before-break `move()` and packing quiet widgets back into pools are in [would-like](../would-like.md).
-- [M4](m4-devtools-release.md)'s devtools panel shows `busyMs` per member and the balancer's placements.
+- [M4](m4-devtools-release.md)'s devtools panel shows `busyMs` per member and the balancer's placements, fed by `isolate:beat`.
