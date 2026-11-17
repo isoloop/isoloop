@@ -5,7 +5,8 @@
 # What runs when (decided 2026-11-07):
 # - pull requests: everything;
 # - pushes to main: `check` only, since the PR already ran the rest;
-# - `v*` tags: everything (the M4 release job will follow it);
+# - release tags (`v<major>.<minor>.<patch>`, no suffix): everything (the M4 release job will follow it);
+#   prerelease tags (`v0.1.0-next.N`) are records only and run nothing (ADR 0019);
 # - weekly, Monday 05:00 UTC: everything, to catch flaky tests and drift.
 name: CI
 
@@ -13,7 +14,9 @@ on:
   pull_request:
   push:
     branches: [main]
-    tags: ['v*']
+    # Release tags only (ADR 0019, decision 6): `v0.1.0` matches, `v0.1.0-next.3`
+    # doesn't. GitHub's filter must match the whole tag, and `.` is literal.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   schedule:
     - cron: '0 5 * * 1'
   workflow_dispatch:
