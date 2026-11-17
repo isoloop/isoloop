@@ -611,7 +611,7 @@ sequenceDiagram
 
 ### 7.6 Shutdown
 
-`kernel.stop(id)` → `shutdown { reason: 'stop', graceMs: 1000 }`. The isolate runs its `onShutdown` handlers, then sends its last `commits` and waits for the broker's answer. The kernel calls `terminate()` after the grace period or on the isolate's last message (`bye`), sends `detach`, and the compositor removes the surface. The isolate ends in state `stopped`.
+`kernel.stop(id)` → `shutdown { reason: 'stop', graceMs: 1000 }`. The isolate runs its `onShutdown` handlers, then sends its last `commits` and waits for the broker's answer. The kernel calls `terminate()` after the grace period or on the isolate's last message (`bye`), sends `detach`, and the compositor removes the surface. The isolate ends in state `stopped`. `stop()` resolves once the worker is gone. A `spawn` with the same id may come before that: the new isolate stays `restarting` until the old one is gone, then starts. Its bus connection, pool member and surface all go by the id, so the old one's late `bye` would otherwise end the new one's connection or pool member.
 
 ### 7.7 Bus worker crash
 
