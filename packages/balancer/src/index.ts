@@ -7,6 +7,8 @@ export type {
   BeatLike,
   BehindEvent,
   CrashLike,
+  FailedEvent,
+  FailedLike,
   ForeignEvent,
   KernelLike,
   LoadStore,

@@ -39,9 +39,14 @@ const balancer = createBalancer(kernel, options?);
 | `spawn(manifest)` | Like `kernel.spawn`, but the balancer picks `pool`. Returns the `Placement`. Throws a `TypeError` if `manifest.pool` is set or the id is already running. |
 | `stop(id)` | Stops the isolate and forgets it. |
 | `hold(id)` | Leaves the isolate where it is until the returned function is called, for example while a widget is open for editing. If a trigger picks a held isolate, the balancer waits for the release rather than moving another in its place. |
-| `measure(id)` | The isolate's load over the last 3 s, as a share of one core (0–100), for any isolate, placed by the balancer or not. `undefined` until 3 s of beats have been seen. |
-| `placements()` | `{ id, pool, state, loadPct, atCap?, foreign? }` for every isolate it placed. `state` is `placed`, `quarantined`, `kept-apart` or `moving`. |
+| `measure(id)` | The isolate's load over the last 3 s from its beats, as a share of one core (0–100), for any isolate, placed by the balancer or not. `undefined` until 3 s of beats have been seen. |
+| `report(id, { backlog?, busyMs? })` | What the app knows about the isolate: how much work is queued for it, and the busy time it measured itself, as a running total in ms since the isolate started (below). Give at least one; each must be a finite number, 0 or more, or it throws a `TypeError`. Report every second or so: a report older than 10 s counts as none. |
+| `placements()` | `{ id, pool, state, loadPct, reportedPct?, backlog?, atCap?, behind?, foreign? }` for every isolate it placed. `state` is `placed`, `quarantined`, `kept-apart`, `moving` or `failed`. `loadPct` is the larger of the beats' and the reported figure; `reportedPct` is the reported one alone, while it's fresh. |
 | `on('move', fn)` | `{ id, from, to, reason }` for every move (reasons below). |
+| `on('arrived', fn)` | `{ id, from, to, reason, costMs }` when a moved isolate first beats in its new pool: `costMs` is the time from stopping it. |
+| `on('spike', fn)` | `{ id, pool, lagMs, action }` for every spike put on a member: `noted` for a first one, `quarantined` when it sends the member to quarantine. |
+| `on('behind', fn)` | `{ id, pool, backlog }` when an isolate's backlog keeps rising, or its pool needs a bisect, and the balancer has nowhere to give it. At most every 30 s per isolate. |
+| `on('failed', fn)` | `{ id, pool, reason }` when the kernel gave up on an isolate (`isolate:failed`, below). |
 | `on('foreign', fn)` | An isolate it didn't place turned up in one of its pools. The host reserves those pools, so this shouldn't happen. It's flagged, never moved. |
 | `dispose()` | Stops watching and gives back the kernel's claim, so another balancer can be created on it. Isolates keep running where they are; `spawn` throws afterwards. |
 
@@ -50,14 +55,15 @@ const balancer = createBalancer(kernel, options?);
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `maxWorkers` | `max(2, navigator.hardwareConcurrency − 2)`, at least 1 | The balancer's own allowance of workers: its `balancer-N` pools and any quarantine worker beyond the first. Workers your app runs itself don't count. |
-| `spike.lagMs` | 100 | One beat with the pool's lag above this sends its busiest member to quarantine. |
+| `spike.lagMs` | 100 | One beat with the pool's lag above this is a spike, put on its busiest member. A first one is only reported; a second from the same member within 60 s sends it to quarantine. |
 | `sustained.lagMs`, `sustained.forMs` | 50 ms, 3,000 ms | The pool's median lag above `lagMs` over `forMs` moves its heaviest member out. |
 | `headroom.loadPct` | 60 | An isolate joins a pool only while the pool's load plus its own stays under this. |
-| `quarantine.steadyMs` | 30,000 | How long an offender must stay quiet to leave quarantine. Each offence doubles it. |
+| `quarantine.steadyMs` | 30,000 | How long an offender must stay quiet to leave quarantine. Each offence doubles it, up to 2 minutes (or `steadyMs`, if longer). |
 | `quarantine.maxReturns` | 3 | Returns from quarantine allowed; the next offence keeps the isolate apart for good. |
 | `loads` | none | A store `{ get(id), set(id, loadPct) }` for measured loads, so a reload places from history (below). |
+| `pack.enabled` | `true` | Packing back: a quiet isolate alone in its pool joins another to free a worker (below). |
 
-Fixed, not options: decisions every 500 ms over a 3 s window, the full-pool threshold of 80 %, loads written back at most every 10 s and only on a change of 5 points or more, and a bisect forgotten 60 s after its last trigger.
+Fixed, not options: decisions every 500 ms over a 3 s window, the full-pool threshold of 80 %, loads written back at most every 10 s and only on a change of 5 points or more, a bisect forgotten 60 s after its last trigger, the backlog's 10 s window, at most 3 moves for load per isolate in 5 minutes, and packing's 60 s steady window, 40 % bar and one pack a minute.
 
 ### Pool names and one balancer per kernel at a time
 
@@ -65,7 +71,7 @@ The balancer's pools are `balancer-1`, `balancer-2`…, and its quarantine is `b
 
 ## How it decides
 
-The balancer listens to the kernel's `isolate:beat` event: every heartbeat of every isolate, with its worker's `lagMs` and its own `busyMs` (below). It keeps a 3 s window per pool and per member. A member's load is its `busyMs` divided by the beat interval; a pool's load is the sum over its members.
+The balancer listens to the kernel's `isolate:beat` event: every heartbeat of every isolate, with its worker's `lagMs` and its own `busyMs` (below). It keeps a 3 s window per pool and per member. A member's load is its `busyMs` divided by the beat interval, or the busy time the app reports for it over the same window, whichever is larger; a pool's load is the sum over its members. It also listens to `isolate:crash` and `isolate:failed`.
 
 ### Placing
 
@@ -76,12 +82,14 @@ The balancer listens to the kernel's `isolate:beat` event: every heartbeat of ev
 
 | Trigger | When | Where the member goes | `reason` |
 | --- | --- | --- | --- |
-| Spike | One beat with the pool's `lagMs` over 100 ms (a long task) | The busiest member in that interval goes to quarantine at once | `spike` |
+| Spike | One beat with the pool's `lagMs` over 100 ms (a long task), a second time from the same member within 60 s | The busiest member in that interval goes to quarantine. A first spike is only reported (`spike`, `noted`) | `spike` |
 | Sustained | The pool's median `lagMs` over 50 ms across 3 s | The heaviest member goes to a pool with room (the 60 % rule), or a new pool within the cap | `sustained` |
 | Full | The members' `busyMs` add up to 80 % of a core or more across 3 s, whatever the lag | As for sustained | `full` |
 | Crash | A member's error restarted its pool | That member goes to quarantine | `crash` |
 | Kill, culprit unknown | A member blocked until the supervisor killed the pool, so no beat named it | Half the pool's members go to quarantine on restart; whichever half blocks again holds the culprit | `bisect` |
+| Backlog | The app's reported backlog is higher at the end of a 10 s window than at its start, and above 0 | A pool of its own if the cap allows, else a pool with less load than its pool-mates; with neither, `behind` | `backlog` |
 | Quiet again | An offender's quiet window passed | Back to a pool with room | `steady` |
+| Packing back | Alone in its pool and steady for 60 s | Into another of the balancer's pools that stays under 40 % with it | `pack` |
 
 The full trigger exists because well-behaved heavy work never looks like lag: tasks that yield every few milliseconds keep `lagMs` at 0–30 ms while their pool runs at 88 % and starves its members. Placement stops adding at 60 % and moving starts at 80 %; the gap keeps the balancer from moving the same isolate back and forth.
 
@@ -89,7 +97,10 @@ Some rules keep it from making things worse:
 
 - **Cooldown.** After a move, both pools wait 30 s, with at most one move per pool per cooldown, and need fresh evidence gathered after it.
 - **Check after a move.** If the pool's lag didn't fall, the next-heaviest member moves.
-- **When `busyMs` can't explain the lag** (the pool lags, but its members' `busyMs` add up to under half the interval), the balancer bisects instead of trusting the figures.
+- **When `busyMs` can't explain the lag** (the pool lags, but its members' loads add up to under half the interval, with any reported busy time counted), the balancer bisects instead of trusting the figures.
+- **Only moves that help.** A move for load is made only if the moves it starts are predicted to bring the pool back under its line. Otherwise the isolate stays and is flagged `atCap`.
+- **A move budget.** Each isolate gets at most 3 moves for load (sustained, full, backlog, pack, and leaving the quarantine) in 5 minutes. Quarantine and bisect moves protect the others, so they aren't limited, though they count toward the 3.
+- **One backlog move per fresh 10 s window,** across the balancer, so the members of a consumer group move one at a time, the one in the busiest pool first.
 - **Alone in its pool.** A member that spikes alone isn't moved unless it has offended before, since moving it spares no one. Nothing joins that pool for 30 s.
 - **A move never lands in a pool that would then be over budget.** With nowhere to go, the member stays and is flagged `atCap`.
 
@@ -97,11 +108,19 @@ Some rules keep it from making things worse:
 
 One shared pool, `balancer-quarantine-1`, outside normal placement and outside `maxWorkers`. Suspects can slow each other there, but never a healthy pool. If it goes over budget with more than one member, its heaviest member gets a quarantine worker of its own, and that worker counts against `maxWorkers`. A blocker found by a bisect gets one too.
 
-- **Leaving:** an offender leaves after its quiet window (30 s, then 60 s, then 120 s after repeat offences) with no spike and no crash, **whatever its load**. Where it goes is the normal placement rule; a heavy but quiet isolate is the full trigger's business, not the quarantine's. With no room anywhere it stays, flagged `atCap`, until there is.
+- **Leaving:** an offender leaves after its quiet window (30 s, then 60 s, then 120 s after repeat offences, and never more than 2 minutes) with no spike and no crash, **whatever its load**. Where it goes is the normal placement rule; a heavy but quiet isolate is the full trigger's business, not the quarantine's. With no room anywhere it stays, flagged `atCap`, until there is.
+- **Offences wear off.** Back in a balancer pool, an offender loses one offence for each quiet window it completes there, so one that stays quiet is back to the 30 s window. One that offends again soon after leaving gets the next, longer window.
 - **Kept apart:** the fourth offence keeps it in quarantine for good (`state: 'kept-apart'`).
 - **Measured-only members** leave once measured, except the ones a bisect moved there, which stay until that bisect ends.
+- **A bisect needs a quarantine pool of its own.** It starts only when the quarantine is empty (or holds only that bisect's own suspects), or the cap leaves room for a new quarantine pool. Suspects never join a pool that holds offenders: when a pool's worker is killed, every member there counts a crash, so crowding suspects in with a blocker gets them all given up on. With no room, the pool stays as it is and its members are `behind`.
 
-Quiet isolates are never packed back together to save workers; the balancer only separates.
+### Packing back
+
+An isolate alone in its pool, steady for 60 s, joins another of the balancer's pools, which frees its worker. Steady means no spike, crash, sustained or full trigger, and a backlog no higher than 60 s before: a queue that holds steady while work arrives is fine, a growing one isn't. The pool it joins must stay under 40 % of a core with it, below the 60 % placement line so it doesn't trip at once, and must not have a member moving, in trouble in the last 60 s, or with a growing backlog. The lightest such isolate goes first, into the fullest pool that fits, and at most one packs per minute. Never a held or `kept-apart` isolate. `pack: { enabled: false }` turns it off.
+
+### Isolates the kernel gave up on
+
+The kernel gives up on an isolate that crashes past its restart limit (the 4th crash within 60 s by default) and emits `isolate:failed`. The balancer then marks it `failed`: it leaves its pool's load, the quarantine's count and any bisect, `on('failed')` reports it, and no move restarts it. Restarting it is the app's choice, with `kernel.restart(id)`; when it beats again, the balancer takes it as new, with no offences, from the pool it restarted in. `balancer.stop(id)` forgets it as usual.
 
 ## Moves
 
@@ -123,7 +142,8 @@ How it's attributed:
 
 Its limits:
 
-- Promise continuations, other libraries' own schedulers, and work shared by the whole worker (GC) belong to no isolate; they show up only in the worker's `lagMs`.
+- Promise continuations, other libraries' own schedulers, and work shared by the whole worker (GC) belong to no isolate; they show up only in the worker's `lagMs`. Work that resumes after `await` is the common case: in M3i's measurement each File processor did its work in slices resumed after `await` and measured 0 to 8 % of a core while its pool fell behind.
+- **For work it misses, report your own.** If the app times its work (the processor times each slice of a file), `balancer.report(id, { busyMs })` with a running total since the isolate started, and the balancer uses the larger figure. A running total means a late or missed report still counts at the next one; a total that goes down is taken as a restart of the count.
 - An equal split can make one isolate look lighter or heavier than it is.
 - The clock is coarse on pages that aren't cross-origin isolated (100 µs). Short callbacks average out over a window; long tasks are measured almost exactly.
 
@@ -143,5 +163,6 @@ M3h measured these on the processor example's File processor, on 4 cores at 2.0 
 
 - `balancer.placements()`: each isolate's pool, state, load and flags.
 - `balancer.on('move')`: every move with its reason. The processor Playground and the plant interactive page keep a move log from it.
+- `balancer.on('arrived')`, `on('spike')`, `on('behind')` and `on('failed')`: each move's cost, every spike and what it did, isolates with nowhere to go, and isolates the kernel gave up on.
 - `kernel.pools()`: the `balancer-` pools and their members, like any pool.
 - `kernel.on('isolate:beat')`: the raw feed the balancer reads.
