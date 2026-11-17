@@ -1,9 +1,15 @@
 # A PR that changes a published package carries a changeset (isoloop/web
 # ADR 0004, decision 4). `changeset status --since` fails when a package
 # changed without one; private packages (e2e, bench) are ignored by the
-# config. An internal-only change (tests, CI, refactors that leave the
-# published .d.ts alone) takes the `no-changeset` label instead. Its own
-# workflow, so adding or removing the label re-runs only this check.
+# config. Its own workflow, so adding or removing a label re-runs only this
+# check. scripts/ci/changeset-check.ts decides first (CONTRIBUTING.md,
+# "Releases"):
+# - a changeset asking for `major` fails while the packages are below 1.0.0,
+#   unless the PR is labelled `release-1.0` (on 0.x a breaking change is a
+#   minor);
+# - `changeset status` is skipped for an internal-only change (tests, CI,
+#   refactors that leave the published .d.ts alone), labelled `no-changeset`,
+#   and for a version PR, told from its diff: it only consumes changesets.
 name: Changeset
 
 on:
@@ -22,23 +28,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Skipped by the no-changeset label
-        if: contains(github.event.pull_request.labels.*.name, 'no-changeset')
-        run: echo "Internal-only change, labelled no-changeset."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}
         with:
-          # The base branch's history, so --since can compare against it.
+          # The base branch's history, so the diff and --since can compare against it.
           fetch-depth: 0
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}
+      # No install: the script runs on the runner's Node.
+      - name: Major guard, version PR or no-changeset label
+        id: decide
+        run: node scripts/ci/changeset-check.ts
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+      - if: steps.decide.outputs.status == 'run'
         run: pnpm install --frozen-lockfile
       - name: A changeset for every changed package
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}
+        if: steps.decide.outputs.status == 'run'
         run: pnpm release:status --since=origin/${{ github.base_ref }}
