@@ -5,6 +5,7 @@ Ideas we've consciously deferred or want to explore later. None of them is plann
 ## Bus and contracts
 
 - **De-duplicating request records by `req.id`.** A crash after a handler's side effect but before its reply delivers the request again, so [M4a](plans/m4a-agents.md) (decision 8) asks tool handlers to be idempotent by `req.id`, as the bus guide asks of every handler. The bus could instead skip a request record it has already seen answered. Only if consequential agent tools turn out to need it.
+- **`no_responder` for `bus.request`.** [ADR 0018](adr/0018-tools-for-agents.md) fails a `kernel.request` at once when no isolate could answer, from grants and states the host has. An isolate's own `bus.request` still waits out its timeout; failing it fast would need the bus to know which isolates could answer.
 - **Async seed `map`.** Let a seed's `map` return a promise, for migrations that need I/O. Deferred because it puts the network on the seed's path inside the bus worker; the migrator-isolate pattern covers it today. ([ADR 0003](adr/0003-schema-format-standard-schema.md))
 - **`kernel.reseed(topic)`.** Re-run the current `map` over the v1 offsets a seed rejected, once the `map` or the schema is fixed. The offsets are already kept in the seed metadata. ([ADR 0003](adr/0003-schema-format-standard-schema.md))
 - **`migrator(from, to, map)` helper.** A ~20-line helper in `@isoloop/runtime` that builds the migrator isolate for migrations a seed can't express. ([ADR 0003](adr/0003-schema-format-standard-schema.md))

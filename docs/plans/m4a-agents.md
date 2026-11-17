@@ -2,7 +2,7 @@
 
 **Goal:** 0.1 ships with agent support. Agents can learn Isoloop (`llms.txt`, `AGENTS.md`, a skill), see a running app (the dev MCP), and call tools an app exposes, at dev time through the dev MCP and in the browser through WebMCP.
 
-**Status:** grilled 2026-11-17 (Q1–Q34, yes to all); background in the [investigation](../investigations/ai-enablers.md). Not started. Its tool surface needs ADR 0018, which goes to the user before any library work merges.
+**Status:** grilled 2026-11-17 (Q1–Q34, yes to all); background in the [investigation](../investigations/ai-enablers.md). Not started. Its tool surface needs ADR 0018, accepted 2026-11-17.
 
 **Done when:**
 
@@ -26,7 +26,7 @@
 2. **The tool's name is the topic's name** (`markets.quote.v1`), which is valid in both WebMCP and MCP. A new topic version is a new tool.
 3. **The app opts in, not the isolate.** A request reaches every subscriber of its topic and the first valid reply wins, so exposure belongs to the topic. The app's kernel config lists what agents may see: `agents: { expose: ['markets.quote.v1', 'markets.alerts.*'], timeoutMs? }`, with the grant matchers. Isolates built apart ([ADR 0012](../adr/0012-isolates-built-apart.md)) can't expose anything on their own.
 4. **The kernel checks at start.** A pattern that matches a topic with no `reply`, no `tool`, or a schema without [Standard JSON Schema](https://standardschema.dev/json-schema) fails the start with `not_exposable`, naming the topic. A pattern that matches no topic is a warning. The JSON Schema is made at run time through the same vendored interface as `isoloop contracts export` ([ADR 0003](../adr/0003-schema-format-standard-schema.md), decision 21).
-5. **`kernel.request(topic, value, { timeoutMs, signal })`,** public and `@experimental`, mirrors `kernel.publish`. The record carries `req: { from: 'kernel', id, via }`, and transports set `via` (`'mcp'`, `'webmcp'`, later `'builder'`), so a handler can refuse agent calls or log them. The protocol addition is part of ADR 0018.
+5. **`kernel.request(topic, value, { timeoutMs, signal })`,** public and `@experimental`, mirrors `kernel.publish`. The record carries `req: { from: 'host', id, via }` (`'host'` is the bus's existing host producer id; ADR 0018 decision 4), and transports set `via` (`'mcp'`, `'webmcp'`, later `'builder'`), so a handler can refuse agent calls or log them. The protocol addition is part of ADR 0018.
 6. **Agent calls time out after 10 s by default** (`agents.timeoutMs`); `kernel.request` keeps the bus's 30 s. The record stays in the log, so an isolate that restarts within the timeout still gets the call and replies.
 7. **`no_responder` at once.** If every isolate allowed to subscribe to the topic has given up (`failed`) or was never spawned, the kernel fails the call straight away instead of waiting out the timeout. It checks grants and isolate states on the host; the bus doesn't change. Tools stay registered either way.
 8. **Handlers must be idempotent by `req.id`.** A crash after the side effect but before the reply delivers the record again, as for any handler (the bus guide's rule). The markets example shows how. De-duplication in the bus is in [would-like](../would-like.md).
