@@ -1,5 +1,12 @@
 # @isoloop/runtime
 
+## 0.1.0-next.1
+
+### Patch Changes
+
+- @isoloop/dom@0.1.0-next.1
+  - @isoloop/protocol@0.1.0-next.1
+
 ## 0.1.0-next.0
 
 ### Minor Changes
