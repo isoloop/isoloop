@@ -1,6 +1,6 @@
 # ADR 0019: Versioning and releases
 
-- **Status:** Proposed (2026-11-17), after grilling (Q1–Q12, yes to all)
+- **Status:** Accepted (2026-11-17), after grilling (Q1–Q12, yes to all)
 - **Date:** 2026-11-17
 - **Builds on:** [ADR 0011](0011-dom-package.md) decision 8 (one Changesets `fixed` group), [ADR 0012](0012-isolates-built-apart.md) (the isolate seam and its `[FLOOR, VERSION]` check), and the release steps of #221 (Changesets pre mode `next`, the version PR, the Prerelease workflow).
 - **Plan:** [M4d](../plans/m4d-release.md), item 2's "semver policy for the protocol version vs package versions".
