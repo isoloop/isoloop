@@ -1,6 +1,6 @@
 # ADR 0018: Tools for agents
 
-- **Status:** Proposed (2026-11-17). Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all).
+- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all).
 - **Date:** 2026-11-17
 - **Amends:** [ADR 0003](0003-schema-format-standard-schema.md). A contract may describe a tool, and the host makes JSON Schema at run time through the same vendored interface that decision 21 uses for `isoloop contracts export`, not only at export.
 - **Plan:** [M4a](../plans/m4a-agents.md), grilled 2026-11-17 (decisions 1–8, 10, 11 and 14 there). Background: the [AI-enablers investigation](../investigations/ai-enablers.md).

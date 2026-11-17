@@ -2,7 +2,7 @@
 
 **Goal:** 0.1 ships with agent support. Agents can learn Isoloop (`llms.txt`, `AGENTS.md`, a skill), see a running app (the dev MCP), and call tools an app exposes, at dev time through the dev MCP and in the browser through WebMCP.
 
-**Status:** grilled 2026-11-17 (Q1–Q34, yes to all); background in the [investigation](../investigations/ai-enablers.md). Not started. Its tool surface needs ADR 0018, which goes to the user before any library work merges.
+**Status:** grilled 2026-11-17 (Q1–Q34, yes to all); background in the [investigation](../investigations/ai-enablers.md). Not started. Its tool surface needs ADR 0018, accepted 2026-11-17.
 
 **Done when:**
 
