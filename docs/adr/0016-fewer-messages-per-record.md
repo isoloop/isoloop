@@ -1,6 +1,6 @@
 # ADR 0016: Fewer bus messages per record
 
-- **Status:** Accepted
+- **Status:** Accepted. Amended 2026-11-17 (accepted the same day, [#211](https://github.com/isoloop/isoloop/issues/211)): commits carry a delivery sequence, so a group commit can't cover a record redelivered after it (points 10–13), and a consumer group that has committed resumes from its committed offset whatever `from` says (point 14).
 - **Date:** 2026-11-11 (proposed 2026-11-10)
 - **Amends:** [ADR 0005](0005-bus-topology-message-channels.md), what travels on an isolate's bus port: commits are combined
 - **Evidence:**
@@ -61,6 +61,23 @@ The proposal had three decisions: combined commits; memory-topic publishes answe
 
    Messaging work is the browser's port delivery plus Isoloop's messaging code. It's down 8–14 ms/s, beyond the run-to-run spread; the renderer total moves within it. `one` and 1 kHz show the same pattern (16–24% fewer messages). It keeps every feature and cuts messages clearly, so it passes the rule. A commit costs about a third of an average message. Most of the messaging cost is in deliveries and publishes, which this decision doesn't touch.
 
+### Group commits carry a delivery sequence (amended 2026-11-17)
+
+Found by the processor example (isoloop/web#130) and reproduced in `packages/bus/src/groups-commit-loss.test.ts` ([investigation](../investigations/group-commit-loss.md), [#211](https://github.com/isoloop/isoloop/issues/211)).
+
+**The bug.** A commit is cumulative: "everything I hold up to offset N is settled". In a consumer group that assumes a member receives offsets in rising order, and redelivery breaks it. When a member leaves, its uncommitted records go to the others before anything new, so a member can be handed a record whose offset is *lower* than records it has already settled. Its next commit then covers that record before the handler has run. That happens within one interval (the committer already holds a higher offset), or when a commit that was already in flight arrives after the reassignment. The broker drops the entry, and the group's offset moves past it. If that member then stops before it gets to the record (a balancer move does exactly this), nobody gets it again. The design's promise, "a member that leaves hands its uncommitted records to the others", is broken.
+
+10. **Every `deliver` carries a `seq`:** `deliver { topic, records, gap?, seq }`. It counts the deliveries to one subscription on one connection, from 1 at each `subscribe`. The broker records, on each group entry, the `seq` of the delivery it went out in, including when the entry is redelivered to another member.
+11. **Every commit entry carries a `seq` too:** `commits { offsets: { topic, offset, seq }[] }`. `seq` is the highest delivery whose records, and those of every earlier delivery on that subscription, are all settled. The committer tracks it beside the highest settled offset. What counts as settled is unchanged (point 4).
+12. **A group commit covers only entries with `offset ≤ N` and `seq ≤ S`.** A record redelivered after the commit's deliveries has a higher `seq`, so neither the in-order case nor the crossing can cover it. Records of a delivery that's only partly settled are covered once the whole delivery is. A subscription that isn't in a group keeps the offset rule: its deliveries are always in order, so `seq` never changes the answer there, and its commit lag is unchanged.
+13. **What it costs and keeps:**
+    - One integer per `deliver` and one per commit entry. Commits stay combined, one `commits` per port per interval, so point 9's message counts stand.
+    - Host subscriptions share the committer and get the same rule.
+    - Redelivery stays at-least-once: this removes the loss, not the duplicates. A group member that crashes still leaves up to one interval of handled records for the others (point 7).
+    - `seq` is per connection and isn't stored. After a bus restart (ADR 0007), a reattaching connection starts again at 1, and the client still sends no commits first on the new port (point 3).
+    - `PROTOCOL` stays `{ v: 1, min: 1 }`: both ends of the bus port come from one build (point 6), and `ctx.bus` doesn't change.
+14. **A group that has committed resumes from its committed offset, whatever `from` says.** Until now a group that every member had left and that rejoined with `from: 'earliest'` started at the topic's tail and replayed it (the processor did 117 files twice). Now `from` applies only when the group has no committed offset yet: on its first join, or after its offsets were dropped with the topic. Its committed offset is kept, as before, under the consumer id `group:<name>`. `from` on a member joining a group that already has members changes nothing either way: the member takes records from where the group is. The design's "Subscriptions and consumers" and "Groups" paragraphs and the bus guide say so, and that group members don't need `from: 'committed'` for this.
+
 ## Not taken
 
 - **Batching per port per task, as an experimental opt-in (`KernelConfig.bus.batch`), built and removed.**
@@ -96,10 +113,15 @@ What's left is mostly the bus hop (ADR 0005) times Chromium's fixed cost per por
     - a reset clearing a lost topic
   - Host and kernel: `invalid_config` for -1, 1,001 and 2.5; a host subscription at a 1 s interval receiving all 1,500 records of a last-100 topic, in order.
   - A kill within the interval redelivers what was handled in it, the cost point 7 accepts.
+- **Tests for the amendment:** `groups-commit-loss.test.ts` passes (no longer `it.fails`), covering the in-order case and the crossing; a member stopped right after a redelivery loses nothing; own subscriptions' commits unchanged; a group that empties and rejoins `from: 'earliest'` resumes after its committed offset, and a new group with `earliest` starts at the tail.
 - **Config:** `createKernel` validates `bus.commitIntervalMs` (`invalid_config` outside 0–1,000, or not an integer).
 - **Docs:** the bus protocol section of the design doc (`commits`, the early sends, the redelivery window), and `KernelConfig.bus.commitIntervalMs` in the guide.
 
 ## Alternatives considered
+
+- **For #211 (point 12), redelivered records needing an exact commit.** The broker would never let a cumulative commit cover a redelivered entry, and the client would commit those offsets one by one. A smaller broker change, but `commits` would need a second shape, and a burst of redeliveries after a member leaves would become one entry per record, which this ADR set out to avoid.
+- **For #211, group commits as ranges of settled offsets.** Exact in every ordering, and ranges stay small when records are handled in order. But it's the largest change: group commits would stop sharing the single-offset shape, and the broker would have to merge ranges.
+- **For point 14, keeping `from` as it is and telling group members to use `from: 'committed'`.** That leaves a replay of the whole topic one option name away, and a group that has committed has already said where it stands.
 
 - **Deliver once per pool worker (deferred).** The pool's runtime would receive one `deliver` per worker and hand the same record to each member that subscribed. The bus would still decide who may receive it, tagging the delivery with the member ids.
   - **Saves:** from the plant's counts, delivers in `matched` fall from about 815 to about 593 a second (estimate).
