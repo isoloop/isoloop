@@ -1,6 +1,6 @@
 # M3j: Balancer gaps
 
-**Status:** planned (grilled 2026-11-17). An amendment to [ADR 0017](../adr/0017-opt-in-balancer.md) is proposed for the user. The balancer change is built in `isoloop/isoloop`, and the processor changes and the measurement in `isoloop/web`. M3j ships as a `0.1.0-next.N` prerelease, then `processor-v0.3.0`, tagged by the user.
+**Status:** planned (grilled 2026-11-17). An amendment to [ADR 0017](../adr/0017-opt-in-balancer.md) was accepted the same day. The balancer change is built in `isoloop/isoloop`, and the processor changes and the measurement in `isoloop/web`. M3j ships as a `0.1.0-next.N` prerelease, then `processor-v0.3.0`, tagged by the user.
 
 **Goal:** `@isoloop/balancer` sees work its busy time misses, packs quiet members back while work keeps arriving, lets members out of the quarantine, and stops placing or reviving an isolate the kernel has given up on.
 
