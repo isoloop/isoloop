@@ -315,6 +315,11 @@ export interface IsolateHandle {
 
 export interface Kernel {
   spawn(manifest: IsolateManifest): IsolateHandle;
+  /**
+   * Stops an isolate: its `onShutdown` handlers get the stop grace, then its
+   * worker goes. Resolves once the worker is gone. The id is free at once: a
+   * `spawn` with it before then starts when the old worker is gone.
+   */
   stop(id: string): Promise<void>;
   restart(id: string): Promise<void>;
   /** Wakes a suspended isolate (ADR 0001); a no-op otherwise. */
@@ -529,6 +534,12 @@ export function createKernel(config: KernelConfig): Kernel {
     readyTimeoutMs: config.heartbeat?.readyTimeoutMs ?? def.readyTimeoutMs,
   };
   const slots = new Map<string, Slot>();
+  /**
+   * Stopped isolates whose worker is still shutting down, by id. A new
+   * isolate with the same id starts once its predecessor is gone: the bus
+   * connection, the pool member and the surface all go by the id.
+   */
+  const closing = new Map<string, Slot>();
   const listeners: { [E in KernelEvent]: Set<(e: KernelEvents[E]) => void> } = {
     'isolate:state': new Set(),
     'isolate:ready': new Set(),
@@ -591,6 +602,7 @@ export function createKernel(config: KernelConfig): Kernel {
     controller?.detach(slot.manifest.id, {
       wake: slot.sup.state === 'suspended' && !slot.manifest.surface,
     });
+    if (closing.get(slot.manifest.id) === slot) closing.delete(slot.manifest.id);
     slot.onClosed();
   };
 
@@ -855,6 +867,13 @@ export function createKernel(config: KernelConfig): Kernel {
 
   const onMessage = (slot: Slot, msg: unknown): void => {
     const id = slot.manifest.id;
+    // A stopped isolate whose id was spawned again only finishes shutting
+    // down: what else it sends would reach the new isolate's surface.
+    const current = slots.get(id);
+    if (current !== undefined && current !== slot) {
+      if (isIsolateToHost(msg) && msg.t === 'bye') terminate(slot);
+      return;
+    }
     if (isIsolateToHost(msg)) {
       switch (msg.t) {
         case 'ready': {
@@ -947,6 +966,17 @@ export function createKernel(config: KernelConfig): Kernel {
 
   const start = (slot: Slot, o: { wake?: boolean } = {}): void => {
     const { manifest } = slot;
+    // Spawned again before the stopped isolate with this id said `bye`: start
+    // after it, so its late `bye` can't end this one's bus connection or pool
+    // member. Waits at most the stop grace (`stopGraceMs`).
+    const prev = closing.get(manifest.id);
+    if (prev) {
+      void prev.closed.then(() => {
+        if (slots.get(manifest.id) === slot && slot.sup.state === 'restarting' && !slot.loaded)
+          start(slot, o);
+      });
+      return;
+    }
     slot.fmt = undefined;
     slot.idle = undefined;
     if (manifest.surface) {
@@ -1384,6 +1414,7 @@ export function createKernel(config: KernelConfig): Kernel {
       if (slot.sup.state !== 'stopped') terminate(slot);
       compositor.detach(id);
       slots.delete(id);
+      if (slot.loaded) closing.set(id, slot);
       return slot.loaded ? slot.closed : Promise.resolve();
     },
 
