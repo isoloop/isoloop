@@ -1,5 +1,8 @@
-// Publishes every public @isoloop/* package as 0.0.0-next.<sha> under the
-// `next` dist-tag (M3b task 1). A stopgap until M4's Changesets pipeline.
+// Publishes every public @isoloop/* package at the version Changesets wrote
+// into its package.json, under the `next` dist-tag. The versions come from
+// `pnpm release:version` (pre mode `next`, so 0.1.0-next.N), merged to main
+// through a PR before this runs; every package shares one version (the fixed
+// group, ADR 0011). A version already on npm is skipped, so a re-run is safe.
 //
 // CI runs it from .github/workflows/prerelease.yml, which npm trusts for each
 // package (trusted publishing: no token, provenance is automatic). Run it with
@@ -9,7 +12,7 @@
 // versions and `publishConfig` applies; `npm publish` uploads it, because npm
 // is what speaks OIDC to the registry.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -20,11 +23,6 @@ const run = (cmd: string, args: string[], cwd?: string, quiet = false): string =
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', quiet ? 'ignore' : 'inherit'],
   }).trim();
-
-const sha = (process.env.GITHUB_SHA ?? run('git', ['rev-parse', 'HEAD'])).slice(0, 7);
-// A prerelease identifier that is all digits must not start with 0 (semver §9).
-const id = /^\d+$/.test(sha) ? `g${sha}` : sha;
-const version = `0.0.0-next.${id}`;
 
 interface Manifest {
   name: string;
@@ -56,10 +54,17 @@ const packages = dirs.flatMap((dir) => {
   return manifest.private ? [] : [{ dir, file, manifest }];
 });
 
-// Set every version first, so `pnpm pack` rewrites `workspace:*` to this one.
-for (const p of packages) {
-  p.manifest.version = version;
-  writeFileSync(p.file, `${JSON.stringify(p.manifest, null, 2)}\n`);
+// One version for the whole fixed group, written by `changeset version`.
+const versions = new Set(packages.map((p) => p.manifest.version));
+if (versions.size !== 1) {
+  const list = packages.map((p) => `${p.manifest.name}@${p.manifest.version}`).join(', ');
+  throw new Error(`the @isoloop/* packages disagree on their version: ${list}`);
+}
+const [version = ''] = versions;
+if (!/^\d+\.\d+\.\d+-next\.\d+$/.test(version)) {
+  throw new Error(
+    `version ${version} isn't a next prerelease: run \`pnpm release:version\` and merge its PR first`,
+  );
 }
 
 const out = mkdtempSync(join(tmpdir(), 'isoloop-next-'));

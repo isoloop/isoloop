@@ -1,5 +1,7 @@
-# Publishes every public @isoloop/* package as 0.0.0-next.<sha> under the npm
-# `next` dist-tag (M3b task 1), a stopgap until M4's Changesets pipeline.
+# Publishes every public @isoloop/* package under the npm `next` dist-tag, at
+# the version Changesets wrote on main (pre mode `next`: 0.1.0-next.N). The
+# version step runs before this, as a PR: `pnpm release:version` bumps every
+# package and writes the CHANGELOG.md sections (CONTRIBUTING.md, "Releases").
 # npm trusts this workflow file for each package (trusted publishing), so there
 # is no token: the job's OIDC token authenticates, and provenance is automatic.
 name: Prerelease
