@@ -1,0 +1,33 @@
+# When a PR changes the public API of a published package (the built
+# dist/**/*.d.ts), it needs a minor changeset, docs or TSDoc, and a Site impact
+# other than none (isoloop/web ADR 0004, decision 4). Skips quickly when no
+# package source changed. Mark an export @internal to keep it out.
+name: API check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: node scripts/ci/api-check.ts
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
