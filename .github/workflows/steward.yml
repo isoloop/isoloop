@@ -12,8 +12,14 @@ on:
 
 permissions: {}
 
+# A push cancels the stale review. Label changes other than the override
+# get a group of their own, so they never cancel a review in progress
+# (`gh pr create --label` sends `opened` and `labeled` a second apart).
 concurrency:
-  group: steward-${{ github.event.pull_request.number }}
+  group: >-
+    steward-${{ github.event.pull_request.number }}-${{
+    (github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
+    github.event.label.name != 'steward-override' && github.run_id || 'review' }}
   cancel-in-progress: true
 
 jobs:
