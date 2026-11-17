@@ -90,7 +90,7 @@ Other editors need three things:
 The packages are in Changesets' pre mode `next`, so versions are `0.1.0-next.N` until 0.1.0. A prerelease takes two steps:
 
 1. **Version, as a PR.** On a branch, run `pnpm release:version`. It bumps every package to the next `0.1.0-next.N`, writes each package's `CHANGELOG.md` section from the pending changesets, and records them under `.changeset/pre/` so the next run doesn't repeat them. Open a PR (`chore: version 0.1.0-next.N`) and merge it on green. It needs no `no-changeset` label: the changeset check sees from the diff that it only consumes changesets (added or deleted `.changeset/*.md`, `.changeset/pre/`, `.changeset/pre.json`, `version` in `packages/*/package.json`, `packages/*/CHANGELOG.md`). Anything else in the diff, and the normal check runs.
-2. **Publish.** Run the *Prerelease* workflow by hand on `main`. It publishes the versions in each `package.json` under the `next` dist-tag through npm trusted publishing (no token), and skips any version already on npm. It refuses to publish unless every package shares one `-next.N` version.
+2. **Publish.** Run the *Prerelease* workflow by hand on `main`. It publishes the versions in each `package.json` under the `next` dist-tag through npm trusted publishing (no token), and skips any version already on npm. It refuses to publish unless every package shares one `-next.N` version. Once every package is on npm, it tags the commit it built with an annotated `v<version>` (`v0.1.0-next.N`), so there's no tag to push by hand. A re-run passes when the tag is already on that commit, and fails when it's on another.
 
 `pnpm release:status` shows what the next version step would do.
 
