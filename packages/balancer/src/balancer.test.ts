@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBalancer } from './balancer';
 import { memoryLoads, SimKernel } from './sim';
-import type { Balancer, BalancerOptions, MoveEvent } from './types';
+import type { Balancer, BalancerOptions, FailedEvent, MoveEvent } from './types';
 
 let sim: SimKernel;
 let balancer: Balancer;
@@ -866,13 +866,27 @@ describe('packing back (M3i)', () => {
     expect(moves).toHaveLength(1);
   });
 
-  it('never packs a member with a backlog, and not at all when turned off', async () => {
+  it('packs a member whose backlog holds steady while work arrives (M3j)', async () => {
     twoApart();
+    await wait(5_000);
     sim.load('h', 5);
-    const stop = reporting(['h'], () => 3);
+    // Never 0 with files arriving, but not rising.
+    const stop = reporting(['a', 'h'], () => 3);
     await wait(120_000);
     stop();
-    expect(moves).toEqual([]);
+    expect(moves.map((m) => m.reason)).toEqual(['pack']);
+    expect(new Set(balancer.placements().map((p) => p.pool)).size).toBe(1);
+  });
+
+  it('never packs a member whose backlog rose over the 60 s, and not at all when turned off', async () => {
+    twoApart();
+    sim.load('h', 5);
+    const t0 = performance.now();
+    // Slowly enough that no 10 s window is a backlog move's trigger for long.
+    const stop = reporting(['h'], () => 3 + Math.floor((performance.now() - t0) / 20_000));
+    await wait(120_000);
+    stop();
+    expect(moves.filter((m) => m.reason === 'pack')).toEqual([]);
     balancer.dispose();
     sim.dispose();
     twoApart({ pack: { enabled: false } });
@@ -887,5 +901,245 @@ describe('packing back (M3i)', () => {
     sim.load('h', 25);
     await wait(300_000);
     expect(moves).toEqual([]);
+  });
+});
+
+/** Reports a running `busyMs` total for every id once a second, growing by `pct(id)` % of each second. */
+const reportingBusy = (ids: string[], pct: (id: string) => number): (() => void) => {
+  const totals = new Map<string, number>();
+  const iv = setInterval(() => {
+    for (const id of ids) {
+      const total = (totals.get(id) ?? 0) + pct(id) * 10;
+      totals.set(id, total);
+      balancer.report(id, { busyMs: total });
+    }
+  }, 1_000);
+  return () => clearInterval(iv);
+};
+
+describe('reported busy time (M3j)', () => {
+  it('reads work the beats miss from the report: a full pool moves its heaviest instead of bisecting', async () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    start({ loads: memoryLoads(Object.fromEntries(ids.map((id) => [id, 1]))) });
+    for (const id of ids) {
+      sim.load(id, 1);
+      balancer.spawn({ id });
+    }
+    // Work resumed after `await`: the worker pays for it, the beats don't
+    // show it, and the app reports it from the start.
+    const stop = reportingBusy(['a', 'b'], (id) => (id === 'a' ? 50 : 30));
+    await wait(5_000);
+    sim.hidden('a', 50);
+    sim.hidden('b', 30);
+    await wait(8_000);
+    stop();
+    expect(moves.length).toBeGreaterThan(0);
+    expect(moves.some((m) => m.reason === 'bisect')).toBe(false);
+    // 80 % reported: the full-pool trigger, which the beats alone never reach.
+    expect(moves[0]).toMatchObject({ id: 'a', reason: 'full' });
+  });
+
+  it("takes the larger of the beats' and the report's figures, and drops a stale report", async () => {
+    start({ loads: memoryLoads({ a: 5 }) });
+    sim.load('a', 5);
+    balancer.spawn({ id: 'a' });
+    let stop = reportingBusy(['a'], () => 30);
+    await wait(5_000);
+    expect(where('a')?.reportedPct).toBeCloseTo(30, 0);
+    expect(where('a')?.loadPct).toBeCloseTo(30, 0);
+    stop();
+    // Under the beats' 5 %: the beats' figure wins.
+    stop = reportingBusy(['a'], () => 1);
+    await wait(5_000);
+    expect(where('a')?.loadPct).toBeCloseTo(5, 0);
+    stop();
+    await wait(11_000);
+    expect(where('a')?.reportedPct).toBeUndefined();
+    expect(where('a')?.loadPct).toBeCloseTo(5, 0);
+  });
+
+  it('starts counting again when the total goes down', async () => {
+    start({ loads: memoryLoads({ a: 5 }) });
+    sim.load('a', 5);
+    balancer.spawn({ id: 'a' });
+    balancer.report('a', { busyMs: 100_000 });
+    await wait(1_000);
+    let total = 0;
+    const iv = setInterval(() => {
+      total += 200;
+      balancer.report('a', { busyMs: total });
+    }, 1_000);
+    await wait(5_000);
+    clearInterval(iv);
+    expect(where('a')?.reportedPct).toBeCloseTo(20, 0);
+  });
+
+  it('rejects a report with neither field, or a busyMs that is not a finite number of 0 or more', () => {
+    start();
+    balancer.spawn({ id: 'a' });
+    expect(() => balancer.report('a', {})).toThrow(TypeError);
+    expect(() => balancer.report('a', { busyMs: -1 })).toThrow(TypeError);
+    expect(() => balancer.report('a', { busyMs: Number.POSITIVE_INFINITY })).toThrow(TypeError);
+    expect(() => balancer.report('a', { busyMs: 10 })).not.toThrow();
+  });
+});
+
+describe('offences decay (M3j)', () => {
+  it('a quiet offender back in a pool loses its offence: the next window is 30 s again', async () => {
+    start({ loads: memoryLoads({ a: 5, s: 5 }) });
+    sim.load('a', 5);
+    sim.load('s', 5);
+    balancer.spawn({ id: 'a' });
+    balancer.spawn({ id: 's' });
+    await wait(1_000);
+    const backAfter: number[] = [];
+    /* oxlint-disable no-await-in-loop */
+    for (let round = 0; round < 3; round++) {
+      await spikeTwice('s');
+      expect(where('s')?.state).toBe('quarantined');
+      const t = performance.now();
+      while (where('s')?.state !== 'placed') await wait(500);
+      backAfter.push(Math.round((performance.now() - t) / 1000));
+      // Quiet back in its pool, and past the move budget's 5 minutes: without
+      // decay, the next window would be twice as long.
+      await wait(300_000);
+    }
+    /* oxlint-enable no-await-in-loop */
+    for (const s of backAfter) {
+      expect(s).toBeGreaterThanOrEqual(30);
+      expect(s).toBeLessThan(60);
+    }
+  });
+
+  it('caps the quiet window at 2 minutes', async () => {
+    start({ loads: memoryLoads({ a: 5, s: 5 }), quarantine: { maxReturns: 10 } });
+    sim.load('a', 5);
+    sim.load('s', 5);
+    balancer.spawn({ id: 'a' });
+    balancer.spawn({ id: 's' });
+    await wait(1_000);
+    await spikeTwice('s');
+    // Three more offences in the quarantine: 4 in all, so 240 s uncapped.
+    /* oxlint-disable no-await-in-loop */
+    for (let i = 0; i < 3; i++) {
+      sim.crash({ id: 's', reason: 'error', pool: 'balancer-quarantine-1' });
+      await wait(500);
+    }
+    /* oxlint-enable no-await-in-loop */
+    expect(where('s')?.state).toBe('quarantined');
+    const t = performance.now();
+    // oxlint-disable-next-line no-await-in-loop
+    while (where('s')?.state !== 'placed') await wait(500);
+    const back = (performance.now() - t) / 1000;
+    expect(back).toBeGreaterThanOrEqual(119);
+    expect(back).toBeLessThan(125);
+  });
+});
+
+describe('a bisect only with a quarantine pool of its own (M3j)', () => {
+  it("doesn't put suspects with an offender at the cap: the pool stays, its members are behind", async () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    start({
+      maxWorkers: 1,
+      loads: memoryLoads(Object.fromEntries([...ids, 'o'].map((id) => [id, 5]))),
+    });
+    for (const id of [...ids, 'o']) {
+      sim.load(id, 5);
+      balancer.spawn({ id });
+    }
+    await wait(1_000);
+    await spikeTwice('o');
+    expect(where('o')).toMatchObject({ pool: 'balancer-quarantine-1', state: 'quarantined' });
+    const behind = new Set<string>();
+    balancer.on('behind', (e) => behind.add(e.id));
+    sim.block('c');
+    await wait(5_000);
+    expect(moves.filter((m) => m.reason === 'bisect')).toEqual([]);
+    expect([...behind].toSorted()).toEqual(ids);
+    expect(where('c')).toMatchObject({ pool: 'balancer-1', behind: true });
+    sim.unblock('c');
+  });
+
+  it('bisects into an empty quarantine as before', async () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    start({ maxWorkers: 1, loads: memoryLoads(Object.fromEntries(ids.map((id) => [id, 5]))) });
+    for (const id of ids) {
+      sim.load(id, 5);
+      balancer.spawn({ id });
+    }
+    await wait(1_000);
+    sim.block('c');
+    await wait(3_000);
+    const bisected = moves.filter((m) => m.reason === 'bisect');
+    expect(bisected.length).toBeGreaterThan(0);
+    expect(bisected.every((m) => m.to === 'balancer-quarantine-1')).toBe(true);
+    sim.unblock('c');
+  });
+});
+
+describe('isolates the kernel gave up on (M3j)', () => {
+  it('marks a failed member, takes it out of its pool, and never moves or restarts it', async () => {
+    start({ loads: memoryLoads({ a: 5, b: 5 }) });
+    for (const id of ['a', 'b']) {
+      sim.load(id, 5);
+      balancer.spawn({ id });
+    }
+    await wait(5_000);
+    const failed: FailedEvent[] = [];
+    balancer.on('failed', (e) => failed.push(e));
+    sim.fail('b');
+    expect(failed).toEqual([{ id: 'b', pool: 'balancer-1', reason: 'unresponsive' }]);
+    expect(where('b')).toMatchObject({ state: 'failed', loadPct: undefined });
+    // `a` alone now: its pool's load no longer counts `b`.
+    sim.load('a', 50);
+    await wait(10_000);
+    expect(moves).toEqual([]);
+    expect(() => balancer.report('b', { backlog: 3 })).not.toThrow();
+    expect(where('b')?.backlog).toBeUndefined();
+    await wait(300_000);
+    expect(moves.filter((m) => m.id === 'b')).toEqual([]);
+    expect(sim.spawned.filter((m) => m.id === 'b')).toHaveLength(1);
+    expect(where('b')?.state).toBe('failed');
+  });
+
+  it('places it again as new once the app restarts it', async () => {
+    start({ loads: memoryLoads({ a: 5, b: 5 }) });
+    for (const id of ['a', 'b']) {
+      sim.load(id, 5);
+      balancer.spawn({ id });
+    }
+    await wait(1_000);
+    sim.fail('b');
+    await wait(5_000);
+    sim.restart('b');
+    await wait(5_000);
+    expect(where('b')).toMatchObject({ pool: 'balancer-1', state: 'placed' });
+    expect(where('b')?.loadPct).toBeCloseTo(5, 0);
+  });
+
+  it('never revives a member that a blocking neighbour got given up on', async () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    start(
+      { loads: memoryLoads(Object.fromEntries(ids.map((id) => [id, 5]))) },
+      new SimKernel({ maxRestarts: 3 }),
+    );
+    for (const id of ids) {
+      sim.load(id, 5);
+      balancer.spawn({ id });
+    }
+    const failedAt = new Map<string, number>();
+    balancer.on('failed', (e) =>
+      failedAt.set(e.id, sim.spawned.filter((m) => m.id === e.id).length),
+    );
+    await wait(1_000);
+    sim.block('c');
+    await wait(60_000);
+    expect(failedAt.has('c')).toBe(true);
+    await wait(300_000);
+    for (const [id, spawns] of failedAt) {
+      expect(where(id)?.state).toBe('failed');
+      expect(sim.spawned.filter((m) => m.id === id)).toHaveLength(spawns);
+    }
+    for (const id of ids.filter((x) => !failedAt.has(x))) expect(where(id)?.state).toBe('placed');
   });
 });

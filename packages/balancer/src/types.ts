@@ -1,7 +1,7 @@
 /**
  * The part of the kernel the balancer uses: the public API only (`spawn`,
- * `stop`, `pools`, and the `isolate:beat` and `isolate:crash` events), so
- * `@isoloop/host`'s `Kernel` fits it as is.
+ * `stop`, `pools`, and the `isolate:beat`, `isolate:crash` and
+ * `isolate:failed` events), so `@isoloop/host`'s `Kernel` fits it as is.
  */
 export interface KernelLike<M extends ManifestLike = ManifestLike> {
   spawn(manifest: M): unknown;
@@ -10,6 +10,8 @@ export interface KernelLike<M extends ManifestLike = ManifestLike> {
   on(event: 'isolate:crash', fn: (e: CrashLike) => void): () => void;
   /** Every heartbeat as it arrives, once per member of a pool (ADR 0017). */
   on(event: 'isolate:beat', fn: (e: BeatLike) => void): () => void;
+  /** An isolate past the kernel's restart limit: it stays down until `kernel.restart` (M3j). */
+  on(event: 'isolate:failed', fn: (e: FailedLike) => void): () => void;
   /**
    * Only for kernels not made by `createKernel` (a simulated one in tests):
    * the claim of the `balancer-*` pools, as the host's `claimPools` gives it.
@@ -41,6 +43,9 @@ export type PoolLike = { name: string; members: readonly string[]; running: bool
 
 /** The fields of the kernel's `isolate:crash` event the balancer reads. */
 export type CrashLike = { id: string; reason: string; pool?: string };
+
+/** The fields of the kernel's `isolate:failed` event the balancer reads (M3j). */
+export type FailedLike = { id: string; reason: string; pool?: string };
 
 /**
  * Where the balancer keeps each isolate's measured load between page loads,
@@ -80,46 +85,75 @@ export type BalancerOptions = {
   headroom?: { loadPct?: number };
   /**
    * Leaving quarantine: an isolate there only to be measured leaves once it
-   * has 3 s of beats there. An offender leaves after `steadyMs` (default
-   * 30,000 ms) with no spike and no crash, whatever its load; each offence
-   * doubles the window (30, 60, 120 s), and after `maxReturns` returns
-   * (default 3) the next offence keeps it apart for good. Either goes where
-   * the placement rule finds room, or stays, flagged `atCap`, until there is.
+   * has 3 s of beats there, or, if a bisect moved it there, once that bisect
+   * ends. An offender leaves after `steadyMs` (default 30,000 ms) with no
+   * spike and no crash, whatever its load; each offence doubles the window
+   * (30, 60, 120 s), capped at 2 minutes (or `steadyMs`, if longer). Back in
+   * a balancer pool, an offender loses one offence for each quiet window it
+   * completes there (M3j). After `maxReturns` returns (default 3) the next
+   * offence keeps it apart for good. Either goes where the placement rule
+   * finds room, or stays, flagged `atCap`, until there is.
    */
   quarantine?: { steadyMs?: number; maxReturns?: number };
   loads?: LoadStore;
   /**
    * Packing back (M3i): a member alone in its pool and steady for 60 s (no
-   * spike, crash, lagging or full pool, rising backlog or backlog above 0)
-   * joins another of the balancer's pools if both together stay under 40 %
-   * of a core, freeing a worker. At most one pack every 60 s. On by default.
+   * spike, crash, lagging or full pool, and a backlog no higher than 60 s
+   * before, M3j) joins another of the balancer's pools if both together stay
+   * under 40 % of a core, freeing a worker. At most one pack every 60 s. On by
+   * default.
    */
   pack?: { enabled?: boolean };
 };
 
-/** What the app tells the balancer about an isolate's queued work (`report`). */
+/**
+ * What the app tells the balancer about an isolate (`report`): its queued
+ * work, its own measured busy time, or both. At least one must be given.
+ */
 export type Report = {
   /**
    * Work items waiting for the isolate, in any unit the app likes, as long as
    * it's the same one each time. For a consumer group, report the group's
    * backlog on every member.
    */
-  backlog: number;
+  backlog?: number;
+  /**
+   * Milliseconds of work the app measured for the isolate since it started:
+   * a running total, so a late or missed report still counts (M3j). For work
+   * the kernel's `busyMs` misses, such as slices resumed after `await`. The
+   * balancer takes its difference over the 3 s window and uses the larger of
+   * that and the beats' figure. A total that goes down is taken as a restart
+   * of the count.
+   */
+  busyMs?: number;
 };
 
-export type PlacementState = 'placed' | 'quarantined' | 'kept-apart' | 'moving';
+/**
+ * `failed`: the kernel gave up on the isolate (past its restart limit, M3j).
+ * The balancer never moves or restarts it; after `kernel.restart(id)` it's
+ * placed again as new.
+ */
+export type PlacementState = 'placed' | 'quarantined' | 'kept-apart' | 'moving' | 'failed';
 
 export type Placement = {
   id: string;
   pool: string;
   state: PlacementState;
-  /** Measured share of one core, 0–100; `undefined` until measured. */
+  /**
+   * Measured share of one core, 0–100: the larger of the beats' `busyMs` and
+   * the app's reported `busyMs` over the last 3 s; `undefined` until measured.
+   */
   loadPct: number | undefined;
+  /** The share of one core from the app's `busyMs` reports alone, while they're fresh (M3j). */
+  reportedPct?: number;
   /** No pool had room and the worker cap was reached: placed anyway, or left where it is. */
   atCap?: true;
   /** The latest backlog `report`, while it's fresh (under 10 s old). */
   backlog?: number;
-  /** Its backlog is rising, and the balancer has nowhere to give it more CPU (`behind`). */
+  /**
+   * Its backlog is rising, or its pool needs a bisect, and the balancer has
+   * nowhere to give it (`behind`).
+   */
   behind?: true;
   /**
    * In one of the balancer's pools, but not placed by it. The host reserves
@@ -171,10 +205,18 @@ export type SpikeEvent = {
 
 /**
  * A member's reported backlog keeps rising, but it already has its pool to
- * itself or the balancer has no worker or pool to give it (M3i). Emitted when
- * it first happens, then at most every 30 s while it lasts.
+ * itself or the balancer has no worker or pool to give it (M3i). Also when
+ * its pool's trouble needs a bisect and no quarantine pool is free for one
+ * (M3j). Emitted when it first happens, then at most every 30 s while it
+ * lasts. `backlog` is the latest fresh report, or 0.
  */
 export type BehindEvent = { id: string; pool: string; backlog: number };
+
+/**
+ * The kernel gave up on a member (`isolate:failed`, M3j). It drops out of its
+ * pool's load and any bisect, and no move restarts it.
+ */
+export type FailedEvent = { id: string; pool: string; reason: string };
 
 /** An isolate the balancer didn't place turned up in one of its pools (see `Placement.foreign`). */
 export type ForeignEvent = { id: string; pool: string };
@@ -184,6 +226,7 @@ export type BalancerEvents = {
   arrived: ArrivedEvent;
   spike: SpikeEvent;
   behind: BehindEvent;
+  failed: FailedEvent;
   foreign: ForeignEvent;
 };
 
@@ -206,11 +249,14 @@ export interface Balancer<M extends ManifestLike = ManifestLike> {
   /** Leaves `id` where it is until the returned function is called (a widget open for editing). */
   hold(id: string): () => void;
   /**
-   * The app's view of `id`'s queued work (M3i). A backlog higher at the end of
-   * a 10 s window than at its start, and above 0, moves the isolate somewhere
-   * with more CPU; a report older than 10 s counts as none, so report at least
-   * every few seconds while there's work. Ignored for isolates the balancer
-   * didn't place.
+   * The app's view of `id`'s queued work (M3i) and of its own busy time (M3j).
+   * A backlog higher at the end of a 10 s window than at its start, and above
+   * 0, moves the isolate somewhere with more CPU. A reported `busyMs` total
+   * counts toward its load wherever the balancer reads one. A report older
+   * than 10 s counts as none, so report at least every few seconds. Throws a
+   * `TypeError` for a report with neither field, or a field that isn't a
+   * finite number of 0 or more. Ignored for isolates the balancer didn't place
+   * and ones the kernel gave up on.
    */
   report(id: string, report: Report): void;
   on<E extends keyof BalancerEvents>(event: E, fn: (e: BalancerEvents[E]) => void): () => void;

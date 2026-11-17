@@ -6,6 +6,7 @@ import type {
   BeatLike,
   BehindEvent,
   CrashLike,
+  FailedLike,
   KernelLike,
   ManifestLike,
   MoveReason,
@@ -34,6 +35,9 @@ const QUARANTINES = 'balancer-quarantine';
 const QUARANTINE = `${QUARANTINES}-1`;
 
 const now = (): number => performance.now();
+
+/** A report's figure: a finite number, 0 or more. */
+const valid = (x: unknown): boolean => typeof x === 'number' && Number.isFinite(x) && x >= 0;
 
 /**
  * `busyMs` is approximate: shared framework work is split between members and
@@ -75,6 +79,9 @@ const PACK_STEADY_MS = 60_000;
 const PACK_PCT = 40;
 const PACK_EVERY_MS = 60_000;
 
+/** An offender's quiet window doubles with each offence up to this, or `steadyMs` if longer (M3j). */
+const QUIET_CAP_MS = 120_000;
+
 /** Worker crash reasons whose culprit the kernel can't name: every member of the pool crashes. */
 const POOL_KILL = new Set(['unresponsive', 'worker-error']);
 
@@ -94,6 +101,8 @@ type Member<M> = {
   offences: number;
   /** When it last entered quarantine, or `-Infinity`. */
   quarantinedAt: number;
+  /** When it last left quarantine or lost an offence: the start of its next quiet window outside (M3j). */
+  decayAt: number;
   /** When a spike or crash that counted was last put on it, or `-Infinity`. */
   lastSpikeAt: number;
   /** A first spike, only noted: a second within `SPIKE_REPEAT_MS` counts (M3i). */
@@ -109,8 +118,14 @@ type Member<M> = {
   /** Backlog reports since it last moved, oldest first; and the latest one. */
   backlogs: { at: number; value: number }[];
   backlog: { at: number; value: number } | undefined;
+  /** Backlog reports over the last `PACK_STEADY_MS` and one before, for packing (M3j). */
+  backlogHistory: { at: number; value: number }[];
+  /** The app's `busyMs` totals since it last moved, oldest first (M3j). */
+  busyReports: { at: number; total: number }[];
   /** When its backlog was last seen rising. */
   risingAt: number;
+  /** When a bisect its pool needed last had no quarantine pool free (M3j). */
+  stuckAt: number;
   /** Rising with nowhere to go, as of the last decision. */
   behind: boolean;
   /** When `behind` was last emitted: at most every `BEHIND_REPEAT_MS`, whatever happens between. */
@@ -194,6 +209,7 @@ export function createBalancer<M extends ManifestLike>(
     arrived: new Set(),
     spike: new Set(),
     behind: new Set(),
+    failed: new Set(),
     foreign: new Set(),
   };
   /** Beats of isolates the balancer didn't place, for `measure` (previews included). */
@@ -237,8 +253,11 @@ export function createBalancer<M extends ManifestLike>(
     return p;
   };
 
+  /** Running in its pool: not mid-move, and not given up on by the kernel. */
+  const live = (m: Member<M>): boolean => m.state !== 'moving' && m.state !== 'failed';
+
   const membersOf = (name: string): Member<M>[] =>
-    [...members.values()].filter((m) => m.pool === name && m.state !== 'moving');
+    [...members.values()].filter((m) => m.pool === name && live(m));
 
   const changed = (name: string): void => {
     const p = pool(name);
@@ -248,9 +267,30 @@ export function createBalancer<M extends ManifestLike>(
     p.since = now();
   };
 
+  /**
+   * The app's reported busy time (M3j) as a share of one core: the running
+   * total's difference over about a window, from a fresh report back to one
+   * taken at least 90 % of a window before it.
+   */
+  const reportedOf = (m: Member<M>, t: number): number | undefined => {
+    const latest = m.busyReports.at(-1);
+    if (!latest || t - latest.at > STALE_MS) return undefined;
+    const start = m.busyReports.findLast((r) => r.at <= latest.at - windowMs * 0.9);
+    if (!start) return undefined;
+    const ms = latest.at - start.at;
+    return Math.min(100, ((latest.total - start.total) / ms) * 100);
+  };
+
+  /** The beats' and the report's measures over the last window, whichever is larger. */
+  const measured = (m: Member<M>, t: number): number | undefined => {
+    const beat = average(m.beats, windowMs, t);
+    const reported = reportedOf(m, t);
+    if (beat === undefined) return reported;
+    return reported === undefined ? beat : Math.max(beat, reported);
+  };
+
   /** Measured load over the last window, or the last one known. */
-  const loadOf = (m: Member<M>): number | undefined =>
-    average(m.beats, windowMs, now()) ?? m.knownLoad;
+  const loadOf = (m: Member<M>): number | undefined => measured(m, now()) ?? m.knownLoad;
 
   const poolLoad = (name: string): number =>
     membersOf(name).reduce((s, m) => s + (loadOf(m) ?? 0), 0);
@@ -270,7 +310,9 @@ export function createBalancer<M extends ManifestLike>(
     kernel.pools().filter((p) => p.running && isOurs(p.name) && p.name !== QUARANTINE).length;
 
   const ownPools = (): string[] =>
-    [...new Set([...members.values()].map((m) => m.pool))].filter((n) => !isQuarantine(n));
+    [
+      ...new Set([...members.values()].filter((m) => m.state !== 'failed').map((m) => m.pool)),
+    ].filter((n) => !isQuarantine(n));
 
   /** Room for one more worker of the balancer's own. */
   const roomForPool = (): boolean => ownWorkers() + 1 <= maxWorkers;
@@ -341,6 +383,9 @@ export function createBalancer<M extends ManifestLike>(
     m.lastBeatAt = undefined;
     m.moveTimes.push(startedAt);
     m.backlogs = [];
+    m.backlogHistory = [];
+    // A respawned isolate counts its busy time from 0 again.
+    m.busyReports = [];
     m.behind = false;
     delete m.arrival;
     // Its new pool is taken at once, so a second move in the same decision
@@ -391,7 +436,27 @@ export function createBalancer<M extends ManifestLike>(
     move(m, QUARANTINE, reason, state);
   };
 
-  const movable = (m: Member<M>): boolean => m.state !== 'moving' && m.holds === 0;
+  const movable = (m: Member<M>): boolean => live(m) && m.holds === 0;
+
+  /**
+   * A member the kernel gave up on beats again: the app restarted it
+   * (`kernel.restart`). It's placed again as new (M3j): no offences, no
+   * history, and its pool's rules from here.
+   */
+  const revive = (m: Member<M>): void => {
+    m.state = isQuarantine(m.pool) ? 'quarantined' : 'placed';
+    m.offences = 0;
+    m.quarantinedAt = isQuarantine(m.pool) ? now() : -Infinity;
+    m.lastSpikeAt = m.spikeNotedAt = m.decayAt = m.risingAt = m.stuckAt = -Infinity;
+    m.arrivedAt = now();
+    m.moveTimes = [];
+    m.beats = [];
+    m.lastBeatAt = undefined;
+    m.backlogs = [];
+    m.backlogHistory = [];
+    m.busyReports = [];
+    changed(m.pool);
+  };
 
   // ---- beats ----
 
@@ -425,6 +490,7 @@ export function createBalancer<M extends ManifestLike>(
       return;
     }
     if (m.state === 'moving' || e.pool !== m.pool) return;
+    if (m.state === 'failed') revive(m);
     if (m.arrival) {
       const { from, to, reason, at } = m.arrival;
       delete m.arrival;
@@ -528,9 +594,24 @@ export function createBalancer<M extends ManifestLike>(
   // ---- deciding ----
 
   /**
+   * A quarantine pool a bisect from `name` can have to itself (M3j): the
+   * first quarantine if it holds only members this bisect moved (or none), else a
+   * new quarantine pool if the cap allows. Never one that holds offenders.
+   */
+  const bisectPool = (name: string): string | undefined => {
+    const free = membersOf(QUARANTINE).every(
+      (o) => o.offences === 0 && bisect?.moved.has(o.manifest.id) === true,
+    );
+    if (!isQuarantine(name) && free) return QUARANTINE;
+    return roomForPool() ? freshName(QUARANTINES, 2) : undefined;
+  };
+
+  /**
    * Finds the member behind a pool's trouble when the kernel or `busyMs`
    * can't name it (Q20): the heavier half of the suspects moves, and
-   * whichever half acts up again holds the culprit.
+   * whichever half acts up again holds the culprit. Only into a quarantine
+   * pool of its own (M3j); with none free, the pool stays as it is and its
+   * members are `behind`.
    */
   const search = (name: string, reason: 'spike' | 'sustained' | 'crash'): void => {
     const here = membersOf(name).filter((m) => m.holds === 0);
@@ -557,23 +638,24 @@ export function createBalancer<M extends ManifestLike>(
       .map((id) => members.get(id))
       .filter((m): m is Member<M> => m !== undefined)
       .toSorted((a, b) => (loadOf(b) ?? 0) - (loadOf(a) ?? 0));
+    const to = bisectPool(name);
+    if (to === undefined) {
+      const t = now();
+      for (const m of here) {
+        m.stuckAt = t;
+        behind(m, t);
+      }
+      return;
+    }
     const half = sorted.slice(0, Math.ceil(sorted.length / 2));
     bisect = {
       suspects: new Set(suspects),
       moved: new Set([...(bisect?.moved ?? []), ...half.map((m) => m.manifest.id)]),
       at: now(),
     };
-    const to = isQuarantine(name)
-      ? roomForPool()
-        ? freshName(QUARANTINES, 2)
-        : undefined
-      : QUARANTINE;
-    if (to === undefined) return;
     for (const m of half) {
-      if (to === QUARANTINE) {
-        m.quarantinedAt = now();
-        move(m, to, 'bisect', stateFor(m));
-      } else move(m, to, 'bisect', m.state);
+      if (!isQuarantine(name)) m.quarantinedAt = now();
+      move(m, to, 'bisect', stateFor(m));
     }
   };
 
@@ -670,7 +752,8 @@ export function createBalancer<M extends ManifestLike>(
     const up = [...members.values()].filter((m) => {
       const r = m.state === 'placed' && !isQuarantine(m.pool) && rising(m, t);
       if (r) m.risingAt = t;
-      else m.behind = false;
+      // `behind` for a bisect with nowhere to go lasts while that does.
+      else if (t - m.stuckAt >= windowMs) m.behind = false;
       return r;
     });
     const order = up.toSorted(
@@ -691,18 +774,33 @@ export function createBalancer<M extends ManifestLike>(
   };
 
   /**
+   * Its backlog rose over the last `PACK_STEADY_MS` (M3j): the latest fresh
+   * report is higher than the one at or just before the window's start (or
+   * the oldest since it moved, when it hasn't reported that long). A
+   * queue that holds steady while work arrives doesn't count, nor does a
+   * stale report or none.
+   */
+  const roseLately = (m: Member<M>, t: number): boolean => {
+    const latest = backlogNow(m, t);
+    if (latest === undefined) return false;
+    // The report at or just before the window's start, or the oldest one since it moved.
+    const start =
+      m.backlogHistory.findLast((b) => b.at <= t - PACK_STEADY_MS) ?? m.backlogHistory[0];
+    return start !== undefined && latest > start.value;
+  };
+
+  /**
    * Packing back (M3i): the lightest member alone in its pool and quiet for
    * `PACK_STEADY_MS` joins the fullest other pool that stays under
-   * `PACK_PCT` with it, which frees its worker. Never one on hold, with a
-   * backlog, in quarantine or kept apart, and never into a pool whose
-   * members have a backlog.
+   * `PACK_PCT` with it, which frees its worker. Never one on hold, whose
+   * backlog rose over the window (M3j), in quarantine or kept apart, and
+   * never into a pool whose members' backlog rose.
    */
   const pack = (t: number): void => {
     const quiet = (since: number): boolean => t - since >= PACK_STEADY_MS;
     const steady = (m: Member<M>): boolean =>
-      quiet(
-        Math.max(m.arrivedAt, m.lastSpikeAt, m.spikeNotedAt, m.risingAt, pool(m.pool).troubleAt),
-      );
+      quiet(Math.max(m.arrivedAt, m.lastSpikeAt, m.spikeNotedAt, pool(m.pool).troubleAt)) &&
+      !roseLately(m, t);
     const alone = [...members.values()]
       .filter(
         (m) =>
@@ -712,7 +810,6 @@ export function createBalancer<M extends ManifestLike>(
           movable(m) &&
           inBudget(m) &&
           membersOf(m.pool).length === 1 &&
-          (backlogNow(m, t) ?? 0) === 0 &&
           loadOf(m) !== undefined &&
           steady(m),
       )
@@ -721,8 +818,12 @@ export function createBalancer<M extends ManifestLike>(
       const load = loadOf(m) ?? 0;
       const into = ownPools()
         .filter((n) => n !== m.pool && !recentlySpiked(n) && quiet(pool(n).troubleAt))
-        // Not into a pool that's busy moving, or whose members have work queued.
-        .filter((n) => membersOf(n).every((o) => o.state !== 'moving' && !(backlogNow(o, t) ?? 0)))
+        // Not into a pool that's busy moving, or whose members' work is piling up.
+        .filter((n) =>
+          [...members.values()]
+            .filter((o) => o.pool === n)
+            .every((o) => o.state !== 'moving' && !roseLately(o, t)),
+        )
         .map((n) => ({ n, load: poolLoad(n) }))
         .filter((c) => c.load + load < PACK_PCT)
         .toSorted((a, b) => b.load - a.load)[0];
@@ -733,7 +834,24 @@ export function createBalancer<M extends ManifestLike>(
     }
   };
 
-  const steadyFor = (m: Member<M>): number => steadyMs * 2 ** Math.max(0, m.offences - 1);
+  /** The quiet window: doubled per offence, capped at 2 minutes (or `steadyMs`, if longer; M3j). */
+  const steadyFor = (m: Member<M>): number =>
+    Math.min(Math.max(steadyMs, QUIET_CAP_MS), steadyMs * 2 ** Math.max(0, m.offences - 1));
+
+  /**
+   * Offences decay (M3j): an offender back in a balancer pool loses one for
+   * each quiet window it completes there, so one that stays quiet is back to
+   * the shortest window. One that offends again soon after leaving still
+   * gets a longer one, and `kept-apart` stays apart.
+   */
+  const decay = (t: number): void => {
+    for (const m of members.values()) {
+      if (m.state !== 'placed' || m.offences === 0) continue;
+      if (t - Math.max(m.decayAt, m.lastSpikeAt, m.spikeNotedAt) < steadyFor(m)) continue;
+      m.offences--;
+      m.decayAt = t;
+    }
+  };
 
   const decide = (): void => {
     const t = now();
@@ -790,6 +908,7 @@ export function createBalancer<M extends ManifestLike>(
     }
 
     backlogs(t);
+    decay(t);
 
     // Out of quarantine (Q18, Q19): an isolate only there to be measured
     // (never measured, or moved there by a bisect that has ended) leaves as
@@ -812,6 +931,7 @@ export function createBalancer<M extends ManifestLike>(
         continue;
       }
       m.atCap = false;
+      m.decayAt = t;
       move(m, to.pool, 'steady', 'placed');
     }
 
@@ -825,7 +945,7 @@ export function createBalancer<M extends ManifestLike>(
 
   const onCrash = (e: CrashLike): void => {
     const m = members.get(e.id);
-    if (!m || m.state === 'moving') return;
+    if (!m || !live(m)) return;
     if (POOL_KILL.has(e.reason) && e.pool !== undefined) killed.add(e.pool);
     else if (e.reason === 'error') {
       // Its own fatal error: the culprit is known (Q6′).
@@ -834,16 +954,44 @@ export function createBalancer<M extends ManifestLike>(
     }
   };
 
+  /**
+   * The kernel gave up on a member (M3j): it leaves its pool's load, the
+   * quarantine's count and any bisect, and stays where it is until the app
+   * restarts it. A member mid-move was stopped by the balancer itself; its
+   * respawn is a fresh start.
+   */
+  const onFailed = (e: FailedLike): void => {
+    const m = members.get(e.id);
+    if (!m || !live(m)) return;
+    m.state = 'failed';
+    m.beats = [];
+    m.lastBeatAt = undefined;
+    m.atCap = false;
+    m.behind = false;
+    m.busyReports = [];
+    delete m.arrival;
+    bisect?.suspects.delete(e.id);
+    bisect?.moved.delete(e.id);
+    changed(m.pool);
+    emit('failed', { id: e.id, pool: m.pool, reason: e.reason });
+  };
+
   const timer = setInterval(decide, DECIDE_MS);
-  const offs = [kernel.on('isolate:crash', onCrash), kernel.on('isolate:beat', onBeat)];
+  const offs = [
+    kernel.on('isolate:crash', onCrash),
+    kernel.on('isolate:beat', onBeat),
+    kernel.on('isolate:failed', onFailed),
+  ];
 
   const placement = (m: Member<M>): Placement => {
     const p: Placement = {
       id: m.manifest.id,
       pool: m.pool,
       state: m.state,
-      loadPct: loadOf(m),
+      loadPct: m.state === 'failed' ? undefined : loadOf(m),
     };
+    const reported = m.state === 'failed' ? undefined : reportedOf(m, now());
+    if (reported !== undefined) p.reportedPct = reported;
     if (m.atCap) p.atCap = true;
     const backlog = backlogNow(m, now());
     if (backlog !== undefined) p.backlog = backlog;
@@ -872,6 +1020,7 @@ export function createBalancer<M extends ManifestLike>(
         savedLoad: known,
         offences: 0,
         quarantinedAt: isQuarantine(dest.pool) ? now() : -Infinity,
+        decayAt: -Infinity,
         lastSpikeAt: -Infinity,
         spikeNotedAt: -Infinity,
         holds: 0,
@@ -880,7 +1029,10 @@ export function createBalancer<M extends ManifestLike>(
         moveTimes: [],
         backlogs: [],
         backlog: undefined,
+        backlogHistory: [],
+        busyReports: [],
         risingAt: -Infinity,
+        stuckAt: -Infinity,
         behind: false,
         behindAt: -Infinity,
       };
@@ -922,17 +1074,34 @@ export function createBalancer<M extends ManifestLike>(
         m.holds--;
       };
     },
-    report(id, { backlog }) {
-      if (typeof backlog !== 'number' || !Number.isFinite(backlog) || backlog < 0)
+    report(id, { backlog, busyMs }) {
+      if (backlog === undefined && busyMs === undefined)
+        throw new TypeError('balancer.report: give a backlog, a busyMs or both');
+      if (backlog !== undefined && !valid(backlog))
         throw new TypeError('balancer.report: backlog must be a finite number, 0 or more');
+      if (busyMs !== undefined && !valid(busyMs))
+        throw new TypeError('balancer.report: busyMs must be a finite number, 0 or more');
       const m = members.get(id);
-      if (!m) return;
+      if (!m || m.state === 'failed') return;
       const t = now();
-      const sample = { at: t, value: backlog };
-      m.backlog = sample;
-      m.backlogs.push(sample);
-      // Keep the latest sample at or before a window ago, and everything after.
-      while ((m.backlogs[1]?.at ?? Infinity) <= t - BACKLOG_WINDOW_MS) m.backlogs.shift();
+      if (backlog !== undefined) {
+        const sample = { at: t, value: backlog };
+        m.backlog = sample;
+        m.backlogs.push(sample);
+        m.backlogHistory.push(sample);
+        // Keep the latest sample at or before a window ago, and everything after.
+        while ((m.backlogs[1]?.at ?? Infinity) <= t - BACKLOG_WINDOW_MS) m.backlogs.shift();
+        while ((m.backlogHistory[1]?.at ?? Infinity) <= t - PACK_STEADY_MS)
+          m.backlogHistory.shift();
+      }
+      if (busyMs !== undefined) {
+        // A total that went down: the app started counting again.
+        if ((m.busyReports.at(-1)?.total ?? 0) > busyMs) m.busyReports = [];
+        m.busyReports.push({ at: t, total: busyMs });
+        // Keep the latest report at or before a window and the stale time ago, and everything after.
+        const cut = t - windowMs - STALE_MS;
+        while ((m.busyReports[1]?.at ?? Infinity) <= cut) m.busyReports.shift();
+      }
     },
     measure(id) {
       const m = members.get(id);
