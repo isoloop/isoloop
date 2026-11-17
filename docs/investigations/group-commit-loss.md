@@ -1,6 +1,6 @@
 # Consumer groups: a commit can cover a redelivered record
 
-**Status:** investigation, 2026-11-16. Found by the processor example's File processor (isoloop/web#130), where balancer moves stop group members often. No behaviour is changed yet; the repro is `packages/bus/src/groups-commit-loss.test.ts`, marked `it.fails`.
+**Status:** decided 2026-11-17: the user chose option 1, as the [ADR 0016 amendment](../adr/0016-fewer-messages-per-record.md#group-commits-carry-a-delivery-sequence-amended-2026-11-17) (points 10–13), and that a group that has committed resumes from its committed offset whatever `from` says (point 14), which replaces answer 2's docs-only fix below. 0.1 waits for the fix. Investigation written 2026-11-16. Found by the processor example's File processor (isoloop/web#130), where balancer moves stop group members often. No behaviour is changed yet; the repro is `packages/bus/src/groups-commit-loss.test.ts`, marked `it.fails`.
 
 **Answer:**
 
