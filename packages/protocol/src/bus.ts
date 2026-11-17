@@ -38,9 +38,12 @@ export type IsolateToBus =
   /**
    * Each entry is the highest settled offset of one subscription on this port
    * (ADR 0016, decision 1): at most one message per commit interval, earlier
-   * at half a subscription's credit, on shutdown and on a new port.
+   * at half a subscription's credit, on shutdown and on a new port. `seq` is
+   * the highest `deliver` whose records, and those of every earlier one on
+   * the subscription, are all settled; a group commit covers only records
+   * with `offset ≤ offset` and `seq ≤ seq` (ADR 0016, points 11–12).
    */
-  | Envelope<'commits', { offsets: { topic: string; offset: number }[] }>
+  | Envelope<'commits', { offsets: { topic: string; offset: number; seq: number }[] }>
   /**
    * `bus.request`: appended like a publish, with `req` set on the record. `id`
    * is required; the reply (or `reply_invalid`) comes back as `result { re: id }`.
@@ -55,8 +58,15 @@ export type IsolateToBus =
 
 /** Bus port: bus worker → isolate. */
 export type BusToIsolate =
-  /** `gap` marks records that expired before delivery. */
-  | Envelope<'deliver', { topic: string; records: BusRecord[]; gap?: { from: number; to: number } }>
+  /**
+   * `gap` marks records that expired before delivery. `seq` counts the
+   * deliveries to this subscription on this connection, from 1 at each
+   * `subscribe` (ADR 0016, point 10).
+   */
+  | Envelope<
+      'deliver',
+      { topic: string; records: BusRecord[]; gap?: { from: number; to: number }; seq: number }
+    >
   /** A memory topic was lost in a bus restart (ADR 0007). */
   | Envelope<'reset', { topic: string; reason: 'bus_restart' }>
   | Envelope<'result', CallResult>;

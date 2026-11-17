@@ -10,7 +10,11 @@
  *   the next start.
  * - Settled offsets go out together, one `commits` per commit interval, or
  *   earlier at half a subscription's credit and on `close` (ADR 0016,
- *   decision 1). A crash can redeliver up to one interval of records.
+ *   decision 1). A crash can redeliver up to one interval of records. Each
+ *   entry carries the delivery `seq` settled whole so far, so a group
+ *   commit can't cover a record redelivered to this member after it
+ *   (ADR 0016, points 10–12). Records settle in the order they arrived: a
+ *   commit by hand settles that record and every one delivered before it.
  * - On `reattach` (a bus restart) it swaps the port, drops the commits still
  *   pending (the new broker would reject them before the subscriptions, so a
  *   persistent topic redelivers up to one interval, as after a crash; ADR
@@ -22,10 +26,12 @@
 import {
   BusError,
   createCommitter,
+  deliveryPoints,
   isBusToIsolate,
   type BusRecord,
   type BusToIsolate,
   type CallResult,
+  type CommitPoint,
   type IsolateToBus,
   type StartPosition,
   type TopicRef,
@@ -33,7 +39,12 @@ import {
 } from '@isoloop/protocol';
 
 export type SubscribeOptions = {
-  /** Default `latest`. */
+  /**
+   * Default `latest`. With `group`, it applies only while the group has no
+   * committed offset: a group that has committed resumes after it, and a
+   * member joining a group that has members takes records from where the
+   * group is (ADR 0016, point 14).
+   */
   from?: StartPosition;
   /** Share the topic with other subscribers of the same group: each record goes to one of them. */
   group?: string;
@@ -68,7 +79,10 @@ export interface BusClient {
   ): Promise<ROut>;
   /** Answers a request record delivered to this isolate; the broker checks `value` against the topic's `reply` schema. */
   reply(record: TypedRecord<unknown>, value: unknown): Promise<void>;
-  /** Commits a record by hand, for `autoCommit: false`. */
+  /**
+   * Commits a record by hand, for `autoCommit: false`: that record and every
+   * one delivered before it on its subscription count as settled.
+   */
   commit(record: TypedRecord<unknown>): void;
 }
 
@@ -115,6 +129,17 @@ type Sub = {
   running: boolean;
   /** A handler threw: no more commits until the isolate restarts. */
   stuck: boolean;
+  /** The highest offset delivered on this subscription and port, `-1` before any. */
+  highest: number;
+};
+
+/** What a delivered record settles, and where it came from. */
+type Delivered = {
+  topic: string;
+  sub: Sub;
+  /** The port it came on: a record from before a bus restart commits nothing. */
+  port: number;
+  at: CommitPoint;
 };
 
 export type BusClientHandle = {
@@ -142,8 +167,10 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
   let seq = 0;
   const pending = new Map<string, Pending>();
   const subs = new Map<string, Sub>();
-  /** Which topic a delivered record came from, for `reply` and `commit`. */
-  const topicOf = new WeakMap<object, string>();
+  /** Where each delivered record came from and what it settles, for `reply` and `commit`. */
+  const delivered = new WeakMap<object, Delivered>();
+  /** Counts bus ports: a new one after each bus restart. */
+  let ports = 0;
 
   const send = (msg: IsolateToBus): void => {
     port.postMessage(msg);
@@ -171,8 +198,14 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
     ...(o.commitIntervalMs === undefined ? {} : { intervalMs: o.commitIntervalMs }),
     ...(o.credit === undefined ? {} : { credit: o.credit }),
   });
-  const commit = (topic: string, offset: number): void => {
-    committer.settle(topic, offset);
+  /**
+   * Settles a record, and with it every record delivered before it on its
+   * subscription. One from a replaced subscription or an old port is
+   * dropped: its delivery `seq` means nothing to the broker now.
+   */
+  const commit = (d: Delivered): void => {
+    if (subs.get(d.topic) !== d.sub || d.port !== ports) return;
+    committer.settle(d.topic, d.at);
   };
 
   const drain = async (sub: Sub): Promise<void> => {
@@ -181,7 +214,6 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
     while (sub.queue.length > 0 && subs.get(sub.topic) === sub) {
       const r = sub.queue.shift();
       if (!r) break;
-      topicOf.set(r, sub.topic);
       try {
         const done = sub.fn(r);
         // A synchronous handler settles in the same microtask: awaiting its
@@ -192,7 +224,8 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
         sub.stuck = true;
         o.onError?.(err);
       }
-      if (sub.opts.autoCommit !== false && !sub.stuck) commit(sub.topic, r.offset);
+      const d = delivered.get(r);
+      if (sub.opts.autoCommit !== false && !sub.stuck && d) commit(d);
     }
     sub.running = false;
   };
@@ -230,7 +263,18 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
             o.onError?.(err);
           }
         }
-        sub.queue.push(...msg.p.records);
+        const { records } = msg.p;
+        const points = deliveryPoints(
+          msg.p.seq,
+          records.map((r) => r.offset),
+          sub.highest,
+        );
+        records.forEach((r, i) => {
+          const at = points[i];
+          if (at) delivered.set(r, { topic: sub.topic, sub, port: ports, at });
+        });
+        sub.highest = points.at(-1)?.offset ?? sub.highest;
+        sub.queue.push(...records);
         void drain(sub);
         return;
       }
@@ -238,6 +282,7 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
         const sub = subs.get(msg.p.topic);
         if (!sub) return;
         sub.queue.length = 0;
+        sub.highest = -1;
         // Offsets from the lost log mean nothing in the new one.
         committer.drop(msg.p.topic);
         try {
@@ -284,6 +329,7 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
         queue: [],
         running: false,
         stuck: false,
+        highest: -1,
       };
       subs.set(topic.name, sub);
       sendSubscribe(sub);
@@ -323,17 +369,16 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
     },
 
     async reply(record, value) {
-      const topic = topicOf.get(record);
+      const topic = delivered.get(record)?.topic;
       if (topic === undefined)
         throw new Error('reply: this record was not delivered to this isolate');
       check(await call({ v: 1, t: 'reply', p: { topic, offset: record.offset, value } }));
     },
 
     commit(record) {
-      const topic = topicOf.get(record);
-      if (topic === undefined)
-        throw new Error('commit: this record was not delivered to this isolate');
-      commit(topic, record.offset);
+      const d = delivered.get(record);
+      if (d === undefined) throw new Error('commit: this record was not delivered to this isolate');
+      commit(d);
     },
   };
 
@@ -343,6 +388,7 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
     reattach(next) {
       const old = port;
       port = next;
+      ports++;
       old.close();
       listen(next);
       const unanswered = [...pending.values()];
@@ -363,6 +409,8 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
       committer.take();
       for (const sub of subs.values()) {
         sub.queue.length = 0;
+        // A new connection numbers its deliveries from 1 again (ADR 0016, point 13).
+        sub.highest = -1;
         sendSubscribe(sub);
       }
       for (const p of unanswered) if (p.msg.t !== 'subscribe') send(p.msg);

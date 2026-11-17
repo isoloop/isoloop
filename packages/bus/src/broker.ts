@@ -154,11 +154,20 @@ type Subscription = {
   cursor: number;
   /** Records that may still be delivered before the next commit. */
   credit: number;
-  /** Offsets delivered to this isolate and not yet committed, ascending. */
-  unacked: number[];
+  /**
+   * Records delivered to this isolate and not yet committed, with the `seq`
+   * of the delivery each went out in. Ascending by offset, except in a
+   * group, where a redelivered record can follow higher ones.
+   */
+  unacked: Delivered[];
+  /** `deliver`s sent on this subscription: the last one's `seq` (ADR 0016, point 10). */
+  seq: number;
   /** A pump is queued for the next microtask. */
   scheduled: boolean;
 };
+
+/** A delivered record's offset and the `seq` of the delivery it went out in. */
+type Delivered = { offset: number; seq: number };
 
 /**
  * Subscribers sharing a group name on a topic: each record goes to one
@@ -173,8 +182,12 @@ type Group = {
   /** Sorted by isolate id, so the key → member mapping is deterministic. */
   members: Subscription[];
   rr: number;
-  /** Delivered and not yet committed, ascending. `member` is unset while waiting for redelivery. */
-  unacked: { offset: number; member: Subscription | undefined }[];
+  /**
+   * Delivered and not yet committed, ascending. `member` is unset while
+   * waiting for redelivery; `seq` is that of the delivery it last went out
+   * in, to its current member.
+   */
+  unacked: { offset: number; member: Subscription | undefined; seq: number }[];
   /** Offsets a departed member left uncommitted, delivered again before anything new. */
   redeliver: number[];
   scheduled: boolean;
@@ -202,6 +215,9 @@ const hasTopic = (p: unknown): boolean =>
 
 const isOffset = (x: unknown): x is number =>
   typeof x === 'number' && Number.isInteger(x) && x >= 0;
+
+/** A commit's `seq`: a non-negative integer, 0 before any delivery is settled whole. */
+const isSeq = isOffset;
 
 /** FNV-1a: a small, stable string hash for key → group member. */
 function hash(s: string): number {
@@ -688,8 +704,13 @@ export class Broker {
         for (const e of offsets as unknown[]) {
           const r =
             typeof e === 'object' && e !== null && 'topic' in e && typeof e.topic === 'string'
-              ? this.#commit(conn, e.topic, 'offset' in e ? e.offset : undefined)
-              : fail('invalid', 'each commit needs a topic and an offset');
+              ? this.#commit(
+                  conn,
+                  e.topic,
+                  'offset' in e ? e.offset : undefined,
+                  'seq' in e ? e.seq : undefined,
+                )
+              : fail('invalid', 'each commit needs a topic, an offset and a seq');
           if (!r.ok && first.ok) first = r;
         }
         reply(first);
@@ -977,6 +998,7 @@ export class Broker {
       cursor: 0,
       credit: this.#inboxLimit,
       unacked: [],
+      seq: 0,
       scheduled: false,
     };
     conn.subs.set(name, sub);
@@ -989,17 +1011,23 @@ export class Broker {
     return { ok: true, value: { from: g.cursor, group } };
   }
 
-  /** Adds a member to a group, creating it at `from` if it has none. */
+  /**
+   * Adds a member to a group. A group with no members starts after its
+   * committed offset when it has one, whatever `from` says, and at `from`
+   * only before its first commit (ADR 0016, point 14). A member joining a
+   * group that has members takes records from where the group is.
+   */
   #join(sub: Subscription, name: string, from: StartPosition): Group {
     const id = `${sub.topic}\u0000${name}`;
     let g = this.#groups.get(id);
     if (!g) {
       const consumer = `group:${name}`;
+      const committed = this.#committed(sub.topic, consumer) !== undefined;
       g = {
         topic: sub.topic,
         name,
         consumer,
-        cursor: this.#start(sub.topic, consumer, from),
+        cursor: this.#start(sub.topic, consumer, committed ? 'committed' : from),
         members: [],
         rr: 0,
         unacked: [],
@@ -1051,23 +1079,31 @@ export class Broker {
     return this.#engine.committed(name, consumer);
   }
 
-  #commit(conn: Connection, name: string, offset: unknown): CallResult {
+  /**
+   * A commit covers the records delivered up to `offset`. In a group it also
+   * needs their delivery's `seq` at or below `seq`: a record redelivered to
+   * this member after the deliveries the commit settled has a higher one,
+   * whatever its offset (ADR 0016, point 12). An own subscription's
+   * deliveries are in order, so the offset alone decides there.
+   */
+  #commit(conn: Connection, name: string, offset: unknown, seq: unknown): CallResult {
     const sub = conn.subs.get(name);
     if (!sub) return fail('forbidden', `not subscribed to ${name}`);
     if (!isOffset(offset)) return fail('invalid', 'offset must be a non-negative integer');
+    if (!isSeq(seq)) return fail('invalid', 'seq must be a non-negative integer');
     if (offset >= this.#engine.head(name)) {
       return fail('invalid', `offset ${offset} is not in ${name} yet`);
     }
-    // A commit restores credit for the delivered records it covers.
-    let freed = 0;
-    while (sub.unacked.length > 0 && (sub.unacked[0] ?? Infinity) <= offset) {
-      sub.unacked.shift();
-      freed++;
-    }
-    sub.credit += freed;
     const g = sub.group;
+    const covers = (d: Delivered): boolean => d.offset <= offset && (!g || d.seq <= seq);
+    // A commit restores credit for the delivered records it covers.
+    const before = sub.unacked.length;
+    if (g) sub.unacked = sub.unacked.filter((d) => !covers(d));
+    else while (sub.unacked[0] && covers(sub.unacked[0])) sub.unacked.shift();
+    const freed = before - sub.unacked.length;
+    sub.credit += freed;
     if (g) {
-      g.unacked = g.unacked.filter((u) => !(u.member === sub && u.offset <= offset));
+      g.unacked = g.unacked.filter((u) => !(u.member === sub && covers(u)));
       // The group's offset only moves past records every member has committed.
       const upTo = (g.unacked[0]?.offset ?? g.cursor) - 1;
       const prev = this.#engine.committed(name, g.consumer) ?? -1;
@@ -1139,9 +1175,11 @@ export class Broker {
     return { from: cursor, to: tail - 1 };
   }
 
-  #deliver(sub: Subscription, records: BusRecord[], gap?: { from: number; to: number }): void {
+  /** Sends one `deliver`, numbered with the subscription's next `seq`, and returns it. */
+  #deliver(sub: Subscription, records: BusRecord[], gap?: { from: number; to: number }): number {
+    const seq = ++sub.seq;
     for (const r of records) {
-      sub.unacked.push(r.offset);
+      sub.unacked.push({ offset: r.offset, seq });
       if (r.req)
         this.#requests.get(reqKey(sub.topic, r.offset))?.recipients.add(sub.conn.isolateId);
     }
@@ -1149,8 +1187,9 @@ export class Broker {
     sub.conn.port.post({
       v: 1,
       t: 'deliver',
-      p: gap ? { topic: sub.topic, records, gap } : { topic: sub.topic, records },
+      p: gap ? { topic: sub.topic, records, gap, seq } : { topic: sub.topic, records, seq },
     });
+    return seq;
   }
 
   /**
@@ -1196,21 +1235,26 @@ export class Broker {
    */
   #pumpGroup(g: Group): void {
     if (g.members.length === 0) return;
-    const batches = new Map<Subscription, BusRecord[]>();
+    type Entry = Group['unacked'][number];
+    const batches = new Map<Subscription, { records: BusRecord[]; entries: Entry[] }>();
     const flush = (m: Subscription): void => {
       const b = batches.get(m);
       batches.delete(m);
-      if (b && b.length > 0) this.#deliver(m, b);
+      if (!b || b.records.length === 0) return;
+      // Each entry keeps the seq it went out in, a redelivered one included.
+      const seq = this.#deliver(m, b.records);
+      for (const e of b.entries) e.seq = seq;
     };
     /** Credit left once the records batched for it go out. */
     const room = (m: Subscription | undefined): number =>
-      m ? m.credit - (batches.get(m)?.length ?? 0) : 0;
-    const give = (m: Subscription, rec: BusRecord): void => {
-      const b = batches.get(m) ?? [];
-      b.push(rec);
+      m ? m.credit - (batches.get(m)?.records.length ?? 0) : 0;
+    const give = (m: Subscription, rec: BusRecord, entry: Entry | undefined): void => {
+      const b = batches.get(m) ?? { records: [], entries: [] };
+      b.records.push(rec);
+      if (entry) b.entries.push(entry);
       batches.set(m, b);
       if (rec.key === undefined) g.rr++;
-      if (b.length >= this.#batch) flush(m);
+      if (b.records.length >= this.#batch) flush(m);
     };
 
     const gap = this.#gap(g.topic, g.cursor);
@@ -1242,7 +1286,7 @@ export class Broker {
       g.redeliver.shift();
       const entry = g.unacked.find((u) => u.offset === offset);
       if (entry) entry.member = m;
-      give(m, rec);
+      give(m, rec, entry);
     }
     const head = this.#engine.head(g.topic);
     let more = !blocked;
@@ -1262,8 +1306,9 @@ export class Broker {
           more = false;
           break;
         }
-        g.unacked.push({ offset: rec.offset, member: m });
-        give(m, rec);
+        const entry = { offset: rec.offset, member: m, seq: 0 };
+        g.unacked.push(entry);
+        give(m, rec, entry);
         g.cursor = rec.offset + 1;
       }
     }

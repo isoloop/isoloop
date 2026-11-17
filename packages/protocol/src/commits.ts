@@ -3,6 +3,11 @@
  * broker how far they got in one `commits` message per commit interval,
  * instead of one `commit` per record. Shared by the isolate's bus client and
  * the host's own subscriptions, so both sides follow the same rules.
+ *
+ * Each entry carries the highest settled offset and the highest delivery
+ * `seq` settled whole, with every delivery before it (ADR 0016, points
+ * 10–12): the broker covers a group member's records only up to both, so a
+ * record redelivered after the commit's deliveries stays uncovered.
  */
 
 /** `KernelConfig.bus.commitIntervalMs` when unset (ADR 0016, decision 1, point 7). */
@@ -19,7 +24,31 @@ export function commitIntervalProblem(ms: unknown): string | undefined {
   return `bus.commitIntervalMs must be an integer from 0 to ${MAX_COMMIT_INTERVAL_MS}, got ${String(ms)}`;
 }
 
-export type CommitOffsets = { topic: string; offset: number }[];
+/** Where one subscription has settled to: the highest settled offset, and the delivery `seq` (ADR 0016, point 11). */
+export type CommitPoint = { offset: number; seq: number };
+
+export type CommitOffsets = ({ topic: string } & CommitPoint)[];
+
+/**
+ * The commit point each record of one `deliver` settles to, in order. A
+ * record settles its delivery `seq` only as the delivery's last record, and
+ * `seq − 1` before that: a delivery counts once all its records are settled,
+ * and records settle in the order they arrived. Its offset is the highest
+ * delivered on the subscription up to it, `highest` being the highest before
+ * this delivery (`-1` for none), so a commit that counts a delivery settled
+ * also reaches every offset in it.
+ */
+export function deliveryPoints(
+  seq: number,
+  offsets: readonly number[],
+  highest: number,
+): CommitPoint[] {
+  let top = highest;
+  return offsets.map((offset, i) => {
+    top = Math.max(top, offset);
+    return { offset: top, seq: i === offsets.length - 1 ? seq : seq - 1 };
+  });
+}
 
 export type CommitterOptions = {
   /** Sends one `commits` message. Called with at least one entry. */
@@ -31,8 +60,13 @@ export type CommitterOptions = {
 };
 
 export type Committer = {
-  /** `records` records of `topic`, up to `offset`, are settled. Default one. */
-  settle(topic: string, offset: number, records?: number): void;
+  /**
+   * `records` records of `topic` are settled (default one): everything up to
+   * `at.offset`, and every delivery up to `at.seq` whole. Each is kept as the
+   * highest seen, separately: a record redelivered to a group member can
+   * have a lower offset than records it settled before (ADR 0016, point 11).
+   */
+  settle(topic: string, at: CommitPoint, records?: number): void;
   /** Sends what's pending now: an unsubscribe, and a new port after a bus restart. */
   flush(): void;
   /**
@@ -42,8 +76,8 @@ export type Committer = {
   take(): CommitOffsets | undefined;
   /** Forgets a topic's pending offset (an unsubscribe or a lost memory topic). */
   drop(topic: string): void;
-  /** Settled offsets not yet sent, by topic. For tests and reports. */
-  pending(): ReadonlyMap<string, number>;
+  /** Settled points not yet sent, by topic. For tests and reports. */
+  pending(): ReadonlyMap<string, CommitPoint>;
   /** Stops the timer without sending. */
   dispose(): void;
 };
@@ -51,8 +85,8 @@ export type Committer = {
 export function createCommitter(o: CommitterOptions): Committer {
   const intervalMs = o.intervalMs ?? DEFAULT_COMMIT_INTERVAL_MS;
   const half = Math.max(1, Math.floor((o.credit ?? DEFAULT_CREDIT) / 2));
-  /** Highest settled offset per topic, not yet sent. */
-  const offsets = new Map<string, number>();
+  /** Highest settled offset and delivery per topic, not yet sent. */
+  const offsets = new Map<string, CommitPoint>();
   /** Records settled per topic since its last send: the early send at half the credit. */
   const counts = new Map<string, number>();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -66,7 +100,7 @@ export function createCommitter(o: CommitterOptions): Committer {
     queued = false;
     if (offsets.size === 0) return undefined;
     const out: CommitOffsets = [];
-    for (const [topic, offset] of offsets) out.push({ topic, offset });
+    for (const [topic, { offset, seq }] of offsets) out.push({ topic, offset, seq });
     offsets.clear();
     counts.clear();
     return out;
@@ -91,9 +125,14 @@ export function createCommitter(o: CommitterOptions): Committer {
   };
 
   return {
-    settle(topic, offset, records = 1) {
+    settle(topic, at, records = 1) {
       const prev = offsets.get(topic);
-      if (prev === undefined || offset > prev) offsets.set(topic, offset);
+      offsets.set(
+        topic,
+        prev === undefined
+          ? { offset: at.offset, seq: at.seq }
+          : { offset: Math.max(prev.offset, at.offset), seq: Math.max(prev.seq, at.seq) },
+      );
       const n = (counts.get(topic) ?? 0) + records;
       counts.set(topic, n);
       if (n >= half) flush();
