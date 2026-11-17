@@ -20,7 +20,10 @@ type Msg =
 
 type BusMsg =
   | { t: 'reset'; p: { topic: string } }
-  | { t: 'deliver'; p: { topic: string; records: { offset: number }[]; gap?: unknown } }
+  | {
+      t: 'deliver';
+      p: { topic: string; records: { offset: number }[]; gap?: unknown; seq: number };
+    }
   | { t: 'result' };
 
 let port: MessagePort | undefined;
@@ -64,7 +67,7 @@ const use = (p: MessagePort): void => {
         p.postMessage({
           v: 1,
           t: 'commits',
-          p: { offsets: [{ topic: m.p.topic, offset: last.offset }] },
+          p: { offsets: [{ topic: m.p.topic, offset: last.offset, seq: m.p.seq }] },
         });
     }
   });

@@ -21,7 +21,7 @@ function setup(retention: Retention, opts: { inboxLimit: number; batchSize?: num
 const batches = (iso: FakeIsolate) => iso.inbox.flatMap((m) => (m.t === 'deliver' ? [m.p] : []));
 
 const commit = (iso: FakeIsolate, offset: number) =>
-  iso.call('commits', { offsets: [{ topic: 't.v1', offset }] });
+  iso.call('commits', { offsets: [{ topic: 't.v1', offset, seq: iso.seq('t.v1') }] });
 
 describe('credits and backpressure', () => {
   it('a consumer that never commits gets exactly the inbox limit, then nothing', async () => {
@@ -115,7 +115,12 @@ describe('credits and backpressure', () => {
     now = 100;
     engine.compact('t.v1');
     await commit(a, 1);
-    expect(batches(a).at(-1)).toEqual({ topic: 't.v1', records: [], gap: { from: 2, to: 3 } });
+    expect(batches(a).at(-1)).toEqual({
+      topic: 't.v1',
+      records: [],
+      gap: { from: 2, to: 3 },
+      seq: 2,
+    });
   });
 
   it('a restart from a commit older than the tail gets a gap', async () => {
@@ -142,7 +147,7 @@ describe('credits and backpressure', () => {
     for (let i = 0; i < 4; i++) void broker.publish({ kind: 'host' }, 'c.v1', 'k', i);
     await flush();
     engine.compact('c.v1'); // keeps only offset 3
-    await a.call('commits', { offsets: [{ topic: 'c.v1', offset: 0 }] });
+    await a.call('commits', { offsets: [{ topic: 'c.v1', offset: 0, seq: a.seq('c.v1') }] });
     const last = batches(a).at(-1);
     expect(last).not.toHaveProperty('gap');
     expect(a.values('c.v1')).toEqual([0, 3]);

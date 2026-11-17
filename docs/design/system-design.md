@@ -131,11 +131,11 @@ export type IsolateToBus =
   | Envelope<'publish', { topic: string; key?: string; value: unknown } & PublishId>   // id set → result
   | Envelope<'subscribe', { topic: string; from: StartPosition; group?: string }>
   | Envelope<'unsubscribe', { topic: string }>
-  | Envelope<'commits', { offsets: { topic: string; offset: number }[] }>   // highest settled offset per subscription, at most once per commit interval (ADR 0016)
+  | Envelope<'commits', { offsets: { topic: string; offset: number; seq: number }[] }>   // highest settled offset per subscription, and the highest deliver seq settled whole with every one before it; at most once per commit interval (ADR 0016)
   | Envelope<'request', { topic: string; key?: string; value: unknown; timeoutMs: number } & PublishId>  // id required; answer comes as result {re}
   | Envelope<'reply', { topic: string; offset: number; value: unknown }>;   // answers the request record at offset
 export type BusToIsolate =
-  | Envelope<'deliver', { topic: string; records: BusRecord[]; gap?: { from: number; to: number } }>
+  | Envelope<'deliver', { topic: string; records: BusRecord[]; gap?: { from: number; to: number }; seq: number }>   // seq: deliveries to this subscription on this connection, from 1 at each subscribe (ADR 0016)
   | Envelope<'reset', { topic: string; reason: 'bus_restart' }>    // memory topic lost in a bus restart (ADR 0007)
   | Envelope<'result', CallResult>;
 
@@ -406,7 +406,7 @@ interface BusClient {
 }
 ```
 
-`subscribe` with `autoCommit` (default `true`) counts a record as settled once its handler's promise resolves. Settled offsets go out together: one `commits` message per port, at most once per `commitIntervalMs` (default 100 ms), earlier when a subscription reaches half its credit, and on shutdown, where the client waits for the broker's answer before `bye` ([ADR 0016](../adr/0016-fewer-messages-per-record.md)). Delivery is at least once, and a crash can redeliver up to one interval of records, so handlers must be idempotent (stated in the docs).
+`subscribe` with `autoCommit` (default `true`) counts a record as settled once its handler's promise resolves. Records settle in the order they arrived, so `commit(record)` by hand settles that record and every one delivered before it on the subscription. Settled offsets go out together: one `commits` message per port, at most once per `commitIntervalMs` (default 100 ms), earlier when a subscription reaches half its credit, and on shutdown, where the client waits for the broker's answer before `bye` ([ADR 0016](../adr/0016-fewer-messages-per-record.md)). Delivery is at least once, and a crash can redeliver up to one interval of records, so handlers must be idempotent (stated in the docs).
 
 `defineIsolate(fn)` in each adapter wraps a framework component into an `IsolateDefinition`. Vanilla and headless isolates export `{ start(ctx) {} }` directly; `@isoloop/runtime` exports `defineIsolate<Root>(def)` to type it (`defineIsolate<HTMLElement>` gives `ctx.root` the DOM's types in DOM-typed code). `onShutdown` handlers run when the host sends `shutdown`, and `bye` follows once they settle or the grace runs out (§7.6).
 
@@ -494,9 +494,9 @@ Responsibilities, in order, for a `publish`:
 8. Reply `result { ok, offset }`: at once for a memory topic, after the batch is on disk for a persistent one.
 9. **Fan out:** push to each live subscription, and wake any suspended isolate waiting on the topic.
 
-**Subscriptions and consumers.** The consumer id is `isolateId` (or `group:<name>` for groups). Offsets are kept by the engine keyed by consumer id, so they survive isolate restarts. On `subscribe`, the start offset is `latest` → `head`, `earliest` → `tail`, or `committed` → `committed + 1`, falling back to `earliest`.
+**Subscriptions and consumers.** The consumer id is `isolateId` (or `group:<name>` for groups). Offsets are kept by the engine keyed by consumer id, so they survive isolate restarts. On `subscribe`, the start offset is `latest` → `head`, `earliest` → `tail`, or `committed` → `committed + 1`, falling back to `earliest`. A group is different: one that has a committed offset resumes after it whatever `from` says, and `from` applies only while the group has none yet, on its first join or after its offsets were dropped with the topic. A member joining a group that already has members takes records from where the group is, whatever its `from` ([ADR 0016](../adr/0016-fewer-messages-per-record.md), point 14). So group members don't need `from: 'committed'` to keep their place.
 
-**Groups.** Subscribers sharing a `group` get each record once among them, by hash of key (records with no key go round-robin). That keeps per-key order within a group while its membership is stable: if a record's member is out of credit, the group waits rather than skip ahead. The group's offset moves only past records every member has committed. A member that leaves hands its uncommitted records to the others, which get them before anything new.
+**Groups.** Subscribers sharing a `group` get each record once among them, by hash of key (records with no key go round-robin). That keeps per-key order within a group while its membership is stable: if a record's member is out of credit, the group waits rather than skip ahead. The group's offset moves only past records every member has committed. A member that leaves hands its uncommitted records to the others, which get them before anything new. A redelivered record can have a lower offset than records its new member already settled, so a group commit isn't cumulative by offset alone: each `deliver` carries a `seq`, numbering the deliveries to that subscription on that connection from 1, and the broker stores on each group entry the `seq` it last went out in. A commit `{ offset: N, seq: S }` covers only the member's entries with `offset ≤ N` and `seq ≤ S`, where `S` is the highest delivery the client has settled whole, with every one before it. A record redelivered after the deliveries a commit settled stays with the member until it's settled too, or goes on to the others if the member leaves ([ADR 0016](../adr/0016-fewer-messages-per-record.md), points 10–13). Own subscriptions keep the offset rule: their deliveries are always in order. `seq` isn't stored; a connection reattached after a bus restart numbers from 1 again.
 
 **Delivery and backpressure (credits).** Each subscription has `credit`, starting at the inbox limit (default 1,000). The broker pushes `deliver` batches (up to 64 records, coalesced per microtask) while `credit > 0`, and subtracts the number sent. Each publish reaches the bus worker as its own task, so in practice a batch holds one record; batching across tasks is the [M5b spike](../plans/m5b-delivery-batching.md). Batching messages per port within a task was built and measured under [ADR 0016](../adr/0016-fewer-messages-per-record.md), cut port messages by 3–5% with no CPU change beyond the run spread, and was removed. A `commits` entry restores credit for the records it settles. At 0 credit the subscription is *paused*: nothing is queued in memory, only its read cursor is kept. When credit comes back, the broker reads from the log at the cursor. Records that expired while paused are skipped, and the isolate gets a `deliver` with `gap: { from, to }` so it can tell.
 
@@ -560,7 +560,7 @@ sequenceDiagram
   B-->>A: result {re:7, ok:true}
   B->>D: deliver {topic, records:[#42]}  (credit -1)
   D->>D: handler(record)
-  D->>B: commits {offsets: [{topic, offset:42}]}  (credit +1; at most once per 100 ms per port)
+  D->>B: commits {offsets: [{topic, offset:42, seq}]}  (credit +1; at most once per 100 ms per port)
 ```
 
 A rejected publish returns `result { ok: false, error: { code: 'invalid' } }`. Isolate A's `publish()` promise rejects and nothing is appended. On a persistent topic the `result` comes after the batch is on disk.

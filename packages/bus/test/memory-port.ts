@@ -16,6 +16,8 @@ export type FakeIsolate = {
   records(topic: string): BusRecord[];
   /** Values delivered on a topic, in order. */
   values(topic: string): unknown[];
+  /** The `seq` of the last `deliver` on a topic, 0 before the first (ADR 0016, point 10). */
+  seq(topic: string): number;
 };
 
 let ids = 0;
@@ -60,6 +62,11 @@ export function fakeIsolate(id: string): FakeIsolate {
     },
     values(topic) {
       return iso.records(topic).map((r) => r.value);
+    },
+    seq(topic) {
+      let last = 0;
+      for (const m of iso.inbox) if (m.t === 'deliver' && m.p.topic === topic) last = m.p.seq;
+      return last;
     },
   };
   return iso;

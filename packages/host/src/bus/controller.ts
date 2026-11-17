@@ -411,7 +411,10 @@ export function createBusController(o: BusControllerOptions): BusController {
     });
     // Offsets settled on the old port go first on the new one (decision 1, point 2).
     const carried = entry.committer?.pending();
-    if (carried) for (const [topic, offset] of carried) committer.settle(topic, offset, 0);
+    // Their delivery seq belonged to the old connection, which numbered its
+    // own; 0 claims no delivery on this one (ADR 0016, point 13).
+    if (carried)
+      for (const [topic, { offset }] of carried) committer.settle(topic, { offset, seq: 0 }, 0);
     committer.flush();
     entry.port = port;
     entry.committer = committer;
@@ -425,8 +428,10 @@ export function createBusController(o: BusControllerOptions): BusController {
           console.error('[isoloop] kernel.subscribe handler threw', err);
         }
       }
+      // The whole delivery is settled at once: its last offset and its seq.
       const last = msg.p.records.at(-1);
-      if (last) committer.settle(sub.topic, last.offset, msg.p.records.length);
+      if (last)
+        committer.settle(sub.topic, { offset: last.offset, seq: msg.p.seq }, msg.p.records.length);
     });
     port.start();
     port.postMessage({ v: 1, t: 'subscribe', p: { topic: sub.topic, from: sub.from } });
