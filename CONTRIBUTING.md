@@ -81,6 +81,8 @@ Other editors need three things:
 - **Branches** are `<type>/<slug>`: `feature/`, `fix/`, `chore/` or `docs/`. Milestone tasks lead with the milestone, e.g. `feature/m1-supervisor`.
 - **Every change reaches `main` through a PR**, docs included, squash-merged on GitHub once CI is green (`gh pr merge --squash`). A ruleset on `main` enforces it. The PR title becomes the commit title, so it carries the matching conventional prefix: `feat:`, `fix:`, `chore:` or `docs:`.
 - **Changesets** record every change to a published package: run `pnpm changeset` and pick the packages and the bump. CI fails a PR that changes `packages/*` without one; an internal-only change (tests, CI, refactors that leave the published `.d.ts` alone) takes the `no-changeset` label instead. Every `@isoloop/*` package is in one fixed group, so they share a version ([ADR 0011](docs/adr/0011-dom-package.md)).
+- **Site impact** closes every PR description: `Site impact: none`, `update needed` or `done in web#N` (the template has it). CI checks the line. "Update needed" means the change is user-visible, so the website follows ([`AGENTS.md`](AGENTS.md), definition of done).
+- **The API check** builds the packages on the PR and on its base and compares their published `.d.ts`. A public change needs a changeset of at least `minor`, TSDoc or `docs/guide` updated, and a Site impact other than `none`. Mark an export `@internal` to keep it out.
 
 ### Releases
 
