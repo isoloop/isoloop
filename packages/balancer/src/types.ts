@@ -62,7 +62,12 @@ export type BalancerOptions = {
    * warning. Default `max(2, navigator.hardwareConcurrency - 2)`; at least 1.
    */
   maxWorkers?: number;
-  /** One beat with the pool's `lagMs` above this moves its busiest member to quarantine. Default 100. */
+  /**
+   * A beat with the pool's `lagMs` above this is a spike, put on the member
+   * that was busiest in it. A first spike is only reported (`spike`, action
+   * `noted`); a second from the same member within 60 s sends it to
+   * quarantine (M3i). Default 100.
+   */
   spike?: { lagMs?: number };
   /**
    * The pool's median `lagMs` above `lagMs` over `forMs` moves its heaviest
@@ -83,6 +88,23 @@ export type BalancerOptions = {
    */
   quarantine?: { steadyMs?: number; maxReturns?: number };
   loads?: LoadStore;
+  /**
+   * Packing back (M3i): a member alone in its pool and steady for 60 s (no
+   * spike, crash, lagging or full pool, rising backlog or backlog above 0)
+   * joins another of the balancer's pools if both together stay under 40 %
+   * of a core, freeing a worker. At most one pack every 60 s. On by default.
+   */
+  pack?: { enabled?: boolean };
+};
+
+/** What the app tells the balancer about an isolate's queued work (`report`). */
+export type Report = {
+  /**
+   * Work items waiting for the isolate, in any unit the app likes, as long as
+   * it's the same one each time. For a consumer group, report the group's
+   * backlog on every member.
+   */
+  backlog: number;
 };
 
 export type PlacementState = 'placed' | 'quarantined' | 'kept-apart' | 'moving';
@@ -95,6 +117,10 @@ export type Placement = {
   loadPct: number | undefined;
   /** No pool had room and the worker cap was reached: placed anyway, or left where it is. */
   atCap?: true;
+  /** The latest backlog `report`, while it's fresh (under 10 s old). */
+  backlog?: number;
+  /** Its backlog is rising, and the balancer has nowhere to give it more CPU (`behind`). */
+  behind?: true;
   /**
    * In one of the balancer's pools, but not placed by it. The host reserves
    * `balancer-*` pools, so this shouldn't happen; it is never moved.
@@ -103,19 +129,63 @@ export type Placement = {
 };
 
 /**
- * Why a member moved: `spike` (one long task), `sustained` (the pool's lag
- * stayed high), `full` (the pool's members' busy time reached 80 % of a core,
- * whatever its lag), `crash`, `bisect` (looking for a pool's unnamed
- * culprit), or `steady` (back out of quarantine).
+ * Why a member moved: `spike` (a second long task within 60 s), `sustained`
+ * (the pool's lag stayed high), `full` (the pool's members' busy time reached
+ * 80 % of a core, whatever its lag), `crash`, `bisect` (looking for a pool's
+ * unnamed culprit), `steady` (back out of quarantine), `backlog` (its
+ * reported backlog kept rising, M3i) or `pack` (a quiet member joining
+ * another pool to free a worker, M3i).
  */
-export type MoveReason = 'spike' | 'sustained' | 'full' | 'crash' | 'bisect' | 'steady';
+export type MoveReason =
+  | 'spike'
+  | 'sustained'
+  | 'full'
+  | 'crash'
+  | 'bisect'
+  | 'steady'
+  | 'backlog'
+  | 'pack';
 
+/** A move, once the old copy has stopped and the new one is spawned. */
 export type MoveEvent = { id: string; from: string; to: string; reason: MoveReason };
+
+/**
+ * A moved member's first beat in its new pool (M3i). `costMs` is the time from
+ * the balancer stopping it to that beat: what the move cost the isolate. It
+ * follows `move`, which fires before the cost is known; a member stopped or
+ * moved again before it beats never arrives.
+ */
+export type ArrivedEvent = MoveEvent & { costMs: number };
+
+/**
+ * A spike put on a member (M3i): `noted` for a first one (nothing moves), or
+ * `quarantined` when it sends the member to quarantine, or restarts the quiet
+ * window of one already there.
+ */
+export type SpikeEvent = {
+  id: string;
+  pool: string;
+  lagMs: number;
+  action: 'noted' | 'quarantined';
+};
+
+/**
+ * A member's reported backlog keeps rising, but it already has its pool to
+ * itself or the balancer has no worker or pool to give it (M3i). Emitted when
+ * it first happens, then at most every 30 s while it lasts.
+ */
+export type BehindEvent = { id: string; pool: string; backlog: number };
 
 /** An isolate the balancer didn't place turned up in one of its pools (see `Placement.foreign`). */
 export type ForeignEvent = { id: string; pool: string };
 
-export type BalancerEvents = { move: MoveEvent; foreign: ForeignEvent };
+export type BalancerEvents = {
+  move: MoveEvent;
+  arrived: ArrivedEvent;
+  spike: SpikeEvent;
+  behind: BehindEvent;
+  foreign: ForeignEvent;
+};
 
 /**
  * Pools are named `balancer-1`, `balancer-2`…; the quarantine is
@@ -135,6 +205,14 @@ export interface Balancer<M extends ManifestLike = ManifestLike> {
   measure(id: string): number | undefined;
   /** Leaves `id` where it is until the returned function is called (a widget open for editing). */
   hold(id: string): () => void;
+  /**
+   * The app's view of `id`'s queued work (M3i). A backlog higher at the end of
+   * a 10 s window than at its start, and above 0, moves the isolate somewhere
+   * with more CPU; a report older than 10 s counts as none, so report at least
+   * every few seconds while there's work. Ignored for isolates the balancer
+   * didn't place.
+   */
+  report(id: string, report: Report): void;
   on<E extends keyof BalancerEvents>(event: E, fn: (e: BalancerEvents[E]) => void): () => void;
   /**
    * Stops watching and gives back the kernel's claim, so another balancer

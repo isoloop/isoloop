@@ -1,9 +1,11 @@
 export { createBalancer } from './balancer';
 export type {
+  ArrivedEvent,
   Balancer,
   BalancerEvents,
   BalancerOptions,
   BeatLike,
+  BehindEvent,
   CrashLike,
   ForeignEvent,
   KernelLike,
@@ -14,4 +16,6 @@ export type {
   Placement,
   PlacementState,
   PoolLike,
+  Report,
+  SpikeEvent,
 } from './types';
