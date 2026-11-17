@@ -1,0 +1,24 @@
+# The PR description ends with exactly one valid "Site impact:" line
+# (isoloop/web ADR 0004, decisions 3 and 4). Reruns when the description is
+# edited. No install: the script runs on the runner's Node.
+name: Site impact
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  site-impact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: scripts/ci
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - run: node scripts/ci/site-impact.ts
