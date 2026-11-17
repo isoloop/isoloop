@@ -80,7 +80,16 @@ Other editors need three things:
 
 - **Branches** are `<type>/<slug>`: `feature/`, `fix/`, `chore/` or `docs/`. Milestone tasks lead with the milestone, e.g. `feature/m1-supervisor`.
 - **Every change reaches `main` through a PR**, docs included, squash-merged on GitHub once CI is green (`gh pr merge --squash`). A ruleset on `main` enforces it. The PR title becomes the commit title, so it carries the matching conventional prefix: `feat:`, `fix:`, `chore:` or `docs:`.
-- **Changesets** record user-facing changes from M1 on: add a file to `.changeset/` by hand. The Changesets tooling and release pipeline arrive with M4 ([plan](docs/plans/m4-devtools-release.md)).
+- **Changesets** record every change to a published package: run `pnpm changeset` and pick the packages and the bump. CI fails a PR that changes `packages/*` without one; an internal-only change (tests, CI, refactors that leave the published `.d.ts` alone) takes the `no-changeset` label instead. Every `@isoloop/*` package is in one fixed group, so they share a version ([ADR 0011](docs/adr/0011-dom-package.md)).
+
+### Releases
+
+The packages are in Changesets' pre mode `next`, so versions are `0.1.0-next.N` until 0.1.0. A prerelease takes two steps:
+
+1. **Version, as a PR.** On a branch, run `pnpm release:version`. It bumps every package to the next `0.1.0-next.N`, writes each package's `CHANGELOG.md` section from the pending changesets, and records them under `.changeset/pre/` so the next run doesn't repeat them. Open a PR (`chore: version 0.1.0-next.N`) and merge it on green.
+2. **Publish.** Run the *Prerelease* workflow by hand on `main`. It publishes the versions in each `package.json` under the `next` dist-tag through npm trusted publishing (no token), and skips any version already on npm. It refuses to publish unless every package shares one `-next.N` version.
+
+`pnpm release:status` shows what the next version step would do.
 - **Decisions** made along the way become [ADRs](docs/adr/README.md); ideas for later go in [`docs/would-like.md`](docs/would-like.md).
 
 The full conventions are in the [plans index](docs/plans/README.md#conventions).

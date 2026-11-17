@@ -1,0 +1,44 @@
+# A PR that changes a published package carries a changeset (isoloop/web
+# ADR 0004, decision 4). `changeset status --since` fails when a package
+# changed without one; private packages (e2e, bench) are ignored by the
+# config. An internal-only change (tests, CI, refactors that leave the
+# published .d.ts alone) takes the `no-changeset` label instead. Its own
+# workflow, so adding or removing the label re-runs only this check.
+name: Changeset
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: changeset-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changeset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Skipped by the no-changeset label
+        if: contains(github.event.pull_request.labels.*.name, 'no-changeset')
+        run: echo "Internal-only change, labelled no-changeset."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}
+        with:
+          # The base branch's history, so --since can compare against it.
+          fetch-depth: 0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}
+        run: pnpm install --frozen-lockfile
+      - name: A changeset for every changed package
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}
+        run: pnpm release:status --since=origin/${{ github.base_ref }}
