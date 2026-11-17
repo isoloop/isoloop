@@ -4,6 +4,7 @@ Ideas we've consciously deferred or want to explore later. None of them is plann
 
 ## Bus and contracts
 
+- **De-duplicating request records by `req.id`.** A crash after a handler's side effect but before its reply delivers the request again, so [M4a](plans/m4a-agents.md) (decision 8) asks tool handlers to be idempotent by `req.id`, as the bus guide asks of every handler. The bus could instead skip a request record it has already seen answered. Only if consequential agent tools turn out to need it.
 - **Async seed `map`.** Let a seed's `map` return a promise, for migrations that need I/O. Deferred because it puts the network on the seed's path inside the bus worker; the migrator-isolate pattern covers it today. ([ADR 0003](adr/0003-schema-format-standard-schema.md))
 - **`kernel.reseed(topic)`.** Re-run the current `map` over the v1 offsets a seed rejected, once the `map` or the schema is fixed. The offsets are already kept in the seed metadata. ([ADR 0003](adr/0003-schema-format-standard-schema.md))
 - **`migrator(from, to, map)` helper.** A ~20-line helper in `@isoloop/runtime` that builds the migrator isolate for migrations a seed can't express. ([ADR 0003](adr/0003-schema-format-standard-schema.md))
@@ -51,7 +52,7 @@ The main thread shows everything isolates render ([engine constraints](investiga
 
 ## Devtools
 
-- **A browser extension.** M4's devtools are a panel in the page, drawn by an isolate ([M4](plans/m4-devtools-release.md#devtools-decisions-2026-11-16)). An extension would give devtools on a site without changing its code, and space outside the page. It would be one more client of `kernel.inspect()`, like the panel and the dev MCP, so it needs no new kernel work. Worth it once other people run Isoloop apps in production. It can't reach phones, and Safari needs an Xcode build and a paid Apple developer account.
+- **A browser extension.** M4b's devtools are a panel in the page, drawn by an isolate ([M4b](plans/m4b-devtools.md#devtools-decisions-2026-11-16)). An extension would give devtools on a site without changing its code, and space outside the page. It would be one more client of `kernel.inspect()`, like the panel and the dev MCP, so it needs no new kernel work. Worth it once other people run Isoloop apps in production. It can't reach phones, and Safari needs an Xcode build and a paid Apple developer account.
 
 ## Widget creator
 
@@ -78,4 +79,4 @@ These move to `isoloop/builder` when that repo is created, with the [decisions s
 
 ## Getting started
 
-- **A way in for new and existing apps,** for developers (non-technical users get the [Isoloop Builder](plans/builder.md)). Two shapes to weigh once 0.1 is out: a starter template (`npm create isoloop`) for new apps, and an agent skill that adapts an existing app to Isoloop, splitting it into isolates and contracts. They may share one source of truth for what an Isoloop app looks like. Whether the unscoped `isoloop` package also re-exports the main APIs, so users install one thing, is part of the same question; today it's planned as the CLI only ([ADR 0004](adr/0004-npm-name.md), M4).
+- **A way in for new and existing apps,** for developers (non-technical users get the [Isoloop Builder](plans/builder.md)). Two shapes to weigh once 0.1 is out: a starter template (`npm create isoloop`) for new apps, and an agent skill that adapts an existing app to Isoloop, splitting it into isolates and contracts (*2026-11-17:* the porting skill is now in [Towards 1.0](plans/README.md#towards-10); 0.1 ships a "build with Isoloop" skill for new code, [M4a](plans/m4a-agents.md) decision 17). They may share one source of truth for what an Isoloop app looks like. Whether the unscoped `isoloop` package also re-exports the main APIs, so users install one thing, is part of the same question; today it's planned as the CLI only ([ADR 0004](adr/0004-npm-name.md), M4).

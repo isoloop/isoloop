@@ -18,7 +18,7 @@ The Builder is planned in its own repository, `isoloop/builder`, created when th
 4. **Where the user talks to the agent,** in two steps:
    - **First, a chat panel in the app,** calling the Claude API with the user's own key, kept in browser storage. No backend.
    - **Later, Claude Desktop,** with a one-click MCP extension that drives the app, using the person's Claude subscription. It gets its own MCP bridge on the dev MCP's transport code; M4's dev MCP stays dev-only, so publishing and restarting from outside the tab are never possible in a production app by accident.
-   - WebMCP ([M7](m7-webmcp-spike.md)) could later let browser agents drive the app directly.
+   - WebMCP ([M7](m7-webmcp-stable.md)) could later let browser agents drive the app directly.
 5. **The agent loop runs in its own headless isolate,** with a `fetch` grant to the Claude API only, and publishes specs to the spec topic. If it hangs or crashes, the dashboard keeps running and the agent restarts. The key never goes into a topic or an export file.
 6. **Claude first, behind our own `Agent` interface** with conformance tests; other providers only if users ask.
 7. **Change sets, previewed and accepted.** The agent can add, edit and remove widgets and sources and change the layout. Each answer is a change set the user previews and accepts, and each accepted one is a record in a persistent topic, so undo is going back one record.
