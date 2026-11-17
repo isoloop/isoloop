@@ -1,6 +1,6 @@
 # M3e: Live widget creator
 
-**Status:** built (2026-11-16): tasks 2–7 and 9 are merged, and markets' interactive page shipped in `markets-v0.4.0`. Plant was re-measured on 2026-11-17 after web#126 (web#134, 20 runs, none stopped; the first run's Isoloop rounds had stopped in the heavy preview, which web#126 fixed). Left: the write-up (task 8, web#135, for the user), `plant-v0.2.0` and the roadmap (task 10). Built in `isoloop/web`; ships as `plant-v0.2.0`, then `markets-v0.4.0`, tagged by the user.
+**Status:** done (2026-11-17). Markets' interactive page shipped in `markets-v0.4.0` on 2026-11-16, and plant's in `plant-v0.2.0` on 2026-11-17, after plant was re-measured following web#126 (web#134, 20 runs, none stopped) and written up (web#135). Built in `isoloop/web`.
 
 **Goal:** show that the drawer that creates widgets and the dashboard it adds them to don't block each other, in either direction: heavy work in the drawer doesn't slow the dashboard, and a dashboard under load doesn't make the drawer lag.
 
@@ -95,10 +95,10 @@
 | 5 | The drawer: host frame with form and preview slots, the form with inline errors, manual placement, the creator topics, persistence, reset, the cap (decisions 8, 11–13, 20) | web | Self-merge on green |
 | 6 | Plant's interactive page: catalog and its test, starter specs, contracts, header entry, Native, E2E (decisions 2–6, 18, 23) | web | Self-merge on green |
 | 7 | The two measured scenarios in `packages/compare`, then the bench-server run (decision 22) | web | Self-merge on green |
-| 8 | Plant's write-up and `example.json` | web | User |
+| 8 | Plant's write-up and `example.json` | web | Done (web#135) |
 | 9 | Markets' interactive page: catalog, starters, contracts, header entry, E2E | web | Self-merge on green |
-| 10 | Roadmap: M3e done | isoloop | User |
-| 11 | `plant-v0.2.0` after task 8, `markets-v0.4.0` after task 9, each on its own commit | web | User pushes the tags |
+| 10 | Roadmap: M3e done | isoloop | This PR |
+| 11 | `plant-v0.2.0` after task 8, `markets-v0.4.0` after task 9, each on its own commit | web | Done (pushed by the user) |
 
 Tasks 2 and 3 run in parallel; 4 needs both; 5 needs 4; 6 needs 5; 7 and 9 need 6 and can run in parallel.
 
