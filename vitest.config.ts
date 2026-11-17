@@ -81,6 +81,14 @@ export default defineConfig({
       node('bus'),
       node('balancer'),
       node('vite'),
+      // The CI scripts' logic (scripts/ci).
+      {
+        test: {
+          name: 'scripts',
+          include: ['scripts/**/*.test.ts'],
+          environment: 'node',
+        },
+      },
       // The core diagrams' drift test (docs/diagrams/README.md).
       {
         test: {
