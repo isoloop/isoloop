@@ -38,12 +38,15 @@ M3h's measurement of the File processor ([write-up](https://github.com/isoloop/w
 4. **The backlog trigger.**
    - An isolate is behind when its reported backlog is higher at the end of a 10 s window than at its start, and isn't zero. A steady, non-zero queue doesn't trigger.
    - The balancer moves the isolate that's behind out of its pool, under the 60 % placement rule and the worker cap, like any other move. The reason is `backlog`.
-5. **A group's backlog.** The backlog of a consumer group's topic belongs to the group, so the app reports it on every member. When several members are behind, the balancer moves one at a time, starting with the one in the busiest pool, and checks again after the cooldown.
+5. **A group's backlog.** The backlog of a consumer group's topic belongs to the group, so the app reports it on every member. When several members are behind, the balancer moves one at a time, starting with the one in the busiest pool.
+   - **Pacing** (amended 2026-11-17, M3i, to match isoloop#214): one backlog move per fresh 10 s window, across the balancer. Rising compares the latest report with one taken at least 10 s before it, both since the isolate's last move and since the last backlog move, rather than a report against now.
+   - **Where it goes:** a pool of its own if the cap allows, else the balancer pool with the least load that stays under `headroom` with it and has less load than its pool-mates. An isolate already alone in its pool is `behind` instead.
 6. **A stale report** (none for 10 s) counts as no signal: it doesn't trigger a move and doesn't block packing back. An app that stops reporting gets today's behaviour.
 7. **Names:**
    - `balancer.report(id, { backlog })`;
    - the MoveReasons `backlog` and `pack`;
-   - `balancer.on('behind', { id, backlog })` when an isolate is behind but can't get more CPU, because it already has a worker of its own or the balancer is at `maxWorkers`.
+   - `balancer.on('behind', { id, pool, backlog })` when an isolate is behind but can't get more CPU, because it already has a pool to itself or the balancer has no pool or worker to give it. It fires at most every 30 s per isolate (amended 2026-11-17, M3i, to match isoloop#214).
+   - Added with isoloop#214 (amended 2026-11-17, M3i): `on('spike', { id, pool, lagMs, action })`, with `action` `noted` for a first spike and `quarantined` for one that sends the member to the quarantine; and `on('arrived', { id, from, to, reason, costMs })`, which follows each `move` with its cost (decision 10).
 
 ### Packing back
 
@@ -51,6 +54,7 @@ M3h's measurement of the File processor ([write-up](https://github.com/isoloop/w
    - Steady means 60 s with no spike, crash, sustained or full trigger, and no growing backlog.
    - The move must empty the member's pool, so it frees a worker.
    - The combined predicted load must stay under 40 %, below the 60 % placement bar, so the pool it joins doesn't trip at once.
+   - Never into a pool whose members have a backlog above zero, or one with a member moving or in trouble in the last 60 s (amended 2026-11-17, M3i, to match isoloop#214).
    - At most one pack every 60 s, across the balancer.
    - Never a held member, one whose backlog is above zero, or one the quarantine keeps apart.
    - The reason is `pack`.
@@ -61,8 +65,9 @@ M3h's measurement of the File processor ([write-up](https://github.com/isoloop/w
 10. **Three rules:**
     - A move only happens if it's predicted to end its trigger, meaning the source pool drops back under its threshold. Otherwise the isolate stays put.
     - Each isolate gets at most 3 moves per 5 minutes. After that it stays where it is until the window has passed.
-    - Each move's cost is measured, from the stop until the first beat in the new place, and reported with the move event.
-11. **A first spike is only logged.** A second spike from the same isolate within 60 s sends it to the quarantine.
+      - **Exemptions** (amended 2026-11-17, M3i, to match isoloop#214): quarantine moves (`spike`, `crash`) and `bisect` moves aren't limited, since they protect the other members, though they count toward the 3. Leaving the quarantine is limited, so an isolate that has used its budget can stay in the quarantine longer than its quiet window.
+    - Each move's cost is measured, from the stop until the first beat in the new place. `move` fires before the cost is known, so it comes in `arrived`, which follows each move with `costMs` (amended 2026-11-17, M3i, to match isoloop#214).
+11. **A first spike is only reported** (`spike`, action `noted`; amended 2026-11-17 to match isoloop#214). A second spike from the same isolate within 60 s sends it to the quarantine.
     - This reverses M3h's instant quarantine on a single spike, decided on 2026-11-16.
     - The balancer only sees a spike after the long task has ended, since the beat that reports it arrives late. A one-off block is already over by then, and when the cause is the data, as with the processor's poison files, the next block hits a different member. An isolate that blocks again is caught on its second spike.
     - The cost: neighbours take one hit from a one-off block before anything moves.
