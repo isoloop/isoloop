@@ -28,6 +28,7 @@ The main thread shows everything isolates render ([engine constraints](investiga
 - **The iframe tier for performance.** The [system design §11](design/system-design.md) iframe tier, planned for hostile code, used for heavy widgets on browsers that give a cross-site iframe its own process (§7). A process and a site per widget; it may not help with canvas presentation, since every process's frames meet in the same compositor.
 
 - **Attribute errors per member in a pool with `AsyncContext`.** Today an error thrown from a shared framework scheduler or a timer in a pooled worker can't be traced to a member, so the whole pool restarts. `AsyncContext` would carry the member across `await` and timers, so such errors could stay the member's own. Waits on browsers shipping it. ([ADR 0015](adr/0015-visual-pools.md))
+- **Count promise continuations in `busyMs` with `AsyncContext`.** The runtime bills timers, rAF, `queueMicrotask` and ports to the member that scheduled them, but not work resumed after `await`, so a member whose work runs in `await`ed slices looks nearly idle. In [M3i](plans/m3i-balancer-scaling.md)'s File processor measurement, each processor read 0 to 8 % of a core. `AsyncContext` would carry the member across `await`. Until browsers ship it, the app reports its own busy time to the balancer ([M3j](plans/m3j-balancer-gaps.md), [ADR 0017](adr/0017-opt-in-balancer.md)).
 
 ## Supervision
 

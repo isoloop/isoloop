@@ -1,6 +1,6 @@
 # M3i: Balancer scaling
 
-**Status:** planned (grilled 2026-11-17). An amendment to [ADR 0017](../adr/0017-opt-in-balancer.md) was accepted the same day. The balancer change is built in `isoloop/isoloop` (isoloop#214). The processor changes and the measurement are built in `isoloop/web`. M3i ships as a `next` prerelease, then `processor-v0.2.0`, tagged by the user. The plant and markets interactive pages pick it up in their next minors.
+**Status:** built and measured (2026-11-17). An amendment to [ADR 0017](../adr/0017-opt-in-balancer.md) was accepted the same day. The balancer change is merged in `isoloop/isoloop` (isoloop#214) and shipped in `0.0.0-next.800569e`. The Playground and the File processor are merged in `isoloop/web` (web#137, web#138), and the bench-server run is in web#149. Left: the user's review of the write-up (web#150), then `processor-v0.2.0`, tagged by the user. The run had the processor's [#211](https://github.com/isoloop/isoloop/issues/211) workarounds in place. #211's fix shipped in `0.1.0-next.0`, and web#151 dropped the workarounds. The write-up found three gaps in the balancer itself, which [M3j](m3j-balancer-gaps.md) plans to fix.
 
 **Goal:** `@isoloop/balancer` also acts when an isolate falls behind on its work, not only when it slows its neighbours. It moves isolates back together once they're quiet, and it moves less often. Three things change: an isolate that falls behind gets more CPU, a quiet one is packed back to free a worker, and a move happens only when it's predicted to help.
 
