@@ -8,11 +8,14 @@
 // package (trusted publishing: no token, provenance is automatic). Run it with
 // `--dry-run` locally to see what would be published.
 //
+// In CI it writes the version to $GITHUB_OUTPUT once every package is on npm,
+// and the workflow's `tag` job tags the commit `v<version>`.
+//
 // `pnpm pack` writes the tarball, so `workspace:*` and `catalog:` become real
 // versions and `publishConfig` applies; `npm publish` uploads it, because npm
 // is what speaks OIDC to the registry.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -87,3 +90,7 @@ for (const p of packages) {
   run('npm', args);
   console.log(`${dryRun ? '~' : '+'} ${name}@${version}`);
 }
+
+// Every package is on npm at this version: the workflow tags the commit.
+const output = process.env['GITHUB_OUTPUT'];
+if (output && !dryRun) appendFileSync(output, `version=${version}\n`);
