@@ -135,6 +135,8 @@ So `busyMs` is a placement guide, not a profiler.
 - **With it:** one listener on the beats (about 10 a second per worker) and a decision every 500 ms on the main thread, plus each move's restart.
 - **Workers:** up to `maxWorkers` pools of its own, plus the quarantine.
 
+`maxWorkers` defaults to `max(2, navigator.hardwareConcurrency − 2)`. In a container or VM, `hardwareConcurrency` can report the host's threads rather than the cores the page may use. On the bench server it reported 16 in a container pinned to 4 cores, so the balancer allowed itself up to 8 pools. Set `maxWorkers` yourself there.
+
 M3h measured these on the processor example's File processor, on 4 cores at 2.0 GHz: one pool with a balancer that watches every beat but never moves anything differs from one pool with no balancer by 0 to 1 point of CPU, a few MB and a few milliseconds of typing, within the rounds' spread. The figures, and what the balancer did with faults, are in the [File processor write-up](https://github.com/isoloop/web/tree/main/apps/processor/comparison).
 
 ## Inspecting it
