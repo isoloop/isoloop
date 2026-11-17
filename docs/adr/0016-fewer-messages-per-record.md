@@ -1,6 +1,6 @@
 # ADR 0016: Fewer bus messages per record
 
-- **Status:** Accepted. Amended 2026-11-17 (proposed, [#211](https://github.com/isoloop/isoloop/issues/211)): commits carry a delivery sequence, so a group commit can't cover a record redelivered after it (points 10–13), and a consumer group that has committed resumes from its committed offset whatever `from` says (point 14).
+- **Status:** Accepted. Amended 2026-11-17 (accepted the same day, [#211](https://github.com/isoloop/isoloop/issues/211)): commits carry a delivery sequence, so a group commit can't cover a record redelivered after it (points 10–13), and a consumer group that has committed resumes from its committed offset whatever `from` says (point 14).
 - **Date:** 2026-11-11 (proposed 2026-11-10)
 - **Amends:** [ADR 0005](0005-bus-topology-message-channels.md), what travels on an isolate's bus port: commits are combined
 - **Evidence:**
