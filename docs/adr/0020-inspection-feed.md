@@ -1,6 +1,6 @@
 # ADR 0020: Inspection feed
 
-- **Status:** Accepted (2026-11-18), after grilling (Q1–Q11, yes to all).
+- **Status:** Accepted (2026-11-18), after grilling (Q1–Q11, yes to all). Amended 2026-11-18 after the first tasks (Q1–Q4, yes to all, then option (b) for memory, then Q1–Q5 on the host's controls): the isolate side (decision 6) and memory per isolate from the host, where the page is cross-origin isolated (decision 4).
 - **Date:** 2026-11-18
 - **Plan:** [M4b](../plans/m4b-devtools.md) (its devtools decisions 2, 5 and 7 are what this ADR makes precise). The [M4a](../plans/m4a-agents.md) dev MCP reads the same feed (decisions 12 and 13 there).
 
@@ -16,7 +16,7 @@ M4b's devtools panel and M4a's dev MCP both need to see a running app: its isola
 What's missing:
 
 - **A worker can't read any of it.** The panel is a visual isolate in its own worker (devtools decision 4), and the dev MCP's page side has to send what it reads over a WebSocket. Both need the data as plain messages.
-- **Some data isn't kept or sent.** Nothing fills the beat's `heapBytes` slot. The bus's restart count exists only as the `bus:restart` event. Per-topic head offsets and retained record counts stay inside the bus worker. Nothing keeps recent events for a reader that arrives late.
+- **Some data isn't kept or sent.** The bus's restart count exists only as the `bus:restart` event. Per-topic head offsets and retained record counts stay inside the bus worker. Nothing keeps recent events for a reader that arrives late.
 - **Records can't be watched without becoming a consumer.** A host subscription (`isoloop:host:N`) shows up in the bus figures as a consumer and takes part in credit, so the panel would distort what it shows.
 - **There's no way to block an isolate on purpose.** The panel's controls are kill, block and restart (devtools decision 7), and the dev MCP has `isoloop_block`. Today a block is only an app's own busy loop, as in the test fixtures.
 
@@ -49,7 +49,7 @@ inspector.close();
 
 `snapshot()` gives:
 
-- the isolates, as `kernel.isolates()` has them, plus `heapBytes` where known (decision 4);
+- the isolates, as `kernel.isolates()` has them;
 - the pools, as `kernel.pools()` has them;
 - the bus: its state, its restart count (newly kept as state), and the last `bus:metrics`;
 - the recent events (decision 5).
@@ -68,9 +68,13 @@ After it, `on` delivers events:
 - **Values are previews.** Each record's value is cut to a 2 KB preview, with its full size given, in both the tap and the read. A devtools view never holds a large record twice.
 - **Both are gated by inspect access:** an `Inspector` on the host, or the `inspect` port.
 
-### 4. Heap and block in the runtime
+### 4. Block in the runtime, and memory measured by the host
 
-- **Heap:** the runtime fills the beat's `heapBytes` from `performance.memory` where the engine has it (Chromium), and leaves it out elsewhere. Readers show it as Chromium-only. It's a per-worker figure, so pool members share one value.
+- **Memory per isolate comes from the host, not the beat.** The first plan was the beat's `heapBytes` from `performance.memory`, but Chromium has `performance.memory` only on the main thread, not in dedicated workers (a browser test in an isolate's worker got `undefined`, isoloop#251). The unused `heapBytes` slot leaves the beat. Instead:
+  - the host calls `performance.measureUserAgentSpecificMemory()` while a reader listens, at most every 5 s, and only when `crossOriginIsolated` is true (it needs COOP/COEP). Elsewhere, and in engines without it (Firefox, Safari), nothing is measured and the figure is absent;
+  - it attributes the breakdown to each isolate's worker by its URL and reports `memory: { bytes, at }` per isolate in the snapshot and as a coalesced `memory` message. Pool members share their worker's figure, marked as shared;
+  - the figure is coarse and can be seconds old, since Chromium answers at its next garbage collection. Readers show its age and label it "Chromium, cross-origin isolated";
+  - `@isoloop/vite` gets `crossOriginIsolation: true`, which makes its dev server send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, so the figure works during development. It's off by default, because COEP blocks third-party resources that don't opt in.
 - **Block:** a new runtime message, `block { ms }`, makes the isolate's worker busy-loop for `ms`, capped at 10 s, so a developer can watch containment work: the heartbeat goes late, the supervisor acts, the page keeps running. Only the `inspect` port (decision 6) and an `Inspector` on the host can send it. For a pooled isolate it blocks the whole worker, as a real busy loop would.
 
 ### 5. Recent events, kept from the start
@@ -93,6 +97,20 @@ kernel.spawn({ id: 'devtools', url, grants: { publish: [], subscribe: [], inspec
 
   There's no separate control grant: the app chose to mount the devtools.
 - **The dev MCP's page side** runs on the host and uses `kernel.inspect()` directly; it needs no grant.
+- **The host's `Inspector` carries the same controls,** `restart(id)`, `kill(id)` and `block(id, ms)`, so the host's and the isolate's inspectors have one shape and the dev MCP's page side can kill and block. They're inspection actions, so they're here rather than new kernel methods; `restart` calls `kernel.restart`. After `close()` (or, for `ctx.inspector`, once its port ends) the controls reject, while the last snapshot stays readable. Nothing gates them in production: any code on the page can already busy-loop or crash an isolate, and mounting the devtools is the app's choice. `kill` on a pooled isolate ends its worker, so every member crashes and restarts; the call resolves once the kill is sent, and the feed shows each member's crash and restart.
+- **The isolate side is `ctx.inspector`,** defined only when the isolate holds `inspect: true` and `undefined` otherwise, so a panel checks once at start. It mirrors the host's `Inspector`, except that everything that crosses the port is asynchronous, and it carries the controls, since the grant covers both:
+
+  ```ts
+  type IsolateInspector = {                                   // @experimental
+    snapshot(): Promise<InspectSnapshot>;
+    on(fn: (m: InspectMessage) => void): () => void;          // the host's messages
+    records(topic: string, o: { last: number }): Promise<InspectRecord[]>;
+    tap(o: { topics: string[]; maxPerSec?: number }, fn: (r: InspectRecord) => void): () => void;
+    restart(id: string): Promise<void>;
+    kill(id: string): Promise<void>;
+    block(id: string, ms: number): Promise<void>;             // ≤ 10 s
+  };
+  ```
 
 ### 7. A versioned, additive message format
 
@@ -104,7 +122,7 @@ kernel.spawn({ id: 'devtools', url, grants: { publish: [], subscribe: [], inspec
 - **The panel survives a bus restart** and doesn't appear as a consumer in the figures it shows.
 - **The feed's cost is measured, not assumed.** M4b task 6 runs plant at `?rate=5` with the feed open and closed and reports the difference as measured, in CI. A budget is asserted only once the numbers are known.
 - **The ring buffer always runs.** It's small, but it isn't zero.
-- **Heap is Chromium-only** and per worker, so pooled members can't be told apart by heap.
+- **Memory is Chromium-only and needs cross-origin isolation.** Without it, or in Firefox and Safari, the devtools show no memory figure. Pool members can't be told apart by memory. Measuring while a reader listens adds the measurement's own cost, which task 6 records.
 - **`block` is a real busy loop.** On a pooled isolate it blocks every member of the pool, which is what a real block would do.
 - **New API, all `@experimental` and all additions:** `kernel.inspect()` and `Inspector`; the `inspect` grant; the `HostToBus` `tap` and `read` envelopes; the head offset and retained count in `BusMetrics`; the isolate messages `inspect { port }` and `block { ms }`. Under [ADR 0019](0019-versioning-and-releases.md) the isolate messages are seam additions ([ADR 0012](0012-isolates-built-apart.md)), so they need a minor.
 - **The balancer's own states** (quarantine, bisect) don't appear. The panel shows pools and members from `kernel.pools()`.
@@ -118,4 +136,7 @@ kernel.spawn({ id: 'devtools', url, grants: { publish: [], subscribe: [], inspec
 - **Keeping recent events only while inspected.** Rejected: the question a late reader asks is what crashed before it connected.
 - **A separate control grant** for kill, block and restart. Rejected: the app chose to mount the devtools, and two grants for one panel add nothing.
 - **Block as suspend** (pausing delivery). Rejected: that shows something else. The point is to watch containment handle a real busy loop.
-- **Heap from `performance.measureUserAgentSpecificMemory()`.** Not taken: it needs cross-origin isolation and reports asynchronously and coarsely. Revisit if browsers make it practical.
+- **No memory figure in 0.1.** Considered after `performance.memory` proved main-thread only. Not taken: memory per isolate is what a developer reaches for when a dashboard feels heavy, and the dev server can provide cross-origin isolation.
+- **The main thread's `performance.memory` only.** Not taken: it says nothing about the isolates, which is what the panel is for.
+- **A synchronous `ctx.inspector.snapshot()`,** kept current by the runtime applying events locally. Not taken: more code and more ways to drift, for a panel that can wait one message.
+- **Inspector methods on `ctx.host`** that reject without the grant, as `navigate` does. Not taken: about eight methods spread across `HostApi`, where one optional object reads better.
