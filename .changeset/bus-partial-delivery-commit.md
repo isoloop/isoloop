@@ -1,5 +1,5 @@
 ---
-'@isoloop/protocol': patch
+'@isoloop/protocol': minor
 '@isoloop/bus': patch
 '@isoloop/runtime': patch
 ---
