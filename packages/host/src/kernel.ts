@@ -1490,7 +1490,7 @@ export function createKernel(config: KernelConfig): Kernel {
     const slot = get(id);
     switch (action) {
       case 'restart':
-        feed(slot, { k: 'respawn' });
+        void kernel.restart(id);
         return;
       case 'kill':
         // As if its worker had died: the supervisor restarts it, and a pool's

@@ -226,4 +226,30 @@ describe('the host Inspector', () => {
     await expect(ins.restart('nobody')).rejects.toThrow();
     ins.close();
   });
+
+  it('rejects its controls after close(), and keeps snapshot() readable', async () => {
+    const k = kernel();
+    k.spawn({ id: 'T', src: burn });
+    await waitFor(() => k.isolates().find((i) => i.id === 'T')?.state === 'running');
+    const ins = k.inspect();
+    ins.close();
+    await expect(ins.restart('T')).rejects.toThrow(/closed/);
+    await expect(ins.kill('T')).rejects.toThrow(/closed/);
+    await expect(ins.block('T', 100)).rejects.toThrow(/closed/);
+    expect(ins.snapshot().isolates.map((i) => i.id)).toEqual(['T']);
+    const t = k.isolates().find((i) => i.id === 'T');
+    expect(t?.state).toBe('running');
+    expect(t?.restarts).toBe(0);
+  });
+
+  it('kill on a pooled isolate restarts every member of the pool', async () => {
+    const k = kernel();
+    const got = crashes(k);
+    k.spawn({ id: 'P1', src: burn, pool: 'p' });
+    k.spawn({ id: 'P2', src: burn, pool: 'p' });
+    await waitFor(() => k.isolates().every((i) => i.state === 'running'));
+    await k.inspect().kill('P1');
+    await waitFor(() => ['P1', 'P2'].every((id) => got.some((e) => e.id === id)));
+    await waitFor(() => k.isolates().every((i) => i.state === 'running' && i.restarts === 1));
+  });
 });

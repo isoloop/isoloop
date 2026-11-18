@@ -59,16 +59,27 @@ export interface Inspector {
    * first, as previews. Rejects with a `BusError`.
    */
   records(topic: string, o: { last: number }): Promise<InspectRecord[]>;
-  /** Restarts an isolate, as `kernel.restart(id)`. */
+  /**
+   * Restarts an isolate: calls `kernel.restart(id)`. Like `kill` and `block`,
+   * it rejects for an unknown id, and after `close()`.
+   */
   restart(id: string): Promise<void>;
-  /** Ends an isolate's worker as a crash, so the supervisor restarts it like any other. */
+  /**
+   * Ends an isolate's worker as a crash (`worker-error`), so the supervisor
+   * restarts it like any other. For a pooled isolate that ends the pool's
+   * worker: every member crashes and restarts, and the feed shows each one.
+   * Resolves once the kill is sent, not when the isolate is back.
+   */
   kill(id: string): Promise<void>;
   /**
    * Busy-loops an isolate's worker for `ms` (at most 10 s), so you can watch
    * containment work. For a pooled isolate it blocks the whole worker.
    */
   block(id: string, ms: number): Promise<void>;
-  /** Stops every listener and tap of this inspector. Its `snapshot()` still works. */
+  /**
+   * Stops every listener and tap of this inspector, and makes its controls
+   * reject. Its `snapshot()` still works.
+   */
   close(): void;
 }
 
@@ -105,6 +116,10 @@ const reportError = (e: unknown): void => {
     throw e;
   });
 };
+
+/** What a control gives after `close()` (ADR 0020, decision 6). */
+const closedControl = (): Promise<void> =>
+  Promise.reject(new Error('inspector: closed; its controls no longer act'));
 
 function controlOf(
   src: InspectSources,
@@ -235,9 +250,12 @@ export function createInspectFeed(src: InspectSources): InspectFeed {
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the bus answers a read with RecordPreview[]
           return r.value as InspectRecord[];
         },
-        restart: (id) => controlOf(src, 'restart', id),
-        kill: (id) => controlOf(src, 'kill', id),
-        block: (id, ms) => controlOf(src, 'block', id, Math.min(Math.max(0, ms), MAX_BLOCK_MS)),
+        restart: (id) => (closed || destroyed ? closedControl() : controlOf(src, 'restart', id)),
+        kill: (id) => (closed || destroyed ? closedControl() : controlOf(src, 'kill', id)),
+        block: (id, ms) =>
+          closed || destroyed
+            ? closedControl()
+            : controlOf(src, 'block', id, Math.min(Math.max(0, ms), MAX_BLOCK_MS)),
         on(fn) {
           if (closed || destroyed) return () => {};
           // One entry per call, so the same function added twice gets two stops.

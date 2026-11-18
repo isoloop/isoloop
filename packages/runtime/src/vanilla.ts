@@ -245,6 +245,8 @@ export function createVanillaIsolate(
     },
     async shutdown(reason) {
       await Promise.allSettled(onShutdown.map(async (fn) => fn(reason)));
+      // Its handlers may still inspect; after them the port ends (ADR 0020).
+      inspect?.end();
       // Before `bye`, for every reason: a graceful stop or a suspend loses no commit.
       await bus.close();
       render?.flush();

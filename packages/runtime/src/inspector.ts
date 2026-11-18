@@ -22,7 +22,10 @@ import {
  * @experimental
  */
 export type IsolateInspector = {
-  /** Isolates, pools, the bus, and the last 200 events. */
+  /**
+   * Isolates, pools, the bus, and the last 200 events. Once the port has
+   * ended it resolves with the last snapshot it got, if any.
+   */
   snapshot(): Promise<InspectSnapshot>;
   /**
    * The host's feed messages from now on: events at once, beats and bus
@@ -37,9 +40,17 @@ export type IsolateInspector = {
    * Returns the function that ends it.
    */
   tap(o: { topics: string[]; maxPerSec?: number }, fn: (r: InspectRecord) => void): () => void;
-  /** Restarts an isolate, as `kernel.restart(id)`. */
+  /**
+   * Restarts an isolate, as `kernel.restart(id)` does. Like `kill` and
+   * `block`, it rejects for an unknown id, and once the port has ended.
+   */
   restart(id: string): Promise<void>;
-  /** Ends an isolate's worker as a crash; the supervisor restarts it. */
+  /**
+   * Ends an isolate's worker as a crash (`worker-error`), so the supervisor
+   * restarts it. For a pooled isolate that ends the pool's worker: every
+   * member crashes and restarts, and the feed shows each one. Resolves once
+   * the kill is sent, not when the isolate is back.
+   */
   kill(id: string): Promise<void>;
   /** Busy-loops an isolate's worker for `ms`, at most 10 s. */
   block(id: string, ms: number): Promise<void>;
@@ -49,12 +60,19 @@ type Pending = { resolve: (v: unknown) => void; reject: (e: unknown) => void };
 
 const failure = (r: CallResult): BusError | undefined => (r.ok ? undefined : new BusError(r.error));
 
+/** What a control gives once the port has ended (ADR 0020, decision 6). */
+const endedError = (): Error => new Error('inspector: its port has ended; controls no longer act');
+
 export function createInspectorClient(): {
   inspector: IsolateInspector;
   /** The port from the host's `inspect` message. */
   attach(port: MessagePort): void;
+  /** The port has ended (the isolate is shutting down): controls reject from now on. */
+  end(): void;
 } {
   let port: MessagePort | null = null;
+  let ended = false;
+  let lastSnapshot: InspectSnapshot | undefined;
   /** What was asked before the port arrived. */
   const queue: IsolateToInspect[] = [];
   const pending = new Map<string, Pending>();
@@ -93,8 +111,10 @@ export function createInspectorClient(): {
       const p = pending.get(msg.re);
       if (!p) return;
       pending.delete(msg.re);
-      if (msg.t === 'snapshot') p.resolve(msg.p);
-      else if (msg.t === 'result') {
+      if (msg.t === 'snapshot') {
+        lastSnapshot = msg.p;
+        p.resolve(msg.p);
+      } else if (msg.t === 'result') {
         const err = failure(msg.p);
         if (err) p.reject(err);
         else p.resolve(msg.p.ok ? msg.p.value : undefined);
@@ -114,11 +134,16 @@ export function createInspectorClient(): {
   };
 
   const control = async (action: 'restart' | 'kill' | 'block', id: string, ms?: number) => {
+    if (ended) throw endedError();
     await ask({ t: 'control', p: ms === undefined ? { action, id } : { action, id, ms } }).done;
   };
 
   const inspector: IsolateInspector = {
     async snapshot() {
+      if (ended) {
+        if (lastSnapshot) return lastSnapshot;
+        throw endedError();
+      }
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the host answers `snapshot` with one
       return (await ask({ t: 'snapshot', p: {} }).done) as InspectSnapshot;
     },
@@ -159,14 +184,30 @@ export function createInspectorClient(): {
     block: (id, ms) => control('block', id, ms),
   };
 
-  return {
+  const client = {
     inspector,
-    attach(p) {
+    attach(p: MessagePort) {
       if (port) return;
       port = p;
       p.addEventListener('message', onMessage);
+      // Where the engine reports it (Chromium), the host closing the port ends it too.
+      p.addEventListener('close', () => {
+        client.end();
+      });
       p.start();
       for (const m of queue.splice(0)) p.postMessage(m);
     },
+    end() {
+      if (ended) return;
+      ended = true;
+      queue.length = 0;
+      for (const p of pending.values()) p.reject(endedError());
+      pending.clear();
+      taps.clear();
+      listeners.clear();
+      port?.removeEventListener('message', onMessage);
+      port?.close();
+    },
   };
+  return client;
 }
