@@ -95,6 +95,14 @@ export type IsolateToHost =
         renderFmt: string;
         /** The Isoloop `major.minor` the isolate was built against, from `defineIsolate` (ADR 0012). */
         requires?: string;
+        /**
+         * True when the worker started from `@isoloop/runtime/worker`, the tiny
+         * entry no chunk imports. Only such a worker can start from a URL with
+         * a fragment of its own without loading the bootstrap twice, which is
+         * what memory per isolate needs (ADR 0020, decision 4). Runtimes
+         * before it leave it out.
+         */
+        entry?: true;
       }
     >
   /**

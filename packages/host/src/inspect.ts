@@ -9,10 +9,13 @@
  *   (decision 5).
  * - Beats and bus metrics are coalesced: the latest of each per isolate, sent
  *   about once a second, and only while a reader listens (decision 2).
+ * - Memory is measured only while a reader listens, at most every 5 s, and
+ *   only where the page can be measured (decision 4, `memory.ts`).
  */
 import {
   BusError,
   INSPECT_COALESCE_MS,
+  INSPECT_MEMORY_MS,
   INSPECT_RING_SIZE,
   MAX_BLOCK_MS,
   MAX_READ,
@@ -27,10 +30,12 @@ import {
   type InspectBeat,
   type InspectEvent,
   type InspectIsolate,
+  type InspectMemory,
   type InspectMessage,
   type InspectPool,
   type InspectSnapshot,
 } from '@isoloop/protocol';
+import { memoryByIsolate, type MeasureMemory, type MemoryWorker } from './memory';
 
 /**
  * A reader of the inspection feed (ADR 0020, decision 1), from
@@ -92,6 +97,10 @@ export type InspectSources = {
   read(topic: string, last: number): Promise<CallResult>;
   /** Restart, kill or block an isolate; throws for an unknown id. */
   control(action: InspectControl, id: string, ms?: number): void;
+  /** The live workers and the isolates in each, for memory (decision 4). */
+  workers(): MemoryWorker[];
+  /** The browser's memory measurement; absent where the page can't be measured. */
+  measure?: MeasureMemory;
 };
 
 /** Events with their own coalesced messages, not sent one by one nor kept. */
@@ -145,6 +154,12 @@ export function createInspectFeed(src: InspectSources): InspectFeed {
   let timer: ReturnType<typeof setInterval> | undefined;
   /** Set by `destroy`: the kernel is gone, so no inspector listens again. */
   let destroyed = false;
+  /** Each isolate's memory from the last measurement (decision 4). */
+  let memory = new Map<string, InspectMemory>();
+  /** Dropped after a measurement fails: the page can't be measured. */
+  let measure = src.measure;
+  /** True while a measurement runs or the next one is due. */
+  let measuring = false;
 
   const send = (m: InspectMessage): void => {
     for (const fn of readers) {
@@ -170,7 +185,51 @@ export function createInspectFeed(src: InspectSources): InspectFeed {
     }
   };
 
+  /**
+   * One measurement, then the next no sooner than 5 s after this one started,
+   * while a reader listens. Chromium answers at its next garbage collection,
+   * so one can take many seconds; they never overlap.
+   */
+  const measureLoop = async (): Promise<void> => {
+    for (;;) {
+      if (!measure || readers.size === 0 || destroyed) break;
+      const started = performance.now();
+      const workers = src.workers();
+      let report: unknown;
+      // Nothing to attribute (no workers, or none with a URL of its own): don't measure.
+      if (workers.length > 0) {
+        try {
+          // oxlint-disable-next-line no-await-in-loop -- one measurement at a time, by design
+          report = await measure();
+        } catch {
+          measure = undefined;
+          break;
+        }
+      }
+      const at = performance.now();
+      // Attributed to the workers still live now; one that ended meanwhile is left out.
+      const live = new Set(src.workers().map((w) => w.url));
+      memory = memoryByIsolate(
+        report,
+        workers.filter((w) => live.has(w.url)),
+        at,
+      );
+      if (readers.size > 0 && memory.size > 0) {
+        const isolates = [...memory].map(([id, m]) => ({ id, memory: m }));
+        send({ v: PROTOCOL.v, t: 'memory', p: { at, isolates } });
+      }
+      const wait = INSPECT_MEMORY_MS - (performance.now() - started);
+      // oxlint-disable-next-line no-await-in-loop -- the pause between measurements
+      if (wait > 0) await new Promise((done) => setTimeout(done, wait));
+    }
+    measuring = false;
+  };
+
   const listen = (): void => {
+    if (readers.size > 0 && measure && !measuring) {
+      measuring = true;
+      void measureLoop();
+    }
     if (readers.size > 0 && timer === undefined) timer = setInterval(flush, INSPECT_COALESCE_MS);
     if (readers.size === 0 && timer !== undefined) {
       clearInterval(timer);
@@ -180,9 +239,14 @@ export function createInspectFeed(src: InspectSources): InspectFeed {
     }
   };
 
+  const withMemory = (i: InspectIsolate): InspectIsolate => {
+    const m = memory.get(i.id);
+    return m === undefined ? i : { ...i, memory: m };
+  };
+
   const snapshot = (): InspectSnapshot => ({
     at: performance.now(),
-    isolates: src.isolates(),
+    isolates: src.isolates().map(withMemory),
     pools: src.pools(),
     bus: {
       state: src.busState(),

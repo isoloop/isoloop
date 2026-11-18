@@ -70,8 +70,12 @@ export function devPlugin(o: HeaderOptions & WorkersOptions): Plugin {
       if (id !== RESOLVED) return null;
       const bus = o.bus ?? true;
       return [
-        "import isolateBootstrap from '@isoloop/runtime/worker?worker&url';",
+        "import worker from '@isoloop/runtime/worker?worker&url';",
         ...(bus ? ["import bus from '@isoloop/bus/worker?worker&url';"] : []),
+        // The mark tells the kernel this is the tiny entry no chunk imports, so
+        // each worker may start from it with a fragment of its own (memory per
+        // isolate, ADR 0020, decision 4). Fragments aren't fetched.
+        'const isolateBootstrap = `${worker}#isoloop-entry`;',
         `export default { isolateBootstrap${bus ? ', bus' : ''} };`,
       ].join('\n');
     },

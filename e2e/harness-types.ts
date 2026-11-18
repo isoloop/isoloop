@@ -44,6 +44,18 @@ type HarnessKernel = {
     busyMs?: number;
   }[];
   restart(id: string): Promise<void>;
+  /** The inspection feed (ADR 0020), as far as the memory E2E reads it. */
+  inspect(): {
+    on(fn: (m: { t: string }) => void): () => void;
+    snapshot(): {
+      isolates: {
+        id: string;
+        state: string;
+        memory?: { bytes: number; at: number; shared?: true };
+      }[];
+    };
+    close(): void;
+  };
   syncRoute(): void;
   debug: { crashBus(): void; messages(): Record<string, number> };
   destroy(): Promise<void>;

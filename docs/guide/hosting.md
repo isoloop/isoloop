@@ -31,7 +31,7 @@ const kernel = createKernel({
 });
 ```
 
-`isoloop()` also sends the Content-Security-Policy below on every dev and preview response, with Vite's HMR socket and injected styles allowed. Pass `isolateOrigins` for isolates on other origins, `csp` for a policy of your own (`false` for none), and `crossOriginIsolated: true` for COOP and COEP. Production responses come from your own server, which has to send the headers itself. Without Vite, `?worker&url` or your bundler's equivalent gives the two URLs.
+`isoloop()` also sends the Content-Security-Policy below on every dev and preview response, with Vite's HMR socket and injected styles allowed. Pass `isolateOrigins` for isolates on other origins, `csp` for a policy of your own (`false` for none), and `crossOriginIsolated: true` for COOP and COEP (needed for `SharedArrayBuffer`, and for the devtools' memory per isolate in Chromium, which `kernel.inspect()` measures only on a cross-origin isolated page, and only for workers started from `@isoloop/runtime/worker` as `virtual:isoloop/workers` gives it; without Vite, pass that entry's URL with `#isoloop-entry` appended to get the figures). Production responses come from your own server, which has to send the headers itself. Without Vite, `?worker&url` or your bundler's equivalent gives the two URLs.
 
 If the contracts module fails to load or is invalid (`contracts_failed`, `contracts_invalid`, `contracts_mismatch`, `reserved_topic`), it isn't retried. The kernel emits `bus:failed { code }`, every isolate fails with reason `bus-failed`, and later `spawn` calls throw `bus_failed`.
 

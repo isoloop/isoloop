@@ -48,7 +48,7 @@ flowchart TB
 | Isolate port | main ↔ isolate worker (the `Worker` itself) | `init`, `ready`, `patch`, `event`, `call`/`result`, `beat`, `error`, `shutdown`, `bye`, `reattach`, `block`, `inspect`. On a pool's worker every message names its member in `isolate`, except `beat`, which is the worker's | Loader |
 | Bus port | isolate ↔ bus worker (`MessageChannel`), one per isolate, pool members included | `publish`, `subscribe`, `unsubscribe`, `commits`, `request`, `reply`, `deliver`, `reset`, `result` | Bus controller, at each isolate start |
 | Control port | main ↔ bus worker (the `Worker` itself) | `boot` (contracts URL and topic configs), `attach`, `detach`, host-side `publish`, `flush`, `drop`, the inspection feed's `tap` and `read` (ADR 0020); back: `ready`, `beat`, `wake`, `metrics`, `result`, `seed`, `error` | Bus controller |
-| Inspect port | main ↔ an isolate worker holding the `inspect` grant (`MessageChannel`), sent once after `init` | `listen`, `snapshot`, `records`, `tap`, `control`; back: the feed's `event`, `beats`, `metrics`, `snapshot`, `result`, tapped `record`s (ADR 0020) | Kernel, at start |
+| Inspect port | main ↔ an isolate worker holding the `inspect` grant (`MessageChannel`), sent once after `init` | `listen`, `snapshot`, `records`, `tap`, `control`; back: the feed's `event`, `beats`, `metrics`, `memory`, `snapshot`, `result`, tapped `record`s (ADR 0020) | Kernel, at start |
 | Canvas handoff | main → isolate worker, once | a transferred `OffscreenCanvas` | Compositor, on request |
 
 **Rule:** no topic record crosses the main thread, except records the host itself publishes or subscribes to through `kernel.publish` / `kernel.subscribe` ([ADR 0005](../adr/0005-bus-topology-message-channels.md)). `kernel.subscribe` opens its own bus port, attached as `isoloop:host:<n>`, so ids starting with `isoloop:` are reserved for the kernel.
@@ -710,7 +710,7 @@ The click-to-paint budget is one frame because a render through `postMessage` ca
 | Framework-agnostic isolates | §5, adapters | M3 |
 | Parallel canvas charts | §4.7 `requestCanvas` | M3 |
 | Routing | §4.1 `syncRoute`, §4.7 `navigate`, ADR 0002 | M2 |
-| Devtools | §6.3 metrics, `Kernel.isolates()`, compositor stats; `kernel.inspect()` and the `inspect` grant with `ctx.inspector` (ADR 0020) | M4 |
+| Devtools | §6.3 metrics, `Kernel.isolates()`, compositor stats; `kernel.inspect()` and the `inspect` grant with `ctx.inspector`; memory per isolate from `measureUserAgentSpecificMemory()` on cross-origin isolated pages (ADR 0020) | M4 |
 | Vue, Svelte and Solid adapters | §5, ADR 0010 (amended 2026-11-16) | M6 |
 | Shared-memory engine | §6.2 `LogEngine` | M5 |
 
