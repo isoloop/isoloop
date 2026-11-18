@@ -1,5 +1,12 @@
 # @isoloop/preact
 
+## 0.1.0-next.2
+
+### Patch Changes
+
+- @isoloop/protocol@0.1.0-next.2
+  - @isoloop/runtime@0.1.0-next.2
+
 ## 0.1.0-next.1
 
 ### Patch Changes

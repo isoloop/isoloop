@@ -1,5 +1,12 @@
 # @isoloop/bus
 
+## 0.1.0-next.2
+
+### Patch Changes
+
+- @isoloop/codec@0.1.0-next.2
+  - @isoloop/protocol@0.1.0-next.2
+
 ## 0.1.0-next.1
 
 ### Patch Changes

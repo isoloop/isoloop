@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/balancer",
-  "version": "0.1.0-next.1",
+  "version": "0.1.0-next.2",
   "description": "Experimental automatic placement for Isoloop isolates: joins a pool or keeps apart from measured load, quarantines what blocks.",
   "license": "MIT",
   "type": "module",
