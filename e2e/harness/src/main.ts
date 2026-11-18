@@ -1,7 +1,11 @@
 // Exposes the kernel to Playwright: tests drive it through page.evaluate.
 import busWorker from '@isoloop/bus/worker?worker&url';
 import { createKernel, type Kernel, type KernelConfig } from '@isoloop/host';
-import bootstrap from '@isoloop/runtime/bootstrap?worker&url';
+import worker from '@isoloop/runtime/worker?worker&url';
+
+// The tiny worker entry, marked as @isoloop/vite's virtual:isoloop/workers marks
+// it, so each worker starts from a URL of its own (memory per isolate, ADR 0020).
+const bootstrap = `${worker}#isoloop-entry`;
 
 type Config = Omit<KernelConfig, 'workers' | 'contracts'> & { budget?: number };
 

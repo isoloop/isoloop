@@ -228,6 +228,7 @@ async function startIsolate(
       adapter: 'vanilla',
       renderFmt: runtime.renderFmt,
       ...(requires === undefined ? {} : { requires }),
+      ...(Reflect.get(self, Symbol.for('isoloop.worker-entry')) === true ? { entry: true } : {}),
     },
   });
   try {

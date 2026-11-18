@@ -44,7 +44,7 @@ import { createBusController, HOST_CONNECTION_PREFIX, type BusController } from 
 import { createCompositor, type FallbackRender, type SurfaceStats } from './compositor';
 import { missingFeatures } from './features';
 import { createInspectFeed, serveInspectPort, type Inspector } from './inspect';
-import { createLoader, type LoadedWorker } from './loader';
+import { createLoader, ENTRY_MARK, type LoadedWorker } from './loader';
 import { memoryMeasure, type MemoryWorker } from './memory';
 import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from './render/isoloop-dom';
 import { createRouter, type OnNavigate, type Router } from './router';
@@ -695,15 +695,21 @@ export function createKernel(config: KernelConfig): Kernel {
           }),
     control: (action, id, ms) => inspectControl(action, id, ms),
     workers: (): MemoryWorker[] => {
-      const byUrl = new Map<string, MemoryWorker & { ids: string[] }>();
+      // One entry per live worker; a URL that several live workers share
+      // (a bootstrap URL without the tiny entry's mark) can't be told apart,
+      // so those workers get no figure.
+      const byWorker = new Map<Worker, MemoryWorker & { ids: string[] }>();
       for (const [id, slot] of slots) {
         const l = slot.loaded;
         if (!l) continue;
-        const w = byUrl.get(l.url) ?? { url: l.url, ids: [], pool: l.pool !== undefined };
+        const w = byWorker.get(l.worker) ?? { url: l.url, ids: [], pool: l.pool !== undefined };
         w.ids.push(id);
-        byUrl.set(l.url, w);
+        byWorker.set(l.worker, w);
       }
-      return [...byUrl.values()];
+      const all = [...byWorker.values()];
+      const count = new Map<string, number>();
+      for (const w of all) count.set(w.url, (count.get(w.url) ?? 0) + 1);
+      return all.filter((w) => count.get(w.url) === 1);
     },
     ...(measureMemory ? { measure: measureMemory } : {}),
   });
@@ -774,6 +780,8 @@ export function createKernel(config: KernelConfig): Kernel {
   };
 
   const loader = createLoader();
+  /** Set once the marked bootstrap URL turned out not to be the tiny entry. */
+  let entryWarned = false;
   /** Live workers: a pool counts once (ADR 0001). */
   const live = (): number => loader.workers();
 
@@ -1058,6 +1066,15 @@ export function createKernel(config: KernelConfig): Kernel {
             return;
           }
           slot.fmt = fmt;
+          const boot = config.workers.isolateBootstrap;
+          if (msg.p.entry !== true && boot.endsWith(ENTRY_MARK) && !entryWarned) {
+            // Marked as the tiny entry, but it isn't: stop giving workers fragments.
+            entryWarned = true;
+            loader.entryDenied(boot);
+            console.warn(
+              `Isoloop: workers.isolateBootstrap ends in ${ENTRY_MARK} but doesn't start @isoloop/runtime/worker; memory per isolate is off (ADR 0020)`,
+            );
+          }
           feed(slot, { k: 'ready' });
           return;
         }

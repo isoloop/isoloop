@@ -78,4 +78,27 @@ describe('@isoloop/vite builds', () => {
       for (const [f, src] of code)
         if (f !== entry) expect(src.includes(`./${entry}`), `${f} imports ${entry}`).toBe(false);
   });
+
+  it('isolate workers start from the tiny entry chunk, marked for memory per isolate (ADR 0020)', async () => {
+    const { out } = await run({ isolates });
+    const assets = join(out, 'assets');
+    const files = (await readdir(assets)).filter((f) => f.endsWith('.js'));
+    const code = new Map(
+      await Promise.all(
+        files.map(async (f) => [f, await readFile(join(assets, f), 'utf8')] as const),
+      ),
+    );
+    const html = await readFile(join(out, 'index.html'), 'utf8');
+    const appEntry = /src="\.\/assets\/([^"]+\.js)"|src="\/assets\/([^"]+\.js)"/.exec(html);
+    const app = code.get(appEntry?.[1] ?? appEntry?.[2] ?? '') ?? '';
+    // The app marks the isolate worker's URL as the tiny entry.
+    expect(app).toContain('#isoloop-entry');
+    // That URL is the tiny entry's own chunk: it marks the worker, then imports the bootstrap.
+    const workerChunks = files.filter((f) => f.startsWith('worker-') && app.includes(f));
+    const tiny = workerChunks.filter((f) => code.get(f)?.includes('isoloop.worker-entry'));
+    expect(tiny).toHaveLength(1);
+    const src = code.get(tiny[0] ?? '') ?? '';
+    expect(src).toMatch(/import\(\s*[`'"]\.\/bootstrap-[^`'"]+\.js[`'"]\s*\)/);
+    expect(src.length).toBeLessThan(2_000);
+  });
 });

@@ -16,9 +16,10 @@ export type LoadedWorker = {
   /** The pool's name, or undefined for an own worker. */
   pool: string | undefined;
   /**
-   * The URL its worker was started from: the bootstrap URL with a fragment
-   * unique to that worker, so a memory measurement can tell workers apart
-   * (ADR 0020, decision 4). The fragment changes nothing that's fetched.
+   * The URL its worker was started from. For the tiny `@isoloop/runtime/worker`
+   * entry, as `@isoloop/vite` marks it (`ENTRY_MARK`), each worker gets a
+   * fragment of its own, so a memory measurement can tell workers apart
+   * (ADR 0020, decision 4). Other bootstrap URLs are used as given.
    */
   url: string;
   /** Sends to this isolate (naming it in `isolate` in a pool). */
@@ -78,13 +79,29 @@ type Pool = { worker: Worker; url: string; members: Set<string> };
 let serial = 0;
 
 /**
+ * The fragment `@isoloop/vite` puts on `@isoloop/runtime/worker`'s URL in
+ * `virtual:isoloop/workers`: the tiny entry no chunk imports, so the kernel
+ * may start each worker from it with a fragment of its own (ADR 0020,
+ * decision 4). Internal: an app passing its own URLs gets no memory figures
+ * per isolate unless it adds the mark to that entry's URL.
+ */
+export const ENTRY_MARK = '#isoloop-entry';
+
+/**
  * The bootstrap URL with a fragment naming one worker. Every isolate starts
  * from the same bootstrap, and `measureUserAgentSpecificMemory()` attributes
  * memory by worker URL, fragment included, so each worker needs its own.
+ *
+ * Only for the tiny `@isoloop/runtime/worker` entry: a module URL with a
+ * fragment is a module of its own, so a worker started that way from
+ * `@isoloop/runtime/bootstrap` evaluates the bootstrap twice once a shared
+ * chunk imports it back by its plain URL.
  */
 export function workerUrl(bootstrapUrl: string): string {
-  const mark = `isoloop-worker=${++serial}`;
-  return bootstrapUrl.includes('#') ? `${bootstrapUrl}&${mark}` : `${bootstrapUrl}#${mark}`;
+  const base = bootstrapUrl.endsWith(ENTRY_MARK)
+    ? bootstrapUrl.slice(0, -ENTRY_MARK.length)
+    : bootstrapUrl;
+  return `${base}#isoloop-worker=${++serial}`;
 }
 
 export type Loader = {
@@ -93,14 +110,27 @@ export type Loader = {
   workers(): number;
   /** Each running pool's members, by pool name. */
   pools(): Record<string, readonly string[]>;
+  /**
+   * A worker started from a marked URL reported no tiny entry in its `ready`:
+   * the mark was wrong, so later workers start from the URL as given.
+   */
+  entryDenied(bootstrapUrl: string): void;
 };
 
 export function createLoader(): Loader {
   const pools = new Map<string, Pool>();
   let own = 0;
+  /** Marked URLs whose worker turned out not to run the tiny entry. */
+  const denied = new Set<string>();
+  const urlOf = (bootstrapUrl: string): string => {
+    if (!bootstrapUrl.endsWith(ENTRY_MARK)) return bootstrapUrl;
+    // A wrongly marked URL starts without any fragment, so its bootstrap loads once.
+    if (denied.has(bootstrapUrl)) return bootstrapUrl.slice(0, -ENTRY_MARK.length);
+    return workerUrl(bootstrapUrl);
+  };
 
   const loadOwn = (o: LoadOptions): LoadedWorker => {
-    const url = workerUrl(o.bootstrapUrl);
+    const url = urlOf(o.bootstrapUrl);
     const worker = new Worker(url, { type: 'module', name: o.id });
     own++;
     worker.postMessage(initOf(o), [o.busPort]);
@@ -125,7 +155,7 @@ export function createLoader(): Loader {
   const loadMember = (o: LoadOptions, name: string): LoadedWorker => {
     let pool = pools.get(name);
     if (!pool) {
-      const url = workerUrl(o.bootstrapUrl);
+      const url = urlOf(o.bootstrapUrl);
       pool = {
         worker: new Worker(url, { type: 'module', name: `pool:${name}` }),
         url,
@@ -174,5 +204,8 @@ export function createLoader(): Loader {
     load: (o) => (o.pool === undefined ? loadOwn(o) : loadMember(o, o.pool)),
     workers: () => own + pools.size,
     pools: () => Object.fromEntries([...pools].map(([name, p]) => [name, [...p.members]])),
+    entryDenied: (bootstrapUrl) => {
+      denied.add(bootstrapUrl);
+    },
   };
 }

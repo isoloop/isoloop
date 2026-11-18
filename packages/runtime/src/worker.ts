@@ -10,6 +10,11 @@
  */
 declare const self: DedicatedWorkerGlobalScope;
 
+// Tells the bootstrap, and through its `ready` the host, that this worker
+// started from this entry, so the host may start later workers from this URL
+// with a fragment of their own (memory per isolate, ADR 0020, decision 4).
+Reflect.set(self, Symbol.for('isoloop.worker-entry'), true);
+
 const held: MessageEvent<unknown>[] = [];
 const hold = (e: MessageEvent<unknown>): void => {
   held.push(e);

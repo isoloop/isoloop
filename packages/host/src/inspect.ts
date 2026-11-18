@@ -194,16 +194,26 @@ export function createInspectFeed(src: InspectSources): InspectFeed {
     for (;;) {
       if (!measure || readers.size === 0 || destroyed) break;
       const started = performance.now();
+      const workers = src.workers();
       let report: unknown;
-      try {
-        // oxlint-disable-next-line no-await-in-loop -- one measurement at a time, by design
-        report = await measure();
-      } catch {
-        measure = undefined;
-        break;
+      // Nothing to attribute (no workers, or none with a URL of its own): don't measure.
+      if (workers.length > 0) {
+        try {
+          // oxlint-disable-next-line no-await-in-loop -- one measurement at a time, by design
+          report = await measure();
+        } catch {
+          measure = undefined;
+          break;
+        }
       }
       const at = performance.now();
-      memory = memoryByIsolate(report, src.workers(), at);
+      // Attributed to the workers still live now; one that ended meanwhile is left out.
+      const live = new Set(src.workers().map((w) => w.url));
+      memory = memoryByIsolate(
+        report,
+        workers.filter((w) => live.has(w.url)),
+        at,
+      );
       if (readers.size > 0 && memory.size > 0) {
         const isolates = [...memory].map(([id, m]) => ({ id, memory: m }));
         send({ v: PROTOCOL.v, t: 'memory', p: { at, isolates } });

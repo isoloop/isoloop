@@ -36,6 +36,8 @@ describe('@isoloop/vite in dev', () => {
     // The isolate worker's tiny entry (runtime/worker), and the bus worker.
     expect(urls.some((u) => u.includes('runtime/src/worker'))).toBe(true);
     expect(urls.some((u) => u.includes('bus/'))).toBe(true);
+    // Marked as the tiny entry, so the kernel gives each worker a fragment of its own (ADR 0020).
+    expect(mod).toContain('#isoloop-entry');
     // The `?worker&url` modules export the worker's URL; that URL serves the worker.
     const served = await Promise.all(
       urls.map(async (u) => {
