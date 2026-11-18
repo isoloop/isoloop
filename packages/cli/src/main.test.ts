@@ -13,6 +13,8 @@ function memoryIo() {
   let out = '';
   let err = '';
   const io: Io = {
+    stdin: (async function* () {})(),
+    env: {},
     out: (t) => void (out += t),
     err: (t) => void (err += t),
     cwd: fixtures,

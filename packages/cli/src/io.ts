@@ -1,12 +1,16 @@
 /*
  * What a command touches outside itself, so tests can run it in-process:
- * output streams, the working directory, files and module loading.
+ * input and output streams, the environment, the working directory, files
+ * and module loading.
  */
 import { writeFile } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export type Io = {
+  /** stdin, as chunks. */
+  readonly stdin: AsyncIterable<string | Uint8Array>;
+  readonly env: { readonly [name: string]: string | undefined };
   /** Writes to stdout as is. */
   readonly out: (text: string) => void;
   /** Writes to stderr as is. */
@@ -24,6 +28,8 @@ export const resolvePath = (io: Io, path: string): string =>
 /** The real process's streams and files. */
 export function nodeIo(): Io {
   return {
+    stdin: process.stdin,
+    env: process.env,
     out: (text) => void process.stdout.write(text),
     err: (text) => void process.stderr.write(text),
     cwd: process.cwd(),
