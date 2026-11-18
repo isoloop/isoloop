@@ -97,11 +97,12 @@ export type BalancerOptions = {
   quarantine?: { steadyMs?: number; maxReturns?: number };
   loads?: LoadStore;
   /**
-   * Packing back (M3i): a member alone in its pool and steady for 60 s (no
-   * spike, crash, lagging or full pool, and a backlog no higher than 60 s
-   * before, M3j) joins another of the balancer's pools if both together stay
-   * under 40 % of a core, freeing a worker. At most one pack every 60 s. On by
-   * default.
+   * Packing back (M3i; whole pools since M3j): a pool whose members have
+   * all been steady for 60 s (no spike, crash, lagging or full pool, and a
+   * backlog no higher than 60 s before) empties into another of the
+   * balancer's pools if both together stay under 40 % of a core, one member
+   * per pack, freeing a worker once the last is in. At most one pack every
+   * 60 s. On by default.
    */
   pack?: { enabled?: boolean };
 };
@@ -250,8 +251,8 @@ export interface Balancer<M extends ManifestLike = ManifestLike> {
   hold(id: string): () => void;
   /**
    * The app's view of `id`'s queued work (M3i) and of its own busy time (M3j).
-   * A backlog higher at the end of a 10 s window than at its start, and above
-   * 0, moves the isolate somewhere with more CPU. A reported `busyMs` total
+   * A backlog that rose over two 10 s windows in a row (M3j), and is above 0,
+   * moves the isolate somewhere with more CPU. A reported `busyMs` total
    * counts toward its load wherever the balancer reads one. A report older
    * than 10 s counts as none, so report at least every few seconds. Throws a
    * `TypeError` for a report with neither field, or a field that isn't a
