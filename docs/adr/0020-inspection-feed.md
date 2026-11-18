@@ -75,7 +75,7 @@ After it, `on` delivers events:
 
 ### 5. Recent events, kept from the start
 
-The kernel keeps a ring buffer of the last 200 supervisor and bus events from the moment it starts, inspected or not, and `snapshot()` includes it. A reader that connects after a crash still sees the crash; that's the first thing an agent asks about. It's the one cost this ADR adds before anything inspects: a few KB of events.
+The kernel keeps a ring buffer of the last 200 supervisor and bus events from the moment it starts, inspected or not, and `snapshot()` includes it. A reader that connects after a crash still sees the crash; that's the first thing an agent asks about. It's the one cost this ADR adds before anything inspects: a small, fixed-size buffer of 200 events, not yet measured (task 6 measures it with the feed).
 
 ### 6. The `inspect` grant and its port
 

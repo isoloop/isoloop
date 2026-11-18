@@ -19,7 +19,7 @@
 ## Devtools decisions (2026-11-16)
 
 1. **A panel in the page, not a browser extension.** It works on every browser and on phones, needs no install and is one package to release. A browser extension is in [would-like](../would-like.md); it would be one more client of the same feed.
-2. **One inspection feed, `kernel.inspect()`, `@experimental` in 0.1.** Subscribing gives a snapshot, then events: isolate state and lag, supervisor events, compositor stats, bus metrics, and sampled records on request. It costs nothing until something subscribes. The panel, the dev MCP and any later extension all read it.
+2. **One inspection feed, `kernel.inspect()`, `@experimental` in 0.1.** Subscribing gives a snapshot, then events: isolate state and lag, supervisor events, compositor stats, bus metrics, and sampled records on request. It costs nothing until something subscribes, except a ring buffer of the last 200 events kept from start ([ADR 0020](../adr/0020-inspection-feed.md), decision 5). The panel, the dev MCP and any later extension all read it.
 3. **`@isoloop/devtools` is imported and mounted by the app,** and is allowed in production builds; the app author's import is the opt-in. After 0.1, isoloop.dev's live examples get a devtools toggle (an `isoloop/web` follow-up).
 4. **The panel is a visual isolate in its own worker,** never pooled, written in Preact. A devtools crash or hang never touches the app, and the panel restarts like any isolate.
 5. **It gets the feed through a dedicated port, granted by a new public `inspect` grant** (`@experimental`), not through bus topics. It has to keep working while the bus restarts, and its traffic mustn't count in the bus figures it shows.
@@ -57,7 +57,7 @@ About one evening each ([conventions](README.md#conventions)). Forks follow the 
 | 3 | The bus's `tap` and `read`, head offset and retained count in `BusMetrics`, the bus restart count as state | `packages/protocol/src/control.ts`, `packages/bus/src/{broker,server}.ts`, `packages/host/src/bus/controller.ts` | unit + browser: tap rate cap, tap absent from the consumer figures, tap reopened after a bus restart, read cap and previews |
 | 4 | `heapBytes` in the beat, and the runtime's `block { ms }` | `packages/runtime`, `packages/protocol/src/isolate.ts` | browser: heap on Chromium, absent elsewhere; block makes the beat late and the supervisor act; 10 s cap |
 | 5 | The `inspect` grant, its refusal in pools, the host↔isolate port, and the controls | `packages/protocol/src/grants.ts`, `packages/host/src/kernel.ts`, `packages/runtime` | browser: an isolate reads the feed, the port survives a bus restart, kill/block/restart work, a pooled `inspect` fails with `invalid_config` |
-| 6 | The feed's cost: plant at `?rate=5`, feed open against closed | `bench/`, a CI job | — (measurement, reported only) |
+| 6 | The feed's cost: plant at `?rate=5`, feed open against closed, plus the ring buffer's size after a run | `bench/`, a CI job | — (measurement, reported only) |
 | 7 | `@isoloop/devtools` package skeleton: the visual isolate in its own worker, Preact, the floating button and dock (decision 8) | `packages/devtools` | browser: mounts, restarts on a crash, `localStorage` state |
 | 8 | Isolates view (decision 2's list) and controls | `packages/devtools` | E2E on a fixture page |
 | 9 | Bus view: topics, rates, consumer lag and credit, rejected publishes | `packages/devtools` | E2E on a fixture page |
