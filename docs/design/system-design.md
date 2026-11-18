@@ -114,7 +114,8 @@ export type HostToIsolate =
   | Envelope<'event', SerializedEvent>
   | Envelope<'result', CallResult>
   | Envelope<'shutdown', { reason: ShutdownReason; graceMs: number }>
-  | Envelope<'reattach', { busPort: MessagePort }>;             // new bus port after a bus restart (ADR 0007)
+  | Envelope<'reattach', { busPort: MessagePort }>              // new bus port after a bus restart (ADR 0007)
+  | Envelope<'block', { ms: number }>;                          // busy-loop the worker for ms (≤ 10 s), sent only for inspect access (ADR 0020)
 
 // Isolate port: isolate → host
 export type IsolateToHost =

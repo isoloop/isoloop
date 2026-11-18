@@ -188,3 +188,30 @@ describe('isolate bootstrap', () => {
     expect(types.lastIndexOf('patch')).toBeLessThan(types.indexOf('bye'));
   });
 });
+
+// ADR 0020, decision 4: `block { ms }`.
+const beats = (got: Msg[]) => got.flatMap((m) => (m.t === 'beat' ? [m.p] : []));
+
+describe('inspection: block', () => {
+  it('block makes the worker busy for ms, so the next beat is late by about that', async () => {
+    const { got, send, at } = spawn(fixture('dom-hello'));
+    await until(() => at.has('ready') && beats(got).length >= 2, 5000);
+    const before = beats(got).length;
+    send({ v: 1, t: 'block', p: { ms: 600 } });
+    await until(() => beats(got).length > before, 5000);
+    const late = beats(got).slice(before);
+    expect(Math.max(...late.map((b) => b.lagMs))).toBeGreaterThanOrEqual(400);
+  });
+
+  it('cuts a longer block to 10 s', { timeout: 30_000 }, async () => {
+    const { got, send, at } = spawn(fixture('dom-hello'));
+    await until(() => at.has('ready') && beats(got).length >= 1, 5000);
+    const before = beats(got).length;
+    const t0 = performance.now();
+    send({ v: 1, t: 'block', p: { ms: 60_000 } });
+    await until(() => beats(got).length > before, 25_000);
+    const waited = performance.now() - t0;
+    expect(waited).toBeGreaterThanOrEqual(9_500);
+    expect(waited).toBeLessThan(15_000);
+  });
+});

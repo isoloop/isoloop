@@ -12,6 +12,7 @@
  * after its last member says `bye`.
  */
 import {
+  MAX_BLOCK_MS,
   PROTOCOL,
   isHostToIsolate,
   type HostToIsolate,
@@ -69,6 +70,16 @@ const fatal = (m: Member, message: string, code?: 'protocol_mismatch'): void => 
 
 let beating = false;
 
+/**
+ * `block { ms }` (ADR 0020, decision 4): a real busy loop, so the beat goes
+ * late and the supervisor acts as it would for a stuck isolate.
+ */
+export function blockFor(ms: number): void {
+  const until = performance.now() + Math.min(Math.max(0, ms), MAX_BLOCK_MS);
+  // The loop is the point.
+  while (performance.now() < until) {}
+}
+
 /** Once per worker, after the first isolate's protocol check. */
 function startHeartbeat(everyMs: number): void {
   if (beating) return;
@@ -118,7 +129,11 @@ function route(msg: HostToIsolate): void {
   const m = members.get(mode === 'pool' ? msg.isolate : undefined);
   if (!m) return;
   if (msg.t === 'shutdown') shutdownMember(m, msg.p.graceMs, msg.p.reason);
-  else if (m.receive) busy.run(busy.of(m.name, m.life), m.receive, undefined, [msg]);
+  else if (msg.t === 'block') {
+    // Billed to the member, as its own busy loop would be (ADR 0017).
+    const ms: unknown = msg.p.ms;
+    if (typeof ms === 'number') busy.run(busy.of(m.name, m.life), blockFor, undefined, [ms]);
+  } else if (m.receive) busy.run(busy.of(m.name, m.life), m.receive, undefined, [msg]);
 }
 
 async function boot(m: Member, init: InitPayload): Promise<void> {
