@@ -28,6 +28,7 @@ import {
   type HostMethod,
   type Rect,
   type HostToIsolate,
+  type InspectIsolate,
 } from '@isoloop/protocol';
 import {
   agentsConfigProblem,
@@ -40,6 +41,7 @@ import {
 import { createBusController, HOST_CONNECTION_PREFIX, type BusController } from './bus/controller';
 import { createCompositor, type FallbackRender, type SurfaceStats } from './compositor';
 import { missingFeatures } from './features';
+import { createInspectFeed, type Inspector } from './inspect';
 import { createLoader, type LoadedWorker } from './loader';
 import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from './render/isoloop-dom';
 import { createRouter, type OnNavigate, type Router } from './router';
@@ -407,6 +409,15 @@ export interface Kernel {
   /** Named pools with members (M2c): members, whether the worker runs, effective grants. */
   pools(): PoolSnapshot[];
   /**
+   * A reader of the inspection feed (ADR 0020): a snapshot of isolates,
+   * pools, the bus and the last 200 events, then events as they happen, with
+   * beats and bus metrics coalesced to about one a second. Costs nothing
+   * until a reader listens, apart from the ring buffer of recent events the
+   * kernel always keeps.
+   * @experimental
+   */
+  inspect(): Inspector;
+  /**
    * The host's router changed the URL: republish `isoloop.route.v1` if
    * `href` or `state` differ (ADR 0002). Wire it once, e.g.
    * `router.subscribe(() => kernel.syncRoute())`. A no-op with routing off.
@@ -444,6 +455,8 @@ type Slot = {
   fmt: string | undefined;
   /** From the last beat: what suspension needs to know. */
   idle: IdleReport | undefined;
+  /** From the last beat: its worker's JS heap, where the engine reports one (ADR 0020). */
+  heapBytes: number | undefined;
   /** The surface is on screen (IntersectionObserver), ignoring the tab's visibility. */
   intersecting: boolean;
   /** `performance.now()` when the surface last stopped being visible. */
@@ -646,7 +659,20 @@ export function createKernel(config: KernelConfig): Kernel {
     ...(config.compositor ? { frameBudgetMs: config.compositor.frameBudgetMs } : {}),
   });
 
+  // Read lazily: the getters it calls are defined below.
+  const inspectFeed = createInspectFeed({
+    isolates: () =>
+      [...slots.values()].map((slot) => {
+        const snap: InspectIsolate = snapshot(slot);
+        if (slot.heapBytes !== undefined) snap.heapBytes = slot.heapBytes;
+        return snap;
+      }),
+    pools: () => kernel.pools(),
+    busState: () => controller?.state ?? 'none',
+  });
+
   const emit = <E extends KernelEvent>(event: E, data: KernelEvents[E]): void => {
+    inspectFeed.event(event, data);
     for (const fn of listeners[event]) fn(data);
   };
 
@@ -1011,16 +1037,22 @@ export function createKernel(config: KernelConfig): Kernel {
           {
             const at = performance.now();
             feed(slot, { k: 'beat', at, lagMs: msg.p.lagMs });
-            if (listeners['isolate:beat'].size > 0) {
+            slot.heapBytes = typeof msg.p.heapBytes === 'number' ? msg.p.heapBytes : undefined;
+            if (listeners['isolate:beat'].size > 0 || inspectFeed.live) {
               const pool = slot.manifest.pool;
               const busyMs = slot.idle?.busyMs;
-              emit('isolate:beat', {
+              const beat = {
                 id,
                 ...(pool === undefined ? {} : { pool }),
                 lagMs: msg.p.lagMs,
                 ...(busyMs === undefined ? {} : { busyMs }),
                 at,
-              });
+              };
+              emit('isolate:beat', beat);
+              if (inspectFeed.live)
+                inspectFeed.beat(
+                  slot.heapBytes === undefined ? beat : { ...beat, heapBytes: slot.heapBytes },
+                );
             }
           }
           return;
@@ -1194,6 +1226,7 @@ export function createKernel(config: KernelConfig): Kernel {
                 (x) =>
                   x.topic === routeTopic.name && !x.consumer.startsWith(HOST_CONNECTION_PREFIX),
               );
+              inspectFeed.metrics(m);
               emit('bus:metrics', m);
             },
             failed: (f) => {
@@ -1467,6 +1500,7 @@ export function createKernel(config: KernelConfig): Kernel {
         dropped: 0,
         fmt: undefined,
         idle: undefined,
+        heapBytes: undefined,
         intersecting: true,
         hiddenSince: performance.now(),
         waking: false,
@@ -1633,6 +1667,10 @@ export function createKernel(config: KernelConfig): Kernel {
       return [...slots.values()].map(snapshot);
     },
 
+    inspect() {
+      return inspectFeed.open();
+    },
+
     pools() {
       const running = loader.pools();
       const out = new Map<string, PoolSnapshot>();
@@ -1668,6 +1706,7 @@ export function createKernel(config: KernelConfig): Kernel {
 
     async destroy() {
       clearInterval(tick);
+      inspectFeed.destroy();
       observer?.disconnect();
       document.removeEventListener('visibilitychange', visibility);
       document.removeEventListener('resume', resumed);
