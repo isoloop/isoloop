@@ -1,6 +1,6 @@
 # ADR 0020: Inspection feed
 
-- **Status:** Accepted (2026-11-18), after grilling (Q1–Q11, yes to all). Amended 2026-11-18 after the first tasks (Q1–Q4, yes to all, then option (b) for memory): the isolate side (decision 6) and memory per isolate from the host, where the page is cross-origin isolated (decision 4).
+- **Status:** Accepted (2026-11-18), after grilling (Q1–Q11, yes to all). Amended 2026-11-18 after the first tasks (Q1–Q4, yes to all, then option (b) for memory, then Q1–Q5 on the host's controls): the isolate side (decision 6) and memory per isolate from the host, where the page is cross-origin isolated (decision 4).
 - **Date:** 2026-11-18
 - **Plan:** [M4b](../plans/m4b-devtools.md) (its devtools decisions 2, 5 and 7 are what this ADR makes precise). The [M4a](../plans/m4a-agents.md) dev MCP reads the same feed (decisions 12 and 13 there).
 
@@ -97,6 +97,7 @@ kernel.spawn({ id: 'devtools', url, grants: { publish: [], subscribe: [], inspec
 
   There's no separate control grant: the app chose to mount the devtools.
 - **The dev MCP's page side** runs on the host and uses `kernel.inspect()` directly; it needs no grant.
+- **The host's `Inspector` carries the same controls,** `restart(id)`, `kill(id)` and `block(id, ms)`, so the host's and the isolate's inspectors have one shape and the dev MCP's page side can kill and block. They're inspection actions, so they're here rather than new kernel methods; `restart` calls `kernel.restart`. After `close()` (or, for `ctx.inspector`, once its port ends) the controls reject, while the last snapshot stays readable. Nothing gates them in production: any code on the page can already busy-loop or crash an isolate, and mounting the devtools is the app's choice. `kill` on a pooled isolate ends its worker, so every member crashes and restarts; the call resolves once the kill is sent, and the feed shows each member's crash and restart.
 - **The isolate side is `ctx.inspector`,** defined only when the isolate holds `inspect: true` and `undefined` otherwise, so a panel checks once at start. It mirrors the host's `Inspector`, except that everything that crosses the port is asynchronous, and it carries the controls, since the grant covers both:
 
   ```ts
