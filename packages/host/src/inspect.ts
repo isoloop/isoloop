@@ -79,6 +79,8 @@ export function createInspectFeed(src: InspectSources): InspectFeed {
   const pendingBeats = new Map<string, InspectBeat>();
   const readers = new Set<(m: InspectMessage) => void>();
   let timer: ReturnType<typeof setInterval> | undefined;
+  /** Set by `destroy`: the kernel is gone, so no inspector listens again. */
+  let destroyed = false;
 
   const send = (m: InspectMessage): void => {
     for (const fn of readers) {
@@ -156,7 +158,7 @@ export function createInspectFeed(src: InspectSources): InspectFeed {
       return {
         snapshot,
         on(fn) {
-          if (closed) return () => {};
+          if (closed || destroyed) return () => {};
           // One entry per call, so the same function added twice gets two stops.
           const entry = (m: InspectMessage): void => fn(m);
           mine.add(entry);
@@ -178,6 +180,7 @@ export function createInspectFeed(src: InspectSources): InspectFeed {
     },
 
     destroy() {
+      destroyed = true;
       readers.clear();
       listen();
     },

@@ -192,6 +192,14 @@ describe('the feed on its own', () => {
     expect(f.live).toBe(false);
   });
 
+  it('never listens again once the kernel is destroyed', () => {
+    const f = feed();
+    const inspector = f.open();
+    f.destroy();
+    inspector.on(() => {});
+    expect(f.live).toBe(false);
+  });
+
   it('keeps reporting to other readers when one throws', () => {
     vi.useFakeTimers();
     const f = feed();
