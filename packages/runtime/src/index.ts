@@ -6,5 +6,6 @@ export {
   type IsolateRoot,
 } from './vanilla';
 export type { BusClient, SubscribeOptions } from './bus-client';
+export type { IsolateInspector } from './inspector';
 export { BusError } from '@isoloop/protocol';
 export { HostCallError, type HostApi, type ScrollIntoViewOptionsLike } from './host-calls';

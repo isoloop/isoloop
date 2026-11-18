@@ -28,7 +28,9 @@ import {
   type HostMethod,
   type Rect,
   type HostToIsolate,
+  type InspectControl,
   type InspectIsolate,
+  MAX_BLOCK_MS,
 } from '@isoloop/protocol';
 import {
   agentsConfigProblem,
@@ -41,7 +43,7 @@ import {
 import { createBusController, HOST_CONNECTION_PREFIX, type BusController } from './bus/controller';
 import { createCompositor, type FallbackRender, type SurfaceStats } from './compositor';
 import { missingFeatures } from './features';
-import { createInspectFeed, type Inspector } from './inspect';
+import { createInspectFeed, serveInspectPort, type Inspector } from './inspect';
 import { createLoader, type LoadedWorker } from './loader';
 import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from './render/isoloop-dom';
 import { createRouter, type OnNavigate, type Router } from './router';
@@ -455,8 +457,6 @@ type Slot = {
   fmt: string | undefined;
   /** From the last beat: what suspension needs to know. */
   idle: IdleReport | undefined;
-  /** From the last beat: its worker's JS heap, where the engine reports one (ADR 0020). */
-  heapBytes: number | undefined;
   /** The surface is on screen (IntersectionObserver), ignoring the tab's visibility. */
   intersecting: boolean;
   /** `performance.now()` when the surface last stopped being visible. */
@@ -471,6 +471,8 @@ type Slot = {
   canvases: WeakSet<HTMLCanvasElement>;
   /** Resize observers on those canvases, disconnected when the worker goes. */
   observers: ResizeObserver[];
+  /** Ends the `inspect` port of this worker (ADR 0020, decision 6), for an isolate holding `inspect`. */
+  inspectEnd: (() => void) | undefined;
   warnedTopics: Set<string>;
 };
 
@@ -561,6 +563,11 @@ function validate(m: IsolateManifest, reservedOk: boolean): void {
         `"${m.id}": pool names starting ${RESERVED_POOL_PREFIX} belong to @isoloop/balancer`,
       );
   }
+  if (m.pool !== undefined && m.grants?.inspect === true)
+    throw new KernelError(
+      'invalid_config',
+      `"${m.id}": an isolate holding \`inspect\` can't be pooled: a pool merges its members' grants (ADR 0020, decision 6)`,
+    );
   const s = m.suspend;
   if (s !== undefined && s !== 'never' && s !== 'when-idle') {
     const ms: unknown = typeof s === 'object' && s !== null ? s.whenIdle?.afterMs : undefined;
@@ -661,14 +668,29 @@ export function createKernel(config: KernelConfig): Kernel {
 
   // Read lazily: the getters it calls are defined below.
   const inspectFeed = createInspectFeed({
-    isolates: () =>
-      [...slots.values()].map((slot) => {
-        const snap: InspectIsolate = snapshot(slot);
-        if (slot.heapBytes !== undefined) snap.heapBytes = slot.heapBytes;
-        return snap;
-      }),
+    isolates: (): InspectIsolate[] => [...slots.values()].map(snapshot),
     pools: () => kernel.pools(),
     busState: () => controller?.state ?? 'none',
+    tap: (spec, fn) => {
+      if (!controller) {
+        throw new BusError({
+          code: 'bus_unavailable',
+          message: 'No bus worker: KernelConfig.contracts is not set',
+        });
+      }
+      return controller.tap(spec, fn);
+    },
+    read: (topic, last) =>
+      controller
+        ? controller.read(topic, last)
+        : Promise.resolve({
+            ok: false,
+            error: {
+              code: 'bus_unavailable',
+              message: 'No bus worker: KernelConfig.contracts is not set',
+            },
+          }),
+    control: (action, id, ms) => inspectControl(action, id, ms),
   });
 
   const emit = <E extends KernelEvent>(event: E, data: KernelEvents[E]): void => {
@@ -715,6 +737,8 @@ export function createKernel(config: KernelConfig): Kernel {
     clearTimeout(slot.graceTimer);
     slot.graceTimer = undefined;
     for (const o of slot.observers.splice(0)) o.disconnect();
+    slot.inspectEnd?.();
+    slot.inspectEnd = undefined;
     if (!slot.loaded) return;
     slot.loaded.terminate();
     slot.loaded = null;
@@ -1037,7 +1061,6 @@ export function createKernel(config: KernelConfig): Kernel {
           {
             const at = performance.now();
             feed(slot, { k: 'beat', at, lagMs: msg.p.lagMs });
-            slot.heapBytes = typeof msg.p.heapBytes === 'number' ? msg.p.heapBytes : undefined;
             if (listeners['isolate:beat'].size > 0 || inspectFeed.live) {
               const pool = slot.manifest.pool;
               const busyMs = slot.idle?.busyMs;
@@ -1049,10 +1072,7 @@ export function createKernel(config: KernelConfig): Kernel {
                 at,
               };
               emit('isolate:beat', beat);
-              if (inspectFeed.live)
-                inspectFeed.beat(
-                  slot.heapBytes === undefined ? beat : { ...beat, heapBytes: slot.heapBytes },
-                );
+              if (inspectFeed.live) inspectFeed.beat(beat);
             }
           }
           return;
@@ -1162,6 +1182,12 @@ export function createKernel(config: KernelConfig): Kernel {
         });
     });
     slot.loaded = loaded;
+    if (grants.inspect === true) {
+      // Its own port to the host, never through the bus (ADR 0020, decision 6).
+      const { port1, port2 } = new MessageChannel();
+      slot.inspectEnd = serveInspectPort(port1, inspectFeed.open());
+      loaded.post({ v: 1, t: 'inspect', p: { port: port2 } }, [port2]);
+    }
     slot.closed = new Promise((resolve) => {
       slot.onClosed = resolve;
     });
@@ -1459,6 +1485,29 @@ export function createKernel(config: KernelConfig): Kernel {
     return slot;
   };
 
+  /** The inspection feed's controls (ADR 0020, decision 6). */
+  const inspectControl = (action: InspectControl, id: string, ms?: number): void => {
+    const slot = get(id);
+    switch (action) {
+      case 'restart':
+        feed(slot, { k: 'respawn' });
+        return;
+      case 'kill':
+        // As if its worker had died: the supervisor restarts it, and a pool's
+        // other members restart with it (M2c).
+        if (slot.loaded)
+          feed(slot, {
+            k: 'workerError',
+            at: performance.now(),
+            message: 'killed through the inspection feed',
+          });
+        return;
+      case 'block':
+        post(slot, { v: 1, t: 'block', p: { ms: Math.min(Math.max(0, ms ?? 0), MAX_BLOCK_MS) } });
+        return;
+    }
+  };
+
   const snapshot = (slot: Slot): IsolateSnapshot => {
     const { state, lastBeatAt, lagMs, restarts, reason, error } = slot.sup;
     const surface = compositor.stats(slot.manifest.id);
@@ -1500,7 +1549,6 @@ export function createKernel(config: KernelConfig): Kernel {
         dropped: 0,
         fmt: undefined,
         idle: undefined,
-        heapBytes: undefined,
         intersecting: true,
         hiddenSince: performance.now(),
         waking: false,
@@ -1509,6 +1557,7 @@ export function createKernel(config: KernelConfig): Kernel {
         warnedHead: false,
         canvases: new WeakSet(),
         observers: [],
+        inspectEnd: undefined,
         warnedTopics: new Set(),
       };
       slots.set(manifest.id, slot);

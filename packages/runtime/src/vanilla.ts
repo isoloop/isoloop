@@ -4,6 +4,7 @@
  * isoloop-dom subset installed as the worker's `document`. Adapters (M3)
  * build on the same context.
  */
+import { createInspectorClient, type IsolateInspector } from './inspector';
 import {
   isHostToIsolate,
   majorMinor,
@@ -52,6 +53,12 @@ export type IsolateContext<Root = IsolateRoot> = {
   readonly host: HostApi;
   /** The log bus, on its own port to the bus worker (design §5). */
   readonly bus: BusClient;
+  /**
+   * The inspection feed and its controls (ADR 0020, decision 6), on a port of
+   * its own to the host; `undefined` unless the isolate holds `inspect: true`.
+   * @experimental
+   */
+  readonly inspector: IsolateInspector | undefined;
   /** Adds stylesheets to the surface (design §4.8); a no-op when headless. */
   styles(css: string | readonly string[]): void;
   /**
@@ -107,6 +114,8 @@ export type VanillaRuntime = {
   renderFmt: string;
   /** Feeds one message from the host: events, results and bus deliveries. */
   receive(msg: unknown): void;
+  /** The host's `inspect` port (ADR 0020, decision 6); ignored without the grant. */
+  attachInspect(port: MessagePort): void;
   /** Runs the `onShutdown` handlers; resolves when all have settled. */
   shutdown(reason: ShutdownReason): Promise<void>;
   /** For the beat: whether the isolate could be suspended now. */
@@ -145,6 +154,7 @@ export function createVanillaIsolate(
   });
   const onShutdown: ((reason: ShutdownReason) => void | Promise<void>)[] = [];
   let portal: unknown;
+  const inspect = init.grants.inspect === true ? createInspectorClient() : undefined;
 
   const ctx: IsolateContext<unknown> = {
     id: init.isolateId,
@@ -165,6 +175,7 @@ export function createVanillaIsolate(
     },
     host: calls.api,
     bus: bus.client,
+    inspector: inspect?.inspector,
     styles: (css) => render?.styles(css),
     setValue(node, value, o) {
       if (!render) return;
@@ -213,6 +224,10 @@ export function createVanillaIsolate(
   return {
     ctx,
     renderFmt: render ? render.fmt : 'none',
+    attachInspect(port) {
+      if (inspect) inspect.attach(port);
+      else port.close();
+    },
     receive(msg) {
       if (isHostToIsolate(msg)) {
         if (msg.t === 'event') render?.receive(msg.p);

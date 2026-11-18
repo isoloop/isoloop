@@ -50,6 +50,10 @@ type Member = {
   idleReport: (() => IdleReport) | null;
   /** Messages for it once it has started. */
   receive: ((msg: unknown) => void) | null;
+  /** The `inspect` port, kept if it arrives before the runtime is built (ADR 0020). */
+  inspectPort: MessagePort | null;
+  /** Set once the runtime is built: hands it the `inspect` port. */
+  onInspect: ((port: MessagePort) => void) | null;
 };
 
 const members = new Map<string | undefined, Member>();
@@ -129,7 +133,13 @@ function route(msg: HostToIsolate): void {
   const m = members.get(mode === 'pool' ? msg.isolate : undefined);
   if (!m) return;
   if (msg.t === 'shutdown') shutdownMember(m, msg.p.graceMs, msg.p.reason);
-  else if (msg.t === 'block') {
+  else if (msg.t === 'inspect') {
+    // Sent just after `init`, usually before the runtime is built.
+    const port: unknown = msg.p.port;
+    if (!(port instanceof MessagePort)) return;
+    if (m.onInspect) m.onInspect(port);
+    else m.inspectPort = port;
+  } else if (msg.t === 'block') {
     // Billed to the member, as its own busy loop would be (ADR 0017).
     const ms: unknown = msg.p.ms;
     if (typeof ms === 'number') busy.run(busy.of(m.name, m.life), blockFor, undefined, [ms]);
@@ -160,6 +170,13 @@ async function boot(m: Member, init: InitPayload): Promise<void> {
     mode === 'pool',
     m.name,
   ]);
+  m.onInspect = (port) => {
+    runtime.attachInspect(port);
+  };
+  if (m.inspectPort) {
+    m.onInspect(m.inspectPort);
+    m.inspectPort = null;
+  }
 
   let mod: unknown;
   try {
@@ -246,6 +263,8 @@ function onMessage(e: MessageEvent<unknown>): void {
     shutdownHook: null,
     idleReport: null,
     receive: null,
+    inspectPort: null,
+    onInspect: null,
   };
   members.set(name, m);
   boot(m, msg.p).catch((err: unknown) => {
