@@ -568,6 +568,9 @@ importers:
       '@isoloop/bus':
         specifier: workspace:*
         version: link:../bus
+      '@isoloop/host':
+        specifier: workspace:*
+        version: link:../host
       '@isoloop/runtime':
         specifier: workspace:*
         version: link:../runtime
