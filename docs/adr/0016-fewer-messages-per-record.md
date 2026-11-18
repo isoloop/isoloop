@@ -83,7 +83,7 @@ Found by the processor example (isoloop/web#130) and reproduced in `packages/bus
 
 ### A partly settled delivery keeps what it settled (amended 2026-11-18, M3j)
 
-Found by the M3j bench run of the File processor (isoloop/web, `@isoloop/*@0.1.0-next.2`, 4 cores at 2.0 GHz), reproduced on the bench server with crash logging and in `groups-commit-loss.test.ts` ([#256](https://github.com/isoloop/isoloop/pull/256)).
+Found by the M3j bench run of the File processor (isoloop/web, `@isoloop/*@0.1.0-next.2`, 4 cores at 2.0 GHz), reproduced on the bench server with crash logging, and in `groups-commit-loss.test.ts` by a test that arrives with the fix ([#256](https://github.com/isoloop/isoloop/pull/256)).
 
 **The bug.** Point 12 covers a delivery's records only once all of them are settled. A member that falls behind gets its records in batches: the broker sends up to 64 a delivery, as many as its credit allows. If it settles the first records of a batch and then stops, by a crash, a move or a stop, it has committed none of them, and the whole batch goes back to the group. Usually that costs only duplicates. But in the bench run, a corrupt file was settled first in its batch, and its processor crashed a moment later on purpose, as that kind of file does. The file was sent again to the next image processor, which crashed the same way. The two crashed in turn, 8 or 9 times in about 8 s, until the kernel gave up on both. That happened in all 16 balancer runs with faults, which lost about 480 files each. At full clock speed the processors keep up, deliveries carry one record each, and it didn't happen.
 
@@ -131,9 +131,9 @@ What's left is mostly the bus hop (ADR 0005) times Chromium's fixed cost per por
   - Host and kernel: `invalid_config` for -1, 1,001 and 2.5; a host subscription at a 1 s interval receiving all 1,500 records of a last-100 topic, in order.
   - A kill within the interval redelivers what was handled in it, the cost point 7 accepts.
 - **Tests for the amendment:** `groups-commit-loss.test.ts` passes (no longer `it.fails`), covering the in-order case and the crossing; a member stopped right after a redelivery loses nothing; own subscriptions' commits unchanged; a group that empties and rejoins `from: 'earliest'` resumes after its committed offset, and a new group with `earliest` starts at the tail.
-- **Tests for the 2026-11-18 amendment:** in `groups-commit-loss.test.ts`, a member that crashes partway through a delivery keeps what it settled (it fails without point 17), and a partly settled delivery never covers a record redelivered after it. The committer keeps the furthest point.
+- **Tests for the 2026-11-18 amendment,** arriving with #256: in `groups-commit-loss.test.ts`, a member that crashes partway through a delivery keeps what it settled (it fails without point 17), and a partly settled delivery never covers a record redelivered after it. The committer keeps the furthest point.
 - **Config:** `createKernel` validates `bus.commitIntervalMs` (`invalid_config` outside 0–1,000, or not an integer).
-- **Docs:** the bus protocol section of the design doc (`commits`, the early sends, the redelivery window), and `KernelConfig.bus.commitIntervalMs` in the guide.
+- **Docs:** the bus protocol section of the design doc (`commits`, the early sends, the redelivery window), and `KernelConfig.bus.commitIntervalMs` in the guide. For the 2026-11-18 amendment, the design doc's `commits` message and "Groups" paragraph gain `partial` (#256); the guide's wording on at-least-once delivery stands.
 
 ## Alternatives considered
 
