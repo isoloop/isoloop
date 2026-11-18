@@ -200,6 +200,22 @@
       }
     },
     {
+      "files": ["packages/cli/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/**", "!@isoloop/bus"],
+                "message": "the CLI uses the bus's contracts and JSON Schema helpers only (M4a task 5)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["packages/vite/**"],
       "rules": {
         "no-restricted-imports": [

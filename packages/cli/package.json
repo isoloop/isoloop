@@ -1,0 +1,33 @@
+{
+  "name": "isoloop",
+  "version": "0.1.0-next.2",
+  "description": "The Isoloop command line: export contracts as JSON Schema, and later the dev MCP server and the agent skill.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isoloop/isoloop.git",
+    "directory": "packages/cli"
+  },
+  "bin": {
+    "isoloop": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "build": "tsdown src/cli.ts --platform node --no-dts --no-fixed-extension",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@isoloop/bus": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

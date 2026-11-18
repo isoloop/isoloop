@@ -411,6 +411,22 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
 
+  packages/cli:
+    dependencies:
+      '@isoloop/bus':
+        specifier: workspace:*
+        version: link:../bus
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
+
   packages/codec:
     devDependencies:
       fast-check:
