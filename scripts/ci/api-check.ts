@@ -44,9 +44,14 @@ export function dropInternal(src: string): string {
   }
 }
 
-/** End of the item starting at `from`: after `;` or `,` at depth 0, or after a block that closes at depth 0. */
+/**
+ * End of the item starting at `from`: after `;` or `,` at depth 0, or after a
+ * block that closes at depth 0. Type arguments (`Envelope<'a', P>`) count as
+ * depth, so their commas don't end the item; the `>` of `=>` doesn't.
+ */
 function itemEnd(s: string, from: number): number {
   let depth = 0;
+  let angles = 0;
   let opened = false;
   for (let i = from; i < s.length; i++) {
     const c = s[i];
@@ -62,6 +67,10 @@ function itemEnd(s: string, from: number): number {
     } else if (c === '{' || c === '(' || c === '[') {
       depth++;
       if (c === '{') opened = true;
+    } else if (c === '<') {
+      angles++;
+    } else if (c === '>' && s[i - 1] !== '=') {
+      if (angles > 0) angles--;
     } else if (c === '}' || c === ')' || c === ']') {
       if (depth === 0) return i;
       depth--;
@@ -69,7 +78,7 @@ function itemEnd(s: string, from: number): number {
         const semi = /^\s*;/.exec(s.slice(i + 1));
         return i + 1 + (semi ? semi[0].length : 0);
       }
-    } else if ((c === ';' || c === ',') && depth === 0) {
+    } else if ((c === ';' || c === ',') && depth === 0 && angles === 0) {
       return i + 1;
     }
   }
