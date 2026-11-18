@@ -1,6 +1,6 @@
 # ADR 0020: Inspection feed
 
-- **Status:** Accepted (2026-11-18), after grilling (Q1–Q11, yes to all). Amended 2026-11-18 after the first tasks (Q1–Q4, yes to all): the isolate side (decision 6) and no heap in 0.1 (decision 4).
+- **Status:** Accepted (2026-11-18), after grilling (Q1–Q11, yes to all). Amended 2026-11-18 after the first tasks (Q1–Q4, yes to all, then option (b) for memory): the isolate side (decision 6) and memory per isolate from the host, where the page is cross-origin isolated (decision 4).
 - **Date:** 2026-11-18
 - **Plan:** [M4b](../plans/m4b-devtools.md) (its devtools decisions 2, 5 and 7 are what this ADR makes precise). The [M4a](../plans/m4a-agents.md) dev MCP reads the same feed (decisions 12 and 13 there).
 
@@ -68,9 +68,13 @@ After it, `on` delivers events:
 - **Values are previews.** Each record's value is cut to a 2 KB preview, with its full size given, in both the tap and the read. A devtools view never holds a large record twice.
 - **Both are gated by inspect access:** an `Inspector` on the host, or the `inspect` port.
 
-### 4. Block in the runtime, and no heap in 0.1
+### 4. Block in the runtime, and memory measured by the host
 
-- **No heap figure in 0.1.** The plan was the beat's `heapBytes` from `performance.memory`, but Chromium has it only on the main thread, not in dedicated workers (a browser test in an isolate's worker got `undefined`, isoloop#251). The unused `heapBytes` slot leaves the beat and the feed's types before the API freeze, and `measureUserAgentSpecificMemory()` is in [would-like](../would-like.md) (see Alternatives).
+- **Memory per isolate comes from the host, not the beat.** The first plan was the beat's `heapBytes` from `performance.memory`, but Chromium has `performance.memory` only on the main thread, not in dedicated workers (a browser test in an isolate's worker got `undefined`, isoloop#251). The unused `heapBytes` slot leaves the beat. Instead:
+  - the host calls `performance.measureUserAgentSpecificMemory()` while a reader listens, at most every 5 s, and only when `crossOriginIsolated` is true (it needs COOP/COEP). Elsewhere, and in engines without it (Firefox, Safari), nothing is measured and the figure is absent;
+  - it attributes the breakdown to each isolate's worker by its URL and reports `memory: { bytes, at }` per isolate in the snapshot and as a coalesced `memory` message. Pool members share their worker's figure, marked as shared;
+  - the figure is coarse and can be seconds old, since Chromium answers at its next garbage collection. Readers show its age and label it "Chromium, cross-origin isolated";
+  - `@isoloop/vite` gets `crossOriginIsolation: true`, which makes its dev server send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, so the figure works during development. It's off by default, because COEP blocks third-party resources that don't opt in.
 - **Block:** a new runtime message, `block { ms }`, makes the isolate's worker busy-loop for `ms`, capped at 10 s, so a developer can watch containment work: the heartbeat goes late, the supervisor acts, the page keeps running. Only the `inspect` port (decision 6) and an `Inspector` on the host can send it. For a pooled isolate it blocks the whole worker, as a real busy loop would.
 
 ### 5. Recent events, kept from the start
@@ -117,7 +121,7 @@ kernel.spawn({ id: 'devtools', url, grants: { publish: [], subscribe: [], inspec
 - **The panel survives a bus restart** and doesn't appear as a consumer in the figures it shows.
 - **The feed's cost is measured, not assumed.** M4b task 6 runs plant at `?rate=5` with the feed open and closed and reports the difference as measured, in CI. A budget is asserted only once the numbers are known.
 - **The ring buffer always runs.** It's small, but it isn't zero.
-- **No heap figure in 0.1.** No engine gives a worker its own heap figure without cross-origin isolation, and only Chromium does with it.
+- **Memory is Chromium-only and needs cross-origin isolation.** Without it, or in Firefox and Safari, the devtools show no memory figure. Pool members can't be told apart by memory. Measuring while a reader listens adds the measurement's own cost, which task 6 records.
 - **`block` is a real busy loop.** On a pooled isolate it blocks every member of the pool, which is what a real block would do.
 - **New API, all `@experimental` and all additions:** `kernel.inspect()` and `Inspector`; the `inspect` grant; the `HostToBus` `tap` and `read` envelopes; the head offset and retained count in `BusMetrics`; the isolate messages `inspect { port }` and `block { ms }`. Under [ADR 0019](0019-versioning-and-releases.md) the isolate messages are seam additions ([ADR 0012](0012-isolates-built-apart.md)), so they need a minor.
 - **The balancer's own states** (quarantine, bisect) don't appear. The panel shows pools and members from `kernel.pools()`.
@@ -131,7 +135,7 @@ kernel.spawn({ id: 'devtools', url, grants: { publish: [], subscribe: [], inspec
 - **Keeping recent events only while inspected.** Rejected: the question a late reader asks is what crashed before it connected.
 - **A separate control grant** for kill, block and restart. Rejected: the app chose to mount the devtools, and two grants for one panel add nothing.
 - **Block as suspend** (pausing delivery). Rejected: that shows something else. The point is to watch containment handle a real busy loop.
-- **Heap from `performance.measureUserAgentSpecificMemory()`.** Not taken for 0.1: it works in workers but needs cross-origin isolation (COOP/COEP), and reports asynchronously and coarsely, in seconds. A per-isolate figure that only works on such pages in Chromium would mislead more than help. In [would-like](../would-like.md).
-- **The main thread's heap only.** Not taken: it says nothing about the isolates, which is what the panel is for.
+- **No memory figure in 0.1.** Considered after `performance.memory` proved main-thread only. Not taken: memory per isolate is what a developer reaches for when a dashboard feels heavy, and the dev server can provide cross-origin isolation.
+- **The main thread's `performance.memory` only.** Not taken: it says nothing about the isolates, which is what the panel is for.
 - **A synchronous `ctx.inspector.snapshot()`,** kept current by the runtime applying events locally. Not taken: more code and more ways to drift, for a panel that can wait one message.
 - **Inspector methods on `ctx.host`** that reject without the grant, as `navigate` does. Not taken: about eight methods spread across `HostApi`, where one optional object reads better.
