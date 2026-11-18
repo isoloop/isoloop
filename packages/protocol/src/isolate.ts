@@ -74,7 +74,15 @@ export type HostToIsolate =
    * inspect access (the `inspect` port, or an `Inspector`). Runtimes before
    * it ignore it. @experimental
    */
-  | Envelope<'block', { ms: number }>;
+  | Envelope<'block', { ms: number }>
+  /**
+   * The isolate's `inspect` port (ADR 0020, decision 6), sent once after
+   * `init` to an isolate holding `inspect: true`. The bus never carries it,
+   * so it keeps working while the bus restarts. Its messages are
+   * `IsolateToInspect` and `InspectToIsolate`. Runtimes before it ignore it.
+   * @experimental
+   */
+  | Envelope<'inspect', { port: MessagePort }>;
 
 /** Isolate port: isolate → host. */
 export type IsolateToHost =
@@ -101,10 +109,7 @@ export type IsolateToHost =
    * `idle`: an own worker's isolate. `members`: a pool's members, by isolate
    * id (M2c); a pool suspends only as a whole (ADR 0001).
    */
-  | Envelope<
-      'beat',
-      { lagMs: number; heapBytes?: number; idle?: IdleReport; members?: Record<string, IdleReport> }
-    >
+  | Envelope<'beat', { lagMs: number; idle?: IdleReport; members?: Record<string, IdleReport> }>
   | Envelope<'error', ErrorPayload>
   /** Last message after `shutdown`: handlers ran, the host may terminate now (design §7.6). */
   | Envelope<'bye', Record<string, never>>;
@@ -116,6 +121,7 @@ export const HOST_TO_ISOLATE: MessageTypes<HostToIsolate> = {
   shutdown: true,
   reattach: true,
   block: true,
+  inspect: true,
 };
 
 export const ISOLATE_TO_HOST: MessageTypes<IsolateToHost> = {

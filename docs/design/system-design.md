@@ -45,9 +45,10 @@ flowchart TB
 
 | Channel | Ends | Carries | Created by |
 | --- | --- | --- | --- |
-| Isolate port | main ↔ isolate worker (the `Worker` itself) | `init`, `ready`, `patch`, `event`, `call`/`result`, `beat`, `error`, `shutdown`, `bye`, `reattach`. On a pool's worker every message names its member in `isolate`, except `beat`, which is the worker's | Loader |
+| Isolate port | main ↔ isolate worker (the `Worker` itself) | `init`, `ready`, `patch`, `event`, `call`/`result`, `beat`, `error`, `shutdown`, `bye`, `reattach`, `block`, `inspect`. On a pool's worker every message names its member in `isolate`, except `beat`, which is the worker's | Loader |
 | Bus port | isolate ↔ bus worker (`MessageChannel`), one per isolate, pool members included | `publish`, `subscribe`, `unsubscribe`, `commits`, `request`, `reply`, `deliver`, `reset`, `result` | Bus controller, at each isolate start |
 | Control port | main ↔ bus worker (the `Worker` itself) | `boot` (contracts URL and topic configs), `attach`, `detach`, host-side `publish`, `flush`, `drop`, the inspection feed's `tap` and `read` (ADR 0020); back: `ready`, `beat`, `wake`, `metrics`, `result`, `seed`, `error` | Bus controller |
+| Inspect port | main ↔ an isolate worker holding the `inspect` grant (`MessageChannel`), sent once after `init` | `listen`, `snapshot`, `records`, `tap`, `control`; back: the feed's `event`, `beats`, `metrics`, `snapshot`, `result`, tapped `record`s (ADR 0020) | Kernel, at start |
 | Canvas handoff | main → isolate worker, once | a transferred `OffscreenCanvas` | Compositor, on request |
 
 **Rule:** no topic record crosses the main thread, except records the host itself publishes or subscribes to through `kernel.publish` / `kernel.subscribe` ([ADR 0005](../adr/0005-bus-topology-message-channels.md)). `kernel.subscribe` opens its own bus port, attached as `isoloop:host:<n>`, so ids starting with `isoloop:` are reserved for the kernel.
@@ -115,14 +116,15 @@ export type HostToIsolate =
   | Envelope<'result', CallResult>
   | Envelope<'shutdown', { reason: ShutdownReason; graceMs: number }>
   | Envelope<'reattach', { busPort: MessagePort }>              // new bus port after a bus restart (ADR 0007)
-  | Envelope<'block', { ms: number }>;                          // busy-loop the worker for ms (≤ 10 s), sent only for inspect access (ADR 0020)
+  | Envelope<'block', { ms: number }>                           // busy-loop the worker for ms (≤ 10 s), sent only for inspect access (ADR 0020)
+  | Envelope<'inspect', { port: MessagePort }>;                 // the inspect port, once after init, for an isolate with the inspect grant (ADR 0020)
 
 // Isolate port: isolate → host
 export type IsolateToHost =
   | Envelope<'ready', { runtime: string; adapter: string; renderFmt: string; requires?: string }>   // requires: the Isoloop major.minor it was built against (ADR 0012)
   | Envelope<'patch', { fmt: string; batch: unknown; styles?: string[]; head?: string[] }>   // styles: sheets added since the last patch (§4.8); head: tags put in the worker's head
   | Envelope<'call', { method: HostMethod; args: unknown[] }>
-  | Envelope<'beat', { lagMs: number; heapBytes?: number; idle?: IdleReport; members?: Record<string, IdleReport> }>   // idle: own worker; members: a pool's members (ADR 0001)
+  | Envelope<'beat', { lagMs: number; idle?: IdleReport; members?: Record<string, IdleReport> }>   // idle: own worker; members: a pool's members (ADR 0001)
   | Envelope<'error', ErrorPayload>
   | Envelope<'bye', {}>;                                         // last message after shutdown: handlers and last commits done, terminate now (§7.6)
 
@@ -178,7 +180,7 @@ export type ErrorPayload = { message: string; stack?: string; fatal: boolean; co
 
 export type BusRecord = { offset: number; key?: string; value: unknown; ts: number; producer: string; req?: { from: string; id: string } };   // req: set on bus.request records
 export type StartPosition = 'latest' | 'earliest' | 'committed';
-export type Grants = { publish: string[]; subscribe: string[]; navigate?: boolean };   // navigate: programmatic navigate() allowed (ADR 0002), default false
+export type Grants = { publish: string[]; subscribe: string[]; navigate?: boolean; inspect?: boolean };   // navigate: programmatic navigate() allowed (ADR 0002); inspect: ctx.inspector, never pooled (ADR 0020); both default false
 export type HostMethod = 'measure' | 'focus' | 'navigate' | 'scrollIntoView' | 'requestCanvas';
 export type CallError = { code: ErrorCode; message: string; issues?: { message: string; path: (string | number)[] }[] };
 export type CallResult = { ok: true; value: unknown } | { ok: false; error: CallError };
@@ -708,7 +710,7 @@ The click-to-paint budget is one frame because a render through `postMessage` ca
 | Framework-agnostic isolates | §5, adapters | M3 |
 | Parallel canvas charts | §4.7 `requestCanvas` | M3 |
 | Routing | §4.1 `syncRoute`, §4.7 `navigate`, ADR 0002 | M2 |
-| Devtools | §6.3 metrics, `Kernel.isolates()`, compositor stats; `kernel.inspect()` and the `inspect` grant (an M4 ADR) | M4 |
+| Devtools | §6.3 metrics, `Kernel.isolates()`, compositor stats; `kernel.inspect()` and the `inspect` grant with `ctx.inspector` (ADR 0020) | M4 |
 | Vue, Svelte and Solid adapters | §5, ADR 0010 (amended 2026-11-16) | M6 |
 | Shared-memory engine | §6.2 `LogEngine` | M5 |
 

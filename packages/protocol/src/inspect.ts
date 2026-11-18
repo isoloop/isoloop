@@ -5,12 +5,13 @@
 // message types they don't know, so a reader built apart keeps working
 // against a newer kernel.
 
-import type { BusMetrics } from './control';
+import type { BusMetrics, RecordPreview } from './control';
 import { envelopeGuard, type Envelope, type MessageTypes } from './envelope';
+import type { CallResult } from './errors';
 import type { Grants } from './grants';
 
 /**
- * One isolate in the feed, as `kernel.isolates()` has it, plus `heapBytes`.
+ * One isolate in the feed, as `kernel.isolates()` has it.
  * `state` and `reason` are the kernel's `IsolateState` and `CrashReason`,
  * typed as strings here so a reader built against an older list still reads
  * a newer kernel's values.
@@ -37,11 +38,6 @@ export type InspectIsolate = {
   dropped: number;
   holds?: { ageMs: number; stack?: string }[];
   busyMs?: number;
-  /**
-   * Its worker's JS heap from the last beat, where the engine reports one
-   * (Chromium's `performance.memory`). Per worker: pool members share it.
-   */
-  heapBytes?: number;
 };
 
 /** One pool in the feed, as `kernel.pools()` has it. @experimental */
@@ -73,7 +69,6 @@ export type InspectBeat = {
   pool?: string;
   lagMs: number;
   busyMs?: number;
-  heapBytes?: number;
   /** `performance.now()` on the host when it arrived. */
   at: number;
 };
@@ -104,7 +99,8 @@ export type InspectSnapshot = {
 
 /**
  * The feed's messages, in the usual envelope (ADR 0020, decision 7):
- * - `snapshot`, first on an `inspect` port, or on request;
+ * - `snapshot`, on request: an isolate's `ctx.inspector.snapshot()` gets it
+ *   over its `inspect` port, as the reply to its `snapshot` call;
  * - `event`, a kernel event as it happens;
  * - `beats`, each isolate's latest beat, coalesced to about one a second;
  * - `metrics`, the latest `bus:metrics`, at most one a second.
@@ -137,3 +133,73 @@ export const INSPECT_RING_SIZE = 200;
 
 /** How often beats and bus metrics are coalesced (ADR 0020, decision 2). */
 export const INSPECT_COALESCE_MS = 1_000;
+
+/**
+ * One record from a tap or a read (ADR 0020, decision 3): its value cut to a
+ * 2 KB preview, with its full size.
+ * @experimental
+ */
+export type InspectRecord = RecordPreview;
+
+/** What an isolate asks over its `inspect` port (ADR 0020, decision 6). @experimental */
+export type InspectControl = 'restart' | 'kill' | 'block';
+
+/**
+ * The `inspect` port: isolate → host (ADR 0020, decision 6). Each message with
+ * an `id` gets a `result` (`snapshot` gets a `snapshot`) with `re` set to it.
+ * - `listen` / `unlisten`: start and stop the feed's `event`, `beats` and
+ *   `metrics` messages on the port;
+ * - `snapshot`: one `InspectSnapshot`;
+ * - `records`: the last `last` records of `topic` (at most 100), as
+ *   `InspectRecord`s in the result's `value`;
+ * - `tap` / `untap`: copy matching records onto the port as `record`
+ *   messages, `untap`'s `re` naming the tap's `id`;
+ * - `control`: restart, kill or block (`ms`, at most 10 s) an isolate.
+ * @experimental
+ */
+export type IsolateToInspect =
+  | Envelope<'listen', Record<string, never>>
+  | Envelope<'unlisten', Record<string, never>>
+  | Envelope<'snapshot', Record<string, never>>
+  | Envelope<'records', { topic: string; last: number }>
+  | Envelope<'tap', { topics: string[]; maxPerSec?: number }>
+  | Envelope<'untap', Record<string, never>>
+  | Envelope<'control', { action: InspectControl; id: string; ms?: number }>;
+
+/**
+ * The `inspect` port: host → isolate. The feed's own messages, a call's
+ * `result`, and a tap's `record` and `skipped` (with `re` naming the tap).
+ * @experimental
+ */
+export type InspectToIsolate =
+  | InspectMessage
+  | Envelope<'result', CallResult>
+  | Envelope<'record', InspectRecord>
+  | Envelope<'skipped', { count: number }>;
+
+/** @experimental */
+export const ISOLATE_TO_INSPECT: MessageTypes<IsolateToInspect> = {
+  listen: true,
+  unlisten: true,
+  snapshot: true,
+  records: true,
+  tap: true,
+  untap: true,
+  control: true,
+};
+
+/** @experimental */
+export const INSPECT_TO_ISOLATE: MessageTypes<InspectToIsolate> = {
+  ...INSPECT_MESSAGES,
+  result: true,
+  record: true,
+  skipped: true,
+};
+
+/** @experimental */
+export const isIsolateToInspect: (x: unknown) => x is IsolateToInspect =
+  envelopeGuard(ISOLATE_TO_INSPECT);
+
+/** @experimental */
+export const isInspectToIsolate: (x: unknown) => x is InspectToIsolate =
+  envelopeGuard(INSPECT_TO_ISOLATE);

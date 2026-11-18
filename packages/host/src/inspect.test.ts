@@ -158,7 +158,14 @@ describe('kernel.inspect() (ADR 0020)', () => {
 });
 
 const feed = () =>
-  createInspectFeed({ isolates: () => [], pools: () => [], busState: () => 'none' });
+  createInspectFeed({
+    isolates: () => [],
+    pools: () => [],
+    busState: () => 'none',
+    tap: () => () => {},
+    read: () => Promise.resolve({ ok: true, value: [] }),
+    control: () => {},
+  });
 
 describe('the feed on its own', () => {
   it('keeps the last 200 events, oldest first, whether inspected or not', () => {

@@ -6,6 +6,15 @@ export type Grants = {
   subscribe: string[];
   /** Programmatic `navigate()` allowed (ADR 0002). Default false. */
   navigate?: boolean;
+  /**
+   * The inspection feed and its controls (ADR 0020, decision 6): the isolate
+   * gets `ctx.inspector` on a port of its own, which reads the feed and can
+   * restart, kill and block isolates. Default false. Never in a pool: spawning
+   * a pooled isolate with it fails with `invalid_config`, since a pool merges
+   * its members' grants.
+   * @experimental
+   */
+  inspect?: boolean;
 };
 
 /** Topics under this prefix belong to the kernel (ADR 0002). */

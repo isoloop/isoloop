@@ -25,6 +25,7 @@ export type {
   InspectIsolate,
   InspectMessage,
   InspectPool,
+  InspectRecord,
   InspectSnapshot,
 } from '@isoloop/protocol';
 export { BusError } from '@isoloop/protocol';

@@ -127,6 +127,7 @@ export function createTestContext(o: TestContextOptions = {}): TestContext {
     },
     host,
     bus,
+    inspector: undefined,
     styles: () => {},
     setValue: () => {},
     onShutdown: (fn) => {
