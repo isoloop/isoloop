@@ -41,6 +41,12 @@ export type DevMcpHello = {
   readonly url: string;
   readonly title?: string;
   readonly tools: readonly DevMcpTool[];
+  /**
+   * The page answers `op` messages through `kernel.inspect()` (M4a task 8): the
+   * CLI then offers it the `isoloop_*` reads, and with `--allow-write` the
+   * writes. Absent: only the page's own tools.
+   */
+  readonly inspect?: boolean;
 };
 
 /** `welcome`'s payload: the page's id, which agents pass as `page`. @internal */
@@ -56,14 +62,57 @@ export type DevMcpCall = { readonly name: string; readonly input: unknown };
 export type PageToCli = Envelope<'hello', DevMcpHello> | Envelope<'result', DevMcpResult>;
 
 /**
- * CLI → page: `welcome` once paired; `call`, with an `id`; `cancel`, `re` = a
- * call's `id`, when the agent cancelled it (the page aborts its signal).
+ * CLI → page: `welcome` once paired; `call` (an app tool) or `op` (one of the
+ * dev MCP's own tools), each with an `id`; `cancel`, `re` = a call's `id`,
+ * when the agent cancelled it (the page aborts its signal).
  * @internal
  */
 export type CliToPage =
   | Envelope<'welcome', DevMcpWelcome>
   | Envelope<'call', DevMcpCall>
+  | Envelope<'op', DevMcpOp>
   | Envelope<'cancel', DevMcpCancel>;
+
+/**
+ * `op`'s payload: one of the dev MCP's own tools, answered by the page from
+ * `kernel.inspect()` (ADR 0020) or the kernel (M4a decision 12). The page
+ * answers with a `result`, `re` = the op's `id`. The writes (`restart`,
+ * `kill`, `block`, `publish`, `request`) are sent only with `--allow-write`.
+ * @internal
+ */
+export type DevMcpOp =
+  | { readonly op: 'isolates' }
+  | { readonly op: 'topics' }
+  | { readonly op: 'records'; readonly topic: string; readonly last: number }
+  | { readonly op: 'events'; readonly last: number }
+  | { readonly op: 'restart' | 'kill'; readonly id: string }
+  | { readonly op: 'block'; readonly id: string; readonly ms: number }
+  | {
+      readonly op: 'publish';
+      readonly topic: string;
+      readonly key?: string;
+      readonly value: unknown;
+    }
+  | {
+      readonly op: 'request';
+      readonly topic: string;
+      readonly key?: string;
+      readonly value: unknown;
+      readonly timeoutMs: number;
+    };
+
+/** `DevMcpOp['op']`, as a list. @internal */
+export const DEV_MCP_OPS: readonly DevMcpOp['op'][] = [
+  'isolates',
+  'topics',
+  'records',
+  'events',
+  'restart',
+  'kill',
+  'block',
+  'publish',
+  'request',
+];
 
 /** `cancel`'s payload: empty. @internal */
 export type DevMcpCancel = Record<string, never>;
@@ -71,7 +120,12 @@ export type DevMcpCancel = Record<string, never>;
 /** @internal */
 export const PAGE_TO_CLI: MessageTypes<PageToCli> = { hello: true, result: true };
 /** @internal */
-export const CLI_TO_PAGE: MessageTypes<CliToPage> = { welcome: true, call: true, cancel: true };
+export const CLI_TO_PAGE: MessageTypes<CliToPage> = {
+  welcome: true,
+  call: true,
+  op: true,
+  cancel: true,
+};
 
 /** @internal */
 export const isPageToCli: (x: unknown) => x is PageToCli = envelopeGuard<PageToCli>(PAGE_TO_CLI);

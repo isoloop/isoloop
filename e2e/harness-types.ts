@@ -55,6 +55,7 @@ type HarnessConfig = {
   budget?: number;
   routing?: boolean;
   basePath?: string;
+  agents?: { expose: string[]; timeoutMs?: number };
   onNavigate?: (req: {
     href: string;
     replace: boolean;
@@ -67,6 +68,10 @@ declare global {
     harness: {
       createKernel(config?: HarnessConfig): HarnessKernel;
       createBusKernel(contractsUrl: string, config?: HarnessConfig): Promise<HarnessKernel>;
+      connectDevMCP(
+        kernel: HarnessKernel,
+        options: { token: string; url?: string },
+      ): Promise<() => void>;
     };
     /** The kernel a suite created, for later page.evaluate calls (e2e/loops.ts and others). */
     kernel: HarnessKernel;

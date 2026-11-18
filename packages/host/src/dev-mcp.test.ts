@@ -3,7 +3,7 @@
 // `isoloop mcp` CLI (the CLI's own tests run its real server).
 import type { CliToPage, PageToCli } from '@isoloop/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import list, { act, ask } from './__fixtures__/agents-contracts';
+import list, { act, ask, told } from './__fixtures__/agents-contracts';
 import { connectDevMCP } from './dev-mcp';
 import { createKernel, type Kernel } from './index';
 
@@ -94,7 +94,7 @@ function setup(mode = 'echo'): Kernel {
   return kernel;
 }
 
-function connect(kernel: Pick<Kernel, 'tools' | 'request'>, url?: string): FakeSocket {
+function connect(kernel: Parameters<typeof connectDevMCP>[0], url?: string): FakeSocket {
   disconnects.push(
     connectDevMCP(kernel, { token: 'tok', title: 'Test page', ...(url ? { url } : {}) }),
   );
@@ -239,5 +239,98 @@ describe('connectDevMCP', () => {
     expect(signal?.aborted).toBe(true);
     vi.advanceTimersByTime(60_000);
     expect(FakeSocket.all).toHaveLength(1);
+  });
+});
+
+const op = (id: string, p: Extract<CliToPage, { t: 'op' }>['p']): CliToPage => ({
+  v: 1,
+  t: 'op',
+  id,
+  p,
+});
+const resultOf = (s: FakeSocket, id: string) => s.results().find((r) => r.re === id)?.p;
+const helloOf = (s: FakeSocket) => s.sent.find((m) => m.t === 'hello');
+
+describe("connectDevMCP: the dev MCP's own tools (M4a task 8)", () => {
+  it('says it inspects only when the kernel has inspect()', () => {
+    const kernel = setup();
+    const full = connect(kernel);
+    full.open();
+    const narrow = connect({
+      tools: () => kernel.tools(),
+      request: (...a) => kernel.request(...a),
+    });
+    narrow.open();
+    expect(helloOf(full)?.p).toMatchObject({ inspect: true });
+    expect(helloOf(narrow)?.p).toMatchObject({ inspect: false });
+  });
+
+  it('answers the reads from kernel.inspect(), with ages instead of page timestamps', async () => {
+    const kernel = setup();
+    await until(() => kernel.isolates().some((i) => i.id === 'R' && i.state === 'running'));
+    const s = connect(kernel);
+    s.open();
+    s.receive(call('c1', ask.name, { q: 'hi' }));
+    await until(() => s.results().length === 1);
+    s.receive(op('o1', { op: 'isolates' }));
+    s.receive(op('o2', { op: 'records', topic: ask.name, last: 5 }));
+    s.receive(op('o3', { op: 'events', last: 200 }));
+    s.receive(op('o4', { op: 'topics' }));
+    await until(() => s.results().length === 5);
+    const isolates = resultOf(s, 'o1');
+    expect(isolates).toMatchObject({
+      ok: true,
+      value: { isolates: [{ id: 'R', state: 'running' }], pools: [] },
+    });
+    expect(JSON.stringify(isolates)).not.toContain('lastBeatAt');
+    const records = resultOf(s, 'o2');
+    expect(records?.ok && records.value).toMatchObject({
+      records: [{ topic: ask.name, req: { from: 'host', via: 'mcp' } }],
+    });
+    const events = resultOf(s, 'o3');
+    const seen = events?.ok
+      ? // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the expect below checks the shape
+        (events.value as { events: { event: string; agoMs: number }[] }).events
+      : [];
+    expect(seen.some((e) => e.event === 'isolate:state' && e.agoMs >= 0)).toBe(true);
+    expect(resultOf(s, 'o4')).toMatchObject({ ok: true, value: { bus: { restarts: 0 } } });
+  });
+
+  it("does the writes: publish, request with via 'mcp', restart; errors keep their codes", async () => {
+    const kernel = setup();
+    await until(() => kernel.isolates().some((i) => i.id === 'R' && i.state === 'running'));
+    const s = connect(kernel);
+    s.open();
+    s.receive(op('w1', { op: 'publish', topic: told.name, value: 7 }));
+    s.receive(op('w2', { op: 'publish', topic: told.name, value: 'seven' }));
+    s.receive(op('w3', { op: 'request', topic: ask.name, value: { q: 'x' }, timeoutMs: 2_000 }));
+    s.receive(op('w4', { op: 'restart', id: 'nobody' }));
+    await until(() => s.results().length === 4);
+    expect(resultOf(s, 'w1')).toEqual({ ok: true, value: { ok: true } });
+    expect(resultOf(s, 'w2')).toMatchObject({ ok: false, code: 'invalid' });
+    expect(resultOf(s, 'w3')).toMatchObject({
+      ok: true,
+      value: { reply: { echo: { q: 'x' }, via: 'mcp' } },
+    });
+    // An unknown id is a plain Error in the kernel: code `error`, with the id.
+    expect(resultOf(s, 'w4')).toMatchObject({ ok: false, code: 'error' });
+    expect(JSON.stringify(resultOf(s, 'w4'))).toContain('nobody');
+    const states: string[] = [];
+    kernel.on('isolate:state', (e) => {
+      if (e.id === 'R') states.push(e.state);
+    });
+    s.receive(op('w5', { op: 'restart', id: 'R' }));
+    await until(() => s.results().length === 5);
+    expect(resultOf(s, 'w5')).toEqual({ ok: true, value: { ok: true } });
+    await until(() => states.includes('running'));
+  });
+
+  it('answers unsupported to an op from a kernel without inspect()', async () => {
+    const kernel = setup();
+    const s = connect({ tools: () => kernel.tools(), request: (...a) => kernel.request(...a) });
+    s.open();
+    s.receive(op('o1', { op: 'isolates' }));
+    await until(() => s.results().length === 1);
+    expect(resultOf(s, 'o1')).toMatchObject({ ok: false, code: 'unsupported' });
   });
 });
