@@ -6,12 +6,16 @@ import { isUnchecked, type AnyTopicDef } from './topic';
  * vendored like {@link StandardSchemaV1} so the bus depends on no schema
  * library (ADR 0003, decision 21; ADR 0018, decision 1). Zod ≥ 4.2 implements
  * it. Copied from the spec; keep it in step with it. Only the parts Isoloop
- * reads are typed: the `jsonSchema` converter beside `validate`.
+ * reads are typed: the `jsonSchema` converter beside `validate`, without the
+ * spec's `Input`/`Output` type parameters, which Isoloop doesn't read.
+ *
+ * @internal
  */
-export interface StandardJSONSchemaV1<Input = unknown, Output = Input> {
-  readonly '~standard': StandardJSONSchemaV1.Props<Input, Output>;
+export interface StandardJSONSchemaV1 {
+  readonly '~standard': StandardJSONSchemaV1.Props;
 }
 
+/** @internal */
 export declare namespace StandardJSONSchemaV1 {
   export interface Props<Input = unknown, Output = Input> {
     readonly version: 1;
@@ -36,10 +40,19 @@ export declare namespace StandardJSONSchemaV1 {
   }
 }
 
-/** A JSON Schema document (draft 2020-12), as the schema library made it. */
-export type JsonSchema = Record<string, unknown>;
+/**
+ * A JSON Schema document (draft 2020-12), as the schema library made it.
+ *
+ * @internal
+ */
+export type JsonSchema = { [key: string]: unknown };
 
-/** A schema's JSON Schema, for what it accepts (`input`) and what it gives (`output`). */
+/**
+ * A schema's JSON Schema, for what it accepts (`input`) and what it gives
+ * (`output`).
+ *
+ * @internal
+ */
 export type JsonSchemaPair = { readonly input: JsonSchema; readonly output: JsonSchema };
 
 /**
@@ -48,21 +61,35 @@ export type JsonSchemaPair = { readonly input: JsonSchema; readonly output: Json
  * - `unsupported`: it doesn't implement `~standard.jsonSchema`;
  * - `failed`: the converter threw (for example, a transform or a type JSON
  *   Schema can't express).
+ *
+ * @internal
  */
 export type NotExportableReason = 'unchecked' | 'unsupported' | 'failed';
 
-/** The result of {@link jsonSchemaOf}. Never throws; a failure is a value. */
+/**
+ * The result of {@link jsonSchemaOf}. Never throws; a failure is a value.
+ *
+ * @internal
+ */
 export type JsonSchemaResult =
   | ({ readonly ok: true } & JsonSchemaPair)
   | { readonly ok: false; readonly reason: NotExportableReason; readonly message: string };
 
-/** The JSON Schema target Isoloop uses everywhere (ADR 0003, decision 21). */
+/**
+ * The JSON Schema target Isoloop uses everywhere (ADR 0003, decision 21).
+ *
+ * @internal
+ */
 export const JSON_SCHEMA_TARGET = 'draft-2020-12';
 
 const isRecord = (x: unknown): x is Record<PropertyKey, unknown> =>
   typeof x === 'object' && x !== null;
 
-/** True if the schema implements Standard JSON Schema (`~standard.jsonSchema`). */
+/**
+ * True if the schema implements Standard JSON Schema (`~standard.jsonSchema`).
+ *
+ * @internal
+ */
 export function hasJsonSchema(schema: unknown): schema is StandardJSONSchemaV1 {
   if (!isRecord(schema)) return false;
   const std = schema['~standard'];
@@ -80,7 +107,7 @@ const messageOf = (e: unknown): string => (e instanceof Error ? e.message : Stri
  * with the reason, so callers decide (`not_exposable` for the kernel, a flag
  * for `isoloop contracts export`).
  *
- * @experimental Used by agent tools and `isoloop contracts export`; may change before 1.0.
+ * @internal Used by the kernel's agent tools and `isoloop contracts export`.
  */
 export function jsonSchemaOf(schema: StandardSchemaV1): JsonSchemaResult {
   if (isUnchecked(schema)) {
@@ -111,13 +138,21 @@ const pair = (r: JsonSchemaResult & { ok: true }): JsonSchemaPair => ({
   output: r.output,
 });
 
-/** A topic's JSON Schemas: its record schema, and its `reply` if it has one. */
+/**
+ * A topic's JSON Schemas: its record schema, and its `reply` if it has one.
+ *
+ * @internal
+ */
 export type TopicJsonSchemas = {
   readonly schema: JsonSchemaPair;
   readonly reply?: JsonSchemaPair;
 };
 
-/** The result of {@link topicJsonSchemas}. `part` says which schema failed. */
+/**
+ * The result of {@link topicJsonSchemas}. `part` says which schema failed.
+ *
+ * @internal
+ */
 export type TopicJsonSchemasResult =
   | ({ readonly ok: true } & TopicJsonSchemas)
   | {
@@ -134,7 +169,7 @@ export type TopicJsonSchemasResult =
  * `reply` schema's when it has one. A tool's input schema is `schema.input`;
  * its output schema is `reply.output` (ADR 0018, decision 1). Never throws.
  *
- * @experimental Used by agent tools and `isoloop contracts export`; may change before 1.0.
+ * @internal Used by the kernel's agent tools and `isoloop contracts export`.
  */
 export function topicJsonSchemas(def: AnyTopicDef): TopicJsonSchemasResult {
   const fail = (part: 'schema' | 'reply', r: JsonSchemaResult & { ok: false }) =>

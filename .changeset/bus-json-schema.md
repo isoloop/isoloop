@@ -1,5 +1,5 @@
 ---
-'@isoloop/bus': minor
+'@isoloop/bus': patch
 ---
 
-Make JSON Schema from a topic's schemas at run time: `jsonSchemaOf(schema)` and `topicJsonSchemas(topic)` (both `@experimental`) return draft 2020-12 input and output schemas, and the `reply`'s, through the vendored Standard JSON Schema interface (`~standard.jsonSchema`, Zod ≥ 4.2). A schema without the interface, an `unchecked()` one, or one whose converter throws comes back as `{ ok: false, reason, message }` naming the topic and part, never as a throw. The kernel's agent tools and `isoloop contracts export` build on it (ADR 0018, ADR 0003 decision 21).
+Internal: the bus can make JSON Schema (draft 2020-12) from a topic's schemas through the vendored Standard JSON Schema interface (`~standard.jsonSchema`, Zod ≥ 4.2). A schema without the interface, an `unchecked()` schema, or a converter that throws comes back as a typed "not exportable" result. Nothing public changes yet. The kernel's agent tools and `isoloop contracts export` will use it (ADR 0018, ADR 0003 decision 21).
