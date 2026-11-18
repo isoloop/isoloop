@@ -1,6 +1,7 @@
 import {
   isSystemTopic,
   topicConfigOf,
+  UNCHECKED_VENDOR,
   type BusRecord,
   type ErrorCode,
   type Retention,
@@ -77,8 +78,6 @@ export function topic<In, Out = In, RIn = never, ROut = RIn>(
 ): TopicDef<In, Out, RIn, ROut> {
   return Object.freeze({ ...def, name });
 }
-
-const UNCHECKED_VENDOR = 'isoloop/unchecked';
 
 /**
  * A Standard Schema that accepts any value unchanged and only carries the type

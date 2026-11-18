@@ -22,6 +22,7 @@ import {
   type ErrorCode,
   type Grants,
   type HostToBus,
+  type RequestVia,
   type SeedEvent,
   type StartPosition,
   isBusToHost,
@@ -99,6 +100,19 @@ export interface BusController {
   /** Forgets a suspended isolate the bus may still be watching for (stopped while asleep). */
   forget(isolateId: string): void;
   publish(topic: string, key: string | undefined, value: unknown): Promise<CallResult>;
+  /**
+   * `kernel.request` (ADR 0018, decision 4). `result` settles with the reply
+   * or a failure; like a publish, it's sent again to the next bus if the bus
+   * dies before answering. `cancel` stops waiting (a timeout or an abort):
+   * the bus forgets the request after its own `timeoutMs`, and a late reply
+   * is dropped.
+   */
+  request(
+    topic: string,
+    key: string | undefined,
+    value: unknown,
+    o: { timeoutMs: number; via?: RequestVia },
+  ): { result: Promise<CallResult>; cancel(): void };
   /** Deletes an orphaned persistent topic (`kernel.dropTopic`). */
   drop(topic: string, force: boolean): Promise<CallResult>;
   subscribe(sub: HostSubscription): () => void;
@@ -468,6 +482,39 @@ export function createBusController(o: BusControllerOptions): BusController {
         results.set(id, { resolve, sentTo: worker ? gen : undefined, resend: msg });
         send(msg);
       });
+    },
+
+    request(topic, key, value, { timeoutMs, via }) {
+      if (down()) return { result: Promise.resolve(unavailable('The bus is down')), cancel() {} };
+      if (
+        !worker &&
+        queue.filter((q) => q.msg.t === 'publish' || q.msg.t === 'request').length >= limit
+      )
+        return {
+          result: Promise.resolve(unavailable('The bus is restarting and its buffer is full')),
+          cancel() {},
+        };
+      const id = `h${++nextId}`;
+      const p = {
+        topic,
+        value,
+        timeoutMs,
+        ...(key === undefined ? {} : { key }),
+        ...(via === undefined ? {} : { via }),
+      };
+      const msg: HostToBus = { v: 1, t: 'request', id, p: { ...p, epoch, seq: ++seq } };
+      const result = new Promise<CallResult>((resolve) => {
+        results.set(id, { resolve, sentTo: worker ? gen : undefined, resend: msg });
+        send(msg);
+      });
+      return {
+        result,
+        cancel() {
+          results.delete(id);
+          const i = queue.findIndex((q) => q.msg === msg);
+          if (i >= 0) queue.splice(i, 1);
+        },
+      };
     },
 
     drop(topic, force) {

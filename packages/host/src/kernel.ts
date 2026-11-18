@@ -9,6 +9,7 @@ import {
   BusError,
   isIsolateToHost,
   isSystemTopic,
+  matchAny,
   ROUTE_KEY,
   routeTopic,
   type BusMetrics,
@@ -28,6 +29,14 @@ import {
   type Rect,
   type HostToIsolate,
 } from '@isoloop/protocol';
+import {
+  agentsConfigProblem,
+  buildTools,
+  requestOptionsProblem,
+  type AgentsConfig,
+  type AgentTool,
+  type RequestOptions,
+} from './agents';
 import { createBusController, HOST_CONNECTION_PREFIX, type BusController } from './bus/controller';
 import { createCompositor, type FallbackRender, type SurfaceStats } from './compositor';
 import { missingFeatures } from './features';
@@ -107,6 +116,12 @@ export type KernelConfig = {
   suspend?: { maxConcurrentWakes?: number };
   /** Dev checks: the bus checks every schema output with `structuredClone` (ADR 0003, decision 11). Default false. */
   dev?: boolean;
+  /**
+   * Tools for agents (ADR 0018, decision 2): which requestable topics agents
+   * may call through the dev MCP or WebMCP. Without it nothing is exposed.
+   * @experimental
+   */
+  agents?: AgentsConfig;
   bus?: {
     /**
      * How far behind the broker's record of what each subscriber handled may
@@ -163,7 +178,14 @@ export type KernelErrorCode =
   /** A `pool` name starting `balancer-`: those belong to `@isoloop/balancer` (ADR 0017). */
   | 'reserved_pool'
   /** `claimPools` called while the kernel's claim is held: one balancer per kernel at a time (ADR 0017). */
-  | 'balancer_exists';
+  | 'balancer_exists'
+  /**
+   * An `agents.expose` pattern matches a topic that can't be a tool: no
+   * `reply`, no `tool`, or a schema without Standard JSON Schema (ADR 0018,
+   * decision 3). The message names the topic.
+   * @experimental
+   */
+  | 'not_exposable';
 
 /** An error the kernel API throws, with a code to branch on. */
 export class KernelError extends Error {
@@ -245,6 +267,13 @@ export type KernelEvents = {
   'isolate:beat': { id: string; pool?: string; lagMs: number; busyMs?: number; at: number };
   /** More live workers than `workers.budget`. Emitted once per kernel. */
   'workers:budget': { live: number; budget: number };
+  /**
+   * `agents.expose` patterns that match no topic in the contracts (ADR 0018,
+   * decision 3). Emitted once, in the microtask after `createKernel`, so a
+   * listener added right after it hears it.
+   * @experimental
+   */
+  'agents:unmatched': { patterns: string[] };
   /** The bus worker loaded its contracts. `first` is false after a restart. */
   'bus:ready': { first: boolean };
   'bus:crash': { reason: CrashReason; message: string };
@@ -338,6 +367,35 @@ export interface Kernel {
    * nothing is stored under the name.
    */
   dropTopic(name: string, opts?: { force?: boolean }): Promise<void>;
+  /**
+   * Requests from the host (ADR 0018, decision 4), the mirror of
+   * `bus.request`: appends a request record with `req: { from: 'host', id,
+   * via }` and resolves with the first valid reply. Works on any requestable
+   * topic, exposed to agents or not. An isolate that restarts within the
+   * timeout still gets the request and can answer it.
+   *
+   * Rejects with a `BusError`:
+   * - `no_responder` at once when no isolate could answer: none has a
+   *   subscribe grant for the topic, or every one that has is stopped or
+   *   `failed`. A positive check doesn't promise a reply;
+   * - `timeout` after `timeoutMs` (default 30 s, the bus's);
+   * - `aborted` when `signal` aborts;
+   * - `forbidden` for `isoloop.*` topics, `unknown_topic`, `not_requestable`,
+   *   `invalid`, `reply_invalid` and `bus_unavailable`, as `bus.request` does.
+   * @experimental
+   */
+  request<In, ROut>(
+    topic: TopicRef<In, any, any, ROut>,
+    value: In,
+    opts?: RequestOptions,
+  ): Promise<ROut>;
+  /**
+   * The tools exposed through `agents.expose` (ADR 0018, decision 2), with
+   * their JSON Schemas, made once at `createKernel`. Empty without `agents`.
+   * Transports list these and call them with `kernel.request`.
+   * @experimental
+   */
+  tools(): readonly AgentTool[];
   /** Subscribes from the host, from `latest` by default. Records cross the main thread only here. */
   subscribe<Out>(
     topic: TopicRef<any, Out, any, any>,
@@ -427,6 +485,8 @@ export function wakeOrder(
 const SURFACE_FMTS: readonly string[] = [ISOLOOP_DOM_FMT];
 
 const DEFAULT_GRANTS: Grants = { publish: [], subscribe: [] };
+/** `kernel.request`'s default timeout: the bus's (system design §6.3). */
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
 /** Stylesheet texts from a patch; anything else is ignored. Capped so one patch can't flood the root. */
 function stylesOf(x: unknown): string[] | undefined {
@@ -520,6 +580,18 @@ export function createKernel(config: KernelConfig): Kernel {
     const problem = commitIntervalProblem(config.bus.commitIntervalMs);
     if (problem) throw new KernelError('invalid_config', problem);
   }
+  let tools: readonly AgentTool[] = [];
+  let unmatched: string[] = [];
+  if (config.agents !== undefined) {
+    const problem = agentsConfigProblem(config.agents);
+    if (problem) throw new KernelError('invalid_config', problem);
+    const built = buildTools(config.contracts?.list, config.agents);
+    if (!built.ok) throw new KernelError('not_exposable', built.message);
+    tools = built.tools;
+    unmatched = built.unmatched;
+  }
+  /** Contracts topics by name, for `kernel.request`'s checks. */
+  const topicsByName = new Map((config.contracts?.list.topics ?? []).map((t) => [t.name, t]));
   const commitIntervalMs = config.bus?.commitIntervalMs ?? DEFAULT_COMMIT_INTERVAL_MS;
   const everyMs = config.heartbeat?.everyMs ?? 100;
   const def = DEFAULT_SUPERVISOR_CONFIG;
@@ -548,6 +620,7 @@ export function createKernel(config: KernelConfig): Kernel {
     'isolate:error': new Set(),
     'isolate:beat': new Set(),
     'workers:budget': new Set(),
+    'agents:unmatched': new Set(),
     'bus:ready': new Set(),
     'bus:crash': new Set(),
     'bus:recovered': new Set(),
@@ -575,6 +648,27 @@ export function createKernel(config: KernelConfig): Kernel {
 
   const emit = <E extends KernelEvent>(event: E, data: KernelEvents[E]): void => {
     for (const fn of listeners[event]) fn(data);
+  };
+
+  if (unmatched.length > 0) {
+    const patterns = unmatched;
+    console.warn(
+      `Isoloop: agents.expose ${patterns.map((p) => JSON.stringify(p)).join(', ')} match${patterns.length === 1 ? 'es' : ''} no topic in the contracts`,
+    );
+    queueMicrotask(() => emit('agents:unmatched', { patterns: [...patterns] }));
+  }
+
+  /**
+   * An isolate could answer a request on `topic` (ADR 0018, decision 6): its
+   * grants let it subscribe, and it isn't stopped or failed. Stopped isolates
+   * leave `slots`, so only `failed` is left to rule out.
+   */
+  const hasResponder = (topic: string): boolean => {
+    for (const slot of slots.values()) {
+      if (slot.sup.state === 'failed' || slot.sup.state === 'stopped') continue;
+      if (matchAny((slot.manifest.grants ?? DEFAULT_GRANTS).subscribe, topic)) return true;
+    }
+    return false;
   };
 
   const post = (slot: Slot, msg: HostToIsolate, transfer: Transferable[] = []): void => {
@@ -1439,6 +1533,61 @@ export function createKernel(config: KernelConfig): Kernel {
       const r = await controller.publish(topic.name, rec.key, rec.value);
       if (!r.ok) throw new BusError(r.error);
     },
+
+    async request(topic, value, opts = {}) {
+      const name = topic.name;
+      const problem = requestOptionsProblem(opts);
+      if (problem) throw new BusError({ code: 'invalid', message: problem });
+      if (isSystemTopic(name))
+        throw new BusError({ code: 'forbidden', message: `${name} belongs to the kernel` });
+      if (!controller)
+        throw new BusError({
+          code: 'bus_unavailable',
+          message: 'No bus worker: KernelConfig.contracts is not set',
+        });
+      const shape = topicsByName.get(name);
+      if (!shape) throw new BusError({ code: 'unknown_topic', message: `unknown topic ${name}` });
+      if (shape.reply === undefined)
+        throw new BusError({ code: 'not_requestable', message: `${name} has no reply schema` });
+      const { signal } = opts;
+      const aborted = (): BusError =>
+        new BusError({ code: 'aborted', message: `The request on ${name} was aborted` });
+      if (signal?.aborted) throw aborted();
+      if (!hasResponder(name))
+        throw new BusError({
+          code: 'no_responder',
+          message: `No isolate can answer ${name}: none with a subscribe grant for it is running or restarting`,
+        });
+      const timeoutMs = opts.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+      const call = controller.request(name, opts.key, value, {
+        timeoutMs,
+        ...(opts.via === undefined ? {} : { via: opts.via }),
+      });
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let onAbort: (() => void) | undefined;
+      const stop = new Promise<CallResult>((resolve) => {
+        timer = setTimeout(() => {
+          resolve({
+            ok: false,
+            error: { code: 'timeout', message: `No reply on ${name} within ${timeoutMs} ms` },
+          });
+        }, timeoutMs);
+        onAbort = () =>
+          resolve({ ok: false, error: { code: 'aborted', message: aborted().message } });
+        signal?.addEventListener('abort', onAbort, { once: true });
+      });
+      const r = await Promise.race([call.result, stop]);
+      clearTimeout(timer);
+      if (onAbort) signal?.removeEventListener('abort', onAbort);
+      if (!r.ok) {
+        call.cancel();
+        throw new BusError(r.error);
+      }
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the broker validated the reply against the topic's reply schema
+      return r.value as never;
+    },
+
+    tools: () => tools,
 
     async dropTopic(name, opts) {
       if (!controller)

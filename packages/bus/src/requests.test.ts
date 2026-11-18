@@ -190,3 +190,58 @@ describe('request/response', () => {
     );
   });
 });
+
+describe('host requests (kernel.request, ADR 0018)', () => {
+  it('appends req { from: host, id, via } and answers the host with the validated reply', async () => {
+    const { broker, responder, timers } = await wired();
+    const got: unknown[] = [];
+    broker.request(
+      price.name,
+      undefined,
+      { sku: 'h' },
+      { id: 'h1', timeoutMs: 10_000, via: 'mcp' },
+      (r) => got.push(r),
+    );
+    await flush();
+    const rec = responder.records(price.name)[0];
+    expect(rec).toMatchObject({ producer: 'host', req: { from: 'host', id: 'h1', via: 'mcp' } });
+    expect(timers.map((t) => t.ms)).toEqual([10_000]);
+    expect(await reply(responder, rec, { cents: 7 })).toEqual({
+      ok: true,
+      value: { delivered: true },
+    });
+    // A second reply is refused, and the host hears only the first.
+    expect(await reply(responder, rec, { cents: 8 })).toMatchObject({
+      error: { code: 'already_replied' },
+    });
+    expect(got).toEqual([{ ok: true, value: { cents: 7 } }]);
+  });
+
+  it('leaves via off when the host sets none, and an isolate request never carries one', async () => {
+    const { broker, caller, responder } = await wired();
+    broker.request(price.name, undefined, { sku: 'a' }, { id: 'h1', timeoutMs: 1000 }, () => {});
+    request(caller, { value: { sku: 'b' }, via: 'webmcp' });
+    await flush();
+    const [host, iso] = responder.records(price.name);
+    expect(host?.req).toEqual({ from: 'host', id: 'h1' });
+    expect(iso?.req).toEqual({ from: 'C', id: 'r1' });
+  });
+
+  it('answers the host with the failure when the record is refused', async () => {
+    const { broker } = await wired();
+    const got: unknown[] = [];
+    broker.request(price.name, undefined, { sku: 1 }, { id: 'h1', timeoutMs: 1000 }, (r) =>
+      got.push(r),
+    );
+    broker.request(plain.name, undefined, 'x', { id: 'h2', timeoutMs: 1000 }, (r) => got.push(r));
+    broker.request('isoloop.route.v1', undefined, {}, { id: 'h3', timeoutMs: 1000 }, (r) =>
+      got.push(r),
+    );
+    await flush();
+    expect(got).toMatchObject([
+      { error: { code: 'invalid' } },
+      { error: { code: 'not_requestable' } },
+      { error: { code: 'forbidden' } },
+    ]);
+  });
+});
