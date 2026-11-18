@@ -59,7 +59,8 @@ function isHello(x: unknown): x is Hello {
     typeof p['url'] === 'string' &&
     (p['title'] === undefined || typeof p['title'] === 'string') &&
     Array.isArray(p['tools']) &&
-    p['tools'].every(isTool)
+    p['tools'].every(isTool) &&
+    (p['inspect'] === undefined || typeof p['inspect'] === 'boolean')
   );
 }
 
@@ -104,6 +105,7 @@ export function listenForPages(o: PagesOptions): Promise<WsServer> {
             url: m.p.url,
             title: m.p.title,
             tools: m.p.tools,
+            inspect: m.p.inspect === true,
             send,
           });
           send({ v: 1, t: 'welcome', p: { page } });

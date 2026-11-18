@@ -12,6 +12,8 @@ export type Harness = {
    * imported here for `contracts.list` and by the bus worker, as in an app.
    */
   createBusKernel(contractsUrl: string, config?: Config): Promise<Kernel>;
+  /** `connectDevMCP` from `@isoloop/host/dev-mcp` (M4a), loaded on first use. */
+  connectDevMCP(kernel: Kernel, options: { token: string; url?: string }): Promise<() => void>;
 };
 
 declare global {
@@ -47,6 +49,10 @@ window.harness = {
       contracts: { url: contractsUrl, list: mod.default },
       workers: { ...workers(budget), bus: busWorker },
     });
+  },
+  async connectDevMCP(kernel, options) {
+    const { connectDevMCP } = await import('@isoloop/host/dev-mcp');
+    return connectDevMCP(kernel, options);
   },
 };
 document.body.dataset['ready'] = 'true';

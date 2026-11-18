@@ -9,13 +9,20 @@ import {
   ToolListChangedNotificationSchema,
   type JSONRPCMessage,
 } from '@modelcontextprotocol/sdk/types.js';
-import { isCliToPage, type CliToPage, type DevMcpTool, type PageToCli } from '@isoloop/protocol';
+import {
+  isCliToPage,
+  type CliToPage,
+  type DevMcpOp,
+  type DevMcpTool,
+  type PageToCli,
+} from '@isoloop/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Io } from '../io';
 import { main } from '../main';
 import { originMatcher, tokenMatches } from './pairing';
 import { UNTRUSTED_SENTENCE } from './server';
 import { readMessages } from './stdio';
+import { BUILTIN_BY_NAME } from './tools';
 import { listenWs } from './websocket';
 
 const TOKEN = 'test-token-0123456789';
@@ -107,6 +114,10 @@ async function startMcp(
   return { client, port, err: () => err, changes: () => changes, stop };
 }
 
+/** The listed names without the dev MCP's own inspection tools (`tools.ts`). */
+const appTools = (tools: readonly { name: string }[]): string[] =>
+  tools.map((t) => t.name).filter((n) => n === 'isoloop_pages' || !BUILTIN_BY_NAME.has(n));
+
 const running: (() => Promise<number>)[] = [];
 afterEach(async () => {
   await Promise.all(running.splice(0).map(async (stop) => stop()));
@@ -155,6 +166,8 @@ async function page(
     tools?: DevMcpTool[];
     answer?: Answer;
     url?: string;
+    /** Says `inspect` in its hello, and answers ops with this. */
+    op?: (op: DevMcpOp) => PageToCli['p'];
   } = {},
 ) {
   const headers: Record<string, string> = {};
@@ -171,6 +184,9 @@ async function page(
       const a = o.answer(m.p);
       if (a !== 'never') ws.send(JSON.stringify({ v: 1, t: 'result', re: m.id, p: a }));
     }
+    if (m.t === 'op' && o.op !== undefined) {
+      ws.send(JSON.stringify({ v: 1, t: 'result', re: m.id, p: o.op(m.p) }));
+    }
   });
   ws.addEventListener('close', (e) => (closeCode = e.code));
   ws.addEventListener('error', () => (failed = true));
@@ -184,6 +200,7 @@ async function page(
         url: o.url ?? 'http://localhost:5173/',
         title: 'Markets',
         tools: o.tools ?? TOOLS,
+        ...(o.op === undefined ? {} : { inspect: true }),
       },
     };
     ws.send(JSON.stringify(hello));
@@ -309,7 +326,7 @@ describe('isoloop mcp', () => {
     expect(client.getServerVersion()?.name).toBe('isoloop');
     expect(client.getServerCapabilities()?.tools).toEqual({ listChanged: true });
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name)).toEqual(['isoloop_pages']);
+    expect(appTools(tools)).toEqual(['isoloop_pages']);
   });
 
   it('prints a fresh token on stderr unless ISOLOOP_MCP_TOKEN is set', async () => {
@@ -326,7 +343,7 @@ describe('isoloop mcp', () => {
     await p.welcomed();
     await until(() => mcp.changes() === 1);
     const { tools } = await mcp.client.listTools();
-    expect(tools.map((t) => t.name)).toEqual(['isoloop_pages', 'markets.quote.v1', 'echo.v1']);
+    expect(appTools(tools)).toEqual(['isoloop_pages', 'markets.quote.v1', 'echo.v1']);
     const quote = tools.find((t) => t.name === 'markets.quote.v1');
     expect(quote?.title).toBe('Quote');
     expect(quote?.description).toBe(`The markets.quote.v1 tool ${UNTRUSTED_SENTENCE}`);
@@ -403,7 +420,7 @@ describe('isoloop mcp', () => {
     await until(() => p.closeCode() !== undefined);
     expect(p.closeCode()).toBe(4401);
     const { tools } = await mcp.client.listTools();
-    expect(tools.map((t) => t.name)).toEqual(['isoloop_pages']);
+    expect(appTools(tools)).toEqual(['isoloop_pages']);
     expect(mcp.err()).toContain('wrong token');
   });
 
@@ -472,7 +489,7 @@ describe('isoloop mcp', () => {
     expect(JSON.stringify(r.content)).toContain('page_gone');
     await until(() => mcp.changes() === 2);
     const { tools } = await mcp.client.listTools();
-    expect(tools.map((t) => t.name)).toEqual(['isoloop_pages']);
+    expect(appTools(tools)).toEqual(['isoloop_pages']);
   });
 
   it("passes the agent's cancellation to the page", async () => {
@@ -523,5 +540,109 @@ describe('isoloop mcp', () => {
     expect(await mcp.stop()).toBe(0);
     await until(() => p.closeCode() !== undefined);
     expect(p.closeCode()).toBe(4000);
+  });
+});
+
+describe("the dev MCP's own tools (M4a task 8)", () => {
+  const READS = ['isoloop_isolates', 'isoloop_topics', 'isoloop_records', 'isoloop_events'];
+  const WRITES = [
+    'isoloop_restart',
+    'isoloop_kill',
+    'isoloop_block',
+    'isoloop_publish',
+    'isoloop_request',
+  ];
+  const ops: DevMcpOp[] = [];
+  const echoOp = (op: DevMcpOp): PageToCli['p'] => {
+    ops.push(op);
+    return { ok: true, value: { got: op.op } };
+  };
+  afterEach(() => void ops.splice(0));
+
+  it('lists the reads always and the writes only with --allow-write', async () => {
+    const ro = await startMcp();
+    const roNames = (await ro.client.listTools()).tools.map((t) => t.name);
+    expect(roNames).toEqual(expect.arrayContaining(READS));
+    for (const w of WRITES) expect(roNames).not.toContain(w);
+    const refused = await ro.client.callTool({ name: 'isoloop_kill', arguments: { id: 'a' } });
+    expect(refused.isError).toBe(true);
+    expect(JSON.stringify(refused.content)).toContain('--allow-write');
+
+    const rw = await startMcp(['--allow-write']);
+    const rwNames = (await rw.client.listTools()).tools.map((t) => t.name);
+    expect(rwNames).toEqual(expect.arrayContaining([...READS, ...WRITES]));
+    const block = (await rw.client.listTools()).tools.find((t) => t.name === 'isoloop_block');
+    expect(block?.annotations?.destructiveHint).toBe(true);
+    expect(block?.inputSchema.required).toEqual(['id', 'ms']);
+  });
+
+  it('sends each tool as an op with its defaults, and returns the answer', async () => {
+    const mcp = await startMcp(['--allow-write']);
+    const p = await page(mcp.port, { op: echoOp });
+    await p.welcomed();
+    const r = await mcp.client.callTool({ name: 'isoloop_records', arguments: { topic: 'a.v1' } });
+    expect(r.structuredContent).toEqual({ got: 'records' });
+    await mcp.client.callTool({ name: 'isoloop_events', arguments: {} });
+    await mcp.client.callTool({ name: 'isoloop_block', arguments: { id: 'w', ms: 2_000 } });
+    await mcp.client.callTool({
+      name: 'isoloop_request',
+      arguments: { topic: 'a.v1', value: { q: 1 }, key: 'k' },
+    });
+    await mcp.client.callTool({
+      name: 'isoloop_publish',
+      arguments: { topic: 'b.v1', value: null },
+    });
+    expect(ops).toEqual([
+      { op: 'records', topic: 'a.v1', last: 20 },
+      { op: 'events', last: 50 },
+      { op: 'block', id: 'w', ms: 2_000 },
+      { op: 'request', topic: 'a.v1', value: { q: 1 }, key: 'k', timeoutMs: 10_000 },
+      { op: 'publish', topic: 'b.v1', value: null },
+    ]);
+  });
+
+  it('refuses bad arguments before the page sees them', async () => {
+    const mcp = await startMcp(['--allow-write']);
+    const p = await page(mcp.port, { op: echoOp });
+    await p.welcomed();
+    const bad = [
+      { name: 'isoloop_records', arguments: { topic: 'a.v1', last: 101 } },
+      { name: 'isoloop_records', arguments: {} },
+      { name: 'isoloop_block', arguments: { id: 'w', ms: 10_001 } },
+      { name: 'isoloop_block', arguments: { id: 'w' } },
+      { name: 'isoloop_request', arguments: { topic: 'a.v1', value: 1, timeoutMs: 30_001 } },
+      { name: 'isoloop_publish', arguments: { topic: 'a.v1' } },
+    ];
+    for (const b of bad) {
+      // oxlint-disable-next-line no-await-in-loop -- one after another, for the order of ops
+      const r = await mcp.client.callTool(b);
+      expect(r.isError, b.name).toBe(true);
+    }
+    expect(ops).toEqual([]);
+  });
+
+  it('answers only from a page that inspects, and passes its errors on', async () => {
+    const mcp = await startMcp();
+    const plain = await page(mcp.port);
+    const plainId = await plain.welcomed();
+    const none = await mcp.client.callTool({ name: 'isoloop_isolates', arguments: {} });
+    expect(none.isError).toBe(true);
+    expect(JSON.stringify(none.content)).toContain('no connected page answers');
+    const notThat = await mcp.client.callTool({
+      name: 'isoloop_isolates',
+      arguments: { page: plainId },
+    });
+    expect(JSON.stringify(notThat.content)).toContain("doesn't pass kernel.inspect()");
+
+    const inspecting = await page(mcp.port, {
+      op: () => ({ ok: false, code: 'unknown_topic', message: 'unknown topic x.v1' }),
+    });
+    await inspecting.welcomed();
+    const failed = await mcp.client.callTool({
+      name: 'isoloop_records',
+      arguments: { topic: 'x.v1' },
+    });
+    expect(failed.isError).toBe(true);
+    expect(JSON.stringify(failed.content)).toContain('unknown_topic: unknown topic x.v1');
   });
 });
