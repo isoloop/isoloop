@@ -55,6 +55,9 @@ export type IdleReport = {
   busyMs?: number;
 };
 
+/** The longest `block` a runtime runs; a longer one is cut to this (ADR 0020, decision 4). */
+export const MAX_BLOCK_MS = 10_000;
+
 /** Isolate port: host → isolate. */
 export type HostToIsolate =
   | Envelope<'init', InitPayload>
@@ -62,7 +65,16 @@ export type HostToIsolate =
   | Envelope<'result', CallResult>
   | Envelope<'shutdown', { reason: ShutdownReason; graceMs: number }>
   /** New bus port after a bus restart (ADR 0007). */
-  | Envelope<'reattach', { busPort: MessagePort }>;
+  | Envelope<'reattach', { busPort: MessagePort }>
+  /**
+   * Busy-loops the isolate's worker for `ms` (at most `MAX_BLOCK_MS`), so a
+   * developer can watch containment work: the beat goes late and the
+   * supervisor acts (ADR 0020, decision 4). For a pool member it blocks the
+   * whole worker, as a real busy loop would. The host sends it only for
+   * inspect access (the `inspect` port, or an `Inspector`). Runtimes before
+   * it ignore it. @experimental
+   */
+  | Envelope<'block', { ms: number }>;
 
 /** Isolate port: isolate → host. */
 export type IsolateToHost =
@@ -103,6 +115,7 @@ export const HOST_TO_ISOLATE: MessageTypes<HostToIsolate> = {
   result: true,
   shutdown: true,
   reattach: true,
+  block: true,
 };
 
 export const ISOLATE_TO_HOST: MessageTypes<IsolateToHost> = {
