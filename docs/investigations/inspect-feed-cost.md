@@ -36,7 +36,8 @@ Median gap B − A over the 5 rounds, with its spread (lowest to highest round).
 | Data gaps on T3 and the other machines | 0.0 s | 0.0 s | 0.0 s |
 
 - **Reading the table:**
-  - **Spreads that straddle zero:** main-thread CPU and memory on Chromium, late frames and Chromium's recovery, all-thread CPU on headless Chromium, and typing on every engine.
+  - **Spreads that straddle zero:** main-thread CPU on isolated Chromium (−2 to +1 pp), memory after GC, late frames on Firefox, Chromium's recovery, all-thread CPU on headless Chromium, and typing on every engine. Main-thread CPU on headless Chromium (0 to +0 pp) and late frames on Chromium (0 to 0) show no gap at all.
+  - **Memory before GC:** the first reading is +3 MB (−3 to +7) on isolated Chromium and +4 MB (+2 to +7) on headless Chromium, where every round had the feed side higher; after a forced GC both straddle zero.
   - **Leaning one way:** on isolated Chromium, all-thread CPU's median gap is +1 pp, the top of its spread (−7 to +1): most rounds had the feed side at about +1 pp. Typing there is +8 ms (+31%) at the median, with a spread of −9 to +25 ms.
   - **The other way:** on Firefox, recovery after the 3 s block was faster with the feed open in every round (−297 to −4 ms, median −110 ms). There is no explanation for it yet: with the feed open, the only extra work is on the main thread, where the reader gets events, beats and metrics.
 - **What the reader got** by the end of the measuring window, about 20 s after navigation: 316 events (start-up, then the block's crash and restart), 17 to 19 coalesced beat messages and as many bus-metrics messages, and on the isolated run 1 or 2 memory messages.
