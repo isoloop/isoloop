@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.lib.json",
+  "compilerOptions": {
+    // The CLI runs in Node (>= 26).
+    "lib": ["ES2023"],
+    "types": ["node"],
+    // A bin with no exports: it publishes no .d.ts, so the fixtures (contracts
+    // modules as apps write them) needn't carry explicit types.
+    "declaration": false,
+    "isolatedDeclarations": false
+  },
+  "include": ["src"]
+}

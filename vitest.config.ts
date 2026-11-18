@@ -81,6 +81,7 @@ export default defineConfig({
       node('bus'),
       node('balancer'),
       node('vite'),
+      node('cli'),
       // The CI scripts' logic (scripts/ci).
       {
         test: {
