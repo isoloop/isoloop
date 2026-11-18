@@ -13,8 +13,10 @@
  *   decision 1). A crash can redeliver up to one interval of records. Each
  *   entry carries the delivery `seq` settled whole so far, so a group
  *   commit can't cover a record redelivered to this member after it
- *   (ADR 0016, points 10–12). Records settle in the order they arrived: a
- *   commit by hand settles that record and every one delivered before it.
+ *   (ADR 0016, points 10–12), and how many records of the next delivery
+ *   are settled, so a crash partway through a delivery keeps them (point
+ *   17). Records settle in the order they arrived: a commit by hand settles
+ *   that record and every one delivered before it.
  * - On `reattach` (a bus restart) it swaps the port, drops the commits still
  *   pending (the new broker would reject them before the subscriptions, so a
  *   persistent topic redelivers up to one interval, as after a crash; ADR

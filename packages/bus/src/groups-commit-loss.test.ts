@@ -139,7 +139,7 @@ describe('consumer-group commits and redelivery (ADR 0016, points 10–13)', () 
     expect(c.values(T)).toEqual([1, 2, 3]);
   });
 
-  it('records of a partly handled redelivery are covered once the whole delivery is', async () => {
+  it('records of a partly handled redelivery are covered as they are settled (point 17)', async () => {
     const { engine, publish, join } = setup();
     const a = await join('A', 'committed');
     const b = await join('B', 'committed');
@@ -152,7 +152,7 @@ describe('consumer-group commits and redelivery (ADR 0016, points 10–13)', () 
     expect(m.handle(1)).toEqual([1]);
     m.committer.flush();
     await flush();
-    expect(engine.committed(T, 'group:g')).toBe(0);
+    expect(engine.committed(T, 'group:g')).toBe(2);
     expect(m.handle(1)).toEqual([3]);
     m.committer.flush();
     await flush();
@@ -178,6 +178,48 @@ describe('consumer-group commits and redelivery (ADR 0016, points 10–13)', () 
     const c = await join('C', 'committed');
     await flush();
     expect(c.values(T)).toEqual(expect.arrayContaining([1, 3, 5]));
+  });
+
+  it('a member that crashes partway through a delivery keeps what it settled (M3j)', async () => {
+    const { broker, engine, publish, join } = setup();
+    const a = await join('A', 'committed');
+    const m = member(a);
+    publish(3);
+    await flush();
+    // One delivery of three: a member that fell behind gets its records batched.
+    expect(a.seq(T)).toBe(1);
+    expect(m.handle(1)).toEqual([0]);
+    m.committer.flush();
+    await flush();
+    expect(engine.committed(T, 'group:g')).toBe(0);
+
+    // It crashes on the next record (a corrupt file) before settling it.
+    broker.detach('A', true);
+    const c = await join('C', 'committed');
+    await flush();
+    expect(c.values(T)).toEqual([1, 2]);
+  });
+
+  it('a partly settled delivery never covers a record redelivered after it', async () => {
+    const { broker, engine, publish, join } = setup();
+    const a = await join('A', 'committed');
+    const b = await join('B', 'committed');
+    const m = member(a);
+    publish(6); // A: 0, 2, 4 in one delivery; B: 1, 3, 5
+    await flush();
+    expect(m.handle(2)).toEqual([0, 2]);
+    // B leaves: 1, 3 and 5 are redelivered to A, in a later delivery.
+    await b.call('unsubscribe', { topic: T });
+    await flush();
+    m.committer.flush();
+    await flush();
+    // 0 and 2 are covered, 1 isn't (and the group's offset stops before it).
+    expect(engine.committed(T, 'group:g')).toBe(0);
+    broker.detach('A', true);
+    const c = await join('C', 'committed');
+    await flush();
+    // 2 comes again: the group's offset moves only past a run of committed records.
+    expect(c.values(T)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('own subscriptions keep the offset rule: seq never changes what a commit covers', async () => {

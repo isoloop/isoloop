@@ -122,7 +122,7 @@ describe('createCommitter (ADR 0016, decision 1)', () => {
   });
 });
 
-describe('delivery seq in commits (ADR 0016, points 10–12)', () => {
+describe('delivery seq in commits (ADR 0016, points 10–12 and 17)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -130,10 +130,10 @@ describe('delivery seq in commits (ADR 0016, points 10–12)', () => {
     vi.useRealTimers();
   });
 
-  it('settles a delivery only with its last record', () => {
+  it('settles a delivery whole with its last record, and its first records before that', () => {
     expect(deliveryPoints(3, [10, 11, 12], 9)).toEqual([
-      { offset: 10, seq: 2 },
-      { offset: 11, seq: 2 },
+      { offset: 10, seq: 2, partial: 1 },
+      { offset: 11, seq: 2, partial: 2 },
       { offset: 12, seq: 3 },
     ]);
     // An empty delivery (a gap alone) settles nothing by itself.
@@ -144,20 +144,20 @@ describe('delivery seq in commits (ADR 0016, points 10–12)', () => {
     // A group member settled 0 and 2 (delivery 1); 1 and 3 come back to it
     // in delivery 2 after another member left.
     expect(deliveryPoints(2, [1, 3], 2)).toEqual([
-      { offset: 2, seq: 1 },
+      { offset: 2, seq: 1, partial: 1 },
       { offset: 3, seq: 2 },
     ]);
   });
 
-  it('a partly settled delivery leaves seq at the delivery before it', () => {
+  it('a partly settled delivery leaves seq at the delivery before it, with its settled records counted', () => {
     const { c, sent } = setup();
     const [a, b] = deliveryPoints(1, [0, 2], -1);
     const [r1] = deliveryPoints(2, [1, 3], 2);
     for (const p of [a, b, r1]) if (p) c.settle('t', p);
     vi.advanceTimersByTime(100);
     // Offset 2 is reached, but delivery 2 (1 and 3) isn't settled whole:
-    // the broker covers 0 and 2, and 1 stays with this member.
-    expect(sent).toEqual([[{ topic: 't', offset: 2, seq: 1 }]]);
+    // the broker covers 0 and 2, and of delivery 2 only its first record, 1.
+    expect(sent).toEqual([[{ topic: 't', offset: 2, seq: 1, partial: 1 }]]);
   });
 
   it('keeps offset and seq as separate highs', () => {
@@ -165,6 +165,15 @@ describe('delivery seq in commits (ADR 0016, points 10–12)', () => {
     c.settle('t', { offset: 5, seq: 1 });
     c.settle('t', { offset: 3, seq: 2 });
     expect(c.pending().get('t')).toEqual({ offset: 5, seq: 2 });
+  });
+
+  it('a whole delivery is further than any part of it, and a later part further than an earlier one', () => {
+    const { c } = setup();
+    c.settle('t', { offset: 4, seq: 1, partial: 1 });
+    c.settle('t', { offset: 5, seq: 1, partial: 2 });
+    expect(c.pending().get('t')).toEqual({ offset: 5, seq: 1, partial: 2 });
+    c.settle('t', { offset: 6, seq: 2 });
+    expect(c.pending().get('t')).toEqual({ offset: 6, seq: 2 });
   });
 
   it('a stuck subscription stops at the delivery before the record that threw', () => {
@@ -177,22 +186,23 @@ describe('delivery seq in commits (ADR 0016, points 10–12)', () => {
     ];
     for (const p of points.slice(0, 7)) c.settle('t', p);
     vi.advanceTimersByTime(100);
-    expect(sent).toEqual([[{ topic: 't', offset: 6, seq: 1 }]]);
+    // 5 and 6, the records of delivery 2 before 7, are settled too.
+    expect(sent).toEqual([[{ topic: 't', offset: 6, seq: 1, partial: 2 }]]);
   });
 
   it('the early send at half the credit carries the seq settled so far', () => {
     const { c, sent } = setup({ intervalMs: 1000, credit: 8 });
     const points = [...deliveryPoints(1, [0, 1], -1), ...deliveryPoints(2, [2, 3, 4], 1)];
     for (const p of points.slice(0, 4)) c.settle('t', p);
-    expect(sent).toEqual([[{ topic: 't', offset: 3, seq: 1 }]]);
+    expect(sent).toEqual([[{ topic: 't', offset: 3, seq: 1, partial: 2 }]]);
   });
 
-  it('take, on shutdown, returns the offset and seq pending and clears them', () => {
+  it('take, on shutdown, returns the commit point pending and clears it', () => {
     const { c, sent } = setup();
     for (const p of deliveryPoints(1, [0, 1], -1)) c.settle('t', p);
     const [first] = deliveryPoints(2, [2, 3], 1);
     if (first) c.settle('t', first);
-    expect(c.take()).toEqual([{ topic: 't', offset: 2, seq: 1 }]);
+    expect(c.take()).toEqual([{ topic: 't', offset: 2, seq: 1, partial: 1 }]);
     expect(c.take()).toBeUndefined();
     vi.advanceTimersByTime(100);
     expect(sent).toEqual([]);

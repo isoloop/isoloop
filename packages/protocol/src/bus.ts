@@ -79,9 +79,14 @@ export type IsolateToBus =
    * at half a subscription's credit, on shutdown and on a new port. `seq` is
    * the highest `deliver` whose records, and those of every earlier one on
    * the subscription, are all settled; a group commit covers only records
-   * with `offset ≤ offset` and `seq ≤ seq` (ADR 0016, points 11–12).
+   * with `offset ≤ offset` and `seq ≤ seq` (ADR 0016, points 11–12), and
+   * the first `partial` records of delivery `seq + 1`, when it's partly
+   * settled (point 17).
    */
-  | Envelope<'commits', { offsets: { topic: string; offset: number; seq: number }[] }>
+  | Envelope<
+      'commits',
+      { offsets: { topic: string; offset: number; seq: number; partial?: number }[] }
+    >
   /**
    * `bus.request`: appended like a publish, with `req` set on the record. `id`
    * is required; the reply (or `reply_invalid`) comes back as `result { re: id }`.

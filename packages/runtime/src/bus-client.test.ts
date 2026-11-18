@@ -70,8 +70,8 @@ describe('createBusClient', () => {
     await vi.waitUntil(() => bus.got.filter((m) => m.t === 'commits').length === 2);
     expect(seen).toEqual([0, 10]);
     expect(bus.got.filter((m) => m.t === 'commits').map((m) => m.p)).toEqual([
-      // The delivery counts once its last record is settled.
-      { offsets: [{ topic: 'nums.v1', offset: 0, seq: 0 }] },
+      // The delivery counts once its last record is settled; before that, its first record.
+      { offsets: [{ topic: 'nums.v1', offset: 0, seq: 0, partial: 1 }] },
       { offsets: [{ topic: 'nums.v1', offset: 1, seq: 1 }] },
     ]);
     bus.send({ v: 1, t: 'reset', p: { topic: 'nums.v1', reason: 'bus_restart' } });
@@ -117,7 +117,7 @@ describe('createBusClient', () => {
     await vi.waitUntil(() => errors.length === 1);
     await new Promise((res) => setTimeout(res, 20));
     expect(bus.got.flatMap((m) => (m.t === 'commits' ? m.p.offsets : []))).toEqual([
-      { topic: 'nums.v1', offset: 0, seq: 0 },
+      { topic: 'nums.v1', offset: 0, seq: 0, partial: 1 },
     ]);
   });
 
@@ -241,7 +241,7 @@ describe('combined commits (ADR 0016, decision 1)', () => {
     await bus.next('subscribe');
     bus.send({ v: 1, t: 'deliver', p: { topic: 'nums.v1', records: [0, 1, 2].map(rec), seq: 1 } });
     await vi.waitUntil(() => commitsOf(bus.got).length === 1);
-    expect(commitsOf(bus.got)).toEqual([[{ topic: 'nums.v1', offset: 1, seq: 0 }]]);
+    expect(commitsOf(bus.got)).toEqual([[{ topic: 'nums.v1', offset: 1, seq: 0, partial: 2 }]]);
   });
 
   it('stops at the record before a handler that throws', async () => {
@@ -256,7 +256,7 @@ describe('combined commits (ADR 0016, decision 1)', () => {
     await vi.waitUntil(() => onError.mock.calls.length === 1);
     void handle.close();
     await vi.waitUntil(() => commitsOf(bus.got).length === 1);
-    expect(commitsOf(bus.got)).toEqual([[{ topic: 'nums.v1', offset: 0, seq: 0 }]]);
+    expect(commitsOf(bus.got)).toEqual([[{ topic: 'nums.v1', offset: 0, seq: 0, partial: 1 }]]);
   });
 
   it('close sends what is pending at once: shutdown, for every reason', async () => {
@@ -360,7 +360,7 @@ describe('delivery seq in commits (ADR 0016, points 10–12)', () => {
     expect(commitsOf(bus.got).at(-1)).toEqual([{ topic: 'nums.v1', offset: 3, seq: 2 }]);
   });
 
-  it('close, while a delivery is partly handled, sends the deliveries settled whole', async () => {
+  it('close, while a delivery is partly handled, sends what is settled, the part included', async () => {
     const bus = fakeBus();
     const handle = createBusClient(bus.port, { commitIntervalMs: 1000 });
     const h = holdAt(4);
@@ -371,7 +371,7 @@ describe('delivery seq in commits (ADR 0016, points 10–12)', () => {
     await new Promise((r) => setTimeout(r, 10));
     void handle.close();
     const sent = await bus.next('commits');
-    expect(sent.p.offsets).toEqual([{ topic: 'nums.v1', offset: 3, seq: 1 }]);
+    expect(sent.p.offsets).toEqual([{ topic: 'nums.v1', offset: 3, seq: 1, partial: 1 }]);
   });
 
   it('a gap alone settles with the next delivery', async () => {
