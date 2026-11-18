@@ -1,5 +1,18 @@
 # @isoloop/balancer
 
+## 0.1.0-next.3
+
+### Patch Changes
+
+- Updated dependencies [c2ad524]
+- Updated dependencies [16b3e38]
+- Updated dependencies [235d488]
+- Updated dependencies [9137d5e]
+- Updated dependencies [29f2296]
+- Updated dependencies [c099c70]
+- Updated dependencies [12e43d0]
+  - @isoloop/host@0.1.0-next.3
+
 ## 0.1.0-next.2
 
 ### Minor Changes

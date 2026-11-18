@@ -1,5 +1,21 @@
 # @isoloop/preact
 
+## 0.1.0-next.3
+
+### Patch Changes
+
+- Updated dependencies [ce4dc9a]
+- Updated dependencies [16b3e38]
+- Updated dependencies [ffb3ef3]
+- Updated dependencies [fcb9fb5]
+- Updated dependencies [9137d5e]
+- Updated dependencies [29f2296]
+- Updated dependencies [c099c70]
+- Updated dependencies [12e43d0]
+- Updated dependencies [c519268]
+  - @isoloop/protocol@0.1.0-next.3
+  - @isoloop/runtime@0.1.0-next.3
+
 ## 0.1.0-next.2
 
 ### Patch Changes
