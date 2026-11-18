@@ -2,7 +2,7 @@
 
 **Goal:** 0.1 ships with agent support. Agents can learn Isoloop (`llms.txt`, `AGENTS.md`, a skill), see a running app (the dev MCP), and call tools an app exposes, at dev time through the dev MCP and in the browser through WebMCP.
 
-**Status:** grilled 2026-11-17 (Q1–Q34, yes to all); background in the [investigation](../investigations/ai-enablers.md). In progress: tasks 1–4 (ADR 0018 and the tool surface) and 5 (the `isoloop` CLI with `contracts export`) done 2026-11-18. An `unchecked()` topic exports as `{}` with a warning and exit 0, as ADR 0003 decision 21 says (the user confirmed it 2026-11-18); a tool still refuses it (`not_exposable`).
+**Status:** grilled 2026-11-17 (Q1–Q34, yes to all); background in the [investigation](../investigations/ai-enablers.md). In progress: tasks 1–4 (ADR 0018 and the tool surface) 5 (the `isoloop` CLI with `contracts export`) and 6 (`isoloop mcp`: the stdio server, the WebSocket and pairing, with the pages' tools forwarded and `isoloop_pages`) done 2026-11-18. The inspection reads and the `isoloop_*` writes are task 8's. An `unchecked()` topic exports as `{}` with a warning and exit 0, as ADR 0003 decision 21 says (the user confirmed it 2026-11-18); a tool still refuses it (`not_exposable`).
 
 **Done when:**
 
