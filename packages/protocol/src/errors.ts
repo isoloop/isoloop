@@ -25,6 +25,11 @@ export const ERROR_CODES = [
   'not_requestable',
   'already_replied',
   'reply_invalid',
+  // kernel.request (ADR 0018)
+  /** The caller's `AbortSignal` aborted the request. */
+  'aborted',
+  /** No isolate that could answer the request is alive: none has a subscribe grant for it, or all of them are stopped or `failed`. */
+  'no_responder',
   // Contracts (ADR 0003): fatal, never retried
   'contracts_failed',
   'contracts_invalid',

@@ -11,6 +11,7 @@ import {
   type ErrorCode,
   type Grants,
   type IsolateToBus,
+  type RequestVia,
   type SeedEvent,
   type StartPosition,
 } from '@isoloop/protocol';
@@ -126,7 +127,7 @@ type Pending = {
   /** Estimated size of the published value. */
   bytes: number;
   key: string | undefined;
-  req: { from: Connection; id: string; timeoutMs: number } | undefined;
+  req: { from: Connection; id: string; timeoutMs: number; via?: RequestVia } | undefined;
   /** A record `follow` forwards keeps its source's `ts`; publishes get the time of append. */
   ts?: number;
   /** The publisher's `(epoch, seq)`, for deduplicating re-sends on persistent topics. */
@@ -200,6 +201,11 @@ type Connection = {
   subs: Map<string, Subscription>;
   /** Set when attached after a bus restart: memory topics not yet reset on this connection. */
   reset: Set<string> | undefined;
+  /**
+   * A `kernel.request`'s caller (ADR 0018): not attached, answered through
+   * the control port, and alive as long as the bus is.
+   */
+  host?: true;
 };
 
 const fail = (code: ErrorCode, message: string, extra?: Partial<CallError>): CallResult => ({
@@ -610,6 +616,61 @@ export class Broker {
     return new Promise((resolve) => this.#publish(from, topic, key, value, undefined, resolve, id));
   }
 
+  /**
+   * A request from the host (`kernel.request`, ADR 0018, decision 4): like
+   * an isolate's `bus.request`, with `req: { from: 'host', id, via }` on the
+   * record. `answer` gets one result: a failure to append, or the first
+   * valid reply (or `reply_invalid`). Nothing, if no reply comes before the
+   * caller's timeout; the request is forgotten after `timeoutMs`.
+   */
+  request(
+    topic: string,
+    key: string | undefined,
+    value: unknown,
+    opts: { id: string; timeoutMs: number; via?: RequestVia },
+    answer: (r: CallResult) => void,
+    appendId?: AppendId,
+  ): void {
+    let answered = false;
+    const once = (r: CallResult): void => {
+      if (answered) return;
+      answered = true;
+      answer(r);
+    };
+    const caller: Connection = {
+      isolateId: HOST_PRODUCER,
+      grants: { publish: [], subscribe: [] },
+      port: {
+        post: (m) => {
+          if (m.t === 'result') once(m.p);
+        },
+        onMessage: () => {},
+        close: () => {},
+      },
+      subs: new Map(),
+      reset: undefined,
+      host: true,
+    };
+    const req = {
+      from: caller,
+      id: opts.id,
+      timeoutMs: opts.timeoutMs > 0 ? opts.timeoutMs : DEFAULT_REQUEST_TIMEOUT_MS,
+      ...(opts.via === undefined ? {} : { via: opts.via }),
+    };
+    // Only failures answer here; success is the reply.
+    this.#publish(
+      { kind: 'host' },
+      topic,
+      key,
+      value,
+      req,
+      (r) => {
+        if (!r.ok) once(r);
+      },
+      appendId,
+    );
+  }
+
   #receive(conn: Connection, msg: unknown): void {
     // Every message names its topic, except `commits`, whose entries each do (ADR 0016).
     if (!isIsolateToBus(msg) || (msg.t !== 'commits' && !hasTopic(msg.p))) {
@@ -835,7 +896,13 @@ export class Broker {
     }
     let rec: NewRecord = { value: checked.value, ts: p.ts ?? this.#now(), producer: p.producer };
     if (p.key !== undefined) rec = { ...rec, key: p.key };
-    if (p.req) rec = { ...rec, req: { from: p.req.from.isolateId, id: p.req.id } };
+    if (p.req) {
+      const { via } = p.req;
+      rec = {
+        ...rec,
+        req: { from: p.req.from.isolateId, id: p.req.id, ...(via === undefined ? {} : { via }) },
+      };
+    }
     const offset = this.#engine.append(name, rec, p.id);
     topic.records++;
     topic.bytes += p.bytes;
@@ -937,7 +1004,8 @@ export class Broker {
         return settle(fail('already_replied', `request ${name}@${offset} has an answer`));
       req.done = true;
       const checked = this.#check(name, r);
-      const callerAlive = this.#conns.get(req.caller.isolateId) === req.caller;
+      const callerAlive =
+        req.caller.host === true || this.#conns.get(req.caller.isolateId) === req.caller;
       if (!checked.ok) {
         settle(checked);
         if (callerAlive) {

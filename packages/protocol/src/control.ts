@@ -1,6 +1,6 @@
 import { envelopeGuard, type Envelope, type MessageTypes } from './envelope';
 import type { CallResult, ErrorCode, ErrorPayload, Issue } from './errors';
-import type { PublishId } from './bus';
+import type { PublishId, RequestVia } from './bus';
 import type { Grants } from './grants';
 
 export type Retention =
@@ -94,6 +94,23 @@ export type HostToBus =
    */
   | Envelope<'publish', { topic: string; key?: string; value: unknown } & PublishId>
   /**
+   * `kernel.request` (ADR 0018, decision 4): appended like a host publish,
+   * with `req: { from: 'host', id, via }` on the record. `id` is required
+   * and is the request id; the reply (or a failure) comes back as `result`.
+   * The broker forgets the request after `timeoutMs`; the host raises the
+   * timeout.
+   */
+  | Envelope<
+      'request',
+      {
+        topic: string;
+        key?: string;
+        value: unknown;
+        timeoutMs: number;
+        via?: RequestVia;
+      } & PublishId
+    >
+  /**
    * The page is freezing or going away: write persistent topics' pending
    * batch now (ADR 0001, what the browser still controls). With `id` set, the
    * bus replies with `result` once it is on disk.
@@ -143,6 +160,7 @@ export const HOST_TO_BUS: MessageTypes<HostToBus> = {
   attach: true,
   detach: true,
   publish: true,
+  request: true,
   flush: true,
   drop: true,
 };

@@ -10,6 +10,8 @@
  */
 import {
   isHostToBus,
+  isRequestVia,
+  REQUEST_VIA,
   isSystemTopic,
   type BusMetrics,
   type BusToHost,
@@ -247,6 +249,34 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         });
         return;
       }
+      case 'request': {
+        const { id } = msg;
+        if (id === undefined) return; // nowhere to send the answer
+        const answer = (p: CallResult): void => post({ v: 1, t: 'result', re: id, p });
+        const key: unknown = msg.p.key;
+        const via: unknown = msg.p.via;
+        const timeoutMs: unknown = msg.p.timeoutMs;
+        if (key !== undefined && typeof key !== 'string')
+          return answer({ ok: false, error: { code: 'invalid', message: 'key must be a string' } });
+        if (via !== undefined && !isRequestVia(via))
+          return answer({
+            ok: false,
+            error: { code: 'invalid', message: `via must be one of ${REQUEST_VIA.join(', ')}` },
+          });
+        b.request(
+          msg.p.topic,
+          key,
+          msg.p.value,
+          {
+            id,
+            timeoutMs: typeof timeoutMs === 'number' ? timeoutMs : 0,
+            ...(via === undefined ? {} : { via }),
+          },
+          answer,
+          publishId(msg.p),
+        );
+        return;
+      }
       case 'flush': {
         const { id } = msg;
         void b.flush().then(
@@ -315,9 +345,10 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         ports.delete(msg.p.isolateId);
         break;
       case 'publish':
+      case 'request':
         if (earlyPublishes >= limit) {
           if (msg.id !== undefined)
-            post({ v: 1, t: 'result', re: msg.id, p: unavailable('kernel.publish') });
+            post({ v: 1, t: 'result', re: msg.id, p: unavailable(`kernel.${msg.t}`) });
           return;
         }
         earlyPublishes++;

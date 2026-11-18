@@ -48,6 +48,11 @@ export type ToolSpec = {
 /** The parts of a topic definition that make up its `TopicConfig`. */
 export type TopicShape = {
   readonly name: string;
+  /**
+   * The topic's Standard Schema. The host reads it only to make a tool's
+   * JSON Schema (ADR 0018, decision 1); it never validates with it.
+   */
+  readonly schema?: unknown;
   readonly retention: Retention;
   readonly maxRecordBytes?: number;
   readonly durability?: 'memory' | 'persistent';
