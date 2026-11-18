@@ -55,6 +55,7 @@ The main thread shows everything isolates render ([engine constraints](investiga
 ## Devtools
 
 - **The balancer's states in devtools (`inspector.annotate(source, data)`).** The M4b panel shows pools and members from `kernel.pools()`, but not the balancer's own states such as quarantine or a running bisect. An `annotate` call on the inspector would let the balancer add them. Deferred because it adds public API to two packages before the 0.1 freeze. ([ADR 0020](adr/0020-inspection-feed.md))
+- **Heap per isolate in devtools (`performance.measureUserAgentSpecificMemory()`).** Chromium has `performance.memory` only on the main thread, so 0.1 shows no heap. `measureUserAgentSpecificMemory()` works in workers but only on cross-origin-isolated pages, asynchronously and coarsely. Worth it if browsers make it practical. ([ADR 0020](adr/0020-inspection-feed.md), decision 4)
 - **A browser extension.** M4b's devtools are a panel in the page, drawn by an isolate ([M4b](plans/m4b-devtools.md#devtools-decisions-2026-11-16)). An extension would give devtools on a site without changing its code, and space outside the page. It would be one more client of `kernel.inspect()`, like the panel and the dev MCP, so it needs no new kernel work. Worth it once other people run Isoloop apps in production. It can't reach phones, and Safari needs an Xcode build and a paid Apple developer account.
 
 ## Widget creator
