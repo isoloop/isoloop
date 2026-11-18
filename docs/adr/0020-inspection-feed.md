@@ -1,6 +1,6 @@
 # ADR 0020: Inspection feed
 
-- **Status:** Proposed (2026-11-18), after grilling (Q1–Q11, yes to all).
+- **Status:** Accepted (2026-11-18), after grilling (Q1–Q11, yes to all).
 - **Date:** 2026-11-18
 - **Plan:** [M4b](../plans/m4b-devtools.md) (its devtools decisions 2, 5 and 7 are what this ADR makes precise). The [M4a](../plans/m4a-agents.md) dev MCP reads the same feed (decisions 12 and 13 there).
 
