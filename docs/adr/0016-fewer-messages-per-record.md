@@ -1,6 +1,6 @@
 # ADR 0016: Fewer bus messages per record
 
-- **Status:** Accepted. Amended 2026-11-17 (accepted the same day, [#211](https://github.com/isoloop/isoloop/issues/211)): commits carry a delivery sequence, so a group commit can't cover a record redelivered after it (points 10–13), and a consumer group that has committed resumes from its committed offset whatever `from` says (point 14). Points 15 and 16, added 2026-11-17 after the fix (#224), record what a by-hand commit settles and what happens to a record from an old connection.
+- **Status:** Accepted. Amended 2026-11-17 (accepted the same day, [#211](https://github.com/isoloop/isoloop/issues/211)): commits carry a delivery sequence, so a group commit can't cover a record redelivered after it (points 10–13), and a consumer group that has committed resumes from its committed offset whatever `from` says (point 14). Points 15 and 16, added 2026-11-17 after the fix (#224), record what a by-hand commit settles and what happens to a record from an old connection. Amended 2026-11-18 (proposed, M3j): a commit also covers the settled first records of a delivery that's only partly settled, so a member that stops partway through a delivery keeps them (points 17 and 18).
 - **Date:** 2026-11-11 (proposed 2026-11-10)
 - **Amends:** [ADR 0005](0005-bus-topology-message-channels.md), what travels on an isolate's bus port: commits are combined
 - **Evidence:**
@@ -81,6 +81,20 @@ Found by the processor example (isoloop/web#130) and reproduced in `packages/bus
 15. **A by-hand `commit(record)` settles that record and every record delivered before it on the subscription** (decided while building the fix, [#224](https://github.com/isoloop/isoloop/pull/224)). Records settle in the order they arrived, so with `autoCommit: false` a commit means "everything up to here is done", as it did before the amendment. The `seq` it sends is that of the latest delivery the commit completes. The alternative was counting each by-hand commit as one record. Then a member that commits only some records would never complete a delivery, its `seq` would stop moving, and its group entries would pause at the credit limit. An isolate that keeps several records in flight after its handler returns must commit the last record whose earlier arrivals are all done.
 16. **A record from an old connection commits nothing** (also #224). A record delivered before a bus restart (ADR 0007), or to a subscription since replaced by a new `subscribe`, carries a `seq` from that connection or subscription. If its handler settles it afterwards, the client drops the commit. That follows point 3 (no commits sent first on a new port), and a `seq` from another connection would cover the wrong deliveries. The record comes back through redelivery, which is at-least-once anyway. Offsets the host carries over to a new port go out with `seq: 0`, which never covers a group entry.
 
+### A partly settled delivery keeps what it settled (amended 2026-11-18, M3j)
+
+Found by the M3j bench run of the File processor (isoloop/web, `@isoloop/*@0.1.0-next.2`, 4 cores at 2.0 GHz), reproduced on the bench server with crash logging and in `groups-commit-loss.test.ts` ([#256](https://github.com/isoloop/isoloop/pull/256)).
+
+**The bug.** Point 12 covers a delivery's records only once all of them are settled. A member that falls behind gets its records in batches: the broker sends up to 64 a delivery, as many as its credit allows. If it settles the first records of a batch and then stops, by a crash, a move or a stop, it has committed none of them, and the whole batch goes back to the group. Usually that costs only duplicates. But in the bench run, a corrupt file was settled first in its batch, and its processor crashed a moment later on purpose, as that kind of file does. The file was sent again to the next image processor, which crashed the same way. The two crashed in turn, 8 or 9 times in about 8 s, until the kernel gave up on both. That happened in all 16 balancer runs with faults, which lost about 480 files each. At full clock speed the processors keep up, deliveries carry one record each, and it didn't happen.
+
+17. **A commit entry carries `partial`: how many records of delivery `seq + 1` are settled,** counting from the delivery's first record, in the order they arrived: `commits { offsets: { topic, offset, seq, partial? }[] }`. A group commit also covers the entries of delivery `seq + 1` whose place in it is below `partial`; the broker keeps each entry's place beside its `seq`. Points 11 and 12 otherwise stand:
+    - **A redelivered record still can't be covered early.** A commit point names a delivery the member has already received, so a record redelivered later is in a later delivery.
+    - **Records settle in the order they arrived** (point 15), so the settled records of a delivery are always its first ones, and a count is enough.
+    - **The committer keeps the furthest point:** a whole delivery is further than any part of it, and the highest offset is kept as before.
+    - **Own subscriptions** already cover by offset, so nothing changes for them.
+    - **The cost** is one more integer in an entry, only while a delivery is partly settled. `PROTOCOL` stays `{ v: 1, min: 1 }`, as in point 13.
+18. **A record that crashes every member before it's settled still comes back to each of them** until the kernel gives up on all of them. That's at-least-once delivery with no limit on attempts, and point 17 doesn't change it. A dead-letter topic, which would set a record aside after a number of failed attempts, is in [would-like](../would-like.md).
+
 ## Not taken
 
 - **Batching per port per task, as an experimental opt-in (`KernelConfig.bus.batch`), built and removed.**
@@ -117,6 +131,7 @@ What's left is mostly the bus hop (ADR 0005) times Chromium's fixed cost per por
   - Host and kernel: `invalid_config` for -1, 1,001 and 2.5; a host subscription at a 1 s interval receiving all 1,500 records of a last-100 topic, in order.
   - A kill within the interval redelivers what was handled in it, the cost point 7 accepts.
 - **Tests for the amendment:** `groups-commit-loss.test.ts` passes (no longer `it.fails`), covering the in-order case and the crossing; a member stopped right after a redelivery loses nothing; own subscriptions' commits unchanged; a group that empties and rejoins `from: 'earliest'` resumes after its committed offset, and a new group with `earliest` starts at the tail.
+- **Tests for the 2026-11-18 amendment:** in `groups-commit-loss.test.ts`, a member that crashes partway through a delivery keeps what it settled (it fails without point 17), and a partly settled delivery never covers a record redelivered after it. The committer keeps the furthest point.
 - **Config:** `createKernel` validates `bus.commitIntervalMs` (`invalid_config` outside 0–1,000, or not an integer).
 - **Docs:** the bus protocol section of the design doc (`commits`, the early sends, the redelivery window), and `KernelConfig.bus.commitIntervalMs` in the guide.
 

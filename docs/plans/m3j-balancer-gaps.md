@@ -1,6 +1,6 @@
 # M3j: Balancer gaps
 
-**Status:** in progress (grilled 2026-11-17; decisions 14–17 added 2026-11-18). An amendment to [ADR 0017](../adr/0017-opt-in-balancer.md) was accepted on 2026-11-17, and a second (decisions 14–16) on 2026-11-18. The balancer change is built in `isoloop/isoloop`, and the processor changes and the measurement in `isoloop/web`. M3j ships as a `0.1.0-next.N` prerelease, then `processor-v0.3.0`, tagged by the user.
+**Status:** in progress (grilled 2026-11-17; decisions 14–17 added 2026-11-18, and 18–21 after the bench run the same day). An amendment to [ADR 0017](../adr/0017-opt-in-balancer.md) was accepted on 2026-11-17, and a second (decisions 14–16) on 2026-11-18. An amendment to [ADR 0016](../adr/0016-fewer-messages-per-record.md) (decision 18) is proposed. The balancer change is built in `isoloop/isoloop`, and the processor changes and the measurement in `isoloop/web`. M3j ships as a `0.1.0-next.N` prerelease, then `processor-v0.3.0`, tagged by the user.
 
 **Goal:** `@isoloop/balancer` sees work its busy time misses, packs quiet members back while work keeps arriving, lets members out of the quarantine, and stops placing or reviving an isolate the kernel has given up on.
 
@@ -123,6 +123,20 @@ Tasks 4 and 5 were done on 2026-11-18 (web#155, web#158). A local smoke run of t
 16. **A backlog move needs the backlog to rise over two 10 s windows in a row,** so a queue that jumps once and holds doesn't move anything. A move now comes about 20 s after a backlog starts growing, not 10 s.
 17. **Fixed before the bench run,** so one run measures them: a balancer PR (task 2b), a `0.1.0-next.2` prerelease run by the user (task 3b), and web on it (task 5b).
 
+### Found by the bench run (2026-11-18)
+
+Task 6 ran on hauseserver from 10:13 to 13:58 UTC on web `601bfb8` (`@isoloop/*@0.1.0-next.2`, 4 cores at 2.0 GHz, `maxWorkers=2`, Chromium and Firefox). All 98 pages ran. The normal mix lost no file in any configuration. With faults, the balancer lost files in all 16 of its runs: about 480 a run, and about 4,450 in the calm runs. `own` and `one` gave up on no processor. In every balancer run the kernel gave up on both image processors, within about 10 s (in one Firefox run, on both hash processors too), and no image file got a result after that. The results weren't published.
+
+The diagnosis ran on the same server (`~/bench/diag-run.sh`). Without bench mode, at full clock speed, it didn't reproduce; at 2.0 GHz it did, on every run:
+- The corrupt file `1-74` crashed image-2 about 2 s in, as corrupt files do once their result is out. Then it came back, to image-1 and to image-2 in turn, 8 or 9 crashes in about 8 s, until the kernel gave up on both (4 crashes within 60 s each).
+- The cause is ADR 0016's point 12: a group commit covers a delivery only once all its records are settled. Running behind, the processors got their files in batches, and `1-74` was settled first in its batch. Its commit covered nothing, so the batch went back to the group.
+- The balancer made it likely without causing it: it starts every never-measured processor in one quarantine pool ([ADR 0017](../adr/0017-opt-in-balancer.md), decision 5), so for about 3 s eight processors share one worker and fall behind. Any placement that falls behind enough to get batches can hit it. A processor's own crash stays its own (`poolFate` restarts the pool only for a worker that stops beating or errors), so its neighbours weren't taken down.
+
+18. **The bus fix:** a commit also covers the settled first records of a partly settled delivery (ADR 0016, point 17, amended). In `@isoloop/protocol`, `@isoloop/bus` and `@isoloop/runtime`, with a test that fails without it (task 2c).
+19. **A record that crashes every member before it's settled** still comes back to each of them until the kernel gives up on all of them (ADR 0016, point 18). A known limitation, with a dead-letter topic in [would-like](../would-like.md); not M3j.
+20. **The balancer's start stays as it is:** never-measured processors share one quarantine pool until they're measured. The bus fix alone stops the loss. If the re-run shows harm at start-up, it's a follow-up.
+21. **The bench runs again in full** on `0.1.0-next.3` (task 6b), about 3.5 h, so v0.3.0 is one run. The write-up (task 7) reports that run, and this one and its bug in its details.
+
 ## Tasks
 
 | # | Task | Repo | Review |
@@ -136,6 +150,10 @@ Tasks 4 and 5 were done on 2026-11-18 (web#155, web#158). A local smoke run of t
 | 3b | A `0.1.0-next.2` prerelease with task 2b | isoloop | Run by the user |
 | 5b | web on `0.1.0-next.2`; the Playground's backlog E2E allows for two windows | web | Self-merge on green, after task 3b |
 | 6 | The bench-server run | web | Self-merge on green, after tasks 4, 5 and 5b |
+| 2c | The bus fix: a commit covers the settled first records of a partly settled delivery, with tests and a changeset (decision 18, [#256](https://github.com/isoloop/isoloop/pull/256)) | isoloop | Self-merge on green, after the ADR 0016 amendment is accepted |
+| 3c | A `0.1.0-next.3` prerelease with task 2c | isoloop | Run by the user |
+| 5c | web on `0.1.0-next.3` | web | Self-merge on green, after task 3c |
+| 6b | The bench-server run again, in full (decision 21) | web | Self-merge on green, after task 5c |
 | 7 | The write-up, in the results page layout (findings first, then the tables, then details) | web | User |
 | 8 | Roadmap: M3j done; `processor-v0.3.0` | isoloop, web | User pushes the tag |
 
@@ -145,7 +163,8 @@ Tasks 4 and 5 were done on 2026-11-18 (web#155, web#158). A local smoke run of t
 - **Decay lets a repeat offender back sooner.** A member that offends once every few minutes now returns after 30 s each time, where it used to wait longer each time. `kept-apart` after the fourth offence still applies while the offences last.
 - **Packing with a backlog can bounce.** A packed member whose queue then rises triggers a backlog move out. The 40 % bar, the 60 s steady window and the move budget keep that to a move each way at most a few times in 5 minutes.
 - **Fewer bisects can mean slower culprit-finding.** With no quarantine pool free, a slow pool waits as `behind`, rather than being split.
-- **The lost files may not be #211's.** If the E2E test or the re-run still loses files, M3j stays open for a diagnosis task.
+- **The lost files may not be #211's.** If the E2E test or the re-run still loses files, M3j stays open for a diagnosis task. (They weren't: the bench run found ADR 0016's point 12, decision 18.)
+- **The re-run may still lose files.** If it does, M3j stays open for another diagnosis.
 
 ## Follow-ups
 
