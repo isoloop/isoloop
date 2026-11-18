@@ -231,8 +231,10 @@ export const HOST_TO_BUS: MessageTypes<HostToBus> = {
   read: true,
 };
 
+/** The message types a tap's port carries from the bus (ADR 0020, decision 3). @experimental */
 export const BUS_TO_TAP: MessageTypes<BusToTap> = { record: true, skipped: true };
 
+/** The message types a tap's port carries to the bus. @experimental */
 export const TAP_TO_BUS: MessageTypes<TapToBus> = { close: true };
 
 export const BUS_TO_HOST: MessageTypes<BusToHost> = {
@@ -249,6 +251,8 @@ export const isHostToBus: (x: unknown) => x is HostToBus = envelopeGuard<HostToB
 
 export const isBusToHost: (x: unknown) => x is BusToHost = envelopeGuard<BusToHost>(BUS_TO_HOST);
 
+/** A well-formed message from the bus on a tap's port. @experimental */
 export const isBusToTap: (x: unknown) => x is BusToTap = envelopeGuard<BusToTap>(BUS_TO_TAP);
 
+/** A well-formed message from the host on a tap's port. @experimental */
 export const isTapToBus: (x: unknown) => x is TapToBus = envelopeGuard<TapToBus>(TAP_TO_BUS);
