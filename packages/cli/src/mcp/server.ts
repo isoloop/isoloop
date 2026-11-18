@@ -16,7 +16,8 @@
  *   names. Those without `readOnly: true` need `--allow-write`.
  * - The dev MCP's own tools (`tools.ts`): the `isoloop_*` reads from a page's
  *   inspection feed, and with `--allow-write` its writes. Only pages whose
- *   hello says `inspect` answer them.
+ *   hello says `inspect` answer them. Their names are reserved: an app tool
+ *   with the same name isn't listed, and the name calls the built-in.
  */
 import type { CliToPage, DevMcpOp, DevMcpResult, DevMcpTool } from '@isoloop/protocol';
 import { BUILTIN_BY_NAME, BUILTIN_TOOLS, UNTRUSTED_SENTENCE } from './tools';

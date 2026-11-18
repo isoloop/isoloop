@@ -170,7 +170,9 @@ function send(socket: WebSocket, m: PageToCli): void {
  * `kernel.request` with `via: 'mcp'` and the tool's `timeoutMs`; an agent's
  * cancellation aborts it. Given a kernel with `inspect()`, it also answers the
  * dev MCP's own `isoloop_*` tools: reads from the inspection feed, and the
- * CLI's `--allow-write` writes (restart, kill, block, publish, request).
+ * CLI's `--allow-write` writes (restart, kill, block, publish, request). The
+ * CLI enforces `--allow-write`; the page runs what the paired CLI sends, since
+ * only a CLI holding the token on 127.0.0.1 can send it.
  * Returns a function that disconnects and aborts the calls in flight.
  * @experimental
  */
