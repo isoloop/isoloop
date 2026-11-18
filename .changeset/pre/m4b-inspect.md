@@ -3,7 +3,7 @@
 '@isoloop/protocol': minor
 ---
 
-New, `@experimental`: `kernel.inspect()` gives an `Inspector` on the inspection feed ([ADR 0020](https://github.com/isoloop/isoloop/blob/main/docs/adr/0020-inspection-feed.md)), the one feed that M4a's dev MCP reads, and M4b's devtools panel will.
+New, `@experimental`: `kernel.inspect()` gives an `Inspector` on the inspection feed ([ADR 0020](https://github.com/isoloop/isoloop/blob/main/docs/adr/0020-inspection-feed.md)), the one feed that M4a's dev MCP reads.
 
 - `snapshot()` returns the isolates (as `kernel.isolates()` has them), the pools, the bus (its state, its restart count and the latest `bus:metrics`), and the last 200 kernel events.
 - `on(fn)` delivers events as they happen. Beats and bus metrics are coalesced to about one message a second, with the latest beat per isolate. `close()` stops this inspector's listeners.
