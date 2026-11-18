@@ -75,8 +75,9 @@ const fallbackFor =
 
 /**
  * Mounts the devtools panel: a surface covering the viewport that takes no
- * pointer events itself (the panel's boxes are `position: fixed`), and the panel isolate in its own worker with the
- * `inspect` grant (never pooled). Alt+Shift+D toggles it.
+ * pointer events itself (the panel's boxes are `position: fixed`), and the
+ * panel isolate in its own worker with the `inspect` grant (never pooled).
+ * Alt+Shift+D toggles it. Guide: `docs/guide/devtools.md`.
  *
  * ```ts
  * import { mountDevtools } from '@isoloop/devtools';

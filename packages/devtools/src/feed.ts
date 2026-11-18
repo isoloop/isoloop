@@ -89,7 +89,11 @@ export function useFeed(inspector: IsolateInspector | undefined): InspectSnapsho
   return snap;
 }
 
-/** The closed button's dot (decision 8): red once an isolate has given up, amber while one is unwell. */
+/**
+ * The closed button's dot ([M4b plan](../../../docs/plans/m4b-devtools.md),
+ * devtools decision 8): red once an isolate has `failed`, amber while one is
+ * `restarting`, `crashed` or `blocked`.
+ */
 export type Health = 'ok' | 'unwell' | 'failed';
 
 const UNWELL = new Set(['restarting', 'crashed', 'blocked']);

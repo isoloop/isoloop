@@ -5,7 +5,8 @@
  *
  * Its surface covers the viewport and takes no pointer events, so the panel
  * places itself: closed, a floating button in its corner, with a dot amber
- * while an isolate is restarting or late and red once one has given up;
+ * while an isolate is `restarting`, `crashed` or `blocked` and red once one
+ * has `failed`;
  * open, a panel docked in that corner, resizable from its inner corner.
  * Open state, size and corner are kept across reloads (`persist.ts`).
  */
