@@ -1,6 +1,6 @@
 # M3j: Balancer gaps
 
-**Status:** planned (grilled 2026-11-17). An amendment to [ADR 0017](../adr/0017-opt-in-balancer.md) was accepted the same day. The balancer change is built in `isoloop/isoloop`, and the processor changes and the measurement in `isoloop/web`. M3j ships as a `0.1.0-next.N` prerelease, then `processor-v0.3.0`, tagged by the user.
+**Status:** in progress (grilled 2026-11-17; decisions 14–17 added 2026-11-18). An amendment to [ADR 0017](../adr/0017-opt-in-balancer.md) was accepted on 2026-11-17, and a second (decisions 14–16) is proposed. The balancer change is built in `isoloop/isoloop`, and the processor changes and the measurement in `isoloop/web`. M3j ships as a `0.1.0-next.N` prerelease, then `processor-v0.3.0`, tagged by the user.
 
 **Goal:** `@isoloop/balancer` sees work its busy time misses, packs quiet members back while work keeps arriving, lets members out of the quarantine, and stops placing or reviving an isolate the kernel has given up on.
 
@@ -110,6 +110,19 @@ As in M3i, the balancer is `@experimental`, outside the core, and builds only on
 12. **`processor-v0.2.0` is M3i as it stands,** once the user has reviewed its write-up (web#150). M3j ships as `processor-v0.3.0`. The user pushes the tags.
 13. **Tasks follow M3i's shape** (below). Tasks 4 and 5 can run in parallel. Web PRs need a changeset or the `no-changeset` label, plus a "Site impact:" line ([web ADR 0004](https://github.com/isoloop/web/blob/main/docs/adr/0004-publishing-and-governance.md)).
 
+### Found before the bench run (2026-11-18)
+
+Tasks 4 and 5 were done on 2026-11-18 (web#155, web#158). A local smoke run of the comparison's "faults, then calm" mix on the balancer (Chromium on a dev machine, one run, not a measurement) lost no files and gave up on no processors. But it showed three things in `@isoloop/balancer` that the bench would have measured again:
+
+- A processor stayed in the quarantine for about 250 s, past decision 4's 2-minute cap. Its way out after its first measurement at boot counted toward the move budget, so one `full` move and one spike quarantine used it up.
+- No pack in 5 minutes of calm: two pools of 4 processors at about 16 % each, and packing only moves an isolate alone in its pool.
+- Backlog moves kept coming at a steady 50 files a second (at 209 s, 220 s and 306 s, in the calm; 32 `behind` events over the run), each restarting the 60 s steady clock packing needs.
+
+14. **A never-measured isolate's way out of the quarantine doesn't count toward the move budget.** Its next moves count as usual, and one that offends in the quarantine before it's measured loses the exemption.
+15. **Packing empties whole pools:** a pool whose members are all steady and packable empties into the fullest other pool that stays under 40 % with all of it, one member per pack (the lightest first), finishing a merge before starting another. The existing checks stay: a backlog not rising and 60 s steady on both sides, one pack a minute and the move budget. If it flaps, the bench shows it.
+16. **A backlog move needs the backlog to rise over two 10 s windows in a row,** so a queue that jumps once and holds doesn't move anything. A move now comes about 20 s after a backlog starts growing, not 10 s.
+17. **Fixed before the bench run,** so one run measures them: a balancer PR (task 2b), a `0.1.0-next.2` prerelease run by the user (task 3b), and web on it (task 5b).
+
 ## Tasks
 
 | # | Task | Repo | Review |
@@ -119,7 +132,10 @@ As in M3i, the balancer is `@experimental`, outside the core, and builds only on
 | 3 | A `0.1.0-next.N` prerelease with task 2 | isoloop | Run by the user |
 | 4 | The Playground: the "after await" switch, both busy times on the card, `failed` in the move log; the File processor reports each processor's `busyMs`; E2E (decisions 9–10) | web | Self-merge on green, after task 3 |
 | 5 | The comparison: a 5-minute calm phase, workers once a second, the given-up processors and their kind; the job topic's retention checked (decisions 9, 11) | web | Self-merge on green, after task 3 |
-| 6 | The bench-server run | web | Self-merge on green, after tasks 4 and 5 |
+| 2b | `@isoloop/balancer`: decisions 14–16, with unit tests, the guide, README and a changeset | isoloop | Self-merge on green, after the amendment is accepted |
+| 3b | A `0.1.0-next.2` prerelease with task 2b | isoloop | Run by the user |
+| 5b | web on `0.1.0-next.2`; the Playground's backlog E2E allows for two windows | web | Self-merge on green, after task 3b |
+| 6 | The bench-server run | web | Self-merge on green, after tasks 4, 5 and 5b |
 | 7 | The write-up, in the results page layout (findings first, then the tables, then details) | web | User |
 | 8 | Roadmap: M3j done; `processor-v0.3.0` | isoloop, web | User pushes the tag |
 
