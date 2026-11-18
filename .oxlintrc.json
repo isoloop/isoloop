@@ -207,8 +207,8 @@
           {
             "patterns": [
               {
-                "group": ["@isoloop/**", "!@isoloop/bus"],
-                "message": "the CLI uses the bus's contracts and JSON Schema helpers only (M4a task 5)."
+                "group": ["@isoloop/**", "!@isoloop/bus", "!@isoloop/protocol"],
+                "message": "the CLI runs in Node: it uses the bus's contracts and JSON Schema helpers and the protocol's dev MCP wire (M4a tasks 5 and 6), never the browser packages."
               }
             ]
           }

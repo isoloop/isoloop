@@ -3,24 +3,17 @@
  * parses the rest against its flags, and runs it. `--help` and `--version`
  * work at the top level; `--help` also after any command.
  */
-import { readFileSync } from 'node:fs';
 import { flagsHelp, parseArgs, UsageError } from './args';
 import { EXIT, type Command } from './command';
 import { contractsExport } from './commands/contracts-export';
+import { mcp } from './commands/mcp';
 import type { Io } from './io';
+import { version } from './version';
 
-/** Every command. `mcp` and `skill add` join here (M4a tasks 6 and 12). */
-export const COMMANDS: readonly Command[] = [contractsExport];
+export { version };
 
-/** This package's version, from its package.json (one level above src/ and dist/). */
-export function version(): string {
-  const pkg: unknown = JSON.parse(
-    readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-  );
-  const v: unknown =
-    typeof pkg === 'object' && pkg !== null ? Reflect.get(pkg, 'version') : undefined;
-  return typeof v === 'string' ? v : 'unknown';
-}
+/** Every command. `skill add` joins here (M4a task 12). */
+export const COMMANDS: readonly Command[] = [contractsExport, mcp];
 
 function topHelp(): string {
   const width = Math.max(...COMMANDS.map((c) => c.path.join(' ').length));
@@ -40,7 +33,7 @@ function topHelp(): string {
 
 function commandHelp(c: Command): string {
   return [
-    `Usage: isoloop ${c.path.join(' ')} ${c.usage} [options]`,
+    `Usage: isoloop ${[...c.path, c.usage].filter((w) => w.length > 0).join(' ')} [options]`,
     '',
     c.summary,
     ...(c.details === undefined ? [] : ['', c.details]),

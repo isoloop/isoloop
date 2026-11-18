@@ -8,6 +8,7 @@ packages:
 # Every tool version lives here, pinned exactly (ADR 0009, rule 8).
 # Packages reference them with "catalog:".
 catalog:
+  '@modelcontextprotocol/sdk': 1.32.2
   '@msgpack/msgpack': 3.1.3
   '@changesets/cli': 3.0.3
   '@playwright/test': 1.65.0
