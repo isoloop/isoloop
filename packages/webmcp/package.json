@@ -1,0 +1,41 @@
+{
+  "name": "@isoloop/webmcp",
+  "version": "0.1.0-next.3",
+  "description": "Registers an Isoloop app's exposed tools with the browser's WebMCP API (document.modelContext).",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isoloop/isoloop.git",
+    "directory": "packages/webmcp"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "@isoloop/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts --platform browser --dts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@isoloop/host": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

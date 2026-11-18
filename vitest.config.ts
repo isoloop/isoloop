@@ -82,6 +82,7 @@ export default defineConfig({
       node('balancer'),
       node('vite'),
       node('cli'),
+      node('webmcp'),
       // The CI scripts' logic (scripts/ci).
       {
         test: {

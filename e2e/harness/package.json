@@ -11,7 +11,8 @@
   "dependencies": {
     "@isoloop/bus": "workspace:*",
     "@isoloop/host": "workspace:*",
-    "@isoloop/runtime": "workspace:*"
+    "@isoloop/runtime": "workspace:*",
+    "@isoloop/webmcp": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:",
