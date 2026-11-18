@@ -165,6 +165,7 @@ const feed = () =>
     tap: () => () => {},
     read: () => Promise.resolve({ ok: true, value: [] }),
     control: () => {},
+    workers: () => [],
   });
 
 describe('the feed on its own', () => {

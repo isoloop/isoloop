@@ -38,6 +38,28 @@ export type InspectIsolate = {
   dropped: number;
   holds?: { ageMs: number; stack?: string }[];
   busyMs?: number;
+  /**
+   * Its worker's memory, from the host's last measurement (ADR 0020, decision
+   * 4). Absent when the page isn't cross-origin isolated, in engines without
+   * `performance.measureUserAgentSpecificMemory()` (Firefox, Safari), and
+   * before the first measurement.
+   */
+  memory?: InspectMemory;
+};
+
+/**
+ * One isolate's memory (ADR 0020, decision 4): the bytes the browser
+ * attributes to its worker. Coarse, and seconds old: Chromium answers a
+ * measurement at its next garbage collection. A reader shows its age and
+ * labels it "Chromium, cross-origin isolated".
+ * @experimental
+ */
+export type InspectMemory = {
+  bytes: number;
+  /** `performance.now()` on the host when the measurement came back. */
+  at: number;
+  /** True for a pool member: the figure is the whole pool's worker, shared by every member. */
+  shared?: true;
 };
 
 /** One pool in the feed, as `kernel.pools()` has it. @experimental */
@@ -103,14 +125,17 @@ export type InspectSnapshot = {
  *   over its `inspect` port, as the reply to its `snapshot` call;
  * - `event`, a kernel event as it happens;
  * - `beats`, each isolate's latest beat, coalesced to about one a second;
- * - `metrics`, the latest `bus:metrics`, at most one a second.
+ * - `metrics`, the latest `bus:metrics`, at most one a second;
+ * - `memory`, each isolate's memory after a measurement, at most one every
+ *   5 s, and only where the page is cross-origin isolated (decision 4).
  * @experimental
  */
 export type InspectMessage =
   | Envelope<'snapshot', InspectSnapshot>
   | Envelope<'event', InspectEvent>
   | Envelope<'beats', { at: number; beats: InspectBeat[] }>
-  | Envelope<'metrics', BusMetrics>;
+  | Envelope<'metrics', BusMetrics>
+  | Envelope<'memory', { at: number; isolates: { id: string; memory: InspectMemory }[] }>;
 
 /** @experimental */
 export const INSPECT_MESSAGES: MessageTypes<InspectMessage> = {
@@ -118,6 +143,7 @@ export const INSPECT_MESSAGES: MessageTypes<InspectMessage> = {
   event: true,
   beats: true,
   metrics: true,
+  memory: true,
 };
 
 /**
@@ -133,6 +159,9 @@ export const INSPECT_RING_SIZE = 200;
 
 /** How often beats and bus metrics are coalesced (ADR 0020, decision 2). */
 export const INSPECT_COALESCE_MS = 1_000;
+
+/** The shortest time between two memory measurements (ADR 0020, decision 4). */
+export const INSPECT_MEMORY_MS = 5_000;
 
 /**
  * One record from a tap or a read (ADR 0020, decision 3): its value cut to a

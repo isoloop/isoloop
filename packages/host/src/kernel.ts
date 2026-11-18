@@ -45,6 +45,7 @@ import { createCompositor, type FallbackRender, type SurfaceStats } from './comp
 import { missingFeatures } from './features';
 import { createInspectFeed, serveInspectPort, type Inspector } from './inspect';
 import { createLoader, type LoadedWorker } from './loader';
+import { memoryMeasure, type MemoryWorker } from './memory';
 import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from './render/isoloop-dom';
 import { createRouter, type OnNavigate, type Router } from './router';
 import { checkRequires } from './version';
@@ -666,6 +667,8 @@ export function createKernel(config: KernelConfig): Kernel {
     ...(config.compositor ? { frameBudgetMs: config.compositor.frameBudgetMs } : {}),
   });
 
+  // Chromium on a cross-origin isolated page; otherwise no memory figures (ADR 0020, decision 4).
+  const measureMemory = memoryMeasure();
   // Read lazily: the getters it calls are defined below.
   const inspectFeed = createInspectFeed({
     isolates: (): InspectIsolate[] => [...slots.values()].map(snapshot),
@@ -691,6 +694,18 @@ export function createKernel(config: KernelConfig): Kernel {
             },
           }),
     control: (action, id, ms) => inspectControl(action, id, ms),
+    workers: (): MemoryWorker[] => {
+      const byUrl = new Map<string, MemoryWorker & { ids: string[] }>();
+      for (const [id, slot] of slots) {
+        const l = slot.loaded;
+        if (!l) continue;
+        const w = byUrl.get(l.url) ?? { url: l.url, ids: [], pool: l.pool !== undefined };
+        w.ids.push(id);
+        byUrl.set(l.url, w);
+      }
+      return [...byUrl.values()];
+    },
+    ...(measureMemory ? { measure: measureMemory } : {}),
   });
 
   const emit = <E extends KernelEvent>(event: E, data: KernelEvents[E]): void => {
