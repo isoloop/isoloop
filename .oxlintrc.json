@@ -315,6 +315,17 @@
           }
         ]
       }
+    },
+    {
+      // App code as the dev MCP guard sees it (M4a task 7): it imports
+      // @isoloop/host/dev-mcp, whose types resolve only once host is built.
+      "files": ["packages/vite/src/__fixtures__/dev-mcp/**"],
+      "rules": {
+        "no-restricted-imports": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off"
+      }
     }
   ],
   "ignorePatterns": [

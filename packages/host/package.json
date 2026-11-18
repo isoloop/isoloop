@@ -18,6 +18,11 @@
       "@isoloop/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./dev-mcp": {
+      "@isoloop/source": "./src/dev-mcp.ts",
+      "types": "./dist/dev-mcp.d.ts",
+      "import": "./dist/dev-mcp.js"
     }
   },
   "publishConfig": {
@@ -25,11 +30,15 @@
       ".": {
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"
+      },
+      "./dev-mcp": {
+        "types": "./dist/dev-mcp.d.ts",
+        "import": "./dist/dev-mcp.js"
       }
     }
   },
   "scripts": {
-    "build": "tsdown --platform browser --dts",
+    "build": "tsdown src/index.ts src/dev-mcp.ts --platform browser --dts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
