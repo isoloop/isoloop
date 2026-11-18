@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/vite",
-  "version": "0.1.0-next.1",
+  "version": "0.1.0-next.2",
   "description": "Vite plugin for Isoloop apps: the bootstrap and bus worker URLs, dev headers, and isolate builds.",
   "license": "MIT",
   "type": "module",

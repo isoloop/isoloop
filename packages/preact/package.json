@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/preact",
-  "version": "0.1.0-next.1",
+  "version": "0.1.0-next.2",
   "description": "Preact adapter for Isoloop isolates: defineIsolate(Component) and bus and host hooks.",
   "license": "MIT",
   "type": "module",
