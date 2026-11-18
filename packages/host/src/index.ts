@@ -17,6 +17,16 @@ export type { FallbackInfo, FallbackRender, SurfaceStats } from './compositor';
 export type { NavigateRequest, OnNavigate } from './router';
 export type { AgentsConfig, AgentTool, RequestOptions, ToolJsonSchema } from './agents';
 export type { RequestVia } from '@isoloop/protocol';
+export type { Inspector } from './inspect';
+export type {
+  InspectBeat,
+  InspectBus,
+  InspectEvent,
+  InspectIsolate,
+  InspectMessage,
+  InspectPool,
+  InspectSnapshot,
+} from '@isoloop/protocol';
 export { BusError } from '@isoloop/protocol';
 export type { HostRenderBridge } from './render/bridge';
 export type { HostComponent } from './render/registry';
