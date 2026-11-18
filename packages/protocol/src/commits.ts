@@ -7,7 +7,10 @@
  * Each entry carries the highest settled offset and the highest delivery
  * `seq` settled whole, with every delivery before it (ADR 0016, points
  * 10–12): the broker covers a group member's records only up to both, so a
- * record redelivered after the commit's deliveries stays uncovered.
+ * record redelivered after the commit's deliveries stays uncovered. When the
+ * next delivery is partly settled, `partial` counts its settled records, in
+ * the order they arrived (point 17), so a member that stops partway through
+ * a delivery keeps what it settled.
  */
 
 /** `KernelConfig.bus.commitIntervalMs` when unset (ADR 0016, decision 1, point 7). */
@@ -24,8 +27,12 @@ export function commitIntervalProblem(ms: unknown): string | undefined {
   return `bus.commitIntervalMs must be an integer from 0 to ${MAX_COMMIT_INTERVAL_MS}, got ${String(ms)}`;
 }
 
-/** Where one subscription has settled to: the highest settled offset, and the delivery `seq` (ADR 0016, point 11). */
-export type CommitPoint = { offset: number; seq: number };
+/**
+ * Where one subscription has settled to: the highest settled offset, the
+ * delivery `seq` settled whole (ADR 0016, point 11), and how many records of
+ * delivery `seq + 1` are settled, when some are (point 17).
+ */
+export type CommitPoint = { offset: number; seq: number; partial?: number };
 
 export type CommitOffsets = ({ topic: string } & CommitPoint)[];
 
@@ -33,7 +40,9 @@ export type CommitOffsets = ({ topic: string } & CommitPoint)[];
  * The commit point each record of one `deliver` settles to, in order. A
  * record settles its delivery `seq` only as the delivery's last record, and
  * `seq − 1` before that: a delivery counts once all its records are settled,
- * and records settle in the order they arrived. Its offset is the highest
+ * and records settle in the order they arrived. Before the last, the `i`-th
+ * record also settles the first `i + 1` records of its delivery (`partial`,
+ * ADR 0016, point 17). Its offset is the highest
  * delivered on the subscription up to it, `highest` being the highest before
  * this delivery (`-1` for none), so a commit that counts a delivery settled
  * also reaches every offset in it.
@@ -46,7 +55,9 @@ export function deliveryPoints(
   let top = highest;
   return offsets.map((offset, i) => {
     top = Math.max(top, offset);
-    return { offset: top, seq: i === offsets.length - 1 ? seq : seq - 1 };
+    return i === offsets.length - 1
+      ? { offset: top, seq }
+      : { offset: top, seq: seq - 1, partial: i + 1 };
   });
 }
 
@@ -82,6 +93,22 @@ export type Committer = {
   dispose(): void;
 };
 
+const point = ({ offset, seq, partial }: CommitPoint): CommitPoint =>
+  partial ? { offset, seq, partial } : { offset, seq };
+
+/**
+ * The further of two commit points: the highest offset, and the delivery
+ * reached furthest, a whole delivery being further than any part of it.
+ */
+function later(a: CommitPoint, b: CommitPoint): CommitPoint {
+  const offset = Math.max(a.offset, b.offset);
+  const reach = (p: CommitPoint): [number, number] => [p.seq, p.partial ?? 0];
+  const [as, ap] = reach(a);
+  const [bs, bp] = reach(b);
+  const far = bs > as || (bs === as && bp >= ap) ? b : a;
+  return point({ ...far, offset });
+}
+
 export function createCommitter(o: CommitterOptions): Committer {
   const intervalMs = o.intervalMs ?? DEFAULT_COMMIT_INTERVAL_MS;
   const half = Math.max(1, Math.floor((o.credit ?? DEFAULT_CREDIT) / 2));
@@ -100,7 +127,8 @@ export function createCommitter(o: CommitterOptions): Committer {
     queued = false;
     if (offsets.size === 0) return undefined;
     const out: CommitOffsets = [];
-    for (const [topic, { offset, seq }] of offsets) out.push({ topic, offset, seq });
+    for (const [topic, { offset, seq, partial }] of offsets)
+      out.push(partial ? { topic, offset, seq, partial } : { topic, offset, seq });
     offsets.clear();
     counts.clear();
     return out;
@@ -127,12 +155,7 @@ export function createCommitter(o: CommitterOptions): Committer {
   return {
     settle(topic, at, records = 1) {
       const prev = offsets.get(topic);
-      offsets.set(
-        topic,
-        prev === undefined
-          ? { offset: at.offset, seq: at.seq }
-          : { offset: Math.max(prev.offset, at.offset), seq: Math.max(prev.seq, at.seq) },
-      );
+      offsets.set(topic, prev === undefined ? point(at) : later(prev, at));
       const n = (counts.get(topic) ?? 0) + records;
       counts.set(topic, n);
       if (n >= half) flush();

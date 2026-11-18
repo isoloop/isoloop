@@ -174,8 +174,8 @@ type Subscription = {
   scheduled: boolean;
 };
 
-/** A delivered record's offset and the `seq` of the delivery it went out in. */
-type Delivered = { offset: number; seq: number };
+/** A delivered record's offset, the `seq` of the delivery it went out in, and its place in it. */
+type Delivered = { offset: number; seq: number; i: number };
 
 /**
  * Subscribers sharing a group name on a topic: each record goes to one
@@ -195,7 +195,7 @@ type Group = {
    * waiting for redelivery; `seq` is that of the delivery it last went out
    * in, to its current member.
    */
-  unacked: { offset: number; member: Subscription | undefined; seq: number }[];
+  unacked: { offset: number; member: Subscription | undefined; seq: number; i: number }[];
   /** Offsets a departed member left uncommitted, delivered again before anything new. */
   redeliver: number[];
   scheduled: boolean;
@@ -781,6 +781,7 @@ export class Broker {
                   e.topic,
                   'offset' in e ? e.offset : undefined,
                   'seq' in e ? e.seq : undefined,
+                  'partial' in e ? e.partial : undefined,
                 )
               : fail('invalid', 'each commit needs a topic, an offset and a seq');
           if (!r.ok && first.ok) first = r;
@@ -1220,19 +1221,33 @@ export class Broker {
    * A commit covers the records delivered up to `offset`. In a group it also
    * needs their delivery's `seq` at or below `seq`: a record redelivered to
    * this member after the deliveries the commit settled has a higher one,
-   * whatever its offset (ADR 0016, point 12). An own subscription's
-   * deliveries are in order, so the offset alone decides there.
+   * whatever its offset (ADR 0016, point 12). `partial` also covers the
+   * first records of delivery `seq + 1`, the ones settled before a member
+   * stops partway through it (point 17). An own subscription's deliveries
+   * are in order, so the offset alone decides there.
    */
-  #commit(conn: Connection, name: string, offset: unknown, seq: unknown): CallResult {
+  #commit(
+    conn: Connection,
+    name: string,
+    offset: unknown,
+    seq: unknown,
+    partial: unknown,
+  ): CallResult {
     const sub = conn.subs.get(name);
     if (!sub) return fail('forbidden', `not subscribed to ${name}`);
     if (!isOffset(offset)) return fail('invalid', 'offset must be a non-negative integer');
     if (!isSeq(seq)) return fail('invalid', 'seq must be a non-negative integer');
+    if (partial !== undefined && !isSeq(partial))
+      return fail('invalid', 'partial must be a non-negative integer');
+    const part = isSeq(partial) ? partial : 0;
     if (offset >= this.#engine.head(name)) {
       return fail('invalid', `offset ${offset} is not in ${name} yet`);
     }
     const g = sub.group;
-    const covers = (d: Delivered): boolean => d.offset <= offset && (!g || d.seq <= seq);
+    const covers = (d: Delivered): boolean =>
+      g
+        ? (d.offset <= offset && d.seq <= seq) || (d.seq === seq + 1 && d.i < part)
+        : d.offset <= offset;
     // A commit restores credit for the delivered records it covers.
     const before = sub.unacked.length;
     if (g) sub.unacked = sub.unacked.filter((d) => !covers(d));
@@ -1315,8 +1330,8 @@ export class Broker {
   /** Sends one `deliver`, numbered with the subscription's next `seq`, and returns it. */
   #deliver(sub: Subscription, records: BusRecord[], gap?: { from: number; to: number }): number {
     const seq = ++sub.seq;
-    for (const r of records) {
-      sub.unacked.push({ offset: r.offset, seq });
+    for (const [i, r] of records.entries()) {
+      sub.unacked.push({ offset: r.offset, seq, i });
       if (r.req)
         this.#requests.get(reqKey(sub.topic, r.offset))?.recipients.add(sub.conn.isolateId);
     }
@@ -1373,22 +1388,28 @@ export class Broker {
   #pumpGroup(g: Group): void {
     if (g.members.length === 0) return;
     type Entry = Group['unacked'][number];
-    const batches = new Map<Subscription, { records: BusRecord[]; entries: Entry[] }>();
+    const batches = new Map<
+      Subscription,
+      { records: BusRecord[]; entries: { entry: Entry; i: number }[] }
+    >();
     const flush = (m: Subscription): void => {
       const b = batches.get(m);
       batches.delete(m);
       if (!b || b.records.length === 0) return;
       // Each entry keeps the seq it went out in, a redelivered one included.
       const seq = this.#deliver(m, b.records);
-      for (const e of b.entries) e.seq = seq;
+      for (const { entry, i } of b.entries) {
+        entry.seq = seq;
+        entry.i = i;
+      }
     };
     /** Credit left once the records batched for it go out. */
     const room = (m: Subscription | undefined): number =>
       m ? m.credit - (batches.get(m)?.records.length ?? 0) : 0;
     const give = (m: Subscription, rec: BusRecord, entry: Entry | undefined): void => {
       const b = batches.get(m) ?? { records: [], entries: [] };
+      if (entry) b.entries.push({ entry, i: b.records.length });
       b.records.push(rec);
-      if (entry) b.entries.push(entry);
       batches.set(m, b);
       if (rec.key === undefined) g.rr++;
       if (b.records.length >= this.#batch) flush(m);
@@ -1443,7 +1464,7 @@ export class Broker {
           more = false;
           break;
         }
-        const entry = { offset: rec.offset, member: m, seq: 0 };
+        const entry = { offset: rec.offset, member: m, seq: 0, i: 0 };
         g.unacked.push(entry);
         give(m, rec, entry);
         g.cursor = rec.offset + 1;
