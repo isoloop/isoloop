@@ -14,8 +14,13 @@
  * }
  * ```
  *
+ * Vite only shows the page `VITE_`-prefixed variables, so for a fixed token
+ * set the same value twice: `ISOLOOP_MCP_TOKEN` for the CLI and
+ * `VITE_ISOLOOP_MCP_TOKEN` for the page. Or paste the token the CLI printed.
+ *
  * It keeps trying while the CLI isn't running, and reconnects after the CLI
- * restarts, backing off to one try every 30 s. A wrong token stops it.
+ * restarts, backing off to one try every 30 s. A wrong token or a bad hello
+ * stops it.
  */
 import {
   BusError,
@@ -33,7 +38,10 @@ import type { Kernel } from './kernel';
 export type DevMcpOptions = {
   /** The CLI's WebSocket. Default `ws://127.0.0.1:4317`. */
   readonly url?: string;
-  /** The token `isoloop mcp` printed, or `ISOLOOP_MCP_TOKEN`. */
+  /**
+   * The token `isoloop mcp` printed, or its fixed `ISOLOOP_MCP_TOKEN`, which
+   * the page sees only under a `VITE_` name (`VITE_ISOLOOP_MCP_TOKEN`).
+   */
   readonly token: string;
   /** What `isoloop_pages` shows as the page's title. Default `document.title`. */
   readonly title?: string;
