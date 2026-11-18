@@ -26,10 +26,10 @@ balancer.on('behind', (e) => console.warn(e.id, 'is behind and has nowhere to go
 balancer.on('arrived', (e) => console.log(e.id, 'moved in', e.costMs, 'ms'));
 ```
 
-- **Backlog:** a backlog higher at the end of a 10 s window than at its start, and above 0, moves the isolate somewhere with more CPU: a pool of its own if the cap allows, else a pool with less load than its pool-mates. One such move per fresh 10 s window, so a group's members move one at a time. A report older than 10 s counts as none. With nowhere to go, it emits `behind` (at most every 30 s).
-- **Fewer moves:** a move for load is made only if the moves it starts are predicted to bring the pool back under its line, and each isolate gets at most 3 of them in 5 minutes. Spike, crash and bisect moves protect the others and aren't limited.
+- **Backlog:** a backlog that rose over two 10 s windows in a row, and is above 0, moves the isolate somewhere with more CPU: a pool of its own if the cap allows, else a pool with less load than its pool-mates. One such move per fresh 10 s window, so a group's members move one at a time. A report older than 10 s counts as none. With nowhere to go, it emits `behind` (at most every 30 s).
+- **Fewer moves:** a move for load is made only if the moves it starts are predicted to bring the pool back under its line, and each isolate gets at most 3 of them in 5 minutes. Spike, crash and bisect moves protect the others and aren't limited. A never-measured isolate's way out of the quarantine, where it starts, doesn't count.
 - **Spikes:** a first long task is only reported (`spike`, action `noted`); a second from the same isolate within 60 s sends it to quarantine. Its own fatal error still does at once.
-- **Packing back:** an isolate alone in its pool and steady for 60 s joins another of the balancer's pools if both stay under 40 % of a core, which frees a worker; at most one every 60 s. Turn it off with `pack: { enabled: false }`.
+- **Packing back:** a pool whose isolates have all been steady for 60 s empties into another of the balancer's pools if both together stay under 40 % of a core, one isolate per pack and at most one pack every 60 s, which frees a worker once the last one is in. Turn it off with `pack: { enabled: false }`.
 - **Move cost:** `arrived` follows each `move` with `costMs`, the time from stopping the isolate to its first beat in the new pool.
 
 And when its busy time misses work, or the kernel gives up on an isolate (M3j):

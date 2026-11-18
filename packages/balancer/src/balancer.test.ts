@@ -698,7 +698,8 @@ describe('backlog (M3i)', () => {
     balancer.on('behind', (e) => behind.push({ at: performance.now(), id: e.id }));
     const t0 = performance.now();
     const stop = reporting(['h'], () => Math.round((performance.now() - t0) / 100));
-    await wait(15_000);
+    // Two rising windows (M3j): 20 s of reports.
+    await wait(22_000);
     expect(behind.map((b) => b.id)).toEqual(['h']);
     expect(where('h')).toMatchObject({ pool: 'balancer-2', behind: true });
     await wait(60_000);
@@ -1141,5 +1142,99 @@ describe('isolates the kernel gave up on (M3j)', () => {
       expect(sim.spawned.filter((m) => m.id === id)).toHaveLength(spawns);
     }
     for (const id of ids.filter((x) => !failedAt.has(x))) expect(where(id)?.state).toBe('placed');
+  });
+});
+
+describe('the move budget after a first measurement (M3j)', () => {
+  it("doesn't count a never-measured isolate's way out of the quarantine", async () => {
+    // The File processor: every processor starts unmeasured, so each one's
+    // first move is out of the quarantine, about 3 s in. It isn't a decision
+    // to help, so it doesn't use up one of the 3 moves in 5 minutes.
+    start({ loads: memoryLoads({ a: 50 }) });
+    sim.load('a', 50);
+    sim.load('h', 15);
+    balancer.spawn({ id: 'a' });
+    balancer.spawn({ id: 'h' });
+    await wait(5_000);
+    // Measured at 15 %: no room with a's 50 %, so a pool of its own.
+    expect(moves).toEqual([
+      { id: 'h', from: 'balancer-quarantine-1', to: 'balancer-2', reason: 'steady' },
+    ]);
+    sim.load('a', 20);
+    // Held, a stays put: h is the one that packs.
+    balancer.hold('a');
+    // Quiet for a minute, alone: h packs in with a (35 %), its first counted move.
+    await wait(70_000);
+    expect(moves.at(-1)).toMatchObject({ id: 'h', to: 'balancer-1', reason: 'pack' });
+    // Its second: two spikes send it to the quarantine.
+    await spikeTwice('h');
+    expect(moves.at(-1)).toMatchObject({ id: 'h', to: 'balancer-quarantine-1', reason: 'spike' });
+    // Its third: out after its 30 s quiet window, well within 5 minutes of the first.
+    await wait(32_000);
+    expect(moves.at(-1)).toMatchObject({
+      id: 'h',
+      from: 'balancer-quarantine-1',
+      reason: 'steady',
+    });
+    expect(where('h')?.state).toBe('placed');
+  });
+});
+
+describe('packing whole pools (M3j)', () => {
+  it('empties a quiet pool of several members into another, one member a minute, and stays put', async () => {
+    // Two pools of two after a busy spell, now light enough for one.
+    start({ loads: memoryLoads({ a: 30, b: 25, c: 30, d: 25 }) });
+    for (const id of ['a', 'b', 'c', 'd']) {
+      sim.load(id, 30);
+      balancer.spawn({ id });
+    }
+    expect(new Set(balancer.placements().map((p) => p.pool)).size).toBe(2);
+    await wait(5_000);
+    for (const id of ['a', 'b', 'c', 'd']) sim.load(id, 5);
+    await wait(200_000);
+    expect(moves.map((m) => m.reason)).toEqual(['pack', 'pack']);
+    // The second move finishes what the first started.
+    expect(moves[0]?.from).toBe(moves[1]?.from);
+    expect(moves[0]?.to).toBe(moves[1]?.to);
+    expect(new Set(balancer.placements().map((p) => p.pool)).size).toBe(1);
+    expect(sim.pools()).toHaveLength(1);
+    await wait(600_000);
+    expect(moves).toHaveLength(2);
+  });
+});
+
+describe('a backlog move needs two rising windows (M3j)', () => {
+  it("doesn't move on a backlog that rose over one 10 s window and then held", async () => {
+    // A queue at a steady rate jumps now and then: one rise isn't falling behind.
+    const ids = ['p1', 'p2', 'p3', 'p4'];
+    start({ maxWorkers: 4, loads: memoryLoads(Object.fromEntries(ids.map((id) => [id, 1]))) });
+    for (const id of ids) {
+      sim.load(id, 10);
+      balancer.spawn({ id });
+    }
+    const t0 = performance.now();
+    const stop = reporting(ids, () => (performance.now() - t0 < 15_000 ? 0 : 10));
+    await wait(60_000);
+    stop();
+    expect(moves).toEqual([]);
+  });
+
+  it('moves once the backlog has risen over two windows in a row', async () => {
+    const ids = ['p1', 'p2', 'p3', 'p4'];
+    start({ maxWorkers: 4, loads: memoryLoads(Object.fromEntries(ids.map((id) => [id, 1]))) });
+    for (const id of ids) {
+      sim.load(id, 10);
+      balancer.spawn({ id });
+    }
+    const t0 = performance.now();
+    const at: number[] = [];
+    balancer.on('move', () => at.push(performance.now() - t0));
+    const stop = reporting(ids, () => Math.round((performance.now() - t0) / 1_000));
+    await wait(30_000);
+    stop();
+    expect(at.length).toBeGreaterThanOrEqual(1);
+    // Not before 20 s of reports.
+    expect(at[0]).toBeGreaterThanOrEqual(20_000);
+    expect(at[0]).toBeLessThan(25_000);
   });
 });

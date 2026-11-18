@@ -61,7 +61,7 @@ const balancer = createBalancer(kernel, options?);
 | `quarantine.steadyMs` | 30,000 | How long an offender must stay quiet to leave quarantine. Each offence doubles it, up to 2 minutes (or `steadyMs`, if longer). |
 | `quarantine.maxReturns` | 3 | Returns from quarantine allowed; the next offence keeps the isolate apart for good. |
 | `loads` | none | A store `{ get(id), set(id, loadPct) }` for measured loads, so a reload places from history (below). |
-| `pack.enabled` | `true` | Packing back: a quiet isolate alone in its pool joins another to free a worker (below). |
+| `pack.enabled` | `true` | Packing back: a quiet pool empties into another to free a worker (below). |
 
 Fixed, not options: decisions every 500 ms over a 3 s window, the full-pool threshold of 80 %, loads written back at most every 10 s and only on a change of 5 points or more, a bisect forgotten 60 s after its last trigger, the backlog's 10 s window, at most 3 moves for load per isolate in 5 minutes, and packing's 60 s steady window, 40 % bar and one pack a minute.
 
@@ -87,9 +87,9 @@ The balancer listens to the kernel's `isolate:beat` event: every heartbeat of ev
 | Full | The members' `busyMs` add up to 80 % of a core or more across 3 s, whatever the lag | As for sustained | `full` |
 | Crash | A member's error restarted its pool | That member goes to quarantine | `crash` |
 | Kill, culprit unknown | A member blocked until the supervisor killed the pool, so no beat named it | Half the pool's members go to quarantine on restart; whichever half blocks again holds the culprit | `bisect` |
-| Backlog | The app's reported backlog is higher at the end of a 10 s window than at its start, and above 0 | A pool of its own if the cap allows, else a pool with less load than its pool-mates; with neither, `behind` | `backlog` |
+| Backlog | The app's reported backlog rose over two 10 s windows in a row, and is above 0 | A pool of its own if the cap allows, else a pool with less load than its pool-mates; with neither, `behind` | `backlog` |
 | Quiet again | An offender's quiet window passed | Back to a pool with room | `steady` |
-| Packing back | Alone in its pool and steady for 60 s | Into another of the balancer's pools that stays under 40 % with it | `pack` |
+| Packing back | Every member of its pool steady for 60 s | Into another of the balancer's pools that stays under 40 % with the whole pool, one member at a time | `pack` |
 
 The full trigger exists because well-behaved heavy work never looks like lag: tasks that yield every few milliseconds keep `lagMs` at 0–30 ms while their pool runs at 88 % and starves its members. Placement stops adding at 60 % and moving starts at 80 %; the gap keeps the balancer from moving the same isolate back and forth.
 
@@ -99,7 +99,7 @@ Some rules keep it from making things worse:
 - **Check after a move.** If the pool's lag didn't fall, the next-heaviest member moves.
 - **When `busyMs` can't explain the lag** (the pool lags, but its members' loads add up to under half the interval, with any reported busy time counted), the balancer bisects instead of trusting the figures.
 - **Only moves that help.** A move for load is made only if the moves it starts are predicted to bring the pool back under its line. Otherwise the isolate stays and is flagged `atCap`.
-- **A move budget.** Each isolate gets at most 3 moves for load (sustained, full, backlog, pack, and leaving the quarantine) in 5 minutes. Quarantine and bisect moves protect the others, so they aren't limited, though they count toward the 3.
+- **A move budget.** Each isolate gets at most 3 moves for load (sustained, full, backlog, pack, and leaving the quarantine) in 5 minutes. Quarantine and bisect moves protect the others, so they aren't limited, though they count toward the 3. A never-measured isolate's way out of the quarantine, where it starts, doesn't count: it's no decision to help, and counting it left a new isolate one incident from a quarantine stay past its quiet window.
 - **One backlog move per fresh 10 s window,** across the balancer, so the members of a consumer group move one at a time, the one in the busiest pool first.
 - **Alone in its pool.** A member that spikes alone isn't moved unless it has offended before, since moving it spares no one. Nothing joins that pool for 30 s.
 - **A move never lands in a pool that would then be over budget.** With nowhere to go, the member stays and is flagged `atCap`.
@@ -116,7 +116,7 @@ One shared pool, `balancer-quarantine-1`, outside normal placement and outside `
 
 ### Packing back
 
-An isolate alone in its pool, steady for 60 s, joins another of the balancer's pools, which frees its worker. Steady means no spike, crash, sustained or full trigger, and a backlog no higher than 60 s before: a queue that holds steady while work arrives is fine, a growing one isn't. The pool it joins must stay under 40 % of a core with it, below the 60 % placement line so it doesn't trip at once, and must not have a member moving, in trouble in the last 60 s, or with a growing backlog. The lightest such isolate goes first, into the fullest pool that fits, and at most one packs per minute. Never a held or `kept-apart` isolate. `pack: { enabled: false }` turns it off.
+A pool whose members have all been steady for 60 s empties into another of the balancer's pools, one member per pack, which frees its worker once the last one is in. Steady means no spike, crash, sustained or full trigger, and a backlog no higher than 60 s before: a queue that holds steady while work arrives is fine, a growing one isn't. The pool it joins must stay under 40 % of a core with the whole pool, below the 60 % placement line so it doesn't trip at once, and must not have a member moving, in trouble in the last 60 s, or with a growing backlog. The lightest such pool goes first, its lightest member first, into the fullest pool that fits; a merge under way is finished before another starts, and at most one member packs per minute. Never a pool with a held, `kept-apart` or out-of-budget member. A pool of one is the M3i case: a single pack frees its worker. `pack: { enabled: false }` turns it off.
 
 ### Isolates the kernel gave up on
 
