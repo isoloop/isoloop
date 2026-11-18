@@ -82,6 +82,12 @@ export type BrokerOptions = {
   onSeed?: (e: SeedEvent) => void;
 };
 
+/**
+ * Gets each record appended to a tapped topic (ADR 0020, decision 3), with
+ * its estimated size. A tap is not a consumer: it has no cursor or credit.
+ */
+export type TapSink = (topic: string, rec: BusRecord, bytes: number) => void;
+
 /** Who is publishing: an isolate (grants apply), the host (`kernel.publish`), or the kernel itself (system topics). */
 export type Publisher =
   | { kind: 'isolate'; isolateId: string }
@@ -104,7 +110,8 @@ type Topic = {
 
 /** Cumulative counters for metrics (design §6.3); the bus worker turns them into rates. */
 export type BrokerStats = {
-  topics: { topic: string; records: number; bytes: number }[];
+  /** `head` and `retained` are the engine's, at the time of the sample (ADR 0020, decision 2). */
+  topics: { topic: string; records: number; bytes: number; head: number; retained: number }[];
   /** `lag` is `head − cursor`: records not yet delivered. */
   subscriptions: { consumer: string; topic: string; lag: number; credit: number }[];
   /** Rejected publishes and requests, by error code. */
@@ -283,6 +290,8 @@ export class Broker {
     (offset: number, v: Extract<SeedVerdict, { ok: false }>) => void
   >();
   #dropped = 0;
+  /** Inspection taps, with the topic patterns each one matches. */
+  readonly #taps = new Map<TapSink, readonly string[]>();
 
   constructor(opts: BrokerOptions) {
     this.#engine = opts.engine;
@@ -371,6 +380,8 @@ export class Broker {
         topic,
         records: t.records,
         bytes: t.bytes,
+        head: this.#engine.head(topic),
+        retained: this.#engine.retained(topic),
       })),
       subscriptions,
       rejected: { ...this.#rejected },
@@ -912,6 +923,64 @@ export class Broker {
     this.#fanOut(name);
     this.#wake(name);
     this.#follow(name, { ...rec, offset });
+    if (this.#taps.size > 0) this.#toTaps(name, { ...rec, offset }, p.bytes);
+  }
+
+  #toTaps(name: string, rec: BusRecord, bytes: number): void {
+    for (const [sink, patterns] of this.#taps) {
+      if (!matchAny(patterns, name)) continue;
+      try {
+        sink(name, rec, bytes);
+      } catch (e) {
+        console.error('[isoloop] bus: a tap threw', e);
+      }
+    }
+  }
+
+  /**
+   * The inspection feed's tap (ADR 0020, decision 3): `sink` gets every
+   * record appended to a topic matching one of `patterns` from now on,
+   * through the publish pipeline. Seeds copying into a topic before it opens
+   * aren't tapped. Returns the function that ends it.
+   */
+  tap(patterns: readonly string[], sink: TapSink): () => void {
+    this.#taps.set(sink, [...patterns]);
+    return () => {
+      this.#taps.delete(sink);
+    };
+  }
+
+  /**
+   * The last `last` retained records of `topic`, oldest first (ADR 0020,
+   * decision 3), paging evicted records in from disk when needed. Seed
+   * sources the contracts don't list are unknown here, as to isolates.
+   */
+  async read(
+    name: string,
+    last: number,
+  ): Promise<{ ok: true; records: BusRecord[] } | { ok: false; error: CallError }> {
+    if (!this.#topics.has(name))
+      return { ok: false, error: { code: 'unknown_topic', message: `unknown topic ${name}` } };
+    if (!Number.isInteger(last) || last < 1)
+      return {
+        ok: false,
+        error: { code: 'invalid', message: 'last must be a positive whole number' },
+      };
+    const tail = this.#engine.tail(name);
+    const head = this.#engine.head(name);
+    // Compaction and expiry leave gaps, so widen the window until it holds
+    // `last` records or reaches the tail.
+    let span = last;
+    for (;;) {
+      const from = Math.max(tail, head - span);
+      // Each wider window depends on what the last one held, so the pages load in turn.
+      // oxlint-disable-next-line eslint/no-await-in-loop -- see above
+      if (!this.#engine.readable(name, from)) await this.#engine.page(name, from);
+      const got = this.#engine.read(name, from, Number.MAX_SAFE_INTEGER);
+      if (got.length >= last || from <= this.#engine.tail(name))
+        return { ok: true, records: got.slice(-last) };
+      span *= 2;
+    }
   }
 
   /**

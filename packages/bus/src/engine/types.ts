@@ -37,6 +37,11 @@ export interface LogEngine {
   head(topic: string): number;
   /** Oldest retained offset; equals `head` when nothing is retained. */
   tail(topic: string): number;
+  /**
+   * How many records are retained in `[tail, head)`: what `read` from the
+   * tail would return, counting records evicted to disk (ADR 0020, decision 2).
+   */
+  retained(topic: string): number;
   /** Stores a consumer's committed offset. Kept even when the records it names are dropped. */
   commit(topic: string, consumer: string, offset: number): void;
   committed(topic: string, consumer: string): number | undefined;

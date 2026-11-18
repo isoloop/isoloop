@@ -51,6 +51,10 @@ export class ReferenceEngine implements LogEngine {
     return t.records[0]?.offset ?? t.head;
   }
 
+  retained(topic: string): number {
+    return this.#topic(topic).records.length;
+  }
+
   commit(topic: string, consumer: string, offset: number): void {
     this.#topic(topic).commits.set(consumer, offset);
   }

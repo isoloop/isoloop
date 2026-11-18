@@ -1,6 +1,6 @@
 import { envelopeGuard, type Envelope, type MessageTypes } from './envelope';
 import type { CallResult, ErrorCode, ErrorPayload, Issue } from './errors';
-import type { PublishId, RequestVia } from './bus';
+import type { PublishId, RecordReq, RequestVia } from './bus';
 import type { Grants } from './grants';
 
 export type Retention =
@@ -47,13 +47,62 @@ export type SeedEvent =
 
 /** Sampled every second on the control port (design §6.3). */
 export type BusMetrics = {
-  topics: { topic: string; recordsPerSec: number; bytesPerSec: number }[];
+  /**
+   * `head` is the next offset to be written; `retained` is how many records
+   * the topic still holds (ADR 0020, decision 2).
+   */
+  topics: {
+    topic: string;
+    recordsPerSec: number;
+    bytesPerSec: number;
+    head: number;
+    retained: number;
+  }[];
   /** `lag` is `head − cursor`. */
   subscriptions: { consumer: string; topic: string; lag: number; credit: number }[];
   rejected: Partial<Record<ErrorCode, number>>;
   /** The origin's storage use, from `navigator.storage.estimate()`, while the bus keeps files. */
   storage?: { usage: number; quota: number };
 };
+
+/** Longest preview of a record's value, in characters (ADR 0020, decision 3). */
+export const PREVIEW_CHARS = 2048;
+
+/** Records a `tap` sends each second when its `maxPerSec` isn't given. */
+export const DEFAULT_TAP_PER_SEC = 50;
+
+/** Most records one `read` returns. */
+export const MAX_READ = 100;
+
+/**
+ * A record as the inspection feed shows it (ADR 0020, decision 3): its value
+ * as text, cut to `PREVIEW_CHARS`, with the value's estimated size in bytes.
+ * @experimental
+ */
+export type RecordPreview = {
+  topic: string;
+  offset: number;
+  key?: string;
+  ts: number;
+  producer: string;
+  req?: RecordReq;
+  /** The value's estimated size, as the bus counts it for `too_large` and the byte rates. */
+  bytes: number;
+  /** The value as JSON-like text, at most `PREVIEW_CHARS` characters. */
+  preview: string;
+  /** `preview` was cut short. */
+  truncated: boolean;
+};
+
+/**
+ * A tap's port: bus → host. `skipped` counts the records over the tap's
+ * `maxPerSec` since the last `skipped`, sent at most once a second.
+ * @experimental
+ */
+export type BusToTap = Envelope<'record', RecordPreview> | Envelope<'skipped', { count: number }>;
+
+/** A tap's port: host → bus. `close` ends the tap. @experimental */
+export type TapToBus = Envelope<'close', Record<string, never>>;
 
 /** Control port: host → bus worker. */
 export type HostToBus =
@@ -120,7 +169,22 @@ export type HostToBus =
    * `kernel.dropTopic`: deletes a persistent topic the contracts no longer
    * list (ADR 0003, decision 19). The bus replies with `result`.
    */
-  | Envelope<'drop', { topic: string; force: boolean }>;
+  | Envelope<'drop', { topic: string; force: boolean }>
+  /**
+   * The inspection feed's tap (ADR 0020, decision 3): the bus copies each
+   * record appended to a topic matching `topics` onto `port` as a
+   * `RecordPreview`, at most `maxPerSec` a second (default 50), and counts
+   * the rest as skipped. A tap is not a consumer: no cursor, no credit, no
+   * commits, and no row in `BusMetrics.subscriptions`. It ends with `close`
+   * on its port, or with the bus worker.
+   */
+  | Envelope<'tap', { topics: string[]; maxPerSec?: number; port: MessagePort }>
+  /**
+   * The inspection feed's read (ADR 0020, decision 3): the last `last`
+   * retained records of `topic` (at most 100), oldest first, as
+   * `RecordPreview`s in a `result`.
+   */
+  | Envelope<'read', { topic: string; last: number }>;
 
 /** Control port: bus worker → host. */
 export type BusToHost =
@@ -163,7 +227,13 @@ export const HOST_TO_BUS: MessageTypes<HostToBus> = {
   request: true,
   flush: true,
   drop: true,
+  tap: true,
+  read: true,
 };
+
+export const BUS_TO_TAP: MessageTypes<BusToTap> = { record: true, skipped: true };
+
+export const TAP_TO_BUS: MessageTypes<TapToBus> = { close: true };
 
 export const BUS_TO_HOST: MessageTypes<BusToHost> = {
   ready: true,
@@ -178,3 +248,7 @@ export const BUS_TO_HOST: MessageTypes<BusToHost> = {
 export const isHostToBus: (x: unknown) => x is HostToBus = envelopeGuard<HostToBus>(HOST_TO_BUS);
 
 export const isBusToHost: (x: unknown) => x is BusToHost = envelopeGuard<BusToHost>(BUS_TO_HOST);
+
+export const isBusToTap: (x: unknown) => x is BusToTap = envelopeGuard<BusToTap>(BUS_TO_TAP);
+
+export const isTapToBus: (x: unknown) => x is TapToBus = envelopeGuard<TapToBus>(TAP_TO_BUS);

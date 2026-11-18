@@ -16,6 +16,7 @@ import {
   type BusRecord,
   type BusToHost,
   type BusToIsolate,
+  type BusToTap,
   type CallResult,
   type ContractsList,
   type DurabilityDegraded,
@@ -27,6 +28,7 @@ import {
   type StartPosition,
   isBusToHost,
   isBusToIsolate,
+  isBusToTap,
 } from '@isoloop/protocol';
 import {
   initialSupervision,
@@ -89,6 +91,9 @@ export type HostSubscription = {
   fn: (r: BusRecord) => void;
 };
 
+/** What a tap watches (ADR 0020, decision 3). */
+export type TapSpec = { topics: string[]; maxPerSec?: number };
+
 export interface BusController {
   /** Wires a new bus connection for an isolate and returns the isolate's end. */
   connect(isolateId: string, grants: Grants, o?: { reattach?: boolean }): MessagePort;
@@ -116,6 +121,21 @@ export interface BusController {
   /** Deletes an orphaned persistent topic (`kernel.dropTopic`). */
   drop(topic: string, force: boolean): Promise<CallResult>;
   subscribe(sub: HostSubscription): () => void;
+  /**
+   * The inspection feed's tap (ADR 0020, decision 3): `fn` gets each
+   * matching record as a preview, and the `skipped` counts. Not a consumer,
+   * so it never shows in `bus:metrics`. It's opened again on each new bus
+   * worker; records appended while none runs aren't seen. Returns the
+   * function that ends it.
+   */
+  tap(spec: TapSpec, fn: (m: BusToTap) => void): () => void;
+  /**
+   * The last `last` retained records of `topic` (at most 100), oldest first,
+   * as `RecordPreview`s in the result's `value` (ADR 0020, decision 3).
+   */
+  read(topic: string, last: number): Promise<CallResult>;
+  /** How many times the bus worker was started again after a crash (ADR 0020, decision 2). */
+  readonly restarts: number;
   /** Supervisor clock and page visibility, fed by the kernel. */
   feed(input: Extract<SupervisorInput, { k: 'tick' | 'hidden' | 'visible' }>): void;
   /** `failed` once the bus is down for good. */
@@ -196,6 +216,13 @@ export function createBusController(o: BusControllerOptions): BusController {
   /** The host's publish ids (ADR 0007, step 6): its instance, and a counter. */
   const epoch = randomEpoch();
   let seq = 0;
+  /** Bus workers started after a crash, for the inspection feed. */
+  let restarts = 0;
+  /** Open taps, each on its own port to the bus worker of generation `gen`. */
+  const taps = new Map<
+    number,
+    { spec: TapSpec; fn: (m: BusToTap) => void; port: MessagePort | null; gen: number }
+  >();
   /** The host's own subscriptions, each on its own connection. */
   const hostSubs = new Map<
     string,
@@ -341,7 +368,11 @@ export function createBusController(o: BusControllerOptions): BusController {
     for (const q of queue.splice(0)) w.postMessage(q.msg, q.transfer);
     for (const p of results.values()) p.sentTo ??= mine;
     feed({ k: 'spawned', at: performance.now() });
-    if (mine > 0) o.events.restart(sup.restarts);
+    if (mine > 0) {
+      restarts++;
+      o.events.restart(sup.restarts);
+    }
+    for (const [id, t] of taps) if (t.gen < mine) bindTap(id);
     // Connections made to an older bus move to this one. The bus buffers
     // their publishes while it loads its contracts (ADR 0003, decision 8).
     for (const [id, c] of conns) {
@@ -406,6 +437,31 @@ export function createBusController(o: BusControllerOptions): BusController {
     };
     send(attach, [port2]);
     return port1;
+  };
+
+  /** (Re)opens one tap on the current (or next) bus worker. */
+  const bindTap = (id: number): void => {
+    const t = taps.get(id);
+    if (!t) return;
+    t.port?.close();
+    const { port1, port2 } = new MessageChannel();
+    t.port = port1;
+    t.gen = gen;
+    port1.addEventListener('message', (e: MessageEvent<unknown>) => {
+      if (taps.get(id)?.port !== port1 || !isBusToTap(e.data)) return;
+      try {
+        t.fn(e.data);
+      } catch (err) {
+        console.error('[isoloop] tap handler threw', err);
+      }
+    });
+    port1.start();
+    const p = {
+      topics: [...t.spec.topics],
+      port: port2,
+      ...(t.spec.maxPerSec === undefined ? {} : { maxPerSec: t.spec.maxPerSec }),
+    };
+    send({ v: 1, t: 'tap', p }, [port2]);
   };
 
   /** (Re)connects one host subscription and sends its subscribe. */
@@ -526,6 +582,32 @@ export function createBusController(o: BusControllerOptions): BusController {
       });
     },
 
+    tap(spec, fn) {
+      const id = ++nextId;
+      taps.set(id, { spec, fn, port: null, gen });
+      if (!down()) bindTap(id);
+      return () => {
+        const t = taps.get(id);
+        if (!t) return;
+        taps.delete(id);
+        t.port?.postMessage({ v: 1, t: 'close', p: {} });
+        t.port?.close();
+      };
+    },
+
+    read(topic, last) {
+      if (down()) return Promise.resolve(unavailable('The bus is down'));
+      const id = `h${++nextId}`;
+      return new Promise((resolve) => {
+        results.set(id, { resolve, sentTo: worker ? gen : undefined });
+        send({ v: 1, t: 'read', id, p: { topic, last } });
+      });
+    },
+
+    get restarts() {
+      return restarts;
+    },
+
     subscribe(sub) {
       const id = `${HOST_CONNECTION_PREFIX}host:${++nextId}`;
       hostSubs.set(id, { sub, port: null, committer: null });
@@ -568,6 +650,8 @@ export function createBusController(o: BusControllerOptions): BusController {
         h.port?.close();
       }
       hostSubs.clear();
+      for (const t of taps.values()) t.port?.close();
+      taps.clear();
       worker?.terminate();
       worker = null;
     },
