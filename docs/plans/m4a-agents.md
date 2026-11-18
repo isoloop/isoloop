@@ -40,6 +40,7 @@
     - Our own are prefixed `isoloop_`. Reads: `isoloop_pages`, `isoloop_isolates`, `isoloop_topics`, `isoloop_records` (the last N of a topic), `isoloop_events` (recent supervisor events). With `--allow-write`: `isoloop_restart`, `isoloop_kill`, `isoloop_block`, `isoloop_publish`, `isoloop_request` (any topic).
     - The app's exposed tools are forwarded under their own names. Those with `readOnly: true` are always available; the others need `--allow-write`.
     - `list_changed` is sent when a page connects or reloads.
+    - The reads come from [ADR 0020](../adr/0020-inspection-feed.md)'s feed: `isoloop_records` uses `inspector.records()`, `isoloop_events` the ring buffer of recent events, and `isoloop_block` the runtime's `block { ms }`.
 13. **Several tabs.** `isoloop_pages` lists the connected pages (URL, kernel id). Every tool takes an optional `page`; the default is the page that connected last.
 
 ### WebMCP
