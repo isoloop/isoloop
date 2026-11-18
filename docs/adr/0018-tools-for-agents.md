@@ -1,6 +1,6 @@
 # ADR 0018: Tools for agents
 
-- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all).
+- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all). What its implementation (isoloop#242) added was grilled on 2026-11-18 (Q1–Q5, yes to all) and is recorded in decisions 1–4 and 8.
 - **Date:** 2026-11-17
 - **Amends:** [ADR 0003](0003-schema-format-standard-schema.md). A contract may describe a tool, and the host makes JSON Schema at run time through the same vendored interface that decision 21 uses for `isoloop contracts export`, not only at export.
 - **Plan:** [M4a](../plans/m4a-agents.md), grilled 2026-11-17 (decisions 1–8, 10, 11 and 14 there). Background: the [AI-enablers investigation](../investigations/ai-enablers.md).
@@ -62,7 +62,8 @@ const quote = topic({
 
 - **The tool's name is the topic's name** (`markets.quote.v1`). It fits both WebMCP's and MCP's rules (1–128 characters: letters, digits, `_`, `-`, `.`). A new topic version is a new tool.
 - **The input schema is the topic schema's input; the output schema is `reply`'s output,** both JSON Schema draft 2020-12, made through `~standard.jsonSchema` (ADR 0003, decision 21).
-- **`tool` stays on the host.** It isn't part of `topicConfigOf`, so the bus and its contracts-mismatch check don't see it: the bus never acts on it, and a differing `tool` doesn't break delivery. Transports only run on the host.
+- **The host makes the JSON Schema from the contract it already has.** `TopicShape` carries the topic's Standard Schema as `schema`. The host reads it only to make JSON Schema and never validates with it. The helpers live in `@isoloop/protocol`, because the host may not import the bus and both depend on protocol. They're `@internal`, and the bus re-exports them for the CLI. They still appear in protocol's published `.d.ts`, and [M4d](../plans/m4d-release.md)'s API freeze tidies that up.
+- **`tool` and `schema` stay on the host.** Neither is part of `topicConfigOf`, so the bus and its contracts-mismatch check don't see it: the bus never acts on it, and a differing `tool` doesn't break delivery. Transports only run on the host.
 
 ### 2. The app opts in: `agents.expose`
 
@@ -77,14 +78,16 @@ createKernel({
 ```
 
 - **Only the app's kernel config exposes tools.** A `tool` field alone exposes nothing, so isolates built apart ([ADR 0012](0012-isolates-built-apart.md)) can't expose anything on their own. There is no per-isolate grant for it, because a request reaches every subscriber of its topic.
-- **`kernel.tools()`**, `@experimental`, lists the exposed tools: name, title, description, the flags, and the two JSON Schemas, built once at start by the check of decision 3. Every transport reads it, so none makes schemas of its own.
+- **`kernel.tools()`**, `@experimental`, lists the exposed tools: name, title, description, the flags, and the two JSON Schemas, built once at start by the check of decision 3. Every transport reads it, so none makes schemas of its own. Each entry also carries:
+  - `timeoutMs`, the `agents.timeoutMs` to pass to `kernel.request`, because a transport can't read the kernel's config;
+  - `topic`, the `TopicRef` to call, so a transport needs no lookup by name and `kernel.request` keeps taking a `TopicRef` only.
 
 ### 3. The kernel checks at start
 
 `createKernel` throws `KernelError('not_exposable')`, naming the topic, when an `expose` pattern matches a topic that:
 - has no `reply`;
 - has no `tool`;
-- has a schema (topic or `reply`) without `~standard.jsonSchema`, or is `unchecked`.
+- has a schema (topic or `reply`) without `~standard.jsonSchema`, or is `unchecked`. An agent needs a real input schema. This is stricter than `isoloop contracts export`, which still writes an `unchecked` topic as `{}` and flags it (ADR 0003, decision 21).
 
 A pattern that matches no topic warns once through a kernel event, `agents:unmatched`, named like `workers:budget`, so devtools can show it. The JSON Schemas are made once, at start.
 
@@ -99,8 +102,8 @@ kernel.request(topic, value, { key?, timeoutMs?, signal?, via? }): Promise<ROut>
   - `not_requestable`, `invalid`, `reply_invalid`, `timeout` and `bus_unavailable`, as `bus.request` does;
   - `aborted`, new, when `signal` aborts (the broker forgets the request, as after a timeout). It's a `BusError` like every other failure, not the platform's `AbortError`, so callers handle one shape;
   - `no_responder`, new (decision 6).
-- **`timeoutMs` defaults to the bus's 30 s.** Transports pass `agents.timeoutMs`.
-- **The record carries `req: { from: 'host', id, via? }`.** `from` is the bus's existing host producer id (`HOST_PRODUCER`), the same as for `kernel.publish`, so one id means the main thread; the M4a grilling first said `'kernel'`. `via` is a short string the caller sets: `'mcp'` and `'webmcp'` for the two transports here, `'builder'` later. A handler can refuse agent calls or log them. An isolate's own `bus.request` never sets `via`. `via` is self-declared: a label for logging and policy between cooperating code on one page, never something to authorize with (see Consequences).
+- **`timeoutMs` defaults to the bus's 30 s.** Transports pass the tool's `timeoutMs` from `kernel.tools()`, which is `agents.timeoutMs`.
+- **The record carries `req: { from: 'host', id, via? }`.** `from` is the bus's existing host producer id (`HOST_PRODUCER`), the same as for `kernel.publish`, so one id means the main thread; the M4a grilling first said `'kernel'`. `via` is a short string the caller sets: `'mcp'` and `'webmcp'` for the two transports here, `'builder'` later. A handler can refuse agent calls or log them. An isolate's own `bus.request` never sets `via`. `via` is self-declared: a label for logging and policy between cooperating code on one page, never something to authorize with (see Consequences). The values are a closed list, `RequestVia`. Any other value rejects with `invalid`, so a typo can't slip through, and a new transport first adds its value to the protocol.
 - **Protocol:** a new `HostToBus` `request` envelope (its answer comes as `result`, like the host's `publish`), and the optional `via` on `BusRecord.req`. Nothing else in the protocol changes. Both are additions, so isolates built against an older protocol keep working ([ADR 0012](0012-isolates-built-apart.md)'s floor is unchanged).
 
 ### 5. A call waits for a restart, up to the timeout
@@ -128,7 +131,7 @@ Both are ordinary clients of `kernel.tools()` and `kernel.request()`. Neither is
 
 **WebMCP.** `connectWebMCP(kernel): () => void` from `@isoloop/webmcp`, a package of its own, `@experimental`, in the Changesets fixed group.
 - If `document.modelContext` is missing, it does nothing.
-- Otherwise it registers each exposed tool with `registerTool({ name, title, description, inputSchema, outputSchema, annotations, execute }, { signal })`. Its `execute` calls `kernel.request(topic, input, { timeoutMs: agents.timeoutMs, signal, via: 'webmcp' })`.
+- Otherwise it registers each exposed tool with `registerTool({ name, title, description, inputSchema, outputSchema, annotations, execute }, { signal })`. Its `execute` calls `kernel.request(tool.topic, input, { timeoutMs: tool.timeoutMs, signal, via: 'webmcp' })`.
 - `toolcancel` aborts that call's signal, and the returned function aborts every registration.
 - Tools stay registered while their isolates restart. A failed call rejects `execute` with the `BusError`'s code and message.
 - No shim for browsers without WebMCP: during development the dev MCP covers them.
