@@ -383,6 +383,10 @@ export class TsEngine implements LogEngine {
     return this.#topic(topic).tail;
   }
 
+  retained(topic: string): number {
+    return this.#topic(topic).live;
+  }
+
   commit(topic: string, consumer: string, offset: number): void {
     const t = this.#topic(topic);
     t.commits.set(consumer, offset);

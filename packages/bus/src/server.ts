@@ -20,6 +20,7 @@ import {
   type DurabilityDegraded,
   type ErrorCode,
   type HostToBus,
+  MAX_READ,
   type TopicConfig,
 } from '@isoloop/protocol';
 import { Broker, publishId, type BrokerStats, type BusPort } from './broker';
@@ -28,6 +29,8 @@ import { TsEngine } from './engine/ts-engine';
 import type { LogStorage, StoredState } from './engine/types';
 import { takeBusLock } from './storage/lock';
 import { OpfsStorage } from './storage/opfs';
+import { recordPreview } from './preview';
+import { openTap } from './tap';
 import { isContracts, topicConfig, type Contracts } from './topic';
 
 /** The part of a worker scope the bus uses. */
@@ -321,6 +324,42 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         );
         return;
       }
+      case 'tap':
+        openTap(b, {
+          topics: Array.isArray(msg.p.topics)
+            ? msg.p.topics.filter((x) => typeof x === 'string')
+            : [],
+          ...(msg.p.maxPerSec === undefined ? {} : { maxPerSec: msg.p.maxPerSec }),
+          port: msg.p.port,
+          now,
+        });
+        return;
+      case 'read': {
+        const { id } = msg;
+        if (id === undefined) return;
+        const answer = (p: CallResult): void => post({ v: 1, t: 'result', re: id, p });
+        const topic = msg.p.topic;
+        const last: unknown = msg.p.last;
+        if (typeof last !== 'number' || !Number.isInteger(last) || last < 1)
+          return answer({
+            ok: false,
+            error: { code: 'invalid', message: 'last must be a positive whole number' },
+          });
+        void b.read(topic, Math.min(last, MAX_READ)).then(
+          (r) =>
+            answer(
+              r.ok
+                ? { ok: true, value: r.records.map((rec) => recordPreview(topic, rec)) }
+                : { ok: false, error: r.error },
+            ),
+          (e: unknown) =>
+            answer({
+              ok: false,
+              error: { code: 'bus_unavailable', message: `read ${topic}: ${String(e)}` },
+            }),
+        );
+        return;
+      }
       default: {
         const never: never = msg;
         return never;
@@ -354,6 +393,8 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
         earlyPublishes++;
         break;
       case 'drop':
+      case 'tap':
+      case 'read':
         early.push(msg);
         return;
       case 'flush':
@@ -407,6 +448,8 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
           topic: x.topic,
           recordsPerSec: (x.records - (before.get(x.topic)?.records ?? 0)) / secs,
           bytesPerSec: (x.bytes - (before.get(x.topic)?.bytes ?? 0)) / secs,
+          head: x.head,
+          retained: x.retained,
         })),
         subscriptions: stats.subscriptions,
         rejected: stats.rejected,

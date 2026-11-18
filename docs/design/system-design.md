@@ -37,7 +37,7 @@ flowchart TB
 
   K <-- "isolate port: init, event, result, shutdown, reattach / ready, patch, call, beat, error, bye" --> RA
   K <-- "isolate port, each message naming its member (beat is the worker's)" --> RP
-  BC <-- "control port: boot, attach/detach, publish, flush, drop / ready, beat, wake, metrics, result, seed, error" --> BR
+  BC <-- "control port: boot, attach/detach, publish, flush, drop, tap, read / ready, beat, wake, metrics, result, seed, error" --> BR
   RA <-- "bus port: publish, subscribe, commits, request/reply / deliver, reset, result" --> BR
   RP <-- "a bus port per member" --> BR
   EN --- OP
@@ -47,7 +47,7 @@ flowchart TB
 | --- | --- | --- | --- |
 | Isolate port | main ↔ isolate worker (the `Worker` itself) | `init`, `ready`, `patch`, `event`, `call`/`result`, `beat`, `error`, `shutdown`, `bye`, `reattach`. On a pool's worker every message names its member in `isolate`, except `beat`, which is the worker's | Loader |
 | Bus port | isolate ↔ bus worker (`MessageChannel`), one per isolate, pool members included | `publish`, `subscribe`, `unsubscribe`, `commits`, `request`, `reply`, `deliver`, `reset`, `result` | Bus controller, at each isolate start |
-| Control port | main ↔ bus worker (the `Worker` itself) | `boot` (contracts URL and topic configs), `attach`, `detach`, host-side `publish`, `flush`, `drop`; back: `ready`, `beat`, `wake`, `metrics`, `result`, `seed`, `error` | Bus controller |
+| Control port | main ↔ bus worker (the `Worker` itself) | `boot` (contracts URL and topic configs), `attach`, `detach`, host-side `publish`, `flush`, `drop`, the inspection feed's `tap` and `read` (ADR 0020); back: `ready`, `beat`, `wake`, `metrics`, `result`, `seed`, `error` | Bus controller |
 | Canvas handoff | main → isolate worker, once | a transferred `OffscreenCanvas` | Compositor, on request |
 
 **Rule:** no topic record crosses the main thread, except records the host itself publishes or subscribes to through `kernel.publish` / `kernel.subscribe` ([ADR 0005](../adr/0005-bus-topology-message-channels.md)). `kernel.subscribe` opens its own bus port, attached as `isoloop:host:<n>`, so ids starting with `isoloop:` are reserved for the kernel.
@@ -146,13 +146,15 @@ export type HostToBus =
   | Envelope<'detach', { isolateId: string; keepOffsets: boolean; wake?: boolean }>                  // wake: suspended; the bus sends wake on a record (ADR 0001)
   | Envelope<'publish', { topic: string; key?: string; value: unknown } & PublishId>
   | Envelope<'flush', {}>                                    // the page is freezing or leaving: write the pending batch now
-  | Envelope<'drop', { topic: string; force: boolean }>;     // kernel.dropTopic (ADR 0003, decision 19)
+  | Envelope<'drop', { topic: string; force: boolean }>      // kernel.dropTopic (ADR 0003, decision 19)
+  | Envelope<'tap', { topics: string[]; maxPerSec?: number; port: MessagePort }>   // inspection tap: RecordPreviews on its own port, ≤ maxPerSec (50), the rest counted as skipped; no consumer (ADR 0020)
+  | Envelope<'read', { topic: string; last: number }>;     // inspection read: the last ≤ 100 retained records as RecordPreviews, in a result (ADR 0020)
 export type BusToHost =
   | Envelope<'ready', { engine: string; storage: 'memory' | 'opfs'; restored: { topic: string; head: number }[];
                         quarantined?: string[]; degraded?: DurabilityDegraded; orphaned?: { names: string[]; bytes: number } }>
   | Envelope<'beat', { lagMs: number }>
   | Envelope<'wake', { isolateId: string; topic: string }>   // record for a suspended isolate (ADR 0001)
-  | Envelope<'metrics', BusMetrics>
+  | Envelope<'metrics', BusMetrics>                         // every 1 s; per topic: rates, head and retained count (ADR 0020)
   | Envelope<'result', CallResult>                          // answers a host publish sent with an id
   | Envelope<'seed', SeedEvent>                             // seeding news (ADR 0003, decision 18)
   | Envelope<'error', ErrorPayload>;   // fatal + contracts code: the bus can't start, no retry (ADR 0003)
@@ -448,6 +450,7 @@ interface LogEngine {
   read(topic: string, fromOffset: number, max: number): BusRecord[];     // offsets ascending, may skip compacted/expired
   head(topic: string): number;                                           // next offset to be written
   tail(topic: string): number;                                           // oldest retained offset
+  retained(topic: string): number;                                       // records retained in [tail, head), evicted ones included (ADR 0020)
   commit(topic: string, consumer: string, offset: number): void;
   committed(topic: string, consumer: string): number | undefined;
   compact(topic: string): void;                                          // retention pass

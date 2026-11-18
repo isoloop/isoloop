@@ -43,7 +43,7 @@ export function runEngineConformance(name: string, makeEngine: MakeEngine): void
       it('starts empty at offset 0', () => {
         const { engine } = setup();
         engine.createTopic(cfg('t', { kind: 'last-n', n: 10 }));
-        expect([engine.head('t'), engine.tail('t')]).toEqual([0, 0]);
+        expect([engine.head('t'), engine.tail('t'), engine.retained('t')]).toEqual([0, 0, 0]);
         expect(engine.read('t', 0, ALL)).toEqual([]);
       });
 
@@ -253,6 +253,7 @@ export function runEngineConformance(name: string, makeEngine: MakeEngine): void
             if (got.length > 0) expect(got[0]).toBe(engine.tail('t'));
             else expect(engine.tail('t')).toBe(engine.head('t'));
             for (const r of engine.read('t', 0, ALL)) expect(r.value).toBe(r.offset);
+            expect(engine.retained('t')).toBe(got.length);
           }),
         );
       });
