@@ -35,35 +35,38 @@ export type DevMcpResult =
       readonly issues?: readonly Issue[];
     };
 
-/**
- * Page → CLI.
- * - `hello`, first: the pairing token, the page's URL and title, and its tools.
- * - `result`, `re` = the call's `id`.
- * @internal
- */
-export type PageToCli =
-  | Envelope<
-      'hello',
-      {
-        readonly token: string;
-        readonly url: string;
-        readonly title?: string;
-        readonly tools: readonly DevMcpTool[];
-      }
-    >
-  | Envelope<'result', DevMcpResult>;
+/** `hello`'s payload: the pairing token, the page's URL and title, and its tools. @internal */
+export type DevMcpHello = {
+  readonly token: string;
+  readonly url: string;
+  readonly title?: string;
+  readonly tools: readonly DevMcpTool[];
+};
+
+/** `welcome`'s payload: the page's id, which agents pass as `page`. @internal */
+export type DevMcpWelcome = { readonly page: string };
+
+/** `call`'s payload: the tool to request and its input. @internal */
+export type DevMcpCall = { readonly name: string; readonly input: unknown };
 
 /**
- * CLI → page.
- * - `welcome`: the pairing worked; `page` is the id agents pass as `page`.
- * - `call`, with an `id`: request the tool `name` with `input`.
- * - `cancel`, `re` = a call's `id`: the agent cancelled it; abort its signal.
+ * Page → CLI: `hello` first, then a `result` per call (`re` = the call's `id`).
+ * @internal
+ */
+export type PageToCli = Envelope<'hello', DevMcpHello> | Envelope<'result', DevMcpResult>;
+
+/**
+ * CLI → page: `welcome` once paired; `call`, with an `id`; `cancel`, `re` = a
+ * call's `id`, when the agent cancelled it (the page aborts its signal).
  * @internal
  */
 export type CliToPage =
-  | Envelope<'welcome', { readonly page: string }>
-  | Envelope<'call', { readonly name: string; readonly input: unknown }>
-  | Envelope<'cancel', Record<string, never>>;
+  | Envelope<'welcome', DevMcpWelcome>
+  | Envelope<'call', DevMcpCall>
+  | Envelope<'cancel', DevMcpCancel>;
+
+/** `cancel`'s payload: empty. @internal */
+export type DevMcpCancel = Record<string, never>;
 
 /** @internal */
 export const PAGE_TO_CLI: MessageTypes<PageToCli> = { hello: true, result: true };
