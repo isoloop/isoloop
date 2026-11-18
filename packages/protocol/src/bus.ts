@@ -11,11 +11,49 @@ export type BusRecord = {
   /** Isolate id of the publisher. */
   producer: string;
   /**
-   * Set on a `bus.request` record: the caller's isolate id and its request id.
-   * A recipient answers with `reply { topic, offset }` (design §6.3).
+   * Set on a `bus.request` record: the caller's isolate id (`'host'` for
+   * `kernel.request`) and its request id. A recipient answers with
+   * `reply { topic, offset }` (design §6.3). `via` names the agent transport
+   * that made the call (ADR 0018, decision 4); an isolate's own `bus.request`
+   * never sets it.
    */
-  req?: { from: string; id: string };
+  req?: RecordReq;
 };
+
+/**
+ * The agent transports that call through `kernel.request` (ADR 0018, decision 4):
+ * the dev MCP, WebMCP, and later the Builder.
+ *
+ * Self-declared by the caller: a label for logging and policy between
+ * cooperating code on one page. Never authorize anything by it.
+ * @experimental
+ */
+export type RequestVia = 'mcp' | 'webmcp' | 'builder';
+
+/** Every {@link RequestVia}, for guards. @experimental */
+export const REQUEST_VIA: readonly RequestVia[] = Object.freeze(['mcp', 'webmcp', 'builder']);
+
+/** True for a known {@link RequestVia}. @experimental */
+export function isRequestVia(x: unknown): x is RequestVia {
+  return typeof x === 'string' && (REQUEST_VIA as readonly string[]).includes(x);
+}
+
+/** `BusRecord.req`: who asked, under which request id, and through which transport. */
+export type RecordReq = { from: string; id: string; via?: RequestVia };
+
+/**
+ * True for a well-formed `BusRecord.req`: string `from` and `id`, and `via`
+ * absent or a known {@link RequestVia}.
+ */
+export function isRecordReq(x: unknown): x is RecordReq {
+  if (typeof x !== 'object' || x === null) return false;
+  const via: unknown = Reflect.get(x, 'via');
+  return (
+    typeof Reflect.get(x, 'from') === 'string' &&
+    typeof Reflect.get(x, 'id') === 'string' &&
+    (via === undefined || isRequestVia(via))
+  );
+}
 
 /**
  * Identifies a publish so a re-send after a bus crash isn't appended twice to
