@@ -1,0 +1,51 @@
+{
+  "name": "@isoloop/devtools",
+  "version": "0.1.0-next.3",
+  "description": "Devtools panel for Isoloop: isolates, the bus and a live record log, drawn by an isolate of its own.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isoloop/isoloop.git",
+    "directory": "packages/devtools"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "@isoloop/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./panel": {
+      "@isoloop/source": "./src/panel.tsx",
+      "import": "./dist/panel.js"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./panel": {
+        "import": "./dist/panel.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@isoloop/host": "workspace:*"
+  },
+  "devDependencies": {
+    "@isoloop/preact": "workspace:*",
+    "@isoloop/protocol": "workspace:*",
+    "@isoloop/runtime": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

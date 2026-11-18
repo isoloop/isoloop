@@ -451,6 +451,25 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
 
+  packages/devtools:
+    dependencies:
+      '@isoloop/host':
+        specifier: workspace:*
+        version: link:../host
+    devDependencies:
+      '@isoloop/preact':
+        specifier: workspace:*
+        version: link:../preact
+      '@isoloop/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@isoloop/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
   packages/dom:
     devDependencies:
       typescript:

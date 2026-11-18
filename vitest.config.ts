@@ -113,6 +113,13 @@ export default defineConfig({
       preact(11),
       react(18),
       react(19),
+      // The devtools panel is a Preact isolate; it bundles Preact 11.
+      {
+        plugins: frameworkPlugins('preact', 11),
+        optimizeDeps: { exclude: ['preact11'] },
+        oxc: jsxFor('preact'),
+        test: browser('devtools', 'packages/devtools/src/**/*.test.{ts,tsx}').test,
+      },
     ],
   },
 });
