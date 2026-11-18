@@ -61,7 +61,7 @@ const fallbackFor =
     const box = document.createElement('div');
     box.setAttribute(
       'style',
-      `position:absolute;${v}:12px;${h}:12px;pointer-events:auto;padding:8px 10px;` +
+      `position:fixed;${v}:12px;${h}:12px;pointer-events:auto;padding:8px 10px;` +
         'border-radius:8px;font:12px/1.4 system-ui,sans-serif;color:#fff;background:#7f1d1d;',
     );
     box.textContent = 'Devtools stopped. ';
@@ -75,7 +75,7 @@ const fallbackFor =
 
 /**
  * Mounts the devtools panel: a surface covering the viewport that takes no
- * pointer events itself, and the panel isolate in its own worker with the
+ * pointer events itself (the panel's boxes are `position: fixed`), and the panel isolate in its own worker with the
  * `inspect` grant (never pooled). Alt+Shift+D toggles it.
  *
  * ```ts
@@ -106,7 +106,8 @@ export function mountDevtools(kernel: Kernel, o: DevtoolsOptions = {}): Devtools
   });
 
   const toggle = (): void => {
-    const button = surface.shadowRoot?.querySelector(TOGGLE);
+    // The compositor draws into a shadow root on an element of its own.
+    const button = surface.querySelector('iso-surface')?.shadowRoot?.querySelector(TOGGLE);
     if (button instanceof HTMLElement) button.click();
   };
   const onKey = (e: KeyboardEvent): void => {

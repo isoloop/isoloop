@@ -4,8 +4,9 @@
  * follow (M4b tasks 8–10).
  */
 import type { InspectSnapshot } from '@isoloop/protocol';
+import type { JSX } from 'preact';
 
-export function Body(props: { snap: InspectSnapshot | undefined }) {
+export function Body(props: { snap: InspectSnapshot | undefined }): JSX.Element {
   const { snap } = props;
   if (!snap) return <p style="margin:8px;color:#9ca3af;">Waiting for the inspection feed…</p>;
   return (

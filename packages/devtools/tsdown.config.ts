@@ -13,7 +13,7 @@ export default defineConfig([
     entry: { panel: 'src/panel.tsx' },
     platform: 'browser',
     dts: false,
-    noExternal: [/.*/],
+    deps: { alwaysBundle: [/.*/] },
     plugins: frameworkPlugins('preact', 11),
     inputOptions: { transform: { jsx: { runtime: 'automatic', importSource: 'preact' } } },
     clean: false,

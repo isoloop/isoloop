@@ -11,6 +11,7 @@
  */
 import { defineIsolate, useIsolate, type IsolateProps } from '@isoloop/preact';
 import type { InspectSnapshot } from '@isoloop/protocol';
+import type { IsolateDefinition } from '@isoloop/runtime';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { healthOf, useFeed, type Health } from './feed';
 import type { DevtoolsPosition } from './index';
@@ -36,10 +37,13 @@ const configPosition = (config: unknown): DevtoolsPosition => {
   return POSITIONS.find((x) => x === p) ?? 'bottom-right';
 };
 
-/** CSS placing a box in `position`'s corner of the viewport. */
+/**
+ * CSS placing a box in `position`'s corner of the viewport. Fixed, not
+ * absolute: the compositor's own element in the surface has no height.
+ */
 const corner = (position: DevtoolsPosition): string => {
   const [v, h] = position.split('-');
-  return `position:absolute;${v}:${GAP}px;${h}:${GAP}px;`;
+  return `position:fixed;${v}:${GAP}px;${h}:${GAP}px;`;
 };
 
 const DOT: Record<Health, string | undefined> = {
@@ -218,4 +222,5 @@ function Panel({ config }: IsolateProps) {
   );
 }
 
-export default defineIsolate(Panel);
+const panel: IsolateDefinition = defineIsolate(Panel);
+export default panel;

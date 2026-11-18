@@ -19,15 +19,11 @@ const mounted: Devtools[] = [];
 const deleteDb = () =>
   new Promise<void>((resolve) => {
     const req = indexedDB.deleteDatabase('isoloop-devtools');
-    req.onsuccess = () => {
-      resolve();
-    };
-    req.onerror = () => {
-      resolve();
-    };
-    req.onblocked = () => {
-      resolve();
-    };
+    for (const type of ['success', 'error', 'blocked']) {
+      req.addEventListener(type, () => {
+        resolve();
+      });
+    }
   });
 
 afterEach(async () => {
@@ -64,7 +60,7 @@ const waitFor = <T>(get: () => T | null | undefined | false, timeout = 8000): Pr
   );
 
 const shadow = (): ShadowRoot | null =>
-  document.querySelector('[data-isoloop-devtools]')?.shadowRoot ?? null;
+  document.querySelector('[data-isoloop-devtools] iso-surface')?.shadowRoot ?? null;
 const find = (sel: string): HTMLElement | null => {
   const el = shadow()?.querySelector(sel);
   return el instanceof HTMLElement ? el : null;
@@ -150,7 +146,12 @@ describe('@isoloop/devtools (M4b task 7)', () => {
 
     const handle = await waitFor(() => find('[data-isoloop-devtools-resize]'));
     handle.dispatchEvent(
-      new PointerEvent('pointerdown', { bubbles: true, composed: true, clientX: 500, clientY: 500 }),
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        composed: true,
+        clientX: 500,
+        clientY: 500,
+      }),
     );
     const layer = await waitFor(() => find('[data-isoloop-devtools-drag]'));
     layer.dispatchEvent(

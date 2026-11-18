@@ -20,10 +20,14 @@ const DB = 'isoloop-devtools';
 const STORE = 'settings';
 const KEY = 'panel';
 
-const POSITIONS: readonly string[] = ['bottom-right', 'bottom-left', 'top-right', 'top-left'];
+const POSITIONS: ReadonlySet<string> = new Set([
+  'bottom-right',
+  'bottom-left',
+  'top-right',
+  'top-left',
+]);
 
-const isPosition = (v: unknown): v is DevtoolsPosition =>
-  typeof v === 'string' && POSITIONS.includes(v);
+const isPosition = (v: unknown): v is DevtoolsPosition => typeof v === 'string' && POSITIONS.has(v);
 
 /** The stored fields that are well formed; anything else is dropped. */
 export function parseUi(v: unknown): Partial<UiState> {
@@ -40,22 +44,30 @@ export function parseUi(v: unknown): Partial<UiState> {
   return out;
 }
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB, 1);
-    req.onupgradeneeded = () => {
-      req.result.createObjectStore(STORE);
-    };
-    req.onsuccess = () => {
+/** Settles with a request's result; rejects on its error. */
+const settle = <T>(req: IDBRequest<T>): Promise<T> =>
+  new Promise((resolve, reject) => {
+    req.addEventListener('success', () => {
       resolve(req.result);
-    };
-    req.onerror = () => {
-      reject(req.error ?? new Error('indexedDB.open failed'));
-    };
-    req.onblocked = () => {
-      reject(new Error('indexedDB.open blocked'));
-    };
+    });
+    req.addEventListener('error', () => {
+      reject(req.error ?? new Error('IndexedDB request failed'));
+    });
   });
+
+function openDb(): Promise<IDBDatabase> {
+  const req = indexedDB.open(DB, 1);
+  req.addEventListener('upgradeneeded', () => {
+    req.result.createObjectStore(STORE);
+  });
+  return Promise.race([
+    settle(req),
+    new Promise<never>((_resolve, reject) => {
+      req.addEventListener('blocked', () => {
+        reject(new Error('indexedDB.open blocked'));
+      });
+    }),
+  ]);
 }
 
 let db: Promise<IDBDatabase> | undefined;
@@ -68,15 +80,10 @@ const database = (): Promise<IDBDatabase> => {
 export async function loadUi(): Promise<Partial<UiState>> {
   try {
     const d = await database();
-    return await new Promise((resolve) => {
-      const req = d.transaction(STORE, 'readonly').objectStore(STORE).get(KEY);
-      req.onsuccess = () => {
-        resolve(parseUi(req.result));
-      };
-      req.onerror = () => {
-        resolve({});
-      };
-    });
+    const stored: unknown = await settle(
+      d.transaction(STORE, 'readonly').objectStore(STORE).get(KEY),
+    );
+    return parseUi(stored);
   } catch {
     return {};
   }
@@ -86,18 +93,14 @@ export async function loadUi(): Promise<Partial<UiState>> {
 export async function saveUi(s: UiState): Promise<void> {
   try {
     const d = await database();
+    const tx = d.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put({ ...s }, KEY);
     await new Promise<void>((resolve) => {
-      const tx = d.transaction(STORE, 'readwrite');
-      tx.objectStore(STORE).put({ ...s }, KEY);
-      tx.oncomplete = () => {
-        resolve();
-      };
-      tx.onerror = () => {
-        resolve();
-      };
-      tx.onabort = () => {
-        resolve();
-      };
+      for (const type of ['complete', 'error', 'abort']) {
+        tx.addEventListener(type, () => {
+          resolve();
+        });
+      }
     });
   } catch {
     // Storage unavailable: the panel keeps its state for this run only.
