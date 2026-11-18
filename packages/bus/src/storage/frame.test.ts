@@ -36,11 +36,19 @@ describe('frames (M2b task 5)', () => {
       rec(0),
       rec(7, { key: 'k' }),
       rec(9, { req: { from: 'B', id: 'm1' }, epoch: 2, seq: 41 }),
+      rec(10, { req: { from: 'host', id: 'm2', via: 'webmcp' } }),
     ]) {
       const f = encodeFrame(r);
       expect(frameOffset(f)).toBe(r.offset);
       expect(decodeFrame(f)).toEqual(r);
     }
+  });
+
+  it('keeps a request record from a newer version, without a via it does not know', () => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a via this version doesn't know
+    const via = 'later' as 'mcp';
+    const f = encodeFrame({ ...rec(3), req: { from: 'host', id: 'm3', via } });
+    expect(decodeFrame(f).req).toEqual({ from: 'host', id: 'm3' });
   });
 
   it('scans complete frames and stops at a torn or corrupt one', () => {

@@ -5,10 +5,11 @@ import {
   type ErrorCode,
   type Retention,
   type TopicConfig,
+  type ToolSpec,
 } from '@isoloop/protocol';
 import type { StandardSchemaV1 } from './standard-schema';
 
-export type { Retention } from '@isoloop/protocol';
+export type { Retention, ToolSpec } from '@isoloop/protocol';
 
 /** Default `maxRecordBytes`: 256 KiB (design §6.1). */
 export const DEFAULT_MAX_RECORD_BYTES: number = 256 * 1024;
@@ -48,6 +49,14 @@ export type TopicDef<In, Out = In, RIn = never, ROut = RIn> = {
     readonly map: (value: any, record: BusRecord) => In;
     readonly follow?: boolean;
   };
+  /**
+   * Describes this topic as a tool for agents (ADR 0018, decision 1). Only a
+   * topic with `reply` can have one: without it this field's type is `never`.
+   * It exposes nothing by itself; the app's `agents.expose` does. The bus
+   * never sees it (not part of `topicConfig`).
+   * @experimental
+   */
+  readonly tool?: [RIn] extends [never] ? never : ToolSpec;
 };
 
 export type AnyTopicDef = TopicDef<any, any, any, any>;
@@ -127,6 +136,20 @@ const isSchema = (x: unknown): boolean =>
 
 const positiveInt = (n: unknown): boolean => typeof n === 'number' && Number.isInteger(n) && n > 0;
 
+const optionalBoolean = (x: unknown): boolean => x === undefined || typeof x === 'boolean';
+
+function toolProblemOf(tool: unknown): string | undefined {
+  if (!isRecord(tool)) return 'has a `tool` that is not an object';
+  if (typeof tool['description'] !== 'string' || tool['description'] === '')
+    return 'has a `tool` without a `description`';
+  if (typeof tool['readOnly'] !== 'boolean') return 'has a `tool` without a boolean `readOnly`';
+  if (tool['title'] !== undefined && typeof tool['title'] !== 'string')
+    return 'has a `tool` whose `title` is not a string';
+  if (!optionalBoolean(tool['consequential']) || !optionalBoolean(tool['untrustedContent']))
+    return 'has a `tool` whose hints are not booleans';
+  return undefined;
+}
+
 function problemOf(t: AnyTopicDef): string | undefined {
   if (typeof t.name !== 'string' || t.name === '') return 'has no name';
   if (!isSchema(t.schema)) return 'has no Standard Schema';
@@ -141,6 +164,10 @@ function problemOf(t: AnyTopicDef): string | undefined {
   }
   if (t.durability !== undefined && t.durability !== 'memory' && t.durability !== 'persistent') {
     return "has a durability other than 'memory' or 'persistent'";
+  }
+  if (t.tool !== undefined) {
+    const problem = toolProblemOf(t.tool);
+    if (problem) return problem;
   }
   if (t.seed !== undefined) {
     const s = t.seed as { from?: { name?: unknown }; map?: unknown; follow?: unknown } | null;

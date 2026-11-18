@@ -1,5 +1,5 @@
 import { decode, encode } from '@isoloop/codec';
-import type { BusRecord } from '@isoloop/protocol';
+import { isRequestVia, type BusRecord } from '@isoloop/protocol';
 
 // One record on disk (M2b task 5, ADR 0007):
 //
@@ -95,11 +95,15 @@ export function scanFrames(bytes: Uint8Array): FrameScan {
 
 const isList = (x: unknown): x is readonly unknown[] => Array.isArray(x);
 
-const isReq = (x: unknown): x is NonNullable<BusRecord['req']> =>
-  typeof x === 'object' &&
-  x !== null &&
-  typeof Reflect.get(x, 'from') === 'string' &&
-  typeof Reflect.get(x, 'id') === 'string';
+/** A stored `req`, rebuilt from its known fields; a `via` this version doesn't know is left out. */
+function reqOf(x: unknown): BusRecord['req'] {
+  if (typeof x !== 'object' || x === null) return undefined;
+  const from: unknown = Reflect.get(x, 'from');
+  const id: unknown = Reflect.get(x, 'id');
+  if (typeof from !== 'string' || typeof id !== 'string') return undefined;
+  const via: unknown = Reflect.get(x, 'via');
+  return isRequestVia(via) ? { from, id, via } : { from, id };
+}
 
 /** Decodes one frame written by `encodeFrame`. */
 export function decodeFrame(frame: Uint8Array): StoredRecord {
@@ -112,7 +116,8 @@ export function decodeFrame(frame: Uint8Array): StoredRecord {
   }
   const rec: StoredRecord = { offset, value, ts, producer };
   if (typeof key === 'string') rec.key = key;
-  if (isReq(req)) rec.req = req;
+  const r = reqOf(req);
+  if (r) rec.req = r;
   if (typeof epoch === 'number') rec.epoch = epoch;
   if (typeof seq === 'number') rec.seq = seq;
   return rec;

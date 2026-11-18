@@ -25,6 +25,26 @@ export type SchemaTypes<In, Out> = {
 /** A record whose value has the topic's output type. */
 export type TypedRecord<T> = Omit<BusRecord, 'value'> & { value: T };
 
+/**
+ * Describes a requestable topic as a tool for agents (ADR 0018, decision 1).
+ * A `tool` field alone exposes nothing: the app's kernel config lists what
+ * agents may call (`agents.expose`). It stays on the host and isn't part of
+ * the `TopicConfig` the bus sees.
+ * @experimental
+ */
+export type ToolSpec = {
+  /** A short human-readable name. The tool's name is always the topic's name. */
+  readonly title?: string;
+  /** What the tool does, for the agent choosing it. */
+  readonly description: string;
+  /** Required: `true` if a call changes nothing. Maps to `readOnlyHint` in WebMCP and MCP. */
+  readonly readOnly: boolean;
+  /** The call has effects the user should confirm. WebMCP `consequentialHint`, MCP `destructiveHint`. Default `false`. */
+  readonly consequential?: boolean;
+  /** The reply can carry third-party text. WebMCP `untrustedContentHint`. Default `false`. */
+  readonly untrustedContent?: boolean;
+};
+
 /** The parts of a topic definition that make up its `TopicConfig`. */
 export type TopicShape = {
   readonly name: string;
@@ -33,6 +53,8 @@ export type TopicShape = {
   readonly durability?: 'memory' | 'persistent';
   readonly reply?: unknown;
   readonly seed?: { readonly from: { readonly name: string }; readonly follow?: boolean };
+  /** Host only: never part of the `TopicConfig` (ADR 0018, decision 1). */
+  readonly tool?: ToolSpec;
 };
 
 /** What `KernelConfig.contracts.list` holds: a `contracts()` list, seen structurally. */

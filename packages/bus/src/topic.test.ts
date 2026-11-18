@@ -17,6 +17,7 @@ import {
   type ReplyInputOf,
   type ReplyOutputOf,
   type TopicDef,
+  type ToolSpec,
 } from './index';
 import { toIssues, type StandardSchemaV1 } from './standard-schema';
 
@@ -260,3 +261,68 @@ function catchErr(fn: () => unknown): ContractsError | undefined {
   }
   return undefined;
 }
+
+describe('tool (ADR 0018, decision 1)', () => {
+  const quoteTool = { description: 'Latest price for a symbol', readOnly: true } as const;
+  const quote = topic('markets.quote.v1', {
+    schema: z.object({ symbol: z.string() }),
+    reply: z.object({ price: z.number() }),
+    retention: last10,
+    tool: { title: 'Quote', ...quoteTool, consequential: false, untrustedContent: false },
+  });
+
+  it('keeps the tool on the definition and its reply types', () => {
+    expect(quote.tool).toEqual({
+      title: 'Quote',
+      description: 'Latest price for a symbol',
+      readOnly: true,
+      consequential: false,
+      untrustedContent: false,
+    });
+    expectTypeOf(quote.tool).toEqualTypeOf<ToolSpec | undefined>();
+    expectTypeOf<ReplyOutputOf<typeof quote>>().toEqualTypeOf<{ price: number }>();
+    expect(contracts(quote).get('markets.quote.v1')).toBe(quote);
+  });
+
+  it('is a type error without reply', () => {
+    topic('markets.tick.v1', {
+      schema: z.object({ symbol: z.string() }),
+      retention: last10,
+      // @ts-expect-error -- `tool` needs a `reply` schema
+      tool: quoteTool,
+    });
+  });
+
+  it('needs description and readOnly', () => {
+    const base = { schema: z.string(), reply: z.number(), retention: last10 };
+    // @ts-expect-error -- `readOnly` is required
+    topic('a.v1', { ...base, tool: { description: 'x' } });
+    // @ts-expect-error -- `description` is required
+    topic('b.v1', { ...base, tool: { readOnly: true } });
+  });
+
+  it('is not part of the topic config the bus sees', () => {
+    const cfg = topicConfig(quote);
+    expect(cfg).not.toHaveProperty('tool');
+    const { tool: _tool, ...withoutTool } = quote;
+    expect(cfg).toEqual(topicConfig(topic(quote.name, withoutTool)));
+  });
+
+  it.each([
+    ['not an object', 'yes', 'is not an object'],
+    ['no description', { readOnly: true }, 'without a `description`'],
+    ['an empty description', { description: '', readOnly: true }, 'without a `description`'],
+    ['no readOnly', { description: 'x' }, 'without a boolean `readOnly`'],
+    ['a number title', { description: 'x', readOnly: true, title: 1 }, '`title` is not a string'],
+    [
+      'a string hint',
+      { description: 'x', readOnly: false, consequential: 'yes' },
+      'hints are not booleans',
+    ],
+  ])('contracts() rejects a tool with %s', (_, tool, message) => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a malformed tool on purpose
+    const bad = { ...quote, tool } as unknown as AnyTopicDef;
+    expect(() => contracts(bad)).toThrow(ContractsError);
+    expect(() => contracts(bad)).toThrow(message);
+  });
+});
