@@ -85,7 +85,8 @@ jobs:
       - uses: ./.github/actions/install-browsers
         with:
           browsers: ${{ matrix.browser }}
-      - run: pnpm e2e --project=${{ matrix.browser }}
+      # Chromium also runs the WebMCP suite, with WebMCP's flag on (M4a decision 15).
+      - run: pnpm e2e --project=${{ matrix.browser }} ${{ matrix.browser == 'chromium' && '--project=chromium-webmcp' || '' }}
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

@@ -23,6 +23,16 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    // WebMCP (M4a decision 15) is behind a flag in Chromium; it works headless,
+    // with no origin-trial token. Only the WebMCP suite runs here.
+    {
+      name: 'chromium-webmcp',
+      testMatch: 'webmcp.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: { args: ['--enable-features=WebMCP'] },
+      },
+    },
   ],
   webServer: [
     {

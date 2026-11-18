@@ -21,6 +21,7 @@ type HarnessKernel = {
     event: 'isolate:state',
     fn: (e: { id: string; state: string; prev: string }) => void,
   ): () => void;
+  on(event: 'isolate:failed', fn: (e: { id: string }) => void): () => void;
   on(event: 'bus:ready', fn: (e: { first: boolean }) => void): () => void;
   on(event: 'bus:durability-degraded', fn: (e: { reason: string }) => void): () => void;
   on(
@@ -33,6 +34,7 @@ type HarnessKernel = {
     opts?: { from?: 'latest' | 'earliest' | 'committed' },
   ): () => void;
   publish(topic: { name: string }, rec: { key?: string; value: unknown }): Promise<void>;
+  request(topic: { name: string }, value: unknown, opts?: { timeoutMs?: number }): Promise<unknown>;
   isolates(): {
     id: string;
     state: string;
@@ -62,7 +64,7 @@ type HarnessKernel = {
 };
 
 type HarnessConfig = {
-  supervisor?: { strategy?: 'one-for-one' | 'never' };
+  supervisor?: { strategy?: 'one-for-one' | 'never'; backoff?: { initialMs?: number } };
   heartbeat?: { everyMs?: number; blockedAfterMs?: number; killAfterMs?: number };
   budget?: number;
   routing?: boolean;
@@ -84,9 +86,12 @@ declare global {
         kernel: HarnessKernel,
         options: { token: string; url?: string },
       ): Promise<() => void>;
+      connectWebMCP(kernel: HarnessKernel): Promise<() => void>;
     };
     /** The kernel a suite created, for later page.evaluate calls (e2e/loops.ts and others). */
     kernel: HarnessKernel;
+    /** What `connectWebMCP` returned (e2e/webmcp.spec.ts). */
+    disconnectWebMCP?: () => void;
     /** The loops' test hook: main-thread message counts by type (I7, e2e/loops.ts). */
     __isoloop: HarnessKernel['debug'];
     /** The durable suite's kernel and what it saw (e2e/durable.spec.ts). */

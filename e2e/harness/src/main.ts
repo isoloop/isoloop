@@ -18,6 +18,8 @@ export type Harness = {
   createBusKernel(contractsUrl: string, config?: Config): Promise<Kernel>;
   /** `connectDevMCP` from `@isoloop/host/dev-mcp` (M4a), loaded on first use. */
   connectDevMCP(kernel: Kernel, options: { token: string; url?: string }): Promise<() => void>;
+  /** `connectWebMCP` from `@isoloop/webmcp` (M4a), loaded on first use. */
+  connectWebMCP(kernel: Kernel): Promise<() => void>;
 };
 
 declare global {
@@ -57,6 +59,10 @@ window.harness = {
   async connectDevMCP(kernel, options) {
     const { connectDevMCP } = await import('@isoloop/host/dev-mcp');
     return connectDevMCP(kernel, options);
+  },
+  async connectWebMCP(kernel) {
+    const { connectWebMCP } = await import('@isoloop/webmcp');
+    return connectWebMCP(kernel);
   },
 };
 document.body.dataset['ready'] = 'true';
