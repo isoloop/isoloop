@@ -15,7 +15,7 @@
   2. **Chromium (headless shell) and Firefox, not isolated:** no memory measurement.
 - **Machine:** the dedicated bench machine (AMD Ryzen 7 5825U), bench mode on (cores fixed at 2.0 GHz, other containers paused), the container pinned to `--cpuset-cpus=2,4,6,8` (4 physical cores), `mcr.microsoft.com/playwright:v1.65.0-noble` (Chromium 158, Firefox from Playwright 1.65), 2026-11-18.
 - **Library:** this repo's main at `ce4dc9a`, packed locally (`pnpm pack`), because `kernel.inspect()` wasn't on npm yet. It includes the feed (#247, #248, #255), memory per isolate (#259) and the bus fix of #256.
-- **Raw results:** `isoloop/web` `apps/dashboards/plant/comparison/inspect/` (`coi-results/`, `results/`), with each run's JSON and `summary.md`.
+- **Raw results:** `isoloop/web` `apps/dashboards/plant/comparison/inspect/` (`coi-results/`, `results/`), with each run's JSON and `summary.md`, added with the `?inspect=1` switch, the `+inspect` configuration and the CI job in [isoloop/web#170](https://github.com/isoloop/web/pull/170).
 
 ## Results
 
