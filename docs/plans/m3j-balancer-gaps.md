@@ -112,11 +112,11 @@ As in M3i, the balancer is `@experimental`, outside the core, and builds only on
 
 ### Found before the bench run (2026-11-18)
 
-Tasks 4 and 5 were done on 2026-11-18 (web#155, web#158). A local smoke run of the comparison's "faults, then calm" mix on the balancer (Chromium on a dev machine, one run, not a measurement) lost no files and gave up on no processors. But it showed three things in `@isoloop/balancer` that the bench would have measured again:
+Tasks 4 and 5 were done on 2026-11-18 (web#155, web#158). A local smoke run of the comparison's "faults, then calm" mix on the balancer (`@isoloop/*@0.1.0-next.1`, Chromium via Playwright on a dev machine, `maxWorkers=2`, one run, not a measurement) lost no files and gave up on no processors. But it showed three things in `@isoloop/balancer` that the bench would have measured again:
 
-- A processor stayed in the quarantine for about 250 s, past decision 4's 2-minute cap. Its way out after its first measurement at boot counted toward the move budget, so one `full` move and one spike quarantine used it up.
+- A processor stayed in the quarantine for about 250 s, past decision 5's 2-minute cap. Its way out after its first measurement at boot counted toward the move budget, so one `full` move and one spike quarantine used it up.
 - No pack in 5 minutes of calm: two pools of 4 processors at about 16 % each, and packing only moves an isolate alone in its pool.
-- Backlog moves kept coming at a steady 50 files a second (at 209 s, 220 s and 306 s, in the calm; 32 `behind` events over the run), each restarting the 60 s steady clock packing needs.
+- Backlog moves kept coming at a steady 50 files a second (at 209 s, 220 s and 306 s, in the calm), each restarting the 60 s steady clock packing needs.
 
 14. **A never-measured isolate's way out of the quarantine doesn't count toward the move budget.** Its next moves count as usual, and one that offends in the quarantine before it's measured loses the exemption.
 15. **Packing empties whole pools:** a pool whose members are all steady and packable empties into the fullest other pool that stays under 40 % with all of it, one member per pack (the lightest first), finishing a merge before starting another. The existing checks stay: a backlog not rising and 60 s steady on both sides, one pack a minute and the move budget. If it flaps, the bench shows it.
