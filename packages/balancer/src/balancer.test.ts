@@ -1238,3 +1238,128 @@ describe('a backlog move needs two rising windows (M3j)', () => {
     expect(at[0]).toBeLessThan(25_000);
   });
 });
+
+/**
+ * The File processor's fault runs on 0.1.0-next.3: two image processors
+ * crash on a corrupt file and are bisected into two quarantine pools; the
+ * second counts toward the cap, so the six others, sharing one worker and
+ * falling behind, have nowhere to go.
+ */
+const twoQuarantines = async (): Promise<string[]> => {
+  const ids = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
+  start({
+    maxWorkers: 2,
+    loads: memoryLoads({ ...Object.fromEntries(ids.map((id) => [id, 9])), o1: 25, o2: 25 }),
+  });
+  for (const id of ids) {
+    sim.load(id, 9);
+    balancer.spawn({ id });
+  }
+  for (const id of ['o1', 'o2']) {
+    sim.load(id, 25);
+    balancer.spawn({ id });
+  }
+  await wait(2_000);
+  for (const id of ['o1', 'o2'])
+    sim.crash({ id, reason: 'error', pool: where(id)?.pool ?? 'balancer-2' });
+  await wait(2_000);
+  sim.block('o1');
+  await wait(1_500);
+  sim.unblock('o1');
+  await wait(2_000);
+  const quarantines = new Set(['o1', 'o2'].map((id) => where(id)?.pool));
+  expect(quarantines).toEqual(new Set(['balancer-quarantine-1', 'balancer-quarantine-2']));
+  expect(new Set(ids.map((id) => where(id)?.pool))).toEqual(new Set(['balancer-1']));
+  return ids;
+};
+
+describe('a backlog outranks a second quarantine worker (M3j)', () => {
+  it('folds the second quarantine into the first so the backlog can move', async () => {
+    const ids = await twoQuarantines();
+    const t0 = performance.now();
+    const stop = reporting(ids, () => Math.round((performance.now() - t0) / 100));
+    await wait(30_000);
+    stop();
+    const room = moves.filter((m) => m.reason === 'room');
+    expect(room).toEqual([
+      expect.objectContaining({ from: 'balancer-quarantine-2', to: 'balancer-quarantine-1' }),
+    ]);
+    const backlog = moves.filter((m) => m.reason === 'backlog');
+    expect(backlog.length).toBeGreaterThanOrEqual(1);
+    expect(backlog[0]).toMatchObject({ from: 'balancer-1', to: 'balancer-2' });
+    expect(sim.peakBalancerPools).toBeLessThanOrEqual(2);
+  });
+
+  it('gives a worker that frees up to the backlog, not to a new quarantine', async () => {
+    const ids = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
+    start({
+      maxWorkers: 2,
+      loads: memoryLoads({ ...Object.fromEntries(ids.map((id) => [id, 9])), x: 50, o1: 5, o2: 5 }),
+    });
+    for (const id of [...ids, 'x', 'o1', 'o2']) {
+      sim.load(id, id === 'x' ? 50 : id.startsWith('o') ? 5 : 9);
+      balancer.spawn({ id });
+    }
+    await wait(2_000);
+    expect(where('x')?.pool).toBe('balancer-2');
+    for (const id of ['o1', 'o2'])
+      sim.crash({ id, reason: 'error', pool: where(id)?.pool ?? 'balancer-1' });
+    await wait(2_000);
+    expect(where('o1')?.pool).toBe('balancer-quarantine-1');
+    const t0 = performance.now();
+    const stop = reporting(ids, () => Math.round((performance.now() - t0) / 100));
+    // Rising over two windows, with nowhere to go: the six are behind.
+    await wait(22_000);
+    expect(where('p1')?.behind).toBe(true);
+    // The app stops x, freeing balancer-2, and before the next decision the
+    // quarantine's worker dies: its search runs first.
+    const stopped = balancer.stop('x');
+    await stopped;
+    for (const id of ['o1', 'o2'])
+      sim.crash({ id, reason: 'unresponsive', pool: 'balancer-quarantine-1' });
+    await wait(3_000);
+    stop();
+    expect(moves.filter((m) => m.to === 'balancer-quarantine-2')).toEqual([]);
+    expect(moves.filter((m) => m.reason === 'backlog').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("never folds a bisect's suspects in with the offenders", async () => {
+    const ids = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
+    start({
+      maxWorkers: 2,
+      loads: memoryLoads({ ...Object.fromEntries(ids.map((id) => [id, 5])), s1: 5, s2: 5, o: 5 }),
+    });
+    for (const id of ['s1', 's2', 'o']) {
+      sim.load(id, 5);
+      balancer.spawn({ id });
+    }
+    await wait(2_000);
+    // o offends: it shares the first quarantine. Then s1 blocks its pool: the
+    // bisect's suspects get a second quarantine pool, the last worker.
+    sim.crash({ id: 'o', reason: 'error', pool: where('o')?.pool ?? 'balancer-1' });
+    await wait(2_000);
+    sim.block('s1');
+    await wait(1_500);
+    sim.unblock('s1');
+    await wait(500);
+    const suspects = ['s1', 's2'].filter((id) => where(id)?.pool === 'balancer-quarantine-2');
+    expect(suspects.length).toBe(1);
+    for (const id of ids) {
+      sim.load(id, 5);
+      balancer.spawn({ id });
+    }
+    await wait(2_000);
+    const t0 = performance.now();
+    const stop = reporting(ids, () => Math.round((performance.now() - t0) / 100));
+    await wait(25_000);
+    stop();
+    expect(moves.filter((m) => m.reason === 'room')).toEqual([]);
+    expect(where(suspects[0] ?? '')?.pool).toBe('balancer-quarantine-2');
+  });
+
+  it('leaves the quarantines alone while nothing is behind', async () => {
+    await twoQuarantines();
+    await wait(20_000);
+    expect(moves.filter((m) => m.reason === 'room')).toEqual([]);
+  });
+});
