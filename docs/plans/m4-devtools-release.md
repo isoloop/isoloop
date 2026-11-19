@@ -4,6 +4,8 @@
 
 **Done when** (RFC 0001): `0.1.0` is published with a launch post, and each epic below has met its own done-when.
 
+**Status (2026-11-19):** M4a's tasks 1–11 and 13 and all of M4b (tasks 1–11; task 12 droppable) are done, on `0.1.0-next.5`; M4c is next, then M4d. Left in M4a: the skill (after the freeze) and the real-agent run with its write-up. The two fixes 0.1 waited for are in: the commit loss (#211, in `0.1.0-next.3`) and the stop-then-spawn race (#219).
+
 Comes after [M3e](m3e-live-widget-creator.md), [M3h](m3h-auto-placement.md), [M3i](m3i-balancer-scaling.md) and [M3g](m3g-federated-comparison.md) ([M3](m3-adapters-dashboard.md) and [M2b](m2b-durable-log.md) are done). 0.1 also waits for two bus and kernel fixes decided on 2026-11-17: the consumer-group commit loss ([#211](https://github.com/isoloop/isoloop/issues/211), [ADR 0016](../adr/0016-fewer-messages-per-record.md)'s amendment) and the stop-then-spawn race on one isolate id. The `0.0.0-next` prerelease workflow from [M3b](m3b-dashboard.md) task 1 is replaced by the Changesets pipeline in M4d.
 
 **Changed 2026-11-17:** M4 became an initiative of four epics, in a grilling that also brought agent support into 0.1 ([investigation](../investigations/ai-enablers.md)). Until then M4 was one outline with the dev MCP as its last, droppable item, and [M7](m7-webmcp-stable.md) was a WebMCP spike after M6.
@@ -42,4 +44,4 @@ In this order: topic replay (M4b), then `@isoloop/webmcp` (M4a), then the skill 
 
 - Scope creep in devtools; ship the two panels and the log first.
 - Docs time is easy to underestimate; start the "limits" page early.
-- WebMCP is still a Community Group draft behind a flag in Chrome; `@isoloop/webmcp` is `@experimental` and in its own package so a change there doesn't touch the other packages.
+- WebMCP is still a Community Group draft, behind a flag in Chromium and behind prefs in Firefox (both supported since 2026-11-19, ADR 0018's amendment); `@isoloop/webmcp` is `@experimental` and in its own package so a change there doesn't touch the other packages.

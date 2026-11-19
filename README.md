@@ -4,7 +4,7 @@
 
 **A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-Status: **M0–M3, M2b–M2d and M3g done, pre-release.** The kernel (loader, supervisor, frame-batched compositor on our own render bridge), the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension, persistent topics in OPFS), worker pools for headless and visual isolates, and the Preact and React adapters, with CI on Chromium, Firefox and WebKit. Prereleases are on npm under the `next` tag; there's no stable release yet. Next: M3e (the live widget creator), then M3h (auto placement), then M4 (devtools and 0.1); after 0.1, the Vue, Svelte and Solid adapters (M6), a WebMCP spike (M7) and the shared-memory engine (M5). The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
+Status: **pre-release, on the way to 0.1.** Done: M0–M3, M2b–M2d, M3e–M3i, and M4's agents and devtools epics. That's the kernel (loader, supervisor, frame-batched compositor on our own render bridge), the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension, persistent topics in OPFS), worker pools for headless and visual isolates, the Preact and React adapters, the experimental balancer, tools for agents (`kernel.request`, the `isoloop` CLI with a dev MCP server, `@isoloop/webmcp`) and the devtools panel on the inspection feed, with CI on Chromium, Firefox and WebKit. Prereleases are on npm under the `next` tag (`0.1.0-next.5`, 2026-11-19); there's no stable release yet. Next: M4c (the docs site), then M4d (the API freeze and `0.1.0`), with M3j (balancer gaps) alongside; after 0.1, the Vue, Svelte and Solid adapters (M6), WebMCP to stable once it ships (M7) and the shared-memory engine (M5). The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
 
 ## Run the demo
 
@@ -19,7 +19,7 @@ pnpm --filter basic dev
 
 ## The comparison
 
-The [markets dashboard](https://github.com/isoloop/examples/tree/main/apps/dashboards/markets), built twice from one source: as an ordinary main-thread app and on Isoloop, in React and in Preact. The same scripted scenario runs on each: live-like market data at 10×, typing into the alerts panel, then typing while one chart runs a 3 s busy loop and the trades table floods the bus. Recorded in CI ([results and method](https://github.com/isoloop/examples/tree/main/apps/dashboards/markets/comparison), [side-by-side video](https://github.com/isoloop/examples/blob/main/apps/dashboards/markets/comparison/side-by-side.webm)):
+The [markets dashboard](https://github.com/isoloop/web/tree/main/apps/dashboards/markets), built twice from one source: as an ordinary main-thread app and on Isoloop, in React and in Preact. The same scripted scenario runs on each: live-like market data at 10×, typing into the alerts panel, then typing while one chart runs a 3 s busy loop and the trades table floods the bus. Recorded in CI ([results and method](https://github.com/isoloop/web/tree/main/apps/dashboards/markets/comparison), [side-by-side video](https://github.com/isoloop/web/blob/main/apps/dashboards/markets/comparison/side-by-side.webm)):
 
 | Build | Typing, calm (median) | Typing, one chart blocked (median) | (worst) | fps after | Long tasks (10 s) | First data | JS, gzipped |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -163,21 +163,25 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 5. **M2c Worker pools:** opt-in named pools for headless isolates, side by side with own-worker isolates; a pool crash restarts only that pool.
 6. **M2d Visual pools:** visual isolates in pools too (shipped with the plant dashboard, `plant-v0.1.0`).
 7. **M3 Adapters and dashboards** (initiative): **M3a** Preact and React adapters (Preact 10 and 11, React 18 and 19); **M3b** the markets dashboard, a native app or Isoloop at the flip of a toggle, with live metrics; **M3c** Lite, Normal and Heavy sizes; **M3d** the 72-widget plant dashboard, measured against matched native builds; **M3f** markets parity, with a native + workers build and pooled placements (`markets-v0.3.0`).
-8. **Website:** [isoloop.dev](https://isoloop.dev), with the landing page, how it works and the live examples (in [isoloop/web](https://github.com/isoloop/web)).
+8. **Website:** [isoloop.dev](https://isoloop.dev), with the landing page, how it works, the features and the live examples (in [isoloop/web](https://github.com/isoloop/web)).
+9. **M3e Live widget creator:** an interactive mode for the plant and markets dashboards: add, edit and delete widgets while the page runs, each a JSON spec (a dashboard topic, fixed operators, a view) running as its own isolate. No user code. Measured both ways against native (`plant-v0.2.0`, `markets-v0.4.0`).
+10. **M3g Federated comparison** ([write-up](https://github.com/isoloop/web/tree/main/apps/dashboards/markets/comparison/federated)): a native build of the markets dashboard's React + Preact version, with the Preact part shipped apart and loaded at run time the way teams combine parts today, measured against Isoloop's, with a pool per team (`markets-v0.5.0`).
+11. **M3h Auto placement and M3i balancer scaling:** `@isoloop/balancer` (experimental, [guide](docs/guide/balancer.md)) places isolates by measured load, moves one out of a pool that lags, is full or has a growing backlog, packs quiet ones back, and quarantines one that blocks or crashes; shown on the processor example (`processor-v0.1.0`, `processor-v0.2.0`) and on the interactive pages.
+12. **M4a Agents** (most of it): tools on contracts ([ADR 0018](docs/adr/0018-tools-for-agents.md), [guide](docs/guide/agents.md)), `kernel.request`, the `isoloop` CLI with `contracts export` and a dev MCP server (`isoloop mcp`), `@isoloop/webmcp` for Chromium's and Firefox's WebMCP (both behind a flag), tools on the markets dashboard, and the [cost per call](docs/investigations/agent-call-cost.md).
+13. **M4b Devtools** ([write-up](docs/posts/m4b-devtools.md)): the inspection feed (`kernel.inspect()`, the `inspect` grant, [ADR 0020](docs/adr/0020-inspection-feed.md), [guide](docs/guide/inspection.md)) and `@isoloop/devtools`, a panel drawn by an isolate with isolates, bus and live-log views ([guide](docs/guide/devtools.md)), on plant and markets behind `?devtools=1`.
 
 **Before 0.1**
 
-9. **M3e Live widget creator:** an interactive mode for the plant and markets dashboards: add, edit and delete widgets while the page runs, each a JSON spec (a dashboard topic, fixed operators, a view) running as its own isolate, placed by hand. No user code. Measured both ways against native: what the drawer's work does to the dashboard, and what the dashboard's load does to the drawer.
-10. **M3g Federated comparison** ([write-up](https://github.com/isoloop/web/tree/main/apps/dashboards/markets/comparison/federated)): a native build of the markets dashboard's React + Preact version, with the Preact part shipped apart and loaded at run time the way teams combine parts today, measured against Isoloop's, with a pool per team (`markets-v0.5.0`).
-11. **M3h Auto placement:** `@isoloop/balancer` (experimental, [guide](docs/guide/balancer.md)) places isolates by measured load, moves one out of a pool that lags or is full, and quarantines one that blocks or crashes; shown on the processor example's Playground.
-12. **M4 Devtools and 0.1:** a devtools panel that is itself an isolate (a floating button that opens isolates, bus and live-log panels), docs site, CLI, npm release with a launch post; a dev-only MCP server for agents, if time allows.
+14. **M3j Balancer gaps:** an app-reported busy time, packing and the quarantine fixed, and isolates the kernel gave up on handled, inside the balancer.
+15. **M4c Docs:** the docs on isoloop.dev, with getting started, the guides, "What Isoloop can't hide", the API reference, `llms.txt` and `llms-full.txt`.
+16. **M4d 0.1 release:** the API freeze, the "build with Isoloop" skill and a recorded run with a real agent (M4a), the release workflow, `0.1.0` on npm and a launch post.
 
 **After 0.1**
 
-13. **M6 Vue, Svelte and Solid adapters:** Vue 3 (starting with a spike), Svelte 5 and Solid 1, with the HTML parsing and `cloneNode` they need, and no change to the render format.
-14. **M7 WebMCP (spike):** whether isolates should expose tools to browser agents through WebMCP.
-15. **M5 Shared-memory engine:** opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
-16. **M5b Delivery batching (spike):** whether batching bus traffic across tasks gets the TS engine from 45.5k to its 50k records/s budget.
+17. **M6 Vue, Svelte and Solid adapters:** Vue 3 (starting with a spike), Svelte 5 and Solid 1, with the HTML parsing and `cloneNode` they need, and no change to the render format.
+18. **M7 WebMCP to stable:** drop `@experimental` from `@isoloop/webmcp` once WebMCP ships in a browser.
+19. **M5 Shared-memory engine:** opt-in Rust/WASM `SharedArrayBuffer` log engine, benchmarked against the TS engine.
+20. **M5b Delivery batching (spike):** whether batching bus traffic across tasks gets the TS engine from 45.5k to its 50k records/s budget.
 
 **Separately**
 
@@ -185,10 +189,10 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 
 ## Repo layout
 
-Plain pnpm workspaces. Today: `protocol`, `dom`, `host`, `runtime`, `bus`, `codec`, `react`, `preact`, `vite` and the experimental `balancer`; the rest arrives with its milestone.
+Plain pnpm workspaces. Today: `protocol`, `dom`, `host`, `runtime`, `bus`, `codec`, `react`, `preact`, `vite`, `cli` (published as `isoloop`), and the experimental `balancer`, `devtools` and `webmcp`; the rest arrives with its milestone.
 
 ```text
-packages/  protocol · dom · host · runtime · bus · codec (M2b) · react, preact (M3) · vite · balancer (M3h) · devtools (M4) · vue, svelte, solid (M6) · bus-wasm (M5)
+packages/  protocol · dom · host · runtime · bus · codec (M2b) · react, preact (M3) · vite · balancer (M3h) · cli, webmcp (M4a) · devtools (M4b) · vue, svelte, solid (M6) · bus-wasm (M5)
 e2e/       Playwright suites, their harness page and the isolates they spawn (the four-loops ones included)
 docs/      rfcs · design · adr · plans · guide · investigations · posts
 bench/     click-to-paint, throughput
@@ -206,7 +210,7 @@ Parallel painting of DOM surfaces (canvas isolates painting through `OffscreenCa
 - [System design](docs/design/system-design.md): packages, interfaces, sequences and invariants
 - [Architecture decision records](docs/adr/README.md)
 - [Implementation plans](docs/plans/README.md), one per milestone
-- Guides: [hosting](docs/guide/hosting.md), [worker pools](docs/guide/pools.md), [automatic placement (balancer)](docs/guide/balancer.md), [devtools panel](docs/guide/devtools.md)
+- Guides: [hosting](docs/guide/hosting.md), [worker pools](docs/guide/pools.md), [automatic placement (balancer)](docs/guide/balancer.md), [agents](docs/guide/agents.md), [inspection feed](docs/guide/inspection.md), [devtools panel](docs/guide/devtools.md)
 - [Contributing](CONTRIBUTING.md): setup, scripts, editors and conventions
 - [Would like](docs/would-like.md): ideas deferred or to explore, not planned
 - [Should do](docs/should-do.md): committed work waiting on a package or milestone
