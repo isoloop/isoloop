@@ -44,7 +44,7 @@ The format is versioned and grows by additions only: a reader ignores fields and
 
 Nothing runs for the feed until a reader listens, apart from a ring buffer of the last 200 supervisor and bus events, kept from the kernel's start so a reader that arrives after a crash still sees it. While a reader listens, events go out as they happen, and beats and bus metrics once a second.
 
-Measured on the plant dashboard at 5 kHz, feed open against closed, 5 rounds on a dedicated bench machine (Ryzen 7 5825U, 4 cores at 2.0 GHz, Chromium 158 and Firefox from Playwright 1.65; [investigation](../investigations/inspect-feed-cost.md)):
+Measured on the plant dashboard at 5 kHz, feed open against closed, 5 rounds on a dedicated bench machine (Ryzen 7 5825U, 4 cores at 2.0 GHz, Chromium 158 and Firefox from Playwright 1.65, the library at `ce4dc9a`, the same code as `0.1.0-next.3`; [investigation](../investigations/inspect-feed-cost.md)):
 - **Main-thread CPU:** gaps of −0 pp (−2 to +1) on cross-origin isolated Chromium and +0 pp (0 to +0) on headless Chromium.
 - **CPU, all threads:** +1 pp (−7 to +1) on cross-origin isolated Chromium, where the feed also measured memory; −3 pp (−13 to +7) on headless Chromium.
 - **Memory, first reading:** before GC, +3 MB (−3 to +7) on isolated Chromium and +4 MB (+2 to +7) on headless Chromium, where every round had the feed side higher. After a forced GC both spreads cross zero.
