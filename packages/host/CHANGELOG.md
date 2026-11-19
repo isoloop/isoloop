@@ -1,5 +1,12 @@
 # @isoloop/host
 
+## 0.1.0-next.4
+
+### Patch Changes
+
+- @isoloop/dom@0.1.0-next.4
+  - @isoloop/protocol@0.1.0-next.4
+
 ## 0.1.0-next.3
 
 ### Minor Changes
