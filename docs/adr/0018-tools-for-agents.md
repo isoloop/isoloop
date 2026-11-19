@@ -1,6 +1,6 @@
 # ADR 0018: Tools for agents
 
-- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all). What its implementation (isoloop#242) added was grilled on 2026-11-18 (Q1–Q5, yes to all) and is recorded in decisions 1–4 and 8.
+- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all). What its implementation (isoloop#242) added was grilled on 2026-11-18 (Q1–Q5, yes to all) and is recorded in decisions 1–4 and 8. Amended on 2026-11-19 for Firefox's WebMCP and three details of Chromium's (decision 8, *Browsers that differ*).
 - **Date:** 2026-11-17
 - **Amends:** [ADR 0003](0003-schema-format-standard-schema.md). A contract may describe a tool, and the host makes JSON Schema at run time through the same vendored interface that decision 21 uses for `isoloop contracts export`, not only at export.
 - **Plan:** [M4a](../plans/m4a-agents.md), grilled 2026-11-17 (decisions 1–8, 10, 11 and 14 there). Background: the [AI-enablers investigation](../investigations/ai-enablers.md).
@@ -130,12 +130,31 @@ Both are ordinary clients of `kernel.tools()` and `kernel.request()`. Neither is
 - Which MCP tools the CLI offers, and what `--allow-write` unlocks, is the CLI's business ([M4a](../plans/m4a-agents.md), decisions 9, 12 and 13), not this ADR's. One rule from here holds: app tools without `readOnly: true` need `--allow-write`.
 
 **WebMCP.** `connectWebMCP(kernel): () => void` from `@isoloop/webmcp`, a package of its own, `@experimental`, in the Changesets fixed group.
-- If `document.modelContext` is missing, it does nothing.
+- It uses `document.modelContext`, or `navigator.modelContext` where only that exists. If neither is there, it does nothing.
 - Otherwise it registers each exposed tool with `registerTool({ name, title, description, inputSchema, outputSchema, annotations, execute }, { signal })`. Its `execute` calls `kernel.request(tool.topic, input, { timeoutMs: tool.timeoutMs, signal, via: 'webmcp' })`.
 - `toolcancel` aborts that call's signal, and the returned function aborts every registration.
 - Tools stay registered while their isolates restart. A failed call rejects `execute` with the `BusError`'s code and message.
 - No shim for browsers without WebMCP: during development the dev MCP covers them.
 - Keeping it out of `@isoloop/host` means a WebMCP change touches one `@experimental` package, not the kernel.
+
+**Browsers that differ (amended 2026-11-19).** The draft ([WebMCP, Draft Community Group Report, 13 November 2026](https://webmachinelearning.github.io/webmcp/)) puts `ModelContext` on `document`, makes it an `EventTarget` with `toolcancel`, unregisters a tool when its registration `signal` aborts, and gives each call a `signal`. What the two implementations do, measured under Playwright on Chromium 158 (`--enable-features=WebMCP`) and Firefox 159 (`dom.modelcontext.enabled` and `dom.modelcontext.testing.enabled`):
+
+| | Chromium 158 | Firefox 159 |
+| --- | --- | --- |
+| Where | `document.modelContext` | `navigator.modelContext` ([`ModelContext.webidl`](https://searchfox.org/firefox-main/source/dom/webidl/ModelContext.webidl)) |
+| Removing a tool | the registration `signal` | `unregisterTool(name)`; the `signal` is ignored |
+| Cancelling a call | the call's own `signal`, and `toolcancel` | neither: `ModelContext` isn't an `EventTarget`, and `execute` gets no signal |
+| A name registered twice | rejected, as the draft says | the new tool replaces the old one |
+| What the agent sees on failure | "Tool execution failed"; the `BusError` is only in the page's console | the `BusError`'s message |
+
+`connectWebMCP` follows the features, not the browser's name:
+- It looks up `document.modelContext`, then `navigator.modelContext`.
+- It listens for `toolcancel` only where `ModelContext` has `addEventListener`.
+- Disconnecting aborts the registration signal and, where `unregisterTool` exists, also unregisters each tool by name.
+- Where a call gets no signal and there's no `toolcancel`, nothing can cancel it from the agent's side: it runs until its reply or its `timeoutMs`, and the agent then gets `timeout`. Disconnecting still aborts it.
+- Chromium's `toolcancel` names only the tool (`toolName`), so it aborts every call of that tool in flight.
+
+Firefox's WebMCP is behind prefs and not shipped, so this follows it the way the rest of the package follows Chromium's flag: `@experimental`, until [M7](../plans/m7-webmcp-stable.md).
 
 ## Consequences
 
@@ -147,7 +166,7 @@ Both are ordinary clients of `kernel.tools()` and `kernel.request()`. Neither is
 - **Two new `BusError` codes (`aborted`, `no_responder`), one `KernelError` code (`not_exposable`), one kernel event (`agents:unmatched`), one host-to-bus envelope and one optional field on request records.** All additions.
 - **A consequential tool runs on agent input.** The annotations tell the agent; asking the user first is the agent's job (WebMCP leaves it to the agent too). The docs say both, plainly.
 - **`@isoloop/webmcp` follows a moving draft.** [M7](../plans/m7-webmcp-stable.md) follows it to its ship and amends this ADR when it drops `@experimental`.
-- **No mainstream agent may call WebMCP tools by 0.1,** so the in-browser path may only be proven under Playwright (Chromium with `--enable-features=WebMCP`).
+- **No mainstream agent may call WebMCP tools by 0.1,** so the in-browser path may only be proven under Playwright (Chromium with `--enable-features=WebMCP`, Firefox with `dom.modelcontext.enabled`).
 - **`via` is self-declared.** Any code on the main thread can call `kernel.request` with any `via`, so it's a label for logging and policy between cooperating code on one page, not a security boundary. The page is one trust domain, and the kernel can't tell its callers apart without a token scheme. The Agents guide says handlers must not authorize anything by `via`.
 
 ## Alternatives considered
