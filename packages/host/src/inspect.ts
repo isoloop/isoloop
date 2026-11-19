@@ -57,8 +57,15 @@ export interface Inspector {
    * isn't a consumer: it isn't in the bus figures. It's opened again after a
    * bus restart; records appended while no bus runs aren't seen. Returns the
    * function that ends it. Throws `bus_unavailable` without contracts.
+   *
+   * `onSkipped` gets each count of records the bus left out over
+   * `maxPerSec`, at most once a second (ADR 0020, decision 6, amended
+   * 2026-11-19). @experimental
    */
-  tap(o: { topics: string[]; maxPerSec?: number }, fn: (r: InspectRecord) => void): () => void;
+  tap(
+    o: { topics: string[]; maxPerSec?: number; onSkipped?: (count: number) => void },
+    fn: (r: InspectRecord) => void,
+  ): () => void;
   /**
    * The last `last` records of `topic` still retained (at most 100), oldest
    * first, as previews. Rejects with a `BusError`.
@@ -293,9 +300,9 @@ export function createInspectFeed(src: InspectSources): InspectFeed {
               ? { topics: [...o.topics] }
               : { topics: [...o.topics], maxPerSec: o.maxPerSec },
             (m) => {
-              if (m.t !== 'record') return;
               try {
-                fn(m.p);
+                if (m.t === 'record') fn(m.p);
+                else if (m.t === 'skipped') o.onSkipped?.(m.p.count);
               } catch (e) {
                 reportError(e);
               }
@@ -401,7 +408,14 @@ export function serveInspectPort(port: MessagePort, inspector: Inspector): () =>
       case 'tap': {
         if (id === undefined || taps.has(id)) return;
         try {
-          const o = msg.p.maxPerSec === undefined ? { topics: msg.p.topics } : msg.p;
+          // Skipped counts always go to the isolate; its `onSkipped` reads them.
+          const onSkipped = (count: number): void => {
+            send({ v: PROTOCOL.v, t: 'skipped', re: id, p: { count } });
+          };
+          const o =
+            msg.p.maxPerSec === undefined
+              ? { topics: msg.p.topics, onSkipped }
+              : { topics: msg.p.topics, maxPerSec: msg.p.maxPerSec, onSkipped };
           taps.set(
             id,
             inspector.tap(o, (r) => send({ v: PROTOCOL.v, t: 'record', re: id, p: r })),

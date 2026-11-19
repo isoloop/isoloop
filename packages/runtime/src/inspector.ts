@@ -37,9 +37,14 @@ export type IsolateInspector = {
   /**
    * Records appended to matching topics, at most `maxPerSec` a second
    * (default 50), as previews. Not a consumer: it isn't in the bus figures.
-   * Returns the function that ends it.
+   * `onSkipped` gets each count of records left out over the cap, at most
+   * once a second (ADR 0020, decision 6, amended 2026-11-19). Returns the
+   * function that ends it.
    */
-  tap(o: { topics: string[]; maxPerSec?: number }, fn: (r: InspectRecord) => void): () => void;
+  tap(
+    o: { topics: string[]; maxPerSec?: number; onSkipped?: (count: number) => void },
+    fn: (r: InspectRecord) => void,
+  ): () => void;
   /**
    * Restarts an isolate, as `kernel.restart(id)` does. Like `kill` and
    * `block`, it rejects for an unknown id, and once the port has ended.
@@ -76,7 +81,10 @@ export function createInspectorClient(): {
   /** What was asked before the port arrived. */
   const queue: IsolateToInspect[] = [];
   const pending = new Map<string, Pending>();
-  const taps = new Map<string, (r: InspectRecord) => void>();
+  const taps = new Map<
+    string,
+    { fn: (r: InspectRecord) => void; onSkipped: ((count: number) => void) | undefined }
+  >();
   const listeners = new Set<(m: InspectMessage) => void>();
   let next = 0;
 
@@ -103,10 +111,13 @@ export function createInspectorClient(): {
     const msg = e.data;
     if (!isInspectToIsolate(msg)) return;
     if (msg.t === 'record') {
-      if (msg.re !== undefined) taps.get(msg.re)?.(msg.p);
+      if (msg.re !== undefined) taps.get(msg.re)?.fn(msg.p);
       return;
     }
-    if (msg.t === 'skipped') return;
+    if (msg.t === 'skipped') {
+      if (msg.re !== undefined) taps.get(msg.re)?.onSkipped?.(msg.p.count);
+      return;
+    }
     if (msg.re !== undefined) {
       const p = pending.get(msg.re);
       if (!p) return;
@@ -167,7 +178,7 @@ export function createInspectorClient(): {
           ? { topics: [...o.topics] }
           : { topics: [...o.topics], maxPerSec: o.maxPerSec };
       const { id, done } = ask({ t: 'tap', p });
-      taps.set(id, fn);
+      taps.set(id, { fn, onSkipped: o.onSkipped });
       let open = true;
       done.catch(() => {
         taps.delete(id);

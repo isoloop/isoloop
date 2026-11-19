@@ -3,8 +3,9 @@
  * appended to the bus, copied from a tap while the Log tab is open, newest
  * first. A tap isn't a consumer, so it isn't in the bus figures, and the
  * host reopens it after a bus restart, so the log carries on. The tap sends
- * at most `MAX_PER_SEC` records a second; values arrive as 2 KB previews with
- * their full size.
+ * at most `MAX_PER_SEC` records a second; the header counts the records it
+ * left out since the log was opened (ADR 0020, decision 6, amended
+ * 2026-11-19). Values arrive as 2 KB previews with their full size.
  */
 import { useIsolate } from '@isoloop/preact';
 import type { InspectRecord } from '@isoloop/protocol';
@@ -42,11 +43,16 @@ export function LogView(): JSX.Element {
   const [applied, setApplied] = useState<string[]>(['*']);
   const [paused, setPaused] = useState(false);
   const [entries, setEntries] = useState<Entry[]>([]);
+  // Records the bus left out over the cap, since the log was opened.
+  const [skipped, setSkipped] = useState(0);
 
   useEffect(() => {
     if (!inspector || paused) return undefined;
     let n = 0;
-    const off = inspector.tap({ topics: applied, maxPerSec: MAX_PER_SEC }, (r) => {
+    const onSkipped = (count: number): void => {
+      setSkipped((x) => x + count);
+    };
+    const off = inspector.tap({ topics: applied, maxPerSec: MAX_PER_SEC, onSkipped }, (r) => {
       n += 1;
       const entry: Entry = { ...r, n };
       setEntries((prev) => [entry, ...prev].slice(0, LOG_SIZE));
@@ -97,8 +103,10 @@ export function LogView(): JSX.Element {
         </button>
       </form>
       <p class="dt-muted" style="margin:4px 0;">
-        {paused ? 'Paused' : `Tapping ${applied.join(', ')}`} · at most {MAX_PER_SEC} records a
-        second · newest first
+        {paused ? 'Paused' : `Tapping ${applied.join(', ')}`} · newest first ·{' '}
+        <span data-log-skipped={skipped}>
+          {MAX_PER_SEC}/s cap · {skipped} skipped
+        </span>
       </p>
       {entries.length === 0 ? (
         <p class="dt-muted">No records yet.</p>
