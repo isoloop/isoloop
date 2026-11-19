@@ -4,15 +4,15 @@
 
 ```ts
 import { connectDevtools } from '@isoloop/devtools';
-// With @isoloop/vite, the build emits the panel like your own isolates:
-import panel from '@isoloop/devtools/panel?isolate';
 
-const disconnect = connectDevtools(kernel, { src: panel, position: 'bottom-right' });
+const disconnect = connectDevtools(kernel, { position: 'bottom-right' });
 // later: await disconnect();
 ```
 
 - **Opting in:** the app opts in by importing and connecting it. Nothing stops a production build from including it.
-- **`src`:** the panel isolate's module URL. Without it, `connectDevtools` uses the `panel.js` that sits next to the package's entry. That file is self-contained, with Preact 11 bundled, so the app's own framework and version don't matter.
+- **`src`:** the panel isolate's module URL. Without it, `connectDevtools` uses the `panel.js` next to the package's entry (`new URL('./panel.js', import.meta.url)`). That file is self-contained, with Preact 11 bundled, so the app's own framework and version don't matter.
+  - **With `@isoloop/vite`, leave `src` out.** In dev, the plugin keeps `@isoloop/devtools` out of Vite's dependency pre-bundling, so the server serves `panel.js` next to the entry. In a build, Vite emits `panel.js` as an asset and rewrites the URL.
+  - **With another bundler,** pass `src` yourself: the URL your build serves `@isoloop/devtools/panel` (the package's `dist/panel.js`) at, copied as a file. Under `@isoloop/vite`, `import panel from '@isoloop/devtools/panel?isolate'` gives that URL as well.
 - **`position`:** the corner where the closed button and the open panel sit: `'bottom-right'` (the default), `'bottom-left'`, `'top-right'` or `'top-left'`.
 - **`id`:** the panel's id in the kernel, `'isoloop-devtools'` by default. The panel lists itself among the isolates.
 

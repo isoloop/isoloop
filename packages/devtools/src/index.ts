@@ -19,9 +19,9 @@ export type DevtoolsPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 't
 export type DevtoolsOptions = {
   /**
    * The panel isolate's module URL. Defaults to the `panel.js` next to this
-   * module in the published package. With `@isoloop/vite`, pass
-   * `import panel from '@isoloop/devtools/panel?isolate'` instead, so the
-   * build emits it like the app's own isolates.
+   * module in the published package, which `@isoloop/vite` serves in dev and
+   * Vite emits in a build. With another bundler, pass the URL it serves
+   * `@isoloop/devtools/panel` at.
    */
   src?: string;
   /** Where the closed button and the opened panel sit. Default `'bottom-right'`. */
