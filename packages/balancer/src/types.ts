@@ -168,8 +168,10 @@ export type Placement = {
  * (the pool's lag stayed high), `full` (the pool's members' busy time reached
  * 80 % of a core, whatever its lag), `crash`, `bisect` (looking for a pool's
  * unnamed culprit), `steady` (back out of quarantine), `backlog` (its
- * reported backlog kept rising, M3i) or `pack` (a quiet member joining
- * another pool to free a worker, M3i).
+ * reported backlog kept rising, M3i), `pack` (a quiet member joining
+ * another pool to free a worker, M3i) or `room` (a quarantine pool of
+ * offenders beyond the first folding into the first, so a member whose backlog is rising gets
+ * its worker, M3j).
  */
 export type MoveReason =
   | 'spike'
@@ -179,7 +181,8 @@ export type MoveReason =
   | 'bisect'
   | 'steady'
   | 'backlog'
-  | 'pack';
+  | 'pack'
+  | 'room';
 
 /** A move, once the old copy has stopped and the new one is spawned. */
 export type MoveEvent = { id: string; from: string; to: string; reason: MoveReason };

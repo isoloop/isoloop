@@ -328,6 +328,17 @@ export function createBalancer<M extends ManifestLike>(
   /** Room for one more worker of the balancer's own. */
   const roomForPool = (): boolean => ownWorkers() + 1 <= maxWorkers;
 
+  /**
+   * When a member whose backlog is rising last found no room in a shared
+   * pool (M3j). For a window after, a worker that frees up is its: no new
+   * quarantine pool takes it.
+   */
+  let starvedAt = -Infinity;
+  const starving = (): boolean => now() - starvedAt < BACKLOG_WINDOW_MS;
+
+  /** Room for a quarantine pool beyond the first: under the cap, and no backlog waiting (M3j). */
+  const roomForQuarantine = (): boolean => roomForPool() && !starving();
+
   const freshName = (prefix: string, first: number): string => {
     const taken = new Set(kernel.pools().map((p) => p.name));
     for (const m of members.values()) taken.add(m.pool);
@@ -621,7 +632,7 @@ export function createBalancer<M extends ManifestLike>(
       (o) => o.offences === 0 && bisect?.moved.has(o.manifest.id) === true,
     );
     if (!isQuarantine(name) && free) return QUARANTINE;
-    return roomForPool() ? freshName(QUARANTINES, 2) : undefined;
+    return roomForQuarantine() ? freshName(QUARANTINES, 2) : undefined;
   };
 
   /**
@@ -645,7 +656,7 @@ export function createBalancer<M extends ManifestLike>(
       if (reason !== 'crash' && membersOf(name).length === 1 && culprit.offences === 0) return;
       // Found: a worker of its own in quarantine when the cap allows (Q18),
       // so it stops taking the other suspects down with it.
-      if (membersOf(name).length > 1 && roomForPool()) {
+      if (membersOf(name).length > 1 && roomForQuarantine()) {
         culprit.offences++;
         culprit.lastSpikeAt = culprit.quarantinedAt = now();
         move(culprit, freshName(QUARANTINES, 2), reason, stateFor(culprit));
@@ -764,11 +775,34 @@ export function createBalancer<M extends ManifestLike>(
   };
 
   /**
+   * Makes room for a backlog (M3j): the quarantine pool beyond the first
+   * with the fewest members folds into the first, all of it, which frees
+   * its worker. Only a pool of offenders, who share the first anyway:
+   * a bisect's suspects never join offenders. A bisect whose halves meet
+   * again ends. False when there's no such pool.
+   */
+  const fold = (): boolean => {
+    const extra = [...new Set([...members.values()].map((m) => m.pool))]
+      .filter((n) => isQuarantine(n) && n !== QUARANTINE)
+      .map((n) => ({ n, here: membersOf(n) }))
+      .filter((c) => c.here.length > 0 && c.here.every((m) => movable(m) && m.offences > 0))
+      .toSorted((a, b) => a.here.length - b.here.length)[0];
+    if (!extra) return false;
+    for (const m of extra.here) {
+      if (bisect?.moved.has(m.manifest.id)) bisect = undefined;
+      move(m, QUARANTINE, 'room', m.state);
+    }
+    return true;
+  };
+
+  /**
    * Backlog (M3i): of the members whose backlog is rising, the one in the
    * busiest pool (the heaviest there first) moves somewhere with more CPU;
    * one move per fresh window across the balancer, so members of one
    * consumer group move one at a time. One that can't get more CPU is
-   * `behind`.
+   * `behind`, unless a quarantine beyond the first holds the worker it
+   * needs: that one folds into the first, and the move follows once its
+   * worker has stopped (M3j).
    */
   const backlogs = (t: number): void => {
     const up = [...members.values()].filter((m) => {
@@ -783,8 +817,13 @@ export function createBalancer<M extends ManifestLike>(
     );
     for (const m of order) {
       if (!movable(m) || !inBudget(m)) continue;
-      const to = membersOf(m.pool).length < 2 ? undefined : roomier(m);
+      const shared = membersOf(m.pool).length >= 2;
+      const to = shared ? roomier(m) : undefined;
       if (to === undefined) {
+        if (shared) {
+          starvedAt = t;
+          if (fold()) return;
+        }
         behind(m, t);
         continue;
       }
@@ -917,7 +956,7 @@ export function createBalancer<M extends ManifestLike>(
       if (!first || (!p.watch && !movable(first))) continue;
       if (isQuarantine(name)) {
         const heaviest = byLoad.find(movable);
-        if (heaviest && roomForPool())
+        if (heaviest && roomForQuarantine())
           move(heaviest, freshName(QUARANTINES, 2), 'sustained', heaviest.state);
         continue;
       }
