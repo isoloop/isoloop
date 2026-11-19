@@ -5,6 +5,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_COMMIT_INTERVAL_MS } from '../../packages/protocol/src/commits.ts';
+import { DEFAULT_FRAME_BUDGET_MS } from '../../packages/host/src/compositor.ts';
+import { FORWARDED_EVENTS } from '../../packages/host/src/events.ts';
 import type { IsolateManifest } from '../../packages/host/src/kernel.ts';
 import {
   DEFAULT_SUPERVISOR_CONFIG,
@@ -12,7 +14,9 @@ import {
 } from '../../packages/host/src/supervisor/machine.ts';
 
 type Labelled = { id?: string; label?: string; sublabel?: string; wraps?: string[] };
+type Card = { title?: string; items?: string[] };
 type Diagram = {
+  cards?: Card[];
   meta: { repository?: { revision?: string } };
   components?: Labelled[];
   boundaries?: Labelled[];
@@ -27,6 +31,7 @@ const NAMES = [
   'runtime-topology',
   'placement',
   'bus-publish',
+  'rendering',
   'isolate-lifecycle',
   'restart-own-worker',
   'restart-pool',
@@ -72,7 +77,7 @@ const STATES: Record<IsolateState, true> = {
 const POOL_FIELD = 'pool' satisfies keyof IsolateManifest;
 
 describe('core diagrams', () => {
-  it('has exactly the seven diagrams, each with its rendered page', () => {
+  it('has exactly the eight diagrams, each with its rendered page', () => {
     const json = readdirSync(dir).filter((f) => f.endsWith('.json'));
     sameMembers(
       json.map((f) => f.replace(/\.json$/, '')),
@@ -124,6 +129,24 @@ describe('core diagrams', () => {
     expect(label(read('bus-publish').flows, 'f-commits')).toBe(
       `commits / ${duration(DEFAULT_COMMIT_INTERVAL_MS)}`,
     );
+  });
+
+  it("rendering: the compositor's default frame budget", () => {
+    const d = read('rendering');
+    const comp = d.components?.find((c) => c.id === 'comp');
+    expect(comp?.sublabel).toMatch(new RegExp(`^${DEFAULT_FRAME_BUDGET_MS} ms a frame\\b`));
+    const frame = d.cards?.find((c) => c.title === 'A frame')?.items?.join(' ') ?? '';
+    expect(frame).toContain(`${DEFAULT_FRAME_BUDGET_MS} ms by default`);
+  });
+
+  it('rendering: the event types the EventBridge forwards', () => {
+    const items = read('rendering').cards?.find((c) => c.title === 'Events back')?.items ?? [];
+    const line = items.find((i) => i.startsWith('Forwarded as they happen: '));
+    const listed = (line ?? '')
+      .replace(/^Forwarded as they happen: /, '')
+      .replace(/\.$/, '')
+      .split(', ');
+    expect(listed).toEqual([...FORWARDED_EVENTS]);
   });
 
   it('placement: the manifest field that picks a pool', () => {

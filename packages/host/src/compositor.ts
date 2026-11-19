@@ -22,6 +22,9 @@ export type SurfaceStats = {
   lastFrameMs: number;
 };
 
+/** DOM work per frame when `frameBudgetMs` isn't given, in ms (design §9). */
+export const DEFAULT_FRAME_BUDGET_MS = 8;
+
 export type CompositorOptions = {
   /** Adopted into every surface's shadow root. */
   styles?: readonly CSSStyleSheet[];
@@ -146,7 +149,7 @@ type Surface = {
 export function createCompositor(opts: CompositorOptions = {}): Compositor {
   const {
     styles = [],
-    frameBudgetMs = 8,
+    frameBudgetMs = DEFAULT_FRAME_BUDGET_MS,
     now = () => performance.now(),
     requestFrame = (fn) => {
       requestAnimationFrame(fn);
