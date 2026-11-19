@@ -144,12 +144,14 @@ Both are ordinary clients of `kernel.tools()` and `kernel.request()`. Neither is
 | Where | `document.modelContext` | `navigator.modelContext` ([`ModelContext.webidl`](https://searchfox.org/firefox-main/source/dom/webidl/ModelContext.webidl)) |
 | Removing a tool | the registration `signal` | `unregisterTool(name)`; the `signal` is ignored |
 | Cancelling a call | the call's own `signal`, and `toolcancel` | neither: `ModelContext` isn't an `EventTarget`, and `execute` gets no signal |
+| Title and hints | kept | no title; only `readOnlyHint`, read as true whenever it's present, even as `false` |
 | A name registered twice | rejected, as the draft says | the new tool replaces the old one |
 | What the agent sees on failure | "Tool execution failed"; the `BusError` is only in the page's console | the `BusError`'s message |
 
 `connectWebMCP` follows the features, not the browser's name:
 - It looks up `document.modelContext`, then `navigator.modelContext`.
 - It listens for `toolcancel` only where `ModelContext` has `addEventListener`.
+- It sends each hint only when it's true (the draft's defaults are false), so Firefox doesn't list a consequential tool as read-only. Firefox's agent doesn't see `consequentialHint` or `untrustedContentHint` at all.
 - Disconnecting aborts the registration signal and, where `unregisterTool` exists, also unregisters each tool by name.
 - Where a call gets no signal and there's no `toolcancel`, nothing can cancel it from the agent's side: it runs until its reply or its `timeoutMs`, and the agent then gets `timeout`. Disconnecting still aborts it.
 - Chromium's `toolcancel` names only the tool (`toolName`), so it aborts every call of that tool in flight.
