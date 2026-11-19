@@ -172,7 +172,7 @@ describe('a stopped pool member (ADR 0015, decision 9)', () => {
 
   it('bills nothing of its old copy to a member restarted under the same name', async () => {
     const p = pool();
-    // A neighbour keeps the pool open: it closes after its last member.
+    // A neighbour, as a pool's worker usually has one.
     p.init('other', { via: 'interval', burnMs: 0 });
     p.init('task', { via: 'interval', burnMs: 3 });
     await wait(400);

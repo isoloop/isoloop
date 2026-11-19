@@ -8,8 +8,8 @@
  * subset installed as `document` when it has a surface.
  *
  * On `shutdown` it says `bye` and closes. A pool (M2c) hosts several
- * isolates the same way, one per `init` naming it in `isolate`, and closes
- * after its last member says `bye`.
+ * isolates the same way, one per `init` naming it in `isolate`, and never
+ * closes itself: the host's loader terminates it after its last member.
  */
 import {
   MAX_BLOCK_MS,
@@ -123,8 +123,12 @@ function shutdownMember(m: Member, graceMs: number, reason: ShutdownReason): voi
     // member doesn't keep working in the pool it left.
     busy.end(m.life);
     m.post({ v: 1, t: 'bye', p: {} });
-    // An own worker closes after its isolate; a pool after its last member.
-    if (members.size === 0) self.close();
+    // An own worker closes after its isolate. A pool stays open for the host
+    // to terminate: other members may still be shutting down (they left the
+    // routing table at once), and the host may have sent a new member's
+    // `init` already. Closing here dropped both, so every later start in the
+    // pool timed out waiting for `ready` (M3j).
+    if (mode !== 'pool' && members.size === 0) self.close();
   });
 }
 

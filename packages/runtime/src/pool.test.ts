@@ -2,7 +2,8 @@
  * The bootstrap as a pool (M2c task 1): every `init` naming a member in
  * `isolate` adds that member to the same worker; messages to and from members
  * name them; each member has its own context and bus port; the beat is the
- * worker's; the worker closes after its last member says `bye`.
+ * worker's; the worker stays open after its last member says `bye`, for the
+ * host to terminate.
  */
 import type { HostToIsolate, IsolateToHost } from '@isoloop/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -126,7 +127,7 @@ describe('bootstrap as a pool', () => {
     expect(of(p.got, 'error', 'ok')).toEqual([]);
   });
 
-  it('shuts down one member at a time and closes after the last', async () => {
+  it('shuts down one member at a time and leaves the worker for the host to end', async () => {
     const p = pool();
     p.add('a');
     p.add('b');
@@ -139,10 +140,26 @@ describe('bootstrap as a pool', () => {
     await until(() => of(p.got, 'beat').length > before + 1);
     p.send({ v: 1, t: 'shutdown', isolate: 'b', p: { reason: 'stop', graceMs: 200 } });
     await until(() => of(p.got, 'bye', 'b').length === 1);
-    // Closed: no more beats.
+    // Still open: the host's loader terminates a pool's worker after its last member.
     const after = of(p.got, 'beat').length;
-    await new Promise((r) => setTimeout(r, 400));
-    expect(of(p.got, 'beat').length).toBe(after);
+    await until(() => of(p.got, 'beat').length > after + 1);
+  });
+
+  it('stays open while a member is still shutting down, and takes a new member meanwhile', async () => {
+    const p = pool();
+    p.add('slow', 'slow-shutdown');
+    p.add('fast');
+    await until(
+      () => of(p.got, 'ready', 'slow').length === 1 && of(p.got, 'ready', 'fast').length === 1,
+    );
+    p.send({ v: 1, t: 'shutdown', isolate: 'slow', p: { reason: 'stop', graceMs: 1000 } });
+    p.send({ v: 1, t: 'shutdown', isolate: 'fast', p: { reason: 'stop', graceMs: 0 } });
+    await until(() => of(p.got, 'bye', 'fast').length === 1);
+    // Out of the routing table, but its handlers still run: its bye comes.
+    await until(() => of(p.got, 'bye', 'slow').length === 1);
+    // A member the host adds after both left starts in the same worker.
+    p.add('next');
+    await until(() => of(p.got, 'ready', 'next').length === 1);
   });
 
   it('ignores an init without `isolate` once it is a pool, and one with `isolate` once it is an own worker', async () => {
