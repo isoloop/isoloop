@@ -54,7 +54,7 @@ const balancer = createBalancer(kernel, options?);
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `maxWorkers` | `max(2, navigator.hardwareConcurrency − 2)`, at least 1 | The balancer's own allowance of workers: its `balancer-N` pools and any quarantine worker beyond the first. Workers your app runs itself don't count. |
+| `maxWorkers` | `max(2, navigator.hardwareConcurrency − 2)`, at least 1 | The balancer's own allowance of workers: its `balancer-N` pools and any quarantine worker beyond the first, counted from the moment a move claims a pool, before its worker runs. Workers your app runs itself don't count. |
 | `spike.lagMs` | 100 | One beat with the pool's lag above this is a spike, put on its busiest member. A first one is only reported; a second from the same member within 60 s sends it to quarantine. |
 | `sustained.lagMs`, `sustained.forMs` | 50 ms, 3,000 ms | The pool's median lag above `lagMs` over `forMs` moves its heaviest member out. |
 | `headroom.loadPct` | 60 | An isolate joins a pool only while the pool's load plus its own stays under this. |
@@ -88,7 +88,7 @@ The balancer listens to the kernel's `isolate:beat` event: every heartbeat of ev
 | Crash | A member's error restarted its pool | That member goes to quarantine | `crash` |
 | Kill, culprit unknown | A member blocked until the supervisor killed the pool, so no beat named it | Half the pool's members go to quarantine on restart; whichever half blocks again holds the culprit | `bisect` |
 | Backlog | The app's reported backlog rose over two 10 s windows in a row, and is above 0 | A pool of its own if the cap allows, else a pool with less load than its pool-mates; with neither, `behind` (but see the next row) | `backlog` |
-| Room for a backlog | A member sharing a pool has a rising backlog and nowhere to go, and a quarantine pool beyond the first holds only offenders, so its worker can be freed | That quarantine pool folds into `balancer-quarantine-1`, all of it, and the backlog move follows once its worker has stopped | `room` |
+| Room for a backlog | A member sharing a pool has a rising backlog and nowhere to go, and a quarantine pool beyond the first can join the first, like with like, so its worker can be freed | That quarantine pool folds into `balancer-quarantine-1`, all of it, and the backlog move follows once its worker has stopped | `room` |
 | Quiet again | An offender's quiet window passed | Back to a pool with room | `steady` |
 | Packing back | Every member of its pool steady for 60 s | Into another of the balancer's pools that stays under 40 % with the whole pool, one member at a time | `pack` |
 
@@ -113,7 +113,7 @@ One shared pool, `balancer-quarantine-1`, outside normal placement and outside `
 - **Offences wear off.** Back in a balancer pool, an offender loses one offence for each quiet window it completes there, so one that stays quiet is back to the 30 s window. One that offends again soon after leaving gets the next, longer window.
 - **Kept apart:** the fourth offence keeps it in quarantine for good (`state: 'kept-apart'`).
 - **Measured-only members** leave once measured, except the ones a bisect moved there, which stay until that bisect ends.
-- **A backlog outranks a second quarantine worker.** While a member that shares a pool has a rising backlog and no room, the quarantine pools beyond the first that hold only offenders fold back into the first, one pool at a time (`room`); a bisect's suspects still never join offenders, and for the next 10 s no new quarantine pool takes the worker that frees up. A bisect whose halves fold together ends. Without this, a quarantine that had split could hold the last worker under the cap for a whole quiet window while healthy members fell behind: in the File processor with faults, on `@isoloop/*@0.1.0-next.3` with `maxWorkers: 2` (a bench server at 2.0 GHz), two image processors in two quarantine pools left six others sharing one worker.
+- **A backlog outranks a second quarantine worker.** While a member that shares a pool has a rising backlog and no room, the quarantine pools beyond the first fold back into the first, one pool at a time (`room`), like with like: offenders into a first quarantine of offenders, or members that never offended, such as the other half of a bisect, into one with no offender. Anyone who hasn't offended still never joins an offender. For the next 10 s no new quarantine pool takes the worker that frees up. A bisect whose halves fold together ends. Without this, a quarantine that had split could hold the last worker under the cap for a whole quiet window while healthy members fell behind: in the File processor with faults, on `@isoloop/*@0.1.0-next.3` with `maxWorkers: 2` (a bench server at 2.0 GHz), two image processors in two quarantine pools left six others sharing one worker. On Firefox the two pools held the two halves of a bisect instead.
 - **A bisect needs a quarantine pool of its own.** It starts only when the quarantine is empty (or holds only that bisect's own suspects), or the cap leaves room for a new quarantine pool. Suspects never join a pool that holds offenders: when a pool's worker is killed, every member there counts a crash, so crowding suspects in with a blocker gets them all given up on. With no room, the pool stays as it is and its members are `behind`.
 
 ### Packing back

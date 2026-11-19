@@ -1338,6 +1338,9 @@ describe('a backlog outranks a second quarantine worker (M3j)', () => {
     // bisect's suspects get a second quarantine pool, the last worker.
     sim.crash({ id: 'o', reason: 'error', pool: where('o')?.pool ?? 'balancer-1' });
     await wait(2_000);
+    // A second offence doubles its quiet window: it stays in the first quarantine.
+    sim.crash({ id: 'o', reason: 'error', pool: 'balancer-quarantine-1' });
+    await wait(500);
     sim.block('s1');
     await wait(1_500);
     sim.unblock('s1');
@@ -1355,11 +1358,75 @@ describe('a backlog outranks a second quarantine worker (M3j)', () => {
     stop();
     expect(moves.filter((m) => m.reason === 'room')).toEqual([]);
     expect(where(suspects[0] ?? '')?.pool).toBe('balancer-quarantine-2');
+    expect(where('o')?.pool).toBe('balancer-quarantine-1');
+  });
+
+  it("folds a bisect's second half back into the first when no offender is there", async () => {
+    // Firefox in the same runs: a lag nobody's busy time explained split
+    // the pool twice, so both quarantine pools held only suspects.
+    const ids = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
+    start({
+      maxWorkers: 2,
+      loads: memoryLoads({
+        ...Object.fromEntries(ids.map((id) => [id, 5])),
+        s1: 8,
+        s2: 6,
+        s3: 1,
+        s4: 1,
+      }),
+    });
+    for (const id of [...ids, 's1', 's2', 's3', 's4']) {
+      sim.load(id, id === 's1' ? 8 : id === 's2' ? 6 : id.startsWith('s') ? 1 : 5);
+      balancer.spawn({ id });
+    }
+    await wait(2_000);
+    sim.block('s1');
+    await wait(1_500);
+    sim.unblock('s1');
+    await wait(1_000);
+    expect(where('s1')?.pool).toBe('balancer-quarantine-1');
+    sim.block('s1');
+    await wait(1_500);
+    sim.unblock('s1');
+    await wait(1_000);
+    const second = balancer
+      .placements()
+      .filter((p) => p.pool === 'balancer-quarantine-2')
+      .map((p) => p.id);
+    expect(second.length).toBeGreaterThan(0);
+    const t0 = performance.now();
+    const stop = reporting(ids, () => Math.round((performance.now() - t0) / 100));
+    await wait(25_000);
+    stop();
+    expect(
+      moves
+        .filter((m) => m.reason === 'room')
+        .map((m) => m.id)
+        .toSorted(),
+    ).toEqual(second.toSorted());
+    expect(moves.some((m) => m.reason === 'backlog')).toBe(true);
   });
 
   it('leaves the quarantines alone while nothing is behind', async () => {
     await twoQuarantines();
     await wait(20_000);
     expect(moves.filter((m) => m.reason === 'room')).toEqual([]);
+  });
+});
+
+describe('the cap counts pools its moves have claimed (M3j)', () => {
+  it('never opens a third pool when a full move and a backlog move want the same freed worker', async () => {
+    // The File processor's fault runs on 0.1.0-next.4: the fold freed a
+    // worker, and in one decision a `full` move and a `backlog` move each
+    // took a new pool, as the first wasn't running yet.
+    const ids = await twoQuarantines();
+    for (const id of ids) sim.load(id, 14);
+    const t0 = performance.now();
+    const stop = reporting(ids, () => Math.round((performance.now() - t0) / 100));
+    await wait(40_000);
+    stop();
+    expect(moves.some((m) => m.reason === 'room')).toBe(true);
+    expect(moves.filter((m) => m.to === 'balancer-3')).toEqual([]);
+    expect(sim.peakBalancerPools).toBeLessThanOrEqual(2);
   });
 });

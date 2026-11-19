@@ -169,8 +169,8 @@ export type Placement = {
  * 80 % of a core, whatever its lag), `crash`, `bisect` (looking for a pool's
  * unnamed culprit), `steady` (back out of quarantine), `backlog` (its
  * reported backlog kept rising, M3i), `pack` (a quiet member joining
- * another pool to free a worker, M3i) or `room` (a quarantine pool of
- * offenders beyond the first folding into the first, so a member whose
+ * another pool to free a worker, M3i) or `room` (a quarantine pool beyond
+ * the first folding into the first, like with like, so a member whose
  * backlog is rising gets its worker, M3j).
  */
 export type MoveReason =
