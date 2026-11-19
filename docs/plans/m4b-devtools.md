@@ -4,7 +4,7 @@
 
 **Done when:** the panel shows isolates, the bus and a live log on plant and markets, keeps working while the bus restarts, and lists itself in its own figures. `kernel.inspect()` and the `inspect` grant are accepted in their own ADR.
 
-**Status:** the inspection feed was grilled on 2026-11-18 (Q1–Q11, yes to all) and is [ADR 0020](../adr/0020-inspection-feed.md), accepted 2026-11-18. Not started. Its feed comes first: M4a's dev MCP reads wait for it.
+**Status:** the inspection feed was grilled on 2026-11-18 (Q1–Q11, yes to all) and is [ADR 0020](../adr/0020-inspection-feed.md), accepted 2026-11-18. Tasks 1–11 are done (2026-11-19): the feed, the panel with its isolates, bus and log views, and the panel on plant and markets behind `?devtools=1` ([isoloop/web#181](https://github.com/isoloop/web/pull/181)). Task 12 (topic replay) isn't started. The write-up is [`docs/posts/m4b-devtools.md`](../posts/m4b-devtools.md).
 
 ## Main work items
 
