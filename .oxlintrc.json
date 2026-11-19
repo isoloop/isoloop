@@ -216,6 +216,67 @@
       }
     },
     {
+      "files": ["packages/devtools/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/**", "!@isoloop/host"],
+                "message": "the devtools mount runs on the main thread: it may import host only, never runtime or bus (system design §2)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // The panel: a visual isolate, drawn in a worker.
+      "files": [
+        "packages/devtools/src/panel.tsx",
+        "packages/devtools/src/views.tsx",
+        "packages/devtools/src/bus-view.tsx",
+        "packages/devtools/src/log-view.tsx",
+        "packages/devtools/src/feed.ts",
+        "packages/devtools/src/persist.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@isoloop/**",
+                  "!@isoloop/preact",
+                  "!@isoloop/runtime",
+                  "!@isoloop/protocol"
+                ],
+                "message": "the devtools panel is an isolate: it may import preact, runtime and protocol's types, never host or bus (system design §2)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/webmcp/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@isoloop/**", "!@isoloop/host"],
+                "message": "webmcp runs on the main thread on the kernel's public API: it may import host only, never runtime or bus (system design §2, ADR 0018)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["packages/vite/**"],
       "rules": {
         "no-restricted-imports": [
