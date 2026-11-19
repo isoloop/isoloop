@@ -11,7 +11,7 @@
  * `@experimental`, follows it on its own outside `@isoloop/host`, and detects
  * features rather than browsers.
  */
-import type { AgentTool, Kernel } from '@isoloop/host';
+import { KernelError, type AgentTool, type Kernel } from '@isoloop/host';
 
 /**
  * The slice of WebMCP's `ModelContext` this package uses. Chromium 158's is an
@@ -56,6 +56,13 @@ function modelContext(): ModelContext | undefined {
   );
 }
 
+/**
+ * The names `connectWebMCP` registered on each `ModelContext`, so a duplicate
+ * fails the same way in every browser: Chromium rejects it, but Firefox 159
+ * silently replaces the tool (ADR 0018, decision 8, "Browsers that differ").
+ */
+const ours = new WeakMap<ModelContext, Set<string>>();
+
 /** Aborts `target` when any of `signals` aborts; returns the cleanup. */
 function follow(target: AbortController, signals: readonly AbortSignal[]): () => void {
   const abort = () => target.abort();
@@ -88,6 +95,10 @@ function follow(target: AbortController, signals: readonly AbortSignal[]): () =>
  *   the tool, so it aborts every call of that tool in flight. Where the
  *   browser gives neither (Firefox 159), a call runs until its reply or its
  *   `timeoutMs`.
+ * - A tool name it already registered on this page and hasn't unregistered
+ *   (a second `connectWebMCP` before the first disconnects) throws
+ *   `KernelError('invalid_config')` naming the tool, and nothing is
+ *   registered. Names other scripts registered aren't seen.
  * - The returned function unregisters every tool (it aborts the registration
  *   signal, and calls `unregisterTool` where that exists) and aborts the
  *   calls still in flight.
@@ -105,11 +116,25 @@ function follow(target: AbortController, signals: readonly AbortSignal[]): () =>
  * @param kernel A kernel created with `agents.expose` (only `tools()` and
  *   `request()` are used).
  * @returns A function that unregisters the tools.
+ * @throws {KernelError} `invalid_config` when one of the tools is already
+ *   registered by an earlier `connectWebMCP` on this page.
  * @experimental
  */
 export function connectWebMCP(kernel: Pick<Kernel, 'tools' | 'request'>): () => void {
   const mc = modelContext();
   if (!mc) return () => {};
+  const tools = kernel.tools();
+  let names = ours.get(mc);
+  if (!names) ours.set(mc, (names = new Set()));
+  const taken = names;
+  for (const tool of tools) {
+    if (taken.has(tool.name)) {
+      throw new KernelError(
+        'invalid_config',
+        `connectWebMCP: the tool ${tool.name} is already registered with WebMCP on this page`,
+      );
+    }
+  }
   const registrations = new AbortController();
   const all = registrations.signal;
   const inFlight = new Map<string, Set<AbortController>>();
@@ -150,7 +175,7 @@ export function connectWebMCP(kernel: Pick<Kernel, 'tools' | 'request'>): () => 
   };
 
   const registered: string[] = [];
-  for (const tool of kernel.tools()) {
+  for (const tool of tools) {
     let result: unknown;
     try {
       result = mc.registerTool(
@@ -170,13 +195,18 @@ export function connectWebMCP(kernel: Pick<Kernel, 'tools' | 'request'>): () => 
       continue;
     }
     registered.push(tool.name);
+    taken.add(tool.name);
     // Chromium's registerTool returns a promise, rejected for example on a
     // name the page registered already.
     if (result instanceof Promise) result.catch((e: unknown) => warn(tool.name, e));
   }
 
+  let disconnected = false;
   return () => {
+    if (disconnected) return;
+    disconnected = true;
     registrations.abort();
+    for (const name of registered) taken.delete(name);
     // Firefox 159 ignores the registration signal and removes tools by name.
     const unregister = mc.unregisterTool;
     if (typeof unregister !== 'function') return;

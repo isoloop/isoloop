@@ -172,6 +172,29 @@ test.describe('with WebMCP', () => {
     await expect.poll(() => failure(r, logs)).toMatch(/No isolate can answer webmcp\.ask\.v1/);
   });
 
+  test('a second connectWebMCP with the same tools throws invalid_config; the first stays', async ({
+    page,
+  }) => {
+    await openPage(page);
+    const second = await page.evaluate(async () => {
+      try {
+        await window.harness.connectWebMCP(window.kernel);
+        return { threw: false, code: '', message: '' };
+      } catch (e) {
+        return {
+          threw: true,
+          code: String(Reflect.get(Object(e), 'code')),
+          message: e instanceof Error ? e.message : String(e),
+        };
+      }
+    });
+    expect(second).toMatchObject({ threw: true, code: 'invalid_config' });
+    expect(second.message).toMatch(/webmcp\.(ask|act)\.v1/);
+    expect(await listTools(page)).toHaveLength(2);
+    const r = await callTool(page, ASK, { q: 'still' });
+    expect(r).toMatchObject({ ok: true, value: { a: 'echo:still', via: 'webmcp' } });
+  });
+
   test('the returned function removes every tool', async ({ page }) => {
     await openPage(page);
     expect(await listTools(page)).toHaveLength(2);
