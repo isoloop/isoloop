@@ -3,13 +3,16 @@
  * each isolate's state, lag, busy time, memory, restarts and patch queue,
  * its pool, and the restart, kill and block controls (devtools decision 7);
  * then the pools and their members. The panel lists itself, marked as
- * devtools (decision 6). The bus and log views follow (M4b tasks 9 and 10).
+ * devtools (decision 6). The bus view: its state and restarts, each topic's
+ * rates, head and retained count, each subscription's lag and credit, and
+ * the publishes it rejected. The log view follows (M4b task 10).
  */
 import { useIsolate } from '@isoloop/preact';
+import { BusView } from './bus-view';
 import type { InspectIsolate, InspectMemory, InspectSnapshot } from '@isoloop/protocol';
 import type { IsolateInspector } from '@isoloop/runtime';
 import type { JSX } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 
 /** How long the block control busy-loops an isolate's worker. */
 export const BLOCK_MS = 2_000;
@@ -90,6 +93,7 @@ function Controls(props: {
       <button
         type="button"
         data-control="restart"
+        aria-label={`Restart ${id}`}
         title={`Restart ${id}`}
         onClick={act('restart', () => inspector.restart(id))}
       >
@@ -98,6 +102,7 @@ function Controls(props: {
       <button
         type="button"
         data-control="kill"
+        aria-label={`Kill ${id}`}
         title={`End ${id}'s worker as a crash; the supervisor restarts it. In a pool, every member restarts.`}
         onClick={act('kill', () => inspector.kill(id))}
       >
@@ -106,6 +111,7 @@ function Controls(props: {
       <button
         type="button"
         data-control="block"
+        aria-label={`Block ${id} for ${BLOCK_MS / 1000} s`}
         title={`Busy-loop ${id}'s worker for ${BLOCK_MS / 1000} s`}
         onClick={act('block', () => inspector.block(id, BLOCK_MS))}
       >
@@ -235,9 +241,15 @@ function IsolatesView(props: { snap: InspectSnapshot }) {
   );
 }
 
-type Tab = 'isolates';
+type Tab = 'isolates' | 'bus';
 
-const TABS: readonly { id: Tab; label: string }[] = [{ id: 'isolates', label: 'Isolates' }];
+const TABS: readonly { id: Tab; label: string }[] = [
+  { id: 'isolates', label: 'Isolates' },
+  { id: 'bus', label: 'Bus' },
+];
+
+const tabId = (t: Tab): string => `dt-tab-${t}`;
+const panelId = (t: Tab): string => `dt-panel-${t}`;
 
 export function Body(props: { snap: InspectSnapshot | undefined }): JSX.Element {
   const ctx = useIsolate();
@@ -246,16 +258,39 @@ export function Body(props: { snap: InspectSnapshot | undefined }): JSX.Element 
     ctx.styles(CSS);
   }, []);
   const { snap } = props;
+  // Arrow keys move between tabs and focus the new one (the WAI-ARIA tabs
+  // pattern); focus is a host call, since the DOM lives on the page.
+  const buttons = useRef<Partial<Record<Tab, unknown>>>({});
+  const onKey = (e: KeyboardEvent): void => {
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (step === 0) return;
+    const i = TABS.findIndex((t) => t.id === tab);
+    const next = TABS[(i + step + TABS.length) % TABS.length];
+    if (!next) return;
+    setTab(next.id);
+    const el = buttons.current[next.id];
+    if (el !== undefined) ctx.host.focus(el).catch(() => undefined);
+  };
+  let view: JSX.Element;
+  if (!snap) view = <p class="dt-view dt-muted">Waiting for the inspection feed…</p>;
+  else if (tab === 'bus') view = <BusView bus={snap.bus} />;
+  else view = <IsolatesView snap={snap} />;
   return (
     <>
-      <div class="dt-tabs" role="tablist">
+      <div class="dt-tabs" role="tablist" aria-label="Devtools views" onKeyDown={onKey}>
         {TABS.map((t) => (
           <button
             key={t.id}
+            ref={(el) => {
+              buttons.current[t.id] = el ?? undefined;
+            }}
+            id={tabId(t.id)}
             type="button"
             role="tab"
             data-tab={t.id}
             aria-selected={tab === t.id ? 'true' : 'false'}
+            aria-controls={panelId(t.id)}
+            tabindex={tab === t.id ? 0 : -1}
             class="dt-tab"
             onClick={() => {
               setTab(t.id);
@@ -265,11 +300,9 @@ export function Body(props: { snap: InspectSnapshot | undefined }): JSX.Element 
           </button>
         ))}
       </div>
-      {snap ? (
-        <IsolatesView snap={snap} />
-      ) : (
-        <p class="dt-view dt-muted">Waiting for the inspection feed…</p>
-      )}
+      <div role="tabpanel" id={panelId(tab)} aria-labelledby={tabId(tab)}>
+        {view}
+      </div>
     </>
   );
 }
