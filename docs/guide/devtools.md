@@ -65,10 +65,10 @@ The Log tab shows records as they are appended to the bus, newest first, and kee
 - the value as a preview, cut at 2 KB.
 
 The records come from a tap ([ADR 0020](../adr/0020-inspection-feed.md), decision 3):
-- **Topics:** every topic by default. Type patterns (`orders.*`, several separated by commas or spaces) and Apply to narrow it.
+- **Topics:** every topic by default. Type patterns (`orders.*`, several separated by commas or spaces) and Apply to narrow it. Rows already in the list stay; Clear removes them.
 - **Rate:** at most 50 records a second reach the panel.
 - **No consumer:** the tap isn't a consumer, so it isn't in the bus figures.
-- **Only while open:** the tap runs only while the Log tab is open. Pause stops it, and Clear empties the list.
+- **Only while open:** the tap runs only while the Log tab is open. Leaving the tab, or closing the panel, ends it and clears the list. Pause stops it, and Clear empties the list.
 - **Bus restarts:** the host reopens the tap after a bus restart, so the log carries on. Memory topics start empty again, so their offsets start from 0. The panel doesn't publish to the bus ([M4b plan](../plans/m4b-devtools.md), devtools decision 7).
 
 The panel's surface covers the viewport, but it doesn't take pointer events, so only the panel's own boxes catch clicks.
