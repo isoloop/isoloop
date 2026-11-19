@@ -172,3 +172,65 @@ test.describe('devtools: bus view (M4b task 9)', () => {
     await expect(page.locator('[data-isoloop-devtools] [data-tab="isolates"]')).toBeFocused();
   });
 });
+
+// The pool members publish on `pooled.v1` after each record they read, so
+// rows are picked by topic.
+const log = (page: Page, topic = 'feed.v1') =>
+  page.locator(`[data-isoloop-devtools] [data-log-table] tbody tr[data-log-topic="${topic}"]`);
+const rows = (page: Page) => page.locator('[data-isoloop-devtools] [data-log-table] tbody tr');
+const publish = (page: Page, topic: string, value: unknown) =>
+  page.evaluate(([t, v]) => window.kernel.publish({ name: t }, { value: v }), [
+    topic,
+    value,
+  ] as const);
+
+test.describe('devtools: live record log (M4b task 10)', () => {
+  test.beforeEach(async ({ page }) => {
+    await openPage(page);
+    await page.locator('[data-isoloop-devtools] button[data-health]').click();
+    await page.locator('[data-isoloop-devtools] [data-tab="log"]').click();
+    await expect(page.locator('[data-isoloop-devtools] [data-view="log"]')).toBeVisible();
+  });
+
+  test('shows records as they are appended, newest first, and filters by topic', async ({
+    page,
+  }) => {
+    await publish(page, 'feed.v1', 41);
+    await publish(page, 'feed.v1', 42);
+    await expect(log(page)).toHaveCount(2);
+    // Newest first.
+    await expect(log(page).first()).toContainText('42');
+    await expect(log(page).nth(1)).toContainText('41');
+
+    await page.locator('[data-isoloop-devtools] [data-log-filter]').fill('notes.*');
+    await page.locator('[data-isoloop-devtools] [data-log-apply]').click();
+    await expect(page.locator('[data-isoloop-devtools] [data-view="log"]')).toContainText(
+      'Tapping notes.*',
+    );
+    await publish(page, 'feed.v1', 777);
+    await publish(page, 'notes.v1', 'hello');
+    await expect(rows(page).first()).toContainText('hello');
+    await expect(rows(page).first()).toHaveAttribute('data-log-topic', 'notes.v1');
+    await expect(log(page).filter({ hasText: '777' })).toHaveCount(0);
+  });
+
+  test('keeps logging through a bus restart', async ({ page }) => {
+    await publish(page, 'feed.v1', 1);
+    await expect(log(page)).toHaveCount(1);
+    await page.evaluate(async () => {
+      const ready = new Promise<void>((resolve) => {
+        const off = window.kernel.on('bus:ready', (e) => {
+          if (!e.first) {
+            off();
+            resolve();
+          }
+        });
+      });
+      window.kernel.debug.crashBus();
+      await ready;
+    });
+    await publish(page, 'feed.v1', 31_337);
+    await expect(log(page).first()).toContainText('31337');
+    await expect(log(page)).toHaveCount(2);
+  });
+});

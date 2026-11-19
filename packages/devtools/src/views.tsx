@@ -5,14 +5,16 @@
  * then the pools and their members. The panel lists itself, marked as
  * devtools (decision 6). The bus view: its state and restarts, each topic's
  * rates, head and retained count, each subscription's lag and credit, and
- * the publishes it rejected. The log view follows (M4b task 10).
+ * the publishes it rejected. The log view: records from a tap, live, while
+ * its tab is open.
  */
 import { useIsolate } from '@isoloop/preact';
-import { BusView } from './bus-view';
 import type { InspectIsolate, InspectMemory, InspectSnapshot } from '@isoloop/protocol';
 import type { IsolateInspector } from '@isoloop/runtime';
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { BusView } from './bus-view';
+import { LogView } from './log-view';
 
 /** How long the block control busy-loops an isolate's worker. */
 export const BLOCK_MS = 2_000;
@@ -44,6 +46,15 @@ const CSS = `
 .dt-status { margin: 6px 0 0; color: #fca5a5; }
 .dt-h { margin: 10px 0 4px; font-size: 12px; color: #9ca3af; }
 .dt-warning { color: #fcd34d; }
+.dt-state-none { color: #9ca3af; }
+.dt-log-bar { display: flex; gap: 4px; }
+.dt-log-bar input { flex: 1; min-width: 0; background: #0b1220; color: #e5e7eb;
+  border: 1px solid #374151; border-radius: 4px; font: inherit; padding: 2px 6px; }
+.dt-log-bar button { background: #1f2937; color: #e5e7eb; border: 1px solid #374151;
+  border-radius: 4px; font: inherit; font-size: 11px; padding: 1px 8px; cursor: pointer; }
+.dt-log-bar input:focus-visible, .dt-log-bar button:focus-visible { outline: 2px solid #60a5fa;
+  outline-offset: 1px; }
+.dt-table td.dt-value { white-space: normal; word-break: break-all; max-width: 40ch; }
 `;
 
 const ms = (n: number | undefined): string => (n === undefined ? '–' : `${Math.round(n)} ms`);
@@ -241,11 +252,12 @@ function IsolatesView(props: { snap: InspectSnapshot }) {
   );
 }
 
-type Tab = 'isolates' | 'bus';
+type Tab = 'isolates' | 'bus' | 'log';
 
 const TABS: readonly { id: Tab; label: string }[] = [
   { id: 'isolates', label: 'Isolates' },
   { id: 'bus', label: 'Bus' },
+  { id: 'log', label: 'Log' },
 ];
 
 const tabId = (t: Tab): string => `dt-tab-${t}`;
@@ -274,6 +286,7 @@ export function Body(props: { snap: InspectSnapshot | undefined }): JSX.Element 
   let view: JSX.Element;
   if (!snap) view = <p class="dt-view dt-muted">Waiting for the inspection feed…</p>;
   else if (tab === 'bus') view = <BusView bus={snap.bus} />;
+  else if (tab === 'log') view = <LogView />;
   else view = <IsolatesView snap={snap} />;
   return (
     <>

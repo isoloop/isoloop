@@ -54,6 +54,21 @@ The Bus tab shows the bus's state and how many times it has restarted. Once the 
 - **Rejected publishes:** counts by error code, since the bus worker started. A bus restart starts them again from zero.
 - **Storage:** the origin's storage use, while the bus keeps files.
 
-The panel reads the feed on a port of its own, not through the bus, so none of these figures include it. Arrow keys move between the tabs. The panel doesn't publish to the bus ([M4b plan](../plans/m4b-devtools.md), devtools decision 7).
+The panel reads the feed on a port of its own, not through the bus, so none of these figures include it. Arrow keys move between the tabs.
+
+## Log view
+
+The Log tab shows records as they are appended to the bus, newest first, and keeps the last 200. Each row has:
+- the time, topic, offset and key;
+- the producer;
+- the value's size;
+- the value as a preview, cut at 2 KB.
+
+The records come from a tap ([ADR 0020](../adr/0020-inspection-feed.md), decision 3):
+- **Topics:** every topic by default. Type patterns (`orders.*`, several separated by commas or spaces) and Apply to narrow it.
+- **Rate:** at most 50 records a second reach the panel.
+- **No consumer:** the tap isn't a consumer, so it isn't in the bus figures.
+- **Only while open:** the tap runs only while the Log tab is open. Pause stops it, and Clear empties the list.
+- **Bus restarts:** the host reopens the tap after a bus restart, so the log carries on. Memory topics start empty again, so their offsets start from 0. The panel doesn't publish to the bus ([M4b plan](../plans/m4b-devtools.md), devtools decision 7).
 
 The panel's surface covers the viewport, but it doesn't take pointer events, so only the panel's own boxes catch clicks.
