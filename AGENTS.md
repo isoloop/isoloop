@@ -20,6 +20,7 @@ A change is done when all five hold:
 
 ## Decisions and review
 
+- **One PR per task** from a plan's task table.
 - **ADRs** record decisions; the maintainer reviews each one on its own, and it's committed once the review ends.
 - **The maintainer reviews** ADRs, docs-only PRs in this repo, and new public API. Forks merge their own code PRs on green.
 - **Tags and releases** are pushed by the maintainer, or on the maintainer's explicit word for that release.
