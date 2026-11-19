@@ -1,8 +1,31 @@
-# Isoloop
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://isoloop.dev/brand/expressive-dark.svg">
+    <img src="https://isoloop.dev/brand/expressive.svg" alt="" width="160">
+  </picture>
+</p>
 
-[![CI](https://github.com/isoloop/isoloop/actions/workflows/ci.yml/badge.svg)](https://github.com/isoloop/isoloop/actions/workflows/ci.yml)
+<h1 align="center">Isoloop</h1>
 
-**A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
+<h3 align="center">Event-loop isolation for JavaScript apps</h3>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@isoloop/runtime"><img alt="npm @next" src="https://img.shields.io/npm/v/@isoloop/runtime/next?style=for-the-badge&label=npm%20%40next&color=2f57cc"></a>
+  <a href="https://github.com/isoloop/isoloop/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/isoloop/isoloop/ci.yml?branch=main&style=for-the-badge&label=CI"></a>
+  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/github/license/isoloop/isoloop?style=for-the-badge&color=6e46c2"></a>
+  <img alt="Written in TypeScript" src="https://img.shields.io/badge/TypeScript-strict-0b7480?style=for-the-badge">
+  <img alt="Status: pre-release" src="https://img.shields.io/badge/status-pre--release-555?style=for-the-badge">
+</p>
+
+<p align="center">
+  <a href="https://isoloop.dev">Website</a> •
+  <a href="https://isoloop.dev/features/">Features</a> •
+  <a href="https://isoloop.dev/examples/">Examples</a> •
+  <a href="docs/guide">Guide</a> •
+  <a href="docs/adr/README.md">ADRs</a>
+</p>
+
+Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
 Status: **pre-release, on the way to 0.1.** Done: M0–M3, M2b–M2d, M3e–M3i, and M4's agents and devtools epics. That's the kernel (loader, supervisor, frame-batched compositor on our own render bridge), the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension, persistent topics in OPFS), worker pools for headless and visual isolates, the Preact and React adapters, the experimental balancer, tools for agents (`kernel.request`, the `isoloop` CLI with a dev MCP server, `@isoloop/webmcp`) and the devtools panel on the inspection feed, with CI on Chromium, Firefox and WebKit. Prereleases are on npm under the `next` tag (`0.1.0-next.6`, 2026-11-19); there's no stable release yet. Next: M4c (the docs site), then M4d (the API freeze and `0.1.0`), with M3j (balancer gaps) alongside; after 0.1, the Vue, Svelte and Solid adapters (M6), WebMCP to stable once it ships (M7) and the shared-memory engine (M5). The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
 
