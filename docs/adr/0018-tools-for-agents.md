@@ -1,6 +1,6 @@
 # ADR 0018: Tools for agents
 
-- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all). What its implementation (isoloop#242) added was grilled on 2026-11-18 (Q1–Q5, yes to all) and is recorded in decisions 1–4 and 8. Amended on 2026-11-19 for Firefox's WebMCP and three details of Chromium's (decision 8, *Browsers that differ*).
+- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all). What its implementation (isoloop#242) added was grilled on 2026-11-18 (Q1–Q5, yes to all) and is recorded in decisions 1–4 and 8. Amended on 2026-11-19 for Firefox's WebMCP and three details of Chromium's (decision 8, *Browsers that differ*); the amendment was grilled the same day (Q1–Q6, yes to all).
 - **Date:** 2026-11-17
 - **Amends:** [ADR 0003](0003-schema-format-standard-schema.md). A contract may describe a tool, and the host makes JSON Schema at run time through the same vendored interface that decision 21 uses for `isoloop contracts export`, not only at export.
 - **Plan:** [M4a](../plans/m4a-agents.md), grilled 2026-11-17 (decisions 1–8, 10, 11 and 14 there). Background: the [AI-enablers investigation](../investigations/ai-enablers.md).
@@ -130,7 +130,7 @@ Both are ordinary clients of `kernel.tools()` and `kernel.request()`. Neither is
 - Which MCP tools the CLI offers, and what `--allow-write` unlocks, is the CLI's business ([M4a](../plans/m4a-agents.md), decisions 9, 12 and 13), not this ADR's. One rule from here holds: app tools without `readOnly: true` need `--allow-write`.
 
 **WebMCP.** `connectWebMCP(kernel): () => void` from `@isoloop/webmcp`, a package of its own, `@experimental`, in the Changesets fixed group.
-- It uses `document.modelContext`, or `navigator.modelContext` where only that exists. If neither is there, it does nothing.
+- It uses `document.modelContext`, or `navigator.modelContext` where only that exists, never both. If neither is there, it does nothing.
 - Otherwise it registers each exposed tool with `registerTool({ name, title, description, inputSchema, outputSchema, annotations, execute }, { signal })`. Its `execute` calls `kernel.request(tool.topic, input, { timeoutMs: tool.timeoutMs, signal, via: 'webmcp' })`.
 - `toolcancel` aborts that call's signal, and the returned function aborts every registration.
 - Tools stay registered while their isolates restart. A failed call rejects `execute` with the `BusError`'s code and message.
@@ -151,9 +151,11 @@ Both are ordinary clients of `kernel.tools()` and `kernel.request()`. Neither is
 `connectWebMCP` follows the features, not the browser's name:
 - It looks up `document.modelContext`, then `navigator.modelContext`.
 - It listens for `toolcancel` only where `ModelContext` has `addEventListener`.
-- It sends each hint only when it's true (the draft's defaults are false), so Firefox doesn't list a consequential tool as read-only. Firefox's agent doesn't see `consequentialHint` or `untrustedContentHint` at all.
+- It sends each hint only when it's true (the draft's defaults are false), so Firefox doesn't list a consequential tool as read-only. Firefox's agent doesn't see `consequentialHint` or `untrustedContentHint` at all; descriptions aren't edited to make up for it, and the Agents guide says so.
+- **It refuses a duplicate name itself, the same in both browsers.** It keeps the names it registered on each `ModelContext`; if one of `kernel.tools()` is already there (a second `connectWebMCP` on the page, before the first disconnects), it throws `KernelError('invalid_config')` naming the tool and registers nothing. Disconnecting frees the names. A name some other script registered isn't seen: Chromium still rejects it (a warning), and Firefox replaces it. `KernelErrorCode` has no plain `'invalid'`, so this uses the existing config code rather than adding one.
 - Disconnecting aborts the registration signal and, where `unregisterTool` exists, also unregisters each tool by name.
-- Where a call gets no signal and there's no `toolcancel`, nothing can cancel it from the agent's side: it runs until its reply or its `timeoutMs`, and the agent then gets `timeout`. Disconnecting still aborts it.
+- Where a call gets no signal and there's no `toolcancel`, nothing can cancel it from the agent's side: it runs until its reply or its `timeoutMs` (the tool's, unchanged), and the agent then gets `timeout`. Disconnecting still aborts it. A Firefox agent can't cancel a call.
+- A failed call still rejects `execute` with the `BusError`, in both browsers; what reaches the agent differs (the table), and [M7](../plans/m7-webmcp-stable.md) follows it.
 - Chromium's `toolcancel` names only the tool (`toolName`), so it aborts every call of that tool in flight.
 
 Firefox's WebMCP is behind prefs and not shipped, so this follows it the way the rest of the package follows Chromium's flag: `@experimental`, until [M7](../plans/m7-webmcp-stable.md).
