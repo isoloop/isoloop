@@ -2,7 +2,7 @@
  * `@isoloop/devtools` (M4b): a panel in the page showing the inspection feed
  * (ADR 0020), drawn by a visual isolate in its own worker, so a devtools
  * crash or hang never touches the app, and it restarts like any isolate
- * (M4b devtools decisions 1–8). The app imports and mounts it; that import is
+ * (M4b devtools decisions 1–8). The app imports and connects it; that import is
  * the opt-in, production builds included (decision 3).
  *
  * The host side here only makes the surface, spawns the panel isolate with
@@ -28,16 +28,6 @@ export type DevtoolsOptions = {
   position?: DevtoolsPosition;
   /** The panel isolate's id in the kernel. Default `'isoloop-devtools'`. */
   id?: string;
-};
-
-/** A mounted panel. @experimental */
-export type Devtools = {
-  /** The panel isolate's id. */
-  readonly id: string;
-  /** Opens or closes the panel, as a click on its button does. */
-  toggle(): void;
-  /** Stops the panel isolate and removes its surface. */
-  unmount(): Promise<void>;
 };
 
 /** The attribute the panel puts on its open and close buttons. */
@@ -74,18 +64,23 @@ const fallbackFor =
   };
 
 /**
- * Mounts the devtools panel: a surface covering the viewport that takes no
+ * Connects the devtools panel: a surface covering the viewport that takes no
  * pointer events itself (the panel's boxes are `position: fixed`), and the
  * panel isolate in its own worker with the `inspect` grant (never pooled).
  * Alt+Shift+D toggles it. Guide: `docs/guide/devtools.md`.
  *
  * ```ts
- * import { mountDevtools } from '@isoloop/devtools';
- * mountDevtools(kernel, { position: 'bottom-left' });
+ * import { connectDevtools } from '@isoloop/devtools';
+ * const disconnect = connectDevtools(kernel, { position: 'bottom-left' });
  * ```
+ *
+ * The floating button and Alt+Shift+D open and close it.
+ *
+ * @returns A function that disconnects: it stops the panel isolate and
+ *   removes its surface, resolving once the worker is gone.
  * @experimental
  */
-export function mountDevtools(kernel: Kernel, o: DevtoolsOptions = {}): Devtools {
+export function connectDevtools(kernel: Kernel, o: DevtoolsOptions = {}): () => Promise<void> {
   const id = o.id ?? 'isoloop-devtools';
   const position = o.position ?? 'bottom-right';
   const surface = document.createElement('div');
@@ -119,16 +114,12 @@ export function mountDevtools(kernel: Kernel, o: DevtoolsOptions = {}): Devtools
   window.addEventListener('keydown', onKey);
 
   let gone: Promise<void> | undefined;
-  return {
-    id,
-    toggle,
-    unmount() {
-      gone ??= (async () => {
-        window.removeEventListener('keydown', onKey);
-        await kernel.stop(id);
-        surface.remove();
-      })();
-      return gone;
-    },
+  return () => {
+    gone ??= (async () => {
+      window.removeEventListener('keydown', onKey);
+      await kernel.stop(id);
+      surface.remove();
+    })();
+    return gone;
   };
 }

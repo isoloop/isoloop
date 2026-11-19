@@ -4,7 +4,7 @@
 import { createKernel, type Kernel } from '@isoloop/host';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import list from './__fixtures__/contracts';
-import { mountDevtools, type Devtools, type DevtoolsOptions } from './index';
+import { connectDevtools, type DevtoolsOptions } from './index';
 
 const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
@@ -14,7 +14,7 @@ const src = new URL('./panel.tsx', import.meta.url).href;
 const contractsUrl = new URL('./__fixtures__/contracts.ts', import.meta.url).href;
 
 const kernels: Kernel[] = [];
-const mounted: Devtools[] = [];
+const mounted: (() => Promise<void>)[] = [];
 
 const deleteDb = () =>
   new Promise<void>((resolve) => {
@@ -27,7 +27,7 @@ const deleteDb = () =>
   });
 
 afterEach(async () => {
-  await Promise.all(mounted.splice(0).map((d) => d.unmount()));
+  await Promise.all(mounted.splice(0).map((d) => d()));
   await Promise.all(kernels.splice(0).map((k) => k.destroy()));
   await deleteDb();
 });
@@ -43,8 +43,8 @@ function kernel(): Kernel {
   return k;
 }
 
-function mount(k: Kernel, o: DevtoolsOptions = {}): Devtools {
-  const d = mountDevtools(k, { src, ...o });
+function mount(k: Kernel, o: DevtoolsOptions = {}): () => Promise<void> {
+  const d = connectDevtools(k, { src, ...o });
   mounted.push(d);
   return d;
 }
@@ -65,6 +65,10 @@ const find = (sel: string): HTMLElement | null => {
   const el = shadow()?.querySelector(sel);
   return el instanceof HTMLElement ? el : null;
 };
+const shortcut = () =>
+  window.dispatchEvent(
+    new KeyboardEvent('keydown', { code: 'KeyD', key: 'D', altKey: true, shiftKey: true }),
+  );
 const fab = () => find('button[data-health]');
 const panel = () => find('[data-isoloop-devtools-panel]');
 
@@ -97,16 +101,15 @@ describe('@isoloop/devtools (M4b task 7)', () => {
     expect(fab()?.style.pointerEvents).toBe('auto');
   });
 
-  it('Alt+Shift+D and toggle() open and close it', async () => {
+  it('Alt+Shift+D opens and closes it', async () => {
     const k = kernel();
-    const d = mount(k);
+    mount(k);
     await waitFor(fab);
-    window.dispatchEvent(
-      new KeyboardEvent('keydown', { code: 'KeyD', key: 'D', altKey: true, shiftKey: true }),
-    );
+    shortcut();
     await waitFor(panel);
-    d.toggle();
+    shortcut();
     await waitFor(fab);
+    expect(panel()).toBeNull();
   });
 
   it('shows an amber dot while an isolate is unwell, red once one has failed', async () => {
@@ -165,7 +168,7 @@ describe('@isoloop/devtools (M4b task 7)', () => {
 
     // Give the write a moment, then mount afresh.
     await new Promise((r) => setTimeout(r, 200));
-    await d.unmount();
+    await d();
     mounted.splice(mounted.indexOf(d), 1);
     mount(k);
     const again = await waitFor(panel);
@@ -174,11 +177,11 @@ describe('@isoloop/devtools (M4b task 7)', () => {
     expect(again.style.left).toBe('12px');
   });
 
-  it('unmount stops the isolate and removes the surface', async () => {
+  it('disconnecting stops the isolate and removes the surface', async () => {
     const k = kernel();
     const d = mount(k);
     await waitFor(fab);
-    await d.unmount();
+    await d();
     mounted.splice(mounted.indexOf(d), 1);
     expect(document.querySelector('[data-isoloop-devtools]')).toBeNull();
     expect(k.isolates().map((i) => i.id)).not.toContain('isoloop-devtools');
