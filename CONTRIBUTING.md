@@ -47,6 +47,19 @@ The runnable examples (basic, the dashboards) live in [isoloop/web](https://gith
 
 There are no git hooks. CI is the only gate.
 
+## Repo layout
+
+Plain pnpm workspaces: `protocol`, `dom`, `host`, `runtime`, `bus`, `codec`, `react`, `preact`, `vite`, `cli` (published as `isoloop`), and the experimental `balancer`, `devtools` and `webmcp`. A package arrives with its milestone ([plans](docs/plans/README.md)).
+
+```text
+packages/  protocol · dom · host · runtime · bus · codec · react · preact · vite · balancer · cli · webmcp · devtools
+e2e/       Playwright suites, their harness page and the isolates they spawn
+docs/      rfcs · design · adr · plans · guide · diagrams · investigations · posts · history
+bench/     click-to-paint, throughput, memory, pools, visual pools, codec, freeze
+```
+
+The examples (basic and the dashboards) and the website live in [isoloop/web](https://github.com/isoloop/web), served at [isoloop.dev](https://isoloop.dev/).
+
 ## CI
 
 `.github/workflows/ci.yml` runs on every PR and on `main`:
@@ -95,6 +108,6 @@ The packages are in Changesets' pre mode `next`, so versions are `0.1.0-next.N` 
 `pnpm release:status` shows what the next version step would do.
 
 **No majors before 1.0.** While the packages are below 1.0.0, the changeset check fails a PR whose changesets ask for a `major` bump: on 0.x a breaking change is a minor. 1.0 starts only on a PR labelled `release-1.0`, which lets the major through.
-- **Decisions** made along the way become [ADRs](docs/adr/README.md); ideas for later go in [`docs/would-like.md`](docs/would-like.md).
+- **Decisions** made along the way become [ADRs](docs/adr/README.md). [Would like](docs/would-like.md) holds ideas deferred or to explore, not planned; [Should do](docs/should-do.md) holds committed work waiting on a package or milestone.
 
 The full conventions are in the [plans index](docs/plans/README.md#conventions).
