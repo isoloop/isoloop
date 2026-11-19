@@ -4,7 +4,7 @@
 
 **A threaded runtime for isolated front-end code.** Isoloop runs each *isolate* (a micro-frontend, a widget, or headless logic such as a state store or a sync engine) in its own Web Worker, so no isolate can freeze, crash or read another. Isolates with a *surface* describe UI that the main thread draws; headless isolates only talk to the bus. Isolates talk only through a Kafka-style message bus with typed topics and replay, so an isolate that restarts rebuilds its state from the log.
 
-Status: **pre-release, on the way to 0.1.** Done: M0–M3, M2b–M2d, M3e–M3i, and M4's agents and devtools epics. That's the kernel (loader, supervisor, frame-batched compositor on our own render bridge), the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension, persistent topics in OPFS), worker pools for headless and visual isolates, the Preact and React adapters, the experimental balancer, tools for agents (`kernel.request`, the `isoloop` CLI with a dev MCP server, `@isoloop/webmcp`) and the devtools panel on the inspection feed, with CI on Chromium, Firefox and WebKit. Prereleases are on npm under the `next` tag (`0.1.0-next.5`, 2026-11-19); there's no stable release yet. Next: M4c (the docs site), then M4d (the API freeze and `0.1.0`), with M3j (balancer gaps) alongside; after 0.1, the Vue, Svelte and Solid adapters (M6), WebMCP to stable once it ships (M7) and the shared-memory engine (M5). The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
+Status: **pre-release, on the way to 0.1.** Done: M0–M3, M2b–M2d, M3e–M3i, and M4's agents and devtools epics. That's the kernel (loader, supervisor, frame-batched compositor on our own render bridge), the log bus (its own worker, typed topics, replay, backpressure, opt-in suspension, persistent topics in OPFS), worker pools for headless and visual isolates, the Preact and React adapters, the experimental balancer, tools for agents (`kernel.request`, the `isoloop` CLI with a dev MCP server, `@isoloop/webmcp`) and the devtools panel on the inspection feed, with CI on Chromium, Firefox and WebKit. Prereleases are on npm under the `next` tag (`0.1.0-next.6`, 2026-11-19); there's no stable release yet. Next: M4c (the docs site), then M4d (the API freeze and `0.1.0`), with M3j (balancer gaps) alongside; after 0.1, the Vue, Svelte and Solid adapters (M6), WebMCP to stable once it ships (M7) and the shared-memory engine (M5). The design: [RFC 0001](docs/rfcs/0001-threaded-runtime.md), the [system design](docs/design/system-design.md), [ADRs](docs/adr/README.md) and [milestone plans](docs/plans/README.md).
 
 ## Run the demo
 
@@ -17,18 +17,33 @@ pnpm install
 pnpm --filter basic dev
 ```
 
+## Install
+
+There's no stable release yet. The prereleases are on npm under the `next` tag (`0.1.0-next.6` as of 2026-11-19). A minimal app, like the [basic example](https://github.com/isoloop/web/tree/main/apps/basic), needs the host, the runtime and the bus, a [Standard Schema](https://standardschema.dev) library for topic schemas (basic uses Zod), and, with Vite, the plugin:
+
+```sh
+pnpm add @isoloop/host@next @isoloop/runtime@next @isoloop/bus@next zod
+pnpm add -D @isoloop/vite@next
+```
+
+Add `@isoloop/react@next` or `@isoloop/preact@next` for an adapter. What the page and the servers must serve is in the [hosting guide](docs/guide/hosting.md).
+
 ## The comparison
 
-The [markets dashboard](https://github.com/isoloop/web/tree/main/apps/dashboards/markets), built twice from one source: as an ordinary main-thread app and on Isoloop, in React and in Preact. The same scripted scenario runs on each: live-like market data at 10×, typing into the alerts panel, then typing while one chart runs a 3 s busy loop and the trades table floods the bus. Recorded in CI ([results and method](https://github.com/isoloop/web/tree/main/apps/dashboards/markets/comparison), [side-by-side video](https://github.com/isoloop/web/blob/main/apps/dashboards/markets/comparison/side-by-side.webm)):
+The [markets dashboard](https://github.com/isoloop/web/tree/main/apps/dashboards/markets), built from one source as native + workers (the data engines in workers, the widgets on the main thread) and on Isoloop with `matched` placement (the same engines as their own workers, plus one pool for every widget): 6 workers against 7. Measured on a dedicated machine (AMD Ryzen 7 5825U, four cores fixed at 2.0 GHz) in Chromium, with `@isoloop/*@0.0.0-next.b8ffdcf`, 5 interleaved rounds, medians ([write-up and method](https://github.com/isoloop/web/blob/main/apps/dashboards/markets/comparison/final/README.md)). Δ is Isoloop minus native; lower is better for every row:
 
-| Build | Typing, calm (median) | Typing, one chart blocked (median) | (worst) | fps after | Long tasks (10 s) | First data | JS, gzipped |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Native · React | 11 ms | 2832 ms | 2844 ms | 27 | 3 | 168 ms | 100 KB |
-| Isoloop · React | 34 ms | 42 ms | 58 ms | 61 | 0 | 357 ms | 153 KB |
-| Native · Preact | 13 ms | 2832 ms | 2847 ms | 4 | 3 | 103 ms | 41 KB |
-| Isoloop · Preact | 35 ms | 40 ms | 86 ms | 61 | 0 | 277 ms | 94 KB |
+| Figure | Normal: native + workers | Normal: Isoloop | Δ | Heavy: native + workers | Heavy: Isoloop | Δ |
+| --- | --- | --- | --- | --- | --- | --- |
+| Late frames (of about 600) | 0 | 0 | 0 | 205 | 0 | −205 |
+| Typing | 35 ms | 41 ms | +7 ms | 156 ms | 41 ms | −115 ms |
+| Main-thread CPU | 86% | 21% | −65 points | 100% | 23% | −77 points |
+| CPU, all threads | 103% | 108% | +4 points | 114% | 143% | +29 points |
+| Memory after GC (16 s) | 188 MB | 222 MB | +33 MB | 246 MB | 301 MB | +52 MB |
+| First data | 249 ms | 383 ms | +125 ms | 362 ms | 527 ms | +212 ms |
 
-With one chart blocked, the native page waits the busy loop out; on Isoloop the other widgets keep answering at 60 fps. That costs about 25 ms per keystroke when nothing is blocked, slower first data and about 50 KB more JavaScript, and the numbers above show it.
+At Normal both builds keep every frame and Isoloop types 7 ms slower. At Heavy native + workers fills the main thread and drops about a third of its frames, and Isoloop keeps them. Either way Isoloop costs more CPU across threads, more memory and later first data. The write-up also has Firefox, the plain native build against Isoloop `one`, and `own` (a worker per widget), the most expensive placement.
+
+The [plant dashboard](https://github.com/isoloop/web/blob/main/apps/dashboards/plant/comparison/final/README.md) (72 widgets), measured the same way: at 5 kHz on Chromium, Isoloop `one` against native types 55 ms sooner and uses 60 points less of the main thread, for 11 points more CPU across threads, 40 MB more memory and first data 187 ms later.
 
 ## Why
 
