@@ -29,7 +29,8 @@
    - When closed, a floating button (FAB) like React Query's devtools, drawn by the devtools isolate itself, so it disappears briefly while the devtools restart.
    - `position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'`, bottom-right by default.
    - The closed FAB shows a dot: amber while an isolate is restarting or lagging, red when one has given up (`maxRestarts`).
-   - A click or a keyboard shortcut opens a docked, resizable panel from that corner. Its size, dock and open state are kept in `localStorage`.
+   - A click or Alt+Shift+D opens a docked, resizable panel from that corner. Its size, dock and open state are kept in IndexedDB, on the page's origin: the panel runs in a worker, which has no `localStorage` (changed 2026-11-19, #265).
+   - The app calls `connectDevtools(kernel, { src?, position?, id? })`, which returns a function that disconnects, as `connectWebMCP` does (2026-11-19, #265).
 9. **An ADR at the start of M4b** records the feed and the `inspect` grant as public API.
 
 ## Inspection feed decisions (2026-11-18)
@@ -59,7 +60,7 @@ About one evening each ([conventions](README.md#conventions)). Forks follow the 
 | 5 | The `inspect` grant, its refusal in pools, the host↔isolate port, `ctx.inspector` (ADR 0020 decision 6), the host `Inspector`'s `tap` and `records`, the controls, and removing the unused `heapBytes` | `packages/protocol/src/grants.ts`, `packages/host/src/kernel.ts`, `packages/runtime` | browser: an isolate reads the feed, the port survives a bus restart, kill/block/restart work, a pooled `inspect` fails with `invalid_config` |
 | 5b | Memory per isolate: the host's `measureUserAgentSpecificMemory()` when cross-origin isolated, attributed by worker URL (a fragment per worker on the marked `@isoloop/runtime/worker` entry only), `memory` in the snapshot and feed; `@isoloop/vite`'s existing `crossOriginIsolated` sends COOP/COEP | `packages/host/src/{memory,inspect,loader,kernel}.ts`, `packages/protocol/src/inspect.ts` | browser: report reading, the 5 s loop, attribution to own workers and pools; E2E (full Chromium, COOP/COEP server): a figure per worker, shared in a pool, absent when not isolated |
 | 6 | The feed's cost: plant at `?rate=5`, feed open against closed, plus the ring buffer's size after a run | `isoloop/web` plant (`?inspect=1`, `comparison/inspect/`), the *Comparison (plant)* workflow's `inspect` job; [the write-up](../investigations/inspect-feed-cost.md) | — (measurement, reported only) |
-| 7 | `@isoloop/devtools` package skeleton: the visual isolate in its own worker, Preact, the floating button and dock (decision 8) | `packages/devtools` | browser: mounts, restarts on a crash, `localStorage` state |
+| 7 | `@isoloop/devtools` package skeleton: the visual isolate in its own worker, Preact, the floating button and dock (decision 8) | `packages/devtools` | browser: mounts, restarts on a crash, settings kept across mounts (IndexedDB) |
 | 8 | Isolates view (decision 2's list) and controls | `packages/devtools` | E2E on a fixture page |
 | 9 | Bus view: topics, rates, consumer lag and credit, rejected publishes | `packages/devtools` | E2E on a fixture page |
 | 10 | Live record log from the tap | `packages/devtools` | E2E: log during a bus restart |

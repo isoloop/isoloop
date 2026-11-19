@@ -206,7 +206,7 @@ Parallel painting of DOM surfaces (canvas isolates painting through `OffscreenCa
 - [System design](docs/design/system-design.md): packages, interfaces, sequences and invariants
 - [Architecture decision records](docs/adr/README.md)
 - [Implementation plans](docs/plans/README.md), one per milestone
-- Guides: [hosting](docs/guide/hosting.md), [worker pools](docs/guide/pools.md), [automatic placement (balancer)](docs/guide/balancer.md)
+- Guides: [hosting](docs/guide/hosting.md), [worker pools](docs/guide/pools.md), [automatic placement (balancer)](docs/guide/balancer.md), [devtools panel](docs/guide/devtools.md)
 - [Contributing](CONTRIBUTING.md): setup, scripts, editors and conventions
 - [Would like](docs/would-like.md): ideas deferred or to explore, not planned
 - [Should do](docs/should-do.md): committed work waiting on a package or milestone
