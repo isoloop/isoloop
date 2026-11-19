@@ -1,6 +1,6 @@
 # ADR 0018: Tools for agents
 
-- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all). What its implementation (isoloop#242) added was grilled on 2026-11-18 (Q1–Q5, yes to all) and is recorded in decisions 1–4 and 8. Amended on 2026-11-19 for Firefox's WebMCP and three details of Chromium's (decision 8, *Browsers that differ*); the amendment was grilled the same day (Q1–Q6, yes to all). Its code, and the `firefox-webmcp` Playwright project, follow in isoloop#267.
+- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all). What its implementation (isoloop#242) added was grilled on 2026-11-18 (Q1–Q5, yes to all) and is recorded in decisions 1–4 and 8. Amended on 2026-11-19 for Firefox's WebMCP and three details of Chromium's (decision 8, *Browsers that differ*); the amendment was grilled the same day (Q1–Q6, yes to all). Its code, and the `firefox-webmcp` Playwright project, landed in isoloop#267.
 - **Date:** 2026-11-17
 - **Amends:** [ADR 0003](0003-schema-format-standard-schema.md). A contract may describe a tool, and the host makes JSON Schema at run time through the same vendored interface that decision 21 uses for `isoloop contracts export`, not only at export.
 - **Plan:** [M4a](../plans/m4a-agents.md), grilled 2026-11-17 (decisions 1–8, 10, 11 and 14 there). Background: the [AI-enablers investigation](../investigations/ai-enablers.md).
