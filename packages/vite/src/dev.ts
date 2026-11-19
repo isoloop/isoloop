@@ -64,7 +64,11 @@ export function devPlugin(o: HeaderOptions & WorkersOptions): Plugin {
   };
   return {
     name: 'isoloop:dev',
-    config: () => ({ worker: { format: 'es' } }),
+    // `@isoloop/devtools` finds its panel isolate next to its own module
+    // (`new URL('./panel.js', import.meta.url)`). Pre-bundled into
+    // node_modules/.vite/deps, that URL points where no panel.js is, so the
+    // dev server serves the package as it is published instead.
+    config: () => ({ worker: { format: 'es' }, optimizeDeps: { exclude: ['@isoloop/devtools'] } }),
     resolveId: (id) => (id === WORKERS_ID ? RESOLVED : null),
     load(id) {
       if (id !== RESOLVED) return null;
