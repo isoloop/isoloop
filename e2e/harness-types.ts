@@ -87,6 +87,10 @@ declare global {
         options: { token: string; url?: string },
       ): Promise<() => void>;
       connectWebMCP(kernel: HarnessKernel): Promise<() => void>;
+      connectDevtools(
+        kernel: HarnessKernel,
+        options: { src: string; position?: string },
+      ): Promise<() => Promise<void>>;
     };
     /** The kernel a suite created, for later page.evaluate calls (e2e/loops.ts and others). */
     kernel: HarnessKernel;
