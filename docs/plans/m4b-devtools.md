@@ -64,7 +64,7 @@ About one evening each ([conventions](README.md#conventions)). Forks follow the 
 | 8 | Isolates view (decision 2's list) and controls | `packages/devtools` | E2E on a fixture page |
 | 9 | Bus view: topics, rates, consumer lag and credit, rejected publishes | `packages/devtools` | E2E on a fixture page |
 | 10 | Live record log from the tap | `packages/devtools` | E2E: log during a bus restart |
-| 11 | Mount it on plant and markets (examples repo), plus the write-up | `isoloop/examples`, `docs/posts/m4b-devtools.md` | E2E: done-when on both |
+| 11 | Mount it on plant and markets (examples repo), plus the write-up. Markets also calls `connectWebMCP`, so its tools show up in a WebMCP browser (added 2026-11-19) | `isoloop/examples`, `docs/posts/m4b-devtools.md` | E2E: done-when on both, on the built preview, plus one dev-server smoke per app; markets' tools listed and called on `chromium-webmcp` |
 | 12 | Topic replay into a scratch view (droppable) | `packages/devtools` | E2E |
 
 ## Open risks
