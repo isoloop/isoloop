@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/host",
-  "version": "0.1.0-next.4",
+  "version": "0.1.0-next.5",
   "description": "Main-thread kernel: loads, supervises and composites isolates.",
   "license": "MIT",
   "type": "module",

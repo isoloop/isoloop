@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/react",
-  "version": "0.1.0-next.4",
+  "version": "0.1.0-next.5",
   "description": "React adapter for Isoloop isolates: defineIsolate(Component) and bus and host hooks.",
   "license": "MIT",
   "type": "module",

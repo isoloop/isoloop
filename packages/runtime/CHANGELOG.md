@@ -1,5 +1,16 @@
 # @isoloop/runtime
 
+## 0.1.0-next.5
+
+### Minor Changes
+
+- 080059d: `tap()` on the host's `Inspector` and on `ctx.inspector` takes `onSkipped?: (count: number) => void` (`@experimental`). It gets each count of records the bus left out over `maxPerSec`, at most once a second (ADR 0020, decision 6, amended 2026-11-19). The devtools Log header shows the cap and the total skipped since the log was opened.
+
+### Patch Changes
+
+- @isoloop/dom@0.1.0-next.5
+  - @isoloop/protocol@0.1.0-next.5
+
 ## 0.1.0-next.4
 
 ### Patch Changes

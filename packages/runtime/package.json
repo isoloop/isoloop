@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/runtime",
-  "version": "0.1.0-next.4",
+  "version": "0.1.0-next.5",
   "description": "Isolate-side runtime that runs inside each worker.",
   "license": "MIT",
   "type": "module",
