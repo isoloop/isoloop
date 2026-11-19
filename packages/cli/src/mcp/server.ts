@@ -215,7 +215,8 @@ export class DevMcpServer {
       serverInfo: { name: 'isoloop', title: 'Isoloop dev MCP', version: this.#o.version },
       instructions:
         'Tools of the Isoloop app pages open in a browser in development. isoloop_pages lists the connected pages; ' +
-        "isoloop_isolates, isoloop_topics, isoloop_records and isoloop_events read a page's isolates, bus, records and recent events; " +
+        "isoloop_isolates, isoloop_topics, isoloop_records, isoloop_tap and isoloop_events read a page's isolates, bus, retained records, " +
+        'a live sample of records and recent events; ' +
         'the other tools are the tools those pages expose, by topic name. ' +
         (this.#o.allowWrite
           ? 'Tools that change something are available (--allow-write), including isoloop_restart, isoloop_kill, isoloop_block, isoloop_publish and isoloop_request.'

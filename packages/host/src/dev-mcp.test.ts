@@ -325,6 +325,51 @@ describe("connectDevMCP: the dev MCP's own tools (M4a task 8)", () => {
     await until(() => states.includes('running'));
   });
 
+  it('taps live records for ms, with what the cap skipped, and stops early at max', async () => {
+    const kernel = setup();
+    await until(() => kernel.isolates().some((i) => i.id === 'R' && i.state === 'running'));
+    const s = connect(kernel);
+    s.open();
+    s.receive(op('t1', { op: 'tap', topics: [told.name], ms: 2_500, max: 100 }));
+    s.receive(op('t2', { op: 'tap', topics: [told.name], ms: 5_000, max: 3 }));
+    // Let both taps open on the bus before publishing.
+    await new Promise((r) => setTimeout(r, 200));
+    for (let i = 0; i < 200; i++) void kernel.publish(told, { value: i });
+    await until(() => s.results().length === 2, 8_000);
+    const wide = resultOf(s, 't1');
+    const v = wide?.ok
+      ? // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the expects check the shape
+        (wide.value as { records: { topic: string }[]; skipped: number; ms: number })
+      : undefined;
+    expect(v?.records.length).toBeGreaterThan(0);
+    expect(v?.records.length).toBeLessThanOrEqual(100);
+    expect(v?.records.every((r) => r.topic === told.name)).toBe(true);
+    // 200 records at once against 50 a second: the bus reports what it left out.
+    expect(v?.skipped).toBeGreaterThan(0);
+    expect(v?.ms).toBeGreaterThanOrEqual(2_400);
+    const narrow = resultOf(s, 't2');
+    expect(narrow?.ok && narrow.value).toMatchObject({ records: [{}, {}, {}] });
+    // Stopped at max, well before its 5 s.
+    expect(
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- checked above
+      narrow?.ok ? (narrow.value as { ms: number }).ms : Infinity,
+    ).toBeLessThan(5_000);
+  }, 15_000);
+
+  it('ends a cancelled tap without answering it', async () => {
+    const kernel = setup();
+    await until(() => kernel.isolates().some((i) => i.id === 'R' && i.state === 'running'));
+    const s = connect(kernel);
+    s.open();
+    s.receive(op('t1', { op: 'tap', topics: [told.name], ms: 10_000, max: 100 }));
+    await new Promise((r) => setTimeout(r, 100));
+    s.receive({ v: 1, t: 'cancel', re: 't1', p: {} });
+    s.receive(op('t2', { op: 'tap', topics: [told.name], ms: 50, max: 100 }));
+    await until(() => s.results().length === 1);
+    expect(resultOf(s, 't1')).toBeUndefined();
+    expect(resultOf(s, 't2')).toMatchObject({ ok: true, value: { records: [], skipped: 0 } });
+  });
+
   it('answers unsupported to an op from a kernel without inspect()', async () => {
     const kernel = setup();
     const s = connect({ tools: () => kernel.tools(), request: (...a) => kernel.request(...a) });

@@ -544,7 +544,13 @@ describe('isoloop mcp', () => {
 });
 
 describe("the dev MCP's own tools (M4a task 8)", () => {
-  const READS = ['isoloop_isolates', 'isoloop_topics', 'isoloop_records', 'isoloop_events'];
+  const READS = [
+    'isoloop_isolates',
+    'isoloop_topics',
+    'isoloop_records',
+    'isoloop_tap',
+    'isoloop_events',
+  ];
   const WRITES = [
     'isoloop_restart',
     'isoloop_kill',
@@ -582,6 +588,11 @@ describe("the dev MCP's own tools (M4a task 8)", () => {
     await p.welcomed();
     const r = await mcp.client.callTool({ name: 'isoloop_records', arguments: { topic: 'a.v1' } });
     expect(r.structuredContent).toEqual({ got: 'records' });
+    await mcp.client.callTool({ name: 'isoloop_tap', arguments: { topics: ['a.v1'] } });
+    await mcp.client.callTool({
+      name: 'isoloop_tap',
+      arguments: { topics: ['a.v1', 'b.v1'], ms: 10_000, max: 5 },
+    });
     await mcp.client.callTool({ name: 'isoloop_events', arguments: {} });
     await mcp.client.callTool({ name: 'isoloop_block', arguments: { id: 'w', ms: 2_000 } });
     await mcp.client.callTool({
@@ -594,6 +605,8 @@ describe("the dev MCP's own tools (M4a task 8)", () => {
     });
     expect(ops).toEqual([
       { op: 'records', topic: 'a.v1', last: 20 },
+      { op: 'tap', topics: ['a.v1'], ms: 3_000, max: 100 },
+      { op: 'tap', topics: ['a.v1', 'b.v1'], ms: 10_000, max: 5 },
       { op: 'events', last: 50 },
       { op: 'block', id: 'w', ms: 2_000 },
       { op: 'request', topic: 'a.v1', value: { q: 1 }, key: 'k', timeoutMs: 10_000 },
@@ -608,6 +621,11 @@ describe("the dev MCP's own tools (M4a task 8)", () => {
     const bad = [
       { name: 'isoloop_records', arguments: { topic: 'a.v1', last: 101 } },
       { name: 'isoloop_records', arguments: {} },
+      { name: 'isoloop_tap', arguments: {} },
+      { name: 'isoloop_tap', arguments: { topics: [] } },
+      { name: 'isoloop_tap', arguments: { topics: ['a.v1', 3] } },
+      { name: 'isoloop_tap', arguments: { topics: ['a.v1'], ms: 10_001 } },
+      { name: 'isoloop_tap', arguments: { topics: ['a.v1'], max: 101 } },
       { name: 'isoloop_block', arguments: { id: 'w', ms: 10_001 } },
       { name: 'isoloop_block', arguments: { id: 'w' } },
       { name: 'isoloop_request', arguments: { topic: 'a.v1', value: 1, timeoutMs: 30_001 } },

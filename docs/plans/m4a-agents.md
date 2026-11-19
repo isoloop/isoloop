@@ -37,10 +37,10 @@
 10. **Pairing.** The server also listens on `ws://127.0.0.1:4317` (`--port`). It prints a token on stderr each run, or takes a fixed one from `ISOLOOP_MCP_TOKEN`, and accepts only that token from an `Origin` matching `--origin` (default `http://localhost:*`). The docs show `claude mcp add isoloop -- npx isoloop mcp` and a `.mcp.json` example.
 11. **The page side is a separate entry,** `connectDevMCP(kernel, { url, token })` from `@isoloop/host/dev-mcp`, imported behind `if (import.meta.env.DEV)`. `@isoloop/vite` fails a production build that still contains it, unless `allowDevMcp: true`. No kernel option, so nothing ships to production by accident.
 12. **Tools.**
-    - Our own are prefixed `isoloop_`. Reads: `isoloop_pages`, `isoloop_isolates`, `isoloop_topics`, `isoloop_records` (the last N of a topic), `isoloop_events` (recent supervisor events). With `--allow-write`: `isoloop_restart`, `isoloop_kill`, `isoloop_block`, `isoloop_publish`, `isoloop_request` (any topic).
+    - Our own are prefixed `isoloop_`. Reads: `isoloop_pages`, `isoloop_isolates`, `isoloop_topics`, `isoloop_records` (the last N of a topic), `isoloop_tap` (a live sample for up to 10 s, with what the 50/s cap skipped; added 2026-11-19), `isoloop_events` (recent supervisor events). With `--allow-write`: `isoloop_restart`, `isoloop_kill`, `isoloop_block`, `isoloop_publish`, `isoloop_request` (any topic).
     - The app's exposed tools are forwarded under their own names. Those with `readOnly: true` are always available; the others need `--allow-write`.
     - `list_changed` is sent when a page connects or reloads.
-    - The reads come from [ADR 0020](../adr/0020-inspection-feed.md)'s feed: `isoloop_records` uses `inspector.records()`, `isoloop_events` the ring buffer of recent events, and `isoloop_block` the runtime's `block { ms }`.
+    - The reads come from [ADR 0020](../adr/0020-inspection-feed.md)'s feed: `isoloop_records` uses `inspector.records()`, `isoloop_tap` `inspector.tap()` with `onSkipped`, `isoloop_events` the ring buffer of recent events, and `isoloop_block` the runtime's `block { ms }`.
 13. **Several tabs.** `isoloop_pages` lists the connected pages (URL, kernel id). Every tool takes an optional `page`; the default is the page that connected last.
 
 ### WebMCP

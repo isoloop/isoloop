@@ -84,6 +84,13 @@ export type DevMcpOp =
   | { readonly op: 'isolates' }
   | { readonly op: 'topics' }
   | { readonly op: 'records'; readonly topic: string; readonly last: number }
+  /** A live sample: tap `topics` for `ms`, stopping early at `max` records. */
+  | {
+      readonly op: 'tap';
+      readonly topics: readonly string[];
+      readonly ms: number;
+      readonly max: number;
+    }
   | { readonly op: 'events'; readonly last: number }
   | { readonly op: 'restart' | 'kill'; readonly id: string }
   | { readonly op: 'block'; readonly id: string; readonly ms: number }
@@ -106,6 +113,7 @@ export const DEV_MCP_OPS: readonly DevMcpOp['op'][] = [
   'isolates',
   'topics',
   'records',
+  'tap',
   'events',
   'restart',
   'kill',
