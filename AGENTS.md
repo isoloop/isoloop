@@ -2,6 +2,13 @@
 
 The Isoloop library: the `@isoloop/*` packages, their tests and benches, and the docs that change with the code (`docs/guide`, `docs/adr`, `docs/design`, `docs/diagrams`). Setup, scripts, branches and code rules are in [`CONTRIBUTING.md`](CONTRIBUTING.md). How changes get published and checked across both repos: [`isoloop/web` ADR 0004](https://github.com/isoloop/web/blob/main/docs/adr/0004-publishing-and-governance.md).
 
+## Where things are
+
+- **`packages/*`:** one folder per `@isoloop/*` package; `packages/cli` is the `isoloop` CLI.
+- **`docs/guide`:** how to use each feature. **`docs/adr`:** the decisions behind them. **`docs/plans`:** milestones and their task tables. **`docs/investigations`:** measurements and research. **`docs/would-like.md`:** ideas for later.
+- **`e2e/`:** Playwright suites against `e2e/harness`. **`bench/`:** the benches. The runnable examples and the site are in [`isoloop/web`](https://github.com/isoloop/web).
+- **A running app:** `isoloop mcp` with `connectDevMCP` lets an agent read a page's isolates, topics, events and records, and call its tools ([`docs/guide/agents.md`](docs/guide/agents.md)).
+
 ## Definition of done
 
 A change is done when all five hold:
@@ -20,6 +27,7 @@ A change is done when all five hold:
 
 ## Decisions and review
 
+- **One PR per task** from a plan's task table.
 - **ADRs** record decisions; the maintainer reviews each one on its own, and it's committed once the review ends.
 - **The maintainer reviews** ADRs, docs-only PRs in this repo, and new public API. Forks merge their own code PRs on green.
 - **Tags and releases** are pushed by the maintainer, or on the maintainer's explicit word for that release.

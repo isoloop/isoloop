@@ -2,12 +2,12 @@
 
 **Goal:** 0.1 ships with agent support. Agents can learn Isoloop (`llms.txt`, `AGENTS.md`, a skill), see a running app (the dev MCP), and call tools an app exposes, at dev time through the dev MCP and in the browser through WebMCP.
 
-**Status:** grilled 2026-11-17 (Q1–Q34, yes to all); background in the [investigation](../investigations/ai-enablers.md). In progress: tasks 1–4 (ADR 0018 and the tool surface), 5 (the `isoloop` CLI with `contracts export`), 6 (`isoloop mcp`: the stdio server, the WebSocket and pairing, with the pages' tools forwarded and `isoloop_pages`) and 7 (`connectDevMCP` from `@isoloop/host/dev-mcp`, and the `@isoloop/vite` production guard) done 2026-11-18, and 8 (the `isoloop_*` reads from `kernel.inspect()` and the `--allow-write` writes, with an E2E of the SDK client, the CLI and a page) done 2026-11-18, and 9 (`@isoloop/webmcp` and the `chromium-webmcp` project) done 2026-11-18. The Firefox try: with its prefs on, Firefox 159 has WebMCP at `navigator.modelContext` (not `document`), ignores `registerTool`'s `signal` (it has `unregisterTool`) and passes no per-call signal, so `connectWebMCP` does nothing there for now; supporting it is the user's call. An `unchecked()` topic exports as `{}` with a warning and exit 0, as ADR 0003 decision 21 says (the user confirmed it 2026-11-18); a tool still refuses it (`not_exposable`).
+**Status:** grilled 2026-11-17 (Q1–Q34, yes to all); background in the [investigation](../investigations/ai-enablers.md). In progress: tasks 1–4 (ADR 0018 and the tool surface), 5 (the `isoloop` CLI with `contracts export`), 6 (`isoloop mcp`: the stdio server, the WebSocket and pairing, with the pages' tools forwarded and `isoloop_pages`) and 7 (`connectDevMCP` from `@isoloop/host/dev-mcp`, and the `@isoloop/vite` production guard) done 2026-11-18, and 8 (the `isoloop_*` reads from `kernel.inspect()` and the `--allow-write` writes, with an E2E of the SDK client, the CLI and a page) done 2026-11-18, and 9 (`@isoloop/webmcp` and the `chromium-webmcp` project) done 2026-11-18. Firefox's WebMCP is supported since 2026-11-19 (ADR 0018's amendment, isoloop#266; the code and the `firefox-webmcp` project, isoloop#267). Task 10 (markets' tools, isoloop/web#168) done 2026-11-18, and 11 (`AGENTS.md` in both repos) done 2026-11-19. An `unchecked()` topic exports as `{}` with a warning and exit 0, as ADR 0003 decision 21 says (the user confirmed it 2026-11-18); a tool still refuses it (`not_exposable`).
 
 **Done when:**
 
 - `llms.txt`, `llms-full.txt` and a Markdown copy of each docs page are served on isoloop.dev (built in [M4c](m4c-docs.md)).
-- `AGENTS.md` is in `isoloop/isoloop`, `isoloop/examples` and `isoloop/web`, and getting started has an `AGENTS.md` snippet for users' apps.
+- `AGENTS.md` is in `isoloop/isoloop` and `isoloop/web`, and getting started has an `AGENTS.md` snippet for users' apps.
 - ADR 0018 is accepted.
 - Markets exposes `markets.quote.v1` and `markets.alerts.create.v1`.
 - An MCP SDK client lists and calls them through `isoloop mcp` (E2E).
@@ -59,7 +59,7 @@
 
 ### Learning Isoloop
 
-16. **`AGENTS.md`** in `isoloop/isoloop`, `isoloop/examples` and `isoloop/web`, for agents contributing to those repos. It's an index: where things are, and the rules (one PR per task, neutral language, never claim Isoloop is faster than native). Each repo gets a `CLAUDE.md` that imports it. Getting started ([M4c](m4c-docs.md)) gets a snippet for users' own apps.
+16. **`AGENTS.md`** in `isoloop/isoloop` and `isoloop/web` (the examples moved into `isoloop/web`), for agents contributing to those repos. It's an index: where things are, and the rules (one PR per task, neutral language, never claim Isoloop is faster than native). Each repo gets a `CLAUDE.md` that imports it. Getting started ([M4c](m4c-docs.md)) gets a snippet for users' own apps.
 17. **The "build with Isoloop" skill** uses the open Agent Skills format (`skills/build-with-isoloop/SKILL.md` in this repo). It covers isolates, contracts, grants, kernel config, exposing tools, pointers to pools and the balancer, and "What Isoloop can't hide". `npx isoloop skill add` copies it into `.claude/skills/` (or `--dir`), so the skill matches the CLI's version, and `llms.txt` links to it.
 18. **The skill is tested by hand before 0.1** with three prompts (vanilla, React, Preact: "a widget isolate that subscribes to X and draws Y"). An answer passes if the result type-checks and its own small E2E passes. Results go in the write-up. CI evals come with the 1.0 porting skill.
 
@@ -88,7 +88,7 @@ About one evening each ([conventions](README.md#conventions)). Forks follow the 
 | 8 | Dev MCP tools: reads, writes, forwarded app tools, pages | `packages/cli/src/mcp/tools.ts` | E2E: SDK client ↔ CLI ↔ a test page (needs M4b's feed for the reads) |
 | 9 | `@isoloop/webmcp` + the `chromium-webmcp` project (+ the Firefox try) | `packages/webmcp` | E2E: decision 15's cases |
 | 10 | Markets tools (examples repo) | `apps/dashboards/markets/src/contracts.ts`, the aggregator and alerts isolates | unit (idempotent create); E2E through both transports |
-| 11 | `AGENTS.md` × 3 + `CLAUDE.md` imports | the three repos | — |
+| 11 | `AGENTS.md` × 2 + `CLAUDE.md` imports (done 2026-11-19) | `isoloop/isoloop`, `isoloop/web` | — |
 | 12 | The skill + `isoloop skill add` (after the freeze) | `skills/build-with-isoloop/`, `packages/cli/src/skill.ts` | unit: copy; the three hand-run prompts |
 | 13 | Cost per call on the bench server | `docs/investigations/agent-call-cost.md` | — (measurement) |
 | 14 | Real-agent run + the M4a write-up | `docs/posts/m4a-agents.md` | — |

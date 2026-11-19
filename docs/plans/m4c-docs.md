@@ -10,7 +10,7 @@ Gets a full task list when it's next to start. The guides that don't depend on f
 
 1. **The docs site,** built in `isoloop/web` and served at `isoloop.dev` (*amended 2026-11-14:* no longer `docs/site` in this repo). The guides and TSDoc stay here, and `web` fetches them at the release tag. The engine is chosen in an ADR there, behind an interface it owns, per `isoloop/web` ADRs 0002 and 0003.
 2. **Guides:**
-   - getting started, with an `AGENTS.md` snippet for users' apps ([M4a](m4a-agents.md), decision 16);
+   - getting started, with an `AGENTS.md` snippet for users' apps ([M4a](m4a-agents.md), decision 16; the repos' own `AGENTS.md` are M4a task 11, and the snippet waits for this guide);
    - hosting (CSP/CORS);
    - isolate authoring per adapter;
    - the bus guide (semantics, idempotent handlers);
