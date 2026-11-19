@@ -119,3 +119,56 @@ test.describe('devtools: isolates view (M4b task 8)', () => {
     expect(await restartsOf(page, 'headless')).toBe(0);
   });
 });
+
+test.describe('devtools: bus view (M4b task 9)', () => {
+  test.beforeEach(async ({ page }) => {
+    await openPage(page);
+    await page.locator('[data-isoloop-devtools] button[data-health]').click();
+    await page.locator('[data-isoloop-devtools] [data-tab="bus"]').click();
+    await expect(page.locator('[data-isoloop-devtools] [data-view="bus"]')).toBeVisible();
+  });
+
+  test('shows topics, subscriptions with lag and credit, and rejected publishes', async ({
+    page,
+  }) => {
+    const bus = page.locator('[data-isoloop-devtools] [data-view="bus"]');
+    await expect(bus.locator('[data-bus-state]')).toHaveAttribute('data-bus-state', 'running');
+    const rejected = await page.evaluate(async () => {
+      await Promise.all(
+        [1, 2, 3].map((value) => window.kernel.publish({ name: 'feed.v1' }, { value })),
+      );
+      try {
+        await window.kernel.publish({ name: 'feed.v1' }, { value: 'not a number' });
+        return 'accepted';
+      } catch (e) {
+        return e instanceof Error && 'code' in e ? String(e.code) : 'threw';
+      }
+    });
+    expect(rejected).toBe('invalid');
+
+    // Metrics come about once a second.
+    const topic = bus.locator('tr[data-topic="feed.v1"]');
+    await expect(topic.locator('[data-head]')).toHaveText('3');
+    await expect(topic.locator('[data-retained]')).toHaveText('3');
+    await expect(bus.locator('tr[data-subscription="feed.v1"]')).not.toHaveCount(0);
+    await expect(bus.locator('tr[data-subscription="feed.v1"] [data-lag]').first()).toHaveText(
+      /^\d+$/,
+    );
+    await expect(bus.locator('tr[data-subscription="feed.v1"] [data-credit]').first()).toHaveText(
+      /^\d+$/,
+    );
+    await expect(bus.locator('[data-rejected="invalid"]')).toContainText('1');
+  });
+
+  test('arrow keys move between the tabs', async ({ page }) => {
+    const busTab = page.locator('[data-isoloop-devtools] [data-tab="bus"]');
+    await busTab.focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.locator('[data-isoloop-devtools] [data-tab="isolates"]')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(page.locator('[data-isoloop-devtools] [data-view="isolates"]')).toBeVisible();
+    await expect(page.locator('[data-isoloop-devtools] [data-tab="isolates"]')).toBeFocused();
+  });
+});
