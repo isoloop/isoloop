@@ -26,4 +26,24 @@ const disconnect = connectDevtools(kernel, { src: panel, position: 'bottom-right
 - **Persistence:** the open state, size and corner are kept across reloads in IndexedDB, on the page's origin. The panel runs in a worker, and workers have no `localStorage`. Without storage (a private window, blocked site data), the panel starts from its defaults.
 - **While it restarts:** the panel briefly disappears. If it gives up, a small box with a Retry button takes its place in the corner.
 
+## Isolates view
+
+The panel opens on the isolates view. Each row is one isolate:
+- **State** comes from the supervisor.
+- **Lag** is from the isolate's last beat.
+- **Busy** is the busy time from its last beat ([ADR 0017](../adr/0017-opt-in-balancer.md)).
+- **Memory** is only measured in Chromium on a cross-origin isolated page. It shows how old the figure is, and for a pool member it's the whole pool's worker.
+- **Restarts** counts crash restarts. A restart you ask for doesn't count.
+- **Queue** is the patch batches waiting for the compositor.
+- The **pool** is shown under the id.
+
+The panel lists itself, marked `devtools`. A pools table below lists each pool's members, and the warning when they share a document.
+
+Each row has three controls:
+- **Restart** restarts the isolate, as `kernel.restart(id)` does.
+- **Kill** ends its worker as a crash, so the supervisor restarts it. For a pool member, that ends the pool's worker, and every member restarts.
+- **Block 2 s** busy-loops its worker for 2 seconds, which is enough for the supervisor to mark it `blocked` with the usual heartbeat settings.
+
+A control that fails shows its error under the table. The panel doesn't publish to the bus ([M4b plan](../plans/m4b-devtools.md), devtools decision 7).
+
 The panel's surface covers the viewport, but it doesn't take pointer events, so only the panel's own boxes catch clicks.

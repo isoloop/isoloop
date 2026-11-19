@@ -30,6 +30,7 @@ bench-results/
 /e2e/isolates/adapter-*.js
 # The four-loops fixtures, built by the same script
 /e2e/isolates/loops-*.js
+/e2e/isolates/devtools-panel.js
 
 # Claude Code (local)
 /.claude/worktrees/

@@ -3,7 +3,8 @@
  * current by the feed's messages. Beats, bus metrics and memory figures are
  * merged in as they come; an event is appended to the recent events and
  * fetches a fresh snapshot shortly after, for the isolate and pool states it
- * changed. Message types this build doesn't know are ignored (decision 7).
+ * changed. `at` moves to the host time of the latest message, so ages
+ * (a memory figure's, say) read against it. Message types this build doesn't know are ignored (decision 7).
  */
 import type {
   InspectMessage,
@@ -26,7 +27,7 @@ export function applyMessage(snap: InspectSnapshot, m: InspectMessage): InspectS
       return m.p;
     case 'event': {
       const events: InspectEvent[] = [...snap.events, m.p].slice(-RING);
-      return { ...snap, events };
+      return { ...snap, at: Math.max(snap.at, m.p.at), events };
     }
     case 'beats': {
       const byId = new Map(m.p.beats.map((b) => [b.id, b]));
@@ -37,7 +38,7 @@ export function applyMessage(snap: InspectSnapshot, m: InspectMessage): InspectS
         if (b.busyMs !== undefined) next.busyMs = b.busyMs;
         return next;
       });
-      return { ...snap, isolates };
+      return { ...snap, at: Math.max(snap.at, m.p.at), isolates };
     }
     case 'metrics':
       return { ...snap, bus: { ...snap.bus, metrics: m.p } };
@@ -47,7 +48,7 @@ export function applyMessage(snap: InspectSnapshot, m: InspectMessage): InspectS
         const memory = byId.get(i.id);
         return memory ? { ...i, memory } : i;
       });
-      return { ...snap, isolates };
+      return { ...snap, at: Math.max(snap.at, m.p.at), isolates };
     }
     default:
       return snap;

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@isoloop/bus": "workspace:*",
+    "@isoloop/devtools": "workspace:*",
     "@isoloop/host": "workspace:*",
     "@isoloop/runtime": "workspace:*",
     "@isoloop/webmcp": "workspace:*"

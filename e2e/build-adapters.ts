@@ -5,8 +5,9 @@
 // widget (ADR 0017) on each React major, into
 // e2e/isolates/adapter-busy-widget-react-<major>.js, and the four-loops
 // fixtures (the proof of concept's isolates and contracts, from
-// e2e/isolates/loops) into e2e/isolates/loops-<name>.js, where the isolate
-// servers serve them. `node e2e/build-adapters.ts`.
+// e2e/isolates/loops) into e2e/isolates/loops-<name>.js, and the devtools
+// panel into e2e/isolates/devtools-panel.js, where the isolate servers serve
+// them. `node e2e/build-adapters.ts`.
 import { fileURLToPath } from 'node:url';
 import { build, defaultClientConditions } from 'vite';
 import { frameworkPlugins, jsxFor, MAJORS } from '../frameworks.config.ts';
@@ -60,6 +61,13 @@ const builds: Build[] = [
     major: 19,
     entry: 'e2e/isolates/loops/votes-react.tsx',
     out: 'loops-votes-react.js',
+  },
+  // The devtools panel isolate (M4b), as its package bundles it: Preact 11.
+  {
+    fw: 'preact',
+    major: 11,
+    entry: 'packages/devtools/src/panel.tsx',
+    out: 'devtools-panel.js',
   },
 ];
 
