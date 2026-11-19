@@ -1,5 +1,11 @@
 # @isoloop/vite
 
+## 0.1.0-next.5
+
+### Patch Changes
+
+- 9582e91: In dev, `@isoloop/vite` keeps `@isoloop/devtools` out of dependency pre-bundling (`optimizeDeps.exclude`), so the panel's default URL (`new URL('./panel.js', import.meta.url)`) reaches the published `panel.js`. With `@isoloop/vite`, `connectDevtools` needs no `src`; with another bundler, pass the URL it serves `@isoloop/devtools/panel` at.
+
 ## 0.1.0-next.4
 
 No changes in this release.
