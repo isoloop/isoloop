@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://isoloop.dev/brand/expressive-dark.svg">
+    <img src="https://isoloop.dev/brand/expressive.svg" alt="The Isoloop mark: a cube with a woven ribbon inside a cycle arrow" width="128">
+  </picture>
+</p>
+
 # Isoloop
 
 [![CI](https://github.com/isoloop/isoloop/actions/workflows/ci.yml/badge.svg)](https://github.com/isoloop/isoloop/actions/workflows/ci.yml)
