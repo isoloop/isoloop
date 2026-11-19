@@ -1,0 +1,425 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Rendering from a worker",
+    "subtitle": "A visual isolate's frame: records out, events and host calls back",
+    "output": "docs/diagrams/rendering.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "backend": {
+          "label": "Isolate side (worker)"
+        },
+        "security": {
+          "label": "Kernel (main thread)"
+        },
+        "frontend": {
+          "label": "The page's DOM"
+        }
+      }
+    },
+    "repository": {
+      "url": "https://github.com/isoloop/isoloop",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "9c9b9689edbbf94eede44aa908b0d07e7105fa45"
+    }
+  },
+  "components": [
+    {
+      "id": "ui",
+      "type": "backend",
+      "label": "Isolate UI code",
+      "sublabel": "React · Preact · plain DOM",
+      "pos": [40, 40],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/runtime/src/vanilla.ts",
+          "line": 160,
+          "end_line": 163,
+          "label": "ctx.root is the render root"
+        }
+      ]
+    },
+    {
+      "id": "wdom",
+      "type": "backend",
+      "label": "isoloop-dom subset",
+      "sublabel": "the worker's document",
+      "pos": [275, 40],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/dom/src/worker/dom.ts",
+          "line": 1,
+          "end_line": 11,
+          "label": "what Preact and React call, recorded"
+        },
+        {
+          "path": "packages/dom/src/worker/install.ts",
+          "line": 35,
+          "end_line": 48,
+          "label": "installed as document and window"
+        }
+      ]
+    },
+    {
+      "id": "rec",
+      "type": "backend",
+      "label": "Recorder",
+      "sublabel": "one batch per microtask",
+      "pos": [510, 40],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/dom/src/worker/dom.ts",
+          "line": 1198,
+          "end_line": 1233,
+          "label": "records batched per microtask"
+        },
+        {
+          "path": "packages/runtime/src/render/index.ts",
+          "line": 111,
+          "end_line": 126,
+          "label": "a batch and its styles in one patch"
+        }
+      ]
+    },
+    {
+      "id": "comp",
+      "type": "security",
+      "label": "Compositor",
+      "sublabel": "8 ms a frame, round-robin",
+      "pos": [745, 40],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/compositor.ts",
+          "line": 1,
+          "end_line": 9,
+          "label": "first batch of a frame always applies"
+        },
+        {
+          "path": "packages/host/src/compositor.ts",
+          "line": 196,
+          "end_line": 210,
+          "label": "the frame loop"
+        },
+        {
+          "path": "packages/host/src/kernel.ts",
+          "line": 1111,
+          "end_line": 1114,
+          "label": "a patch joins its surface's queue"
+        }
+      ]
+    },
+    {
+      "id": "applier",
+      "type": "security",
+      "label": "Applier + registry",
+      "sublabel": "sanitises tags, attributes",
+      "pos": [980, 40],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/dom/src/host/applier.ts",
+          "line": 1,
+          "end_line": 8,
+          "label": "applies under a container"
+        },
+        {
+          "path": "packages/host/src/render/registry.ts",
+          "line": 1,
+          "end_line": 15,
+          "label": "sanitiser and host components"
+        },
+        {
+          "path": "packages/host/src/render/registry.ts",
+          "line": 293,
+          "end_line": 321,
+          "label": "the element, attribute and property rules"
+        }
+      ]
+    },
+    {
+      "id": "surface",
+      "type": "frontend",
+      "label": "Surface shadow root",
+      "sublabel": "<iso-surface> · adopted CSS",
+      "pos": [1215, 40],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/compositor.ts",
+          "line": 237,
+          "end_line": 251,
+          "label": "shadow host, shell, mount"
+        },
+        {
+          "path": "packages/host/src/compositor.ts",
+          "line": 220,
+          "end_line": 228,
+          "label": "isolate CSS stays in the shadow root"
+        }
+      ]
+    },
+    {
+      "id": "calls",
+      "type": "backend",
+      "label": "ctx.host",
+      "sublabel": "flushes, then calls",
+      "pos": [510, 230],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/runtime/src/host-calls.ts",
+          "line": 1,
+          "end_line": 5,
+          "label": "call and result, 5 s timeout"
+        },
+        {
+          "path": "packages/runtime/src/host-calls.ts",
+          "line": 93,
+          "end_line": 100,
+          "label": "pending patches flushed first"
+        }
+      ]
+    },
+    {
+      "id": "runner",
+      "type": "security",
+      "label": "Host calls",
+      "sublabel": "run in the frame",
+      "pos": [745, 230],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/kernel.ts",
+          "line": 902,
+          "end_line": 949,
+          "label": "measure, focus, scrollIntoView"
+        },
+        {
+          "path": "packages/host/src/kernel.ts",
+          "line": 980,
+          "end_line": 1004,
+          "label": "requestCanvas"
+        }
+      ]
+    },
+    {
+      "id": "deliver",
+      "type": "backend",
+      "label": "Event dispatch",
+      "sublabel": "capture and bubble",
+      "pos": [275, 400],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/runtime/src/render/index.ts",
+          "line": 185,
+          "end_line": 191,
+          "label": "an event from the host"
+        },
+        {
+          "path": "packages/dom/src/worker/dom.ts",
+          "line": 1186,
+          "end_line": 1196,
+          "label": "dispatched to the node it names"
+        }
+      ]
+    },
+    {
+      "id": "events",
+      "type": "security",
+      "label": "EventBridge",
+      "sublabel": "delegated listeners",
+      "pos": [1215, 400],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/events.ts",
+          "line": 1,
+          "end_line": 31,
+          "label": "default actions, forwarded types"
+        },
+        {
+          "path": "packages/host/src/events.ts",
+          "line": 56,
+          "end_line": 105,
+          "label": "listeners and per-frame coalescing"
+        },
+        {
+          "path": "packages/dom/src/host/applier.ts",
+          "line": 222,
+          "end_line": 235,
+          "label": "only listeners the isolate registered"
+        }
+      ]
+    },
+    {
+      "id": "router",
+      "type": "security",
+      "label": "Router",
+      "sublabel": "onNavigate decides",
+      "pos": [1215, 560],
+      "size": [155, 66],
+      "sources": [
+        {
+          "path": "packages/host/src/router.ts",
+          "line": 1,
+          "end_line": 10,
+          "label": "the host owns the URL"
+        },
+        {
+          "path": "packages/host/src/kernel.ts",
+          "line": 1348,
+          "end_line": 1357,
+          "label": "links go through the router"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Isolate's worker",
+      "wraps": ["ui", "wdom", "rec", "calls", "deliver"],
+      "pad": 12
+    },
+    {
+      "kind": "region",
+      "label": "Main thread",
+      "wraps": ["comp", "applier", "surface", "runner", "events", "router"],
+      "pad": 12
+    }
+  ],
+  "connections": [
+    {
+      "id": "dom-calls",
+      "from": "ui",
+      "to": "wdom",
+      "label": "DOM calls",
+      "variant": "emphasis"
+    },
+    {
+      "id": "records",
+      "from": "wdom",
+      "to": "rec",
+      "label": "records",
+      "variant": "emphasis"
+    },
+    {
+      "id": "patch",
+      "from": "rec",
+      "to": "comp",
+      "label": "patch",
+      "variant": "emphasis"
+    },
+    {
+      "id": "apply",
+      "from": "comp",
+      "to": "applier",
+      "label": "apply",
+      "variant": "emphasis"
+    },
+    {
+      "id": "write",
+      "from": "applier",
+      "to": "surface",
+      "label": "writes",
+      "variant": "emphasis"
+    },
+    {
+      "id": "flush",
+      "from": "calls",
+      "to": "rec",
+      "label": "flush"
+    },
+    {
+      "id": "call",
+      "from": "calls",
+      "to": "runner",
+      "label": "call"
+    },
+    {
+      "id": "after",
+      "from": "runner",
+      "to": "comp",
+      "label": "after queued batches"
+    },
+    {
+      "id": "result",
+      "from": "runner",
+      "to": "calls",
+      "label": "result · OffscreenCanvas",
+      "variant": "dashed"
+    },
+    {
+      "id": "input",
+      "from": "surface",
+      "to": "events",
+      "label": "user input"
+    },
+    {
+      "id": "event",
+      "from": "events",
+      "to": "deliver",
+      "label": "event: target, listeners on its path",
+      "variant": "dashed"
+    },
+    {
+      "id": "listeners",
+      "from": "deliver",
+      "to": "wdom",
+      "label": "dispatch"
+    },
+    {
+      "id": "links",
+      "from": "events",
+      "to": "router",
+      "label": "link clicks"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "How to read it",
+      "items": [
+        "Isolate code never touches the page. It changes a document in its worker; the changes travel as isoloop-dom@1 records (ADR 0010, ADR 0011), and the compositor is the only code that writes to a surface.",
+        "The bold arrows are a frame on its way out; dashed arrows come back to the worker: an event, or a host call's result."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "A frame",
+      "items": [
+        "Every change in one microtask becomes one batch, sent as one patch with any new stylesheets from ctx.styles.",
+        "One requestAnimationFrame applies the queued batches round-robin across surfaces while the budget lasts, 8 ms by default (KernelConfig.compositor). The first batch of a frame always applies; batches are never split.",
+        "The registry turns unknown tags into div, never creates script-capable tags or on* attributes, and allows only http(s), mailto and relative URLs. KernelConfig.components maps a tag to a host custom element."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Events back",
+      "items": [
+        "Forwarded as they happen: click, dblclick, input, change, keydown, keyup, submit, focusin, focusout, pointerdown, pointerup.",
+        "Coalesced to one per frame: pointermove, and scroll per scrolled node.",
+        "Only to nodes with a listener for that type. submit is always prevented on the host. With routing on, plain clicks on same-origin links go to the router."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Host calls and pools",
+      "items": [
+        "measure, focus and scrollIntoView run after every batch sent before them, so measure sees their layout. requestCanvas hands a rendered canvas over as an OffscreenCanvas, once.",
+        "Styles: KernelConfig.styles in every surface, then the isolate's own sheets; neither leaks out of the shadow root.",
+        "In a pool, the visual members share one document with a root each; each root has its own recorder, and its patches name the member (ADR 0015)."
+      ]
+    }
+  ]
+}
