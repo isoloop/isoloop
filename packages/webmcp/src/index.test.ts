@@ -1,6 +1,8 @@
-// connectWebMCP against a fake document.modelContext; the real one is
-// covered by the chromium-webmcp E2E project (e2e/webmcp.spec.ts).
+// connectWebMCP against a fake document.modelContext (Chromium's shape) and a
+// fake navigator.modelContext (Firefox 159's); the real ones are covered by
+// the chromium-webmcp and firefox-webmcp E2E projects (e2e/webmcp.spec.ts).
 import type { AgentTool, RequestOptions } from '@isoloop/host';
+import { KernelError } from '@isoloop/host';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { connectWebMCP } from './index';
 
@@ -11,7 +13,7 @@ type Registered = {
     description: string;
     inputSchema: object;
     outputSchema: object;
-    annotations: Record<string, boolean>;
+    annotations: Record<string, true>;
     execute(input: unknown, client?: { signal?: AbortSignal }): Promise<unknown>;
   };
   signal: AbortSignal | undefined;
@@ -29,6 +31,23 @@ function fakeContext(register?: (t: Registered) => unknown) {
   });
   vi.stubGlobal('document', { modelContext: mc });
   return { mc, tools };
+}
+
+/** Firefox 159's shape: on navigator, not an EventTarget, unregisterTool, no per-call signal. */
+function fakeFirefoxContext() {
+  const tools = new Map<string, Registered['tool']>();
+  const unregisterTool = vi.fn((name: string) => {
+    tools.delete(name);
+  });
+  const mc = {
+    registerTool(tool: Registered['tool']) {
+      tools.set(tool.name, tool);
+    },
+    unregisterTool,
+  };
+  vi.stubGlobal('document', {});
+  vi.stubGlobal('navigator', { modelContext: mc });
+  return { tools, unregisterTool };
 }
 
 const tool = (name: string, extra: Partial<AgentTool> = {}): AgentTool => ({
@@ -102,14 +121,11 @@ describe('connectWebMCP', () => {
       description: 'does a.v1',
       inputSchema: { type: 'object' },
       outputSchema: { type: 'string' },
-      annotations: { readOnlyHint: true, consequentialHint: false, untrustedContentHint: false },
+      annotations: { readOnlyHint: true },
     });
     expect(b?.tool).not.toHaveProperty('title');
-    expect(b?.tool.annotations).toEqual({
-      readOnlyHint: false,
-      consequentialHint: true,
-      untrustedContentHint: true,
-    });
+    // Only the hints that are true: Firefox 159 reads a present readOnlyHint as true.
+    expect(b?.tool.annotations).toEqual({ consequentialHint: true, untrustedContentHint: true });
     expect(a?.signal?.aborted).toBe(false);
     off();
     expect(a?.signal?.aborted).toBe(true);
@@ -193,5 +209,91 @@ describe('connectWebMCP', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     connectWebMCP(fakeKernel([tool('a.v1')]).kernel);
     expect(warn).toHaveBeenCalledWith('[isoloop] WebMCP refused the tool a.v1: Invalid tool name');
+  });
+});
+
+describe('connectWebMCP on navigator.modelContext (Firefox 159)', () => {
+  it('registers there when document has none', () => {
+    const { tools } = fakeFirefoxContext();
+    connectWebMCP(fakeKernel([tool('a.v1'), tool('b.v1')]).kernel);
+    expect([...tools.keys()]).toEqual(['a.v1', 'b.v1']);
+  });
+
+  it('prefers document.modelContext when both exist', () => {
+    const { tools: onNavigator } = fakeFirefoxContext();
+    const { tools: onDocument } = fakeContext();
+    connectWebMCP(fakeKernel([tool('a.v1')]).kernel);
+    expect(onDocument.map((t) => t.tool.name)).toEqual(['a.v1']);
+    expect(onNavigator.size).toBe(0);
+  });
+
+  it('calls kernel.request without a per-call signal from the browser', async () => {
+    const { tools } = fakeFirefoxContext();
+    const { kernel, calls } = fakeKernel([tool('a.v1')]);
+    connectWebMCP(kernel);
+    await expect(tools.get('a.v1')?.execute({ q: 1 })).resolves.toEqual({ ok: 'a.v1' });
+    expect(calls[0]).toMatchObject({ opts: { timeoutMs: 1234, via: 'webmcp' } });
+  });
+
+  it('unregisters each tool by name and aborts calls in flight when disconnected', async () => {
+    const { tools, unregisterTool } = fakeFirefoxContext();
+    const { kernel, calls } = fakeKernel([tool('a.v1'), tool('b.v1')], untilAborted);
+    const off = connectWebMCP(kernel);
+    const p = tools.get('a.v1')?.execute({});
+    off();
+    await expect(p).rejects.toThrow('aborted');
+    expect(calls[0]?.opts?.signal?.aborted).toBe(true);
+    expect(unregisterTool.mock.calls).toEqual([['a.v1'], ['b.v1']]);
+    expect(tools.size).toBe(0);
+  });
+
+  it('ignores unregisterTool throwing for a tool already gone', () => {
+    const { unregisterTool } = fakeFirefoxContext();
+    unregisterTool.mockImplementation(() => {
+      throw new Error('not registered');
+    });
+    const off = connectWebMCP(fakeKernel([tool('a.v1')]).kernel);
+    expect(() => off()).not.toThrow();
+  });
+});
+
+/** Calls `connect` and returns what it threw. */
+function thrownBy(connect: () => unknown): unknown {
+  try {
+    connect();
+  } catch (e) {
+    return e;
+  }
+  return undefined;
+}
+
+describe('connectWebMCP with a tool name already registered', () => {
+  it('throws invalid_config naming the tool and registers nothing (Chromium shape)', () => {
+    const { tools } = fakeContext();
+    connectWebMCP(fakeKernel([tool('a.v1'), tool('b.v1')]).kernel);
+    const e = thrownBy(() => connectWebMCP(fakeKernel([tool('c.v1'), tool('b.v1')]).kernel));
+    expect(e).toBeInstanceOf(KernelError);
+    expect(e).toMatchObject({ code: 'invalid_config' });
+    expect(e instanceof Error ? e.message : '').toContain('b.v1');
+    expect(tools.map((t) => t.tool.name)).toEqual(['a.v1', 'b.v1']);
+  });
+
+  it("throws the same on Firefox 159's shape, so the first tool isn't replaced", () => {
+    const { tools } = fakeFirefoxContext();
+    connectWebMCP(fakeKernel([tool('b.v1')]).kernel);
+    const e = thrownBy(() =>
+      connectWebMCP(fakeKernel([tool('b.v1', { description: 'another' })]).kernel),
+    );
+    expect(e).toMatchObject({ code: 'invalid_config' });
+    expect(tools.get('b.v1')?.description).toBe('does b.v1');
+  });
+
+  it('frees the names on disconnect, once', () => {
+    const { tools } = fakeContext();
+    const off = connectWebMCP(fakeKernel([tool('a.v1')]).kernel);
+    off();
+    off();
+    expect(() => connectWebMCP(fakeKernel([tool('a.v1')]).kernel)).not.toThrow();
+    expect(tools).toHaveLength(2);
   });
 });

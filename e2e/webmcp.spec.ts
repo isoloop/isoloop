@@ -2,13 +2,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import './harness-types';
 import { HARNESS, ISOLATES_CORS } from './servers';
-import { callTool, listTools } from './webmcp';
+import { callTool, listTools, type Called } from './webmcp';
 
 // `@isoloop/webmcp` end to end (M4a task 9, decision 15): a real page runs
 // `connectWebMCP`, and Playwright calls its tools the way a browser agent
-// would, through the browser's own WebMCP. Only the `chromium-webmcp`
-// project launches Chromium with `--enable-features=WebMCP`; in the other
-// projects WebMCP is missing, so only the "does nothing" case runs.
+// would, through the browser's own WebMCP. Only the `chromium-webmcp` and
+// `firefox-webmcp` projects turn WebMCP on (a flag, and prefs); in the other
+// projects it's missing, so only the "does nothing" case runs.
+const WITH_WEBMCP = new Set(['chromium-webmcp', 'firefox-webmcp']);
 
 const CONTRACTS = new URL('webmcp-contracts.js', ISOLATES_CORS).href;
 const ANSWERER = new URL('webmcp-answerer.js', ISOLATES_CORS).href;
@@ -65,6 +66,14 @@ async function openPage(page: Page, s: Setup = {}): Promise<string[]> {
   return logs;
 }
 
+/**
+ * Where a failed call's BusError shows: in the agent's error (Firefox) or
+ * only in the page's console (Chromium, which tells the agent "Tool execution
+ * failed").
+ */
+const failure = (r: Called, logs: string[]): string =>
+  [r.ok ? '' : r.error, ...logs.filter((l) => l.includes('BusError'))].join('\n');
+
 /** Whether the page's main thread still runs: two animation frames come back. */
 const pageRuns = (page: Page): Promise<boolean> =>
   page.evaluate(
@@ -77,8 +86,8 @@ const pageRuns = (page: Page): Promise<boolean> =>
 test.describe('with WebMCP', () => {
   test.beforeEach(() => {
     test.skip(
-      test.info().project.name !== 'chromium-webmcp',
-      'WebMCP needs the chromium-webmcp project',
+      !WITH_WEBMCP.has(test.info().project.name),
+      'WebMCP needs the chromium-webmcp or firefox-webmcp project',
     );
   });
 
@@ -95,11 +104,19 @@ test.describe('with WebMCP', () => {
     });
     expect(ask?.annotations).toEqual({ readOnly: true });
     expect(act).toMatchObject({ description: 'Acts on a question', inputSchema: input });
-    expect(act?.annotations).toEqual({ consequential: true, untrustedContent: true });
-    // The title isn't in Playwright's listing; the page's own sees it.
+    if (test.info().project.name === 'firefox-webmcp') {
+      // Firefox 159 keeps only readOnlyHint; act sends none, so it isn't listed as read-only.
+      expect(act?.annotations?.readOnly).toBeFalsy();
+    } else {
+      expect(act?.annotations).toEqual({ consequential: true, untrustedContent: true });
+    }
+    // Firefox 159 keeps no title. Chromium does, though Playwright's listing
+    // leaves it out; the page's own listing sees it.
+    if (test.info().project.name === 'firefox-webmcp') return;
     const titles = await page.evaluate(async () => {
-      // Chromium's draft API, untyped in lib.dom.
-      const mc: unknown = Reflect.get(document, 'modelContext');
+      // The draft API, untyped in lib.dom: on document (Chromium) or navigator (Firefox).
+      const mc: unknown =
+        Reflect.get(document, 'modelContext') ?? Reflect.get(navigator, 'modelContext');
       const getTools: unknown = mc && Reflect.get(Object(mc), 'getTools');
       if (typeof getTools !== 'function') return {};
       const listed: unknown = await Reflect.apply(getTools, mc, []);
@@ -130,11 +147,9 @@ test.describe('with WebMCP', () => {
     expect(r.ms).toBeGreaterThanOrEqual(550);
     expect(r.ms).toBeLessThan(3_000);
     expect(await pageRuns(page)).toBe(true);
-    // The browser tells the agent only that the tool failed; the page's
-    // console has the kernel's BusError.
-    await expect
-      .poll(() => logs.find((l) => l.includes('BusError')))
-      .toMatch(/webmcp\.ask\.v1 within 600 ms/);
+    // Chromium tells the agent only that the tool failed, and the page's
+    // console has the kernel's BusError; Firefox passes the message on.
+    await expect.poll(() => failure(r, logs)).toMatch(/webmcp\.ask\.v1 within 600 ms/);
   });
 
   test('a crash mid-call: the isolate restarts and the reply still arrives', async ({ page }) => {
@@ -154,9 +169,30 @@ test.describe('with WebMCP', () => {
     const r = await callTool(page, ASK, { q: 'anyone' });
     expect(r.ok).toBe(false);
     expect(r.ms).toBeLessThan(500);
-    await expect
-      .poll(() => logs.find((l) => l.includes('BusError')))
-      .toMatch(/No isolate can answer webmcp\.ask\.v1/);
+    await expect.poll(() => failure(r, logs)).toMatch(/No isolate can answer webmcp\.ask\.v1/);
+  });
+
+  test('a second connectWebMCP with the same tools throws invalid_config; the first stays', async ({
+    page,
+  }) => {
+    await openPage(page);
+    const second = await page.evaluate(async () => {
+      try {
+        await window.harness.connectWebMCP(window.kernel);
+        return { threw: false, code: '', message: '' };
+      } catch (e) {
+        return {
+          threw: true,
+          code: String(Reflect.get(Object(e), 'code')),
+          message: e instanceof Error ? e.message : String(e),
+        };
+      }
+    });
+    expect(second).toMatchObject({ threw: true, code: 'invalid_config' });
+    expect(second.message).toMatch(/webmcp\.(ask|act)\.v1/);
+    expect(await listTools(page)).toHaveLength(2);
+    const r = await callTool(page, ASK, { q: 'still' });
+    expect(r).toMatchObject({ ok: true, value: { a: 'echo:still', via: 'webmcp' } });
   });
 
   test('the returned function removes every tool', async ({ page }) => {
@@ -168,9 +204,11 @@ test.describe('with WebMCP', () => {
 });
 
 test('without WebMCP, connectWebMCP does nothing', async ({ page }, info) => {
-  test.skip(info.project.name === 'chromium-webmcp', 'this case needs WebMCP missing');
+  test.skip(WITH_WEBMCP.has(info.project.name), 'this case needs WebMCP missing');
   await openPage(page);
-  expect(await page.evaluate(() => 'modelContext' in document)).toBe(false);
+  expect(await page.evaluate(() => 'modelContext' in document || 'modelContext' in navigator)).toBe(
+    false,
+  );
   // The kernel still answers on its own.
   const reply = await page.evaluate(() =>
     window.kernel.request({ name: 'webmcp.ask.v1' }, { q: 'plain' }),

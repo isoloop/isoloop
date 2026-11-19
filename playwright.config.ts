@@ -33,6 +33,21 @@ export default defineConfig({
         launchOptions: { args: ['--enable-features=WebMCP'] },
       },
     },
+    // Firefox's WebMCP is behind prefs (ADR 0018, decision 8, "Browsers that
+    // differ"); the testing pref adds the getTools/invokeTool Playwright uses.
+    {
+      name: 'firefox-webmcp',
+      testMatch: 'webmcp.spec.ts',
+      use: {
+        ...devices['Desktop Firefox'],
+        launchOptions: {
+          firefoxUserPrefs: {
+            'dom.modelcontext.enabled': true,
+            'dom.modelcontext.testing.enabled': true,
+          },
+        },
+      },
+    },
   ],
   webServer: [
     {
