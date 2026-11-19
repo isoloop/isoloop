@@ -1,5 +1,13 @@
 # @isoloop/bus
 
+## 0.1.0-next.6
+
+### Patch Changes
+
+- Updated dependencies [8e04ddf]
+  - @isoloop/protocol@0.1.0-next.6
+  - @isoloop/codec@0.1.0-next.6
+
 ## 0.1.0-next.5
 
 ### Patch Changes

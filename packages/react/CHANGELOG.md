@@ -1,5 +1,14 @@
 # @isoloop/react
 
+## 0.1.0-next.6
+
+### Patch Changes
+
+- Updated dependencies [8e04ddf]
+- Updated dependencies [0a22865]
+  - @isoloop/protocol@0.1.0-next.6
+  - @isoloop/runtime@0.1.0-next.6
+
 ## 0.1.0-next.5
 
 ### Patch Changes
