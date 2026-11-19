@@ -23,8 +23,9 @@
 1. **Follow the spec until it ships:** renames, the shape of `executeTool`'s result, annotation changes. Roughly one evening per breaking change.
 2. **Use `toolchange`:** keep the registered tools in step with the kernel while the page runs, for example when exposure changes at run time. 0.1 registers once.
 3. **Reconsider a shim** for browsers without WebMCP, registering into an in-page registry the dev MCP and the Builder can read. 0.1 has none.
-4. **Other engines** as they arrive: a Firefox project once its prefs become a real implementation, then Safari.
-5. **Drop `@experimental`** in the release after WebMCP ships.
+4. **Other engines** as they arrive: following Firefox's prefs was decided on 2026-11-19 (ADR 0018, decision 8) and arrives with isoloop#267 and its `firefox-webmcp` project; then Safari.
+5. **How errors reach the agent:** Chromium shows only "Tool execution failed", with the `BusError` in the page's console; Firefox passes the message on. Follow it until the browsers agree.
+6. **Drop `@experimental`** in the release after WebMCP ships.
 
 ## Open risks
 

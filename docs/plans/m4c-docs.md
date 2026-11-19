@@ -14,7 +14,7 @@ Gets a full task list when it's next to start. The guides that don't depend on f
    - hosting (CSP/CORS);
    - isolate authoring per adapter;
    - the bus guide (semantics, idempotent handlers);
-   - **"Agents":** exposing tools, the dev MCP (`claude mcp add isoloop -- npx isoloop mcp`, `.mcp.json`), `@isoloop/webmcp`, idempotent tool handlers, and what the annotations do and don't do;
+   - **"Agents":** exposing tools, the dev MCP (`claude mcp add isoloop -- npx isoloop mcp`, `.mcp.json`), `@isoloop/webmcp`, idempotent tool handlers, and what the annotations do and don't do (Firefox's agent doesn't see `consequentialHint` or `untrustedContentHint`, ADR 0018 decision 8, checked by `e2e/webmcp.spec.ts`'s registration case in `firefox-webmcp`, isoloop#267);
    - **"Build a dev tool as an isolate,"** with `@isoloop/devtools` as the worked example: tools that read only the app's own topics need no grant, and tools that read the kernel's feed need `inspect`;
    - **"What Isoloop can't hide"** (sync layout, `window`/`document` globals, drag and drop), up front, as the RFC asks.
 3. **API reference** generated from TSDoc, after the freeze.
