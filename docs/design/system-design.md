@@ -71,8 +71,11 @@ flowchart LR
   preact --> runtime
   balancer["balancer (experimental)"] --> host
   vite["vite (build plugin)"]
-  devtools["devtools (M4)"] --> host
+  devtools["devtools (experimental)"] --> host
   devtools --> preact
+  webmcp["webmcp (experimental)"] --> host
+  cli["cli (isoloop, Node)"] --> bus
+  cli --> protocol
   host -. "starts (URL only)" .-> bus
   host -. "starts (URL only)" .-> runtime
 ```
@@ -87,7 +90,9 @@ flowchart LR
 | `@isoloop/runtime` | isolate worker | `protocol`, `dom/worker` | `host`, `bus` |
 | `@isoloop/react`, `@isoloop/preact` | isolate worker | `runtime`, the framework (peer dep) | `host` |
 | `@isoloop/balancer` (experimental) | main thread | `host` (the public kernel API and the internal `claimPools`) | `runtime`, `bus` ([ADR 0017](../adr/0017-opt-in-balancer.md)) |
-| `@isoloop/devtools` (M4) | main thread (the mount), isolate worker (the panel, a visual isolate) | `host` (mount); `preact` and `runtime` (panel) | `bus`; the mount must not depend on `runtime`, nor the panel on `host` |
+| `@isoloop/devtools` (experimental) | main thread (the mount), isolate worker (the panel, a visual isolate) | `host` (mount); `preact` and `runtime` (panel) | `bus`; the mount must not depend on `runtime`, nor the panel on `host` |
+| `@isoloop/webmcp` (experimental) | main thread | `host` | `runtime`, `bus` ([ADR 0018](../adr/0018-tools-for-agents.md)) |
+| `isoloop` (`packages/cli`) | Node | `bus` (contracts, JSON Schema), `protocol` (the dev MCP wire) | every browser package (`host`, `runtime`, `dom`, the adapters) |
 
 Enforced by pnpm's strict `node_modules` (a package can only import what its `package.json` lists) plus an oxlint `no-restricted-imports` rule per package ([ADR 0009](../adr/0009-toolchain.md)). `bus` builds with `lib: ["ES2022", "WebWorker"]` minus DOM, so a stray DOM type fails the build; its tests run in Node.
 

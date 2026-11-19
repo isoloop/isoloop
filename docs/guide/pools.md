@@ -72,7 +72,7 @@ Group by what fails together: a pool is a unit of failure. When you can't know a
 
 ## When to pool, and when not to: the plant dashboard's figures
 
-The [plant dashboard](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant) (72 widgets, 8 machines) runs the same code in several placements, so it shows what each choice costs and contains. Unless a row says otherwise, figures are from its latest matched comparison on a dedicated machine ([`comparison/matched-v2/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/matched-v2), `@isoloop/*@0.0.0-next.d028bc1`): Chromium, 4 physical cores fixed at 2.0 GHz, 1 kHz, medians of 5 rounds. Memory is after GC, 16 s after load. The per-pool costs come from the [plant memory investigation](../investigations/plant-memory.md).
+The [plant dashboard](https://github.com/isoloop/web/tree/main/apps/dashboards/plant) (72 widgets, 8 machines) runs the same code in several placements, so it shows what each choice costs and contains. Unless a row says otherwise, figures are from its latest matched comparison on a dedicated machine ([`comparison/matched-v2/`](https://github.com/isoloop/web/tree/main/apps/dashboards/plant/comparison/matched-v2), `@isoloop/*@0.0.0-next.d028bc1`): Chromium, 4 physical cores fixed at 2.0 GHz, 1 kHz, medians of 5 rounds. Memory is after GC, 16 s after load. The per-pool costs come from the [plant memory investigation](../investigations/plant-memory.md).
 
 | Do | Don't | Why, measured |
 | --- | --- | --- |
@@ -82,7 +82,7 @@ The [plant dashboard](https://github.com/isoloop/examples/tree/main/apps/dashboa
 | Split by failure domain | Put everything in one pool | In `one`, a 3 s block stalled every widget and cost every machine 3.3 s of data, as on a native page. After a 10-minute run it took 5.5 s to recover, against 3.4–3.5 s early in a run, because a restarted member that reads from `'earliest'` replays the retained history on the pool's one thread ([investigation](https://github.com/isoloop/isoloop/pull/172)). |
 | Add pools for containment, knowing each one costs a thread | Add pools you don't need | CPU across threads rises with the number of workers: 88% in `one` (1 + bus), 95% in `matched` (10 + bus), 110% in `split` (18 + bus). Time to first data: 512, 535 and 816 ms. |
 
-¹ `machine` isn't in the matched comparison; this figure is from the first, local run ([`comparison/desktop-4core/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/desktop-4core)), which was on a different machine with an unfixed clock. Its data gaps don't depend on the machine; its CPU and memory figures aren't comparable with the table below.
+¹ `machine` isn't in the matched comparison; this figure is from the first, local run ([`comparison/desktop-4core/`](https://github.com/isoloop/web/tree/main/apps/dashboards/plant/comparison/desktop-4core)), which was on a different machine with an unfixed clock. Its data gaps don't depend on the machine; its CPU and memory figures aren't comparable with the table below.
 
 ### What each placement cost and contained
 
@@ -103,7 +103,7 @@ In every Isoloop placement the main thread stayed at 23–28% CPU at 5 kHz, agai
 
 ### On a mid-range phone
 
-On a mid-range phone (MediaTek MT8781V, 8 cores, 8 GB, 96 Hz screen, Android 15, Firefox 156; [`comparison/phone/ikko-mindone-focus156/`](https://github.com/isoloop/examples/tree/main/apps/dashboards/plant/comparison/phone/ikko-mindone-focus156)), the number of workers decided the result more than anything else. Two rounds each, 96 frames/s at most:
+On a mid-range phone (MediaTek MT8781V, 8 cores, 8 GB, 96 Hz screen, Android 15, Firefox 156; [`comparison/phone/ikko-mindone-focus156/`](https://github.com/isoloop/web/tree/main/apps/dashboards/plant/comparison/phone/ikko-mindone-focus156)), the number of workers decided the result more than anything else. Two rounds each, 96 frames/s at most:
 
 | Placement | Workers | Frames/s, 1 and 5 kHz | Late frames | Typing median |
 | --- | --- | --- | --- | --- |
