@@ -142,6 +142,53 @@ describe('the inspect grant (ADR 0020, decision 6)', () => {
   });
 });
 
+describe("a tap's skipped count (ADR 0020, decision 6, amended 2026-11-19)", () => {
+  it('reaches ctx.inspector through onSkipped', async () => {
+    const k = kernel();
+    const reports = inspectorIsolate(k, { do: 'tap-skipped' });
+    await waitFor(() => step(reports, 'tapping') !== undefined);
+    await vi.waitFor(
+      async () => {
+        await Promise.all(Array.from({ length: 20 }, (_, i) => k.publish(count, { value: i })));
+        const s = step(reports, 'skipped');
+        if (typeof s?.data !== 'number' || s.data < 1) throw new Error('not yet');
+      },
+      { timeout: 8000, interval: 300 },
+    );
+  });
+
+  it('reaches the host Inspector through onSkipped', async () => {
+    const k = kernel();
+    k.spawn({ id: 'T', src: burn });
+    await waitFor(() => k.isolates().find((i) => i.id === 'T')?.state === 'running');
+    const ins = k.inspect();
+    let skipped = 0;
+    let seen = 0;
+    const stop = ins.tap(
+      {
+        topics: [count.name],
+        maxPerSec: 1,
+        onSkipped: (n) => {
+          skipped += n;
+        },
+      },
+      () => {
+        seen++;
+      },
+    );
+    await vi.waitFor(
+      async () => {
+        await Promise.all(Array.from({ length: 20 }, (_, i) => k.publish(count, { value: i })));
+        if (skipped < 1) throw new Error('not yet');
+      },
+      { timeout: 8000, interval: 300 },
+    );
+    expect(seen).toBeGreaterThan(0);
+    stop();
+    ins.close();
+  });
+});
+
 const crashes = (k: Kernel) => {
   const got: KernelEvents['isolate:crash'][] = [];
   k.on('isolate:crash', (e) => got.push(e));

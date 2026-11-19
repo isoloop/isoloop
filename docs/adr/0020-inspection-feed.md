@@ -1,6 +1,6 @@
 # ADR 0020: Inspection feed
 
-- **Status:** Accepted (2026-11-18), after grilling (Q1–Q11, yes to all). Amended 2026-11-18 after the first tasks (Q1–Q4, yes to all, then option (b) for memory, then Q1–Q5 on the host's controls): the isolate side (decision 6) and memory per isolate from the host, where the page is cross-origin isolated (decision 4).
+- **Status:** Accepted (2026-11-18), after grilling (Q1–Q11, yes to all). Amended 2026-11-18 after the first tasks (Q1–Q4, yes to all, then option (b) for memory, then Q1–Q5 on the host's controls): the isolate side (decision 6) and memory per isolate from the host, where the page is cross-origin isolated (decision 4). Amended 2026-11-19 after grilling (Q1–Q5, yes to all): a tap's skipped count reaches its reader through `onSkipped` (decision 6).
 - **Date:** 2026-11-18
 - **Plan:** [M4b](../plans/m4b-devtools.md) (its devtools decisions 2, 5 and 7 are what this ADR makes precise). The [M4a](../plans/m4a-agents.md) dev MCP reads the same feed (decisions 12 and 13 there).
 
@@ -106,12 +106,17 @@ kernel.spawn({ id: 'devtools', url, grants: { publish: [], subscribe: [], inspec
     snapshot(): Promise<InspectSnapshot>;
     on(fn: (m: InspectMessage) => void): () => void;          // the host's messages
     records(topic: string, o: { last: number }): Promise<InspectRecord[]>;
-    tap(o: { topics: string[]; maxPerSec?: number }, fn: (r: InspectRecord) => void): () => void;
+    tap(
+      o: { topics: string[]; maxPerSec?: number; onSkipped?: (count: number) => void },
+      fn: (r: InspectRecord) => void,
+    ): () => void;
     restart(id: string): Promise<void>;
     kill(id: string): Promise<void>;
     block(id: string, ms: number): Promise<void>;             // ≤ 10 s
   };
   ```
+
+- **Skipped records reach the reader (amended 2026-11-19).** The host's `Inspector.tap` and `ctx.inspector.tap` both take `onSkipped?: (count: number) => void`, `@experimental`. It's called with each count of records the bus left out over `maxPerSec` (decision 3), the `skipped` messages the tap's port already carries, at most one a second. Before, the isolate side dropped them, so a reader couldn't tell a quiet topic from one over the cap. Readers that pass nothing see no change. The devtools panel's Log header shows the cap and the total skipped since the log was opened (`50/s cap · N skipped`), starting again from zero when it's reopened.
 
 ### 7. A versioned, additive message format
 

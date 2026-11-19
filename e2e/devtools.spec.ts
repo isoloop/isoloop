@@ -119,3 +119,139 @@ test.describe('devtools: isolates view (M4b task 8)', () => {
     expect(await restartsOf(page, 'headless')).toBe(0);
   });
 });
+
+test.describe('devtools: bus view (M4b task 9)', () => {
+  test.beforeEach(async ({ page }) => {
+    await openPage(page);
+    await page.locator('[data-isoloop-devtools] button[data-health]').click();
+    await page.locator('[data-isoloop-devtools] [data-tab="bus"]').click();
+    await expect(page.locator('[data-isoloop-devtools] [data-view="bus"]')).toBeVisible();
+  });
+
+  test('shows topics, subscriptions with lag and credit, and rejected publishes', async ({
+    page,
+  }) => {
+    const bus = page.locator('[data-isoloop-devtools] [data-view="bus"]');
+    await expect(bus.locator('[data-bus-state]')).toHaveAttribute('data-bus-state', 'running');
+    const rejected = await page.evaluate(async () => {
+      await Promise.all(
+        [1, 2, 3].map((value) => window.kernel.publish({ name: 'feed.v1' }, { value })),
+      );
+      try {
+        await window.kernel.publish({ name: 'feed.v1' }, { value: 'not a number' });
+        return 'accepted';
+      } catch (e) {
+        return e instanceof Error && 'code' in e ? String(e.code) : 'threw';
+      }
+    });
+    expect(rejected).toBe('invalid');
+
+    // Metrics come about once a second.
+    const topic = bus.locator('tr[data-topic="feed.v1"]');
+    await expect(topic.locator('[data-head]')).toHaveText('3');
+    await expect(topic.locator('[data-retained]')).toHaveText('3');
+    await expect(bus.locator('tr[data-subscription="feed.v1"]')).not.toHaveCount(0);
+    await expect(bus.locator('tr[data-subscription="feed.v1"] [data-lag]').first()).toHaveText(
+      /^\d+$/,
+    );
+    await expect(bus.locator('tr[data-subscription="feed.v1"] [data-credit]').first()).toHaveText(
+      /^\d+$/,
+    );
+    await expect(bus.locator('[data-rejected="invalid"]')).toContainText('1');
+  });
+
+  test('arrow keys move between the tabs', async ({ page }) => {
+    const busTab = page.locator('[data-isoloop-devtools] [data-tab="bus"]');
+    await busTab.focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.locator('[data-isoloop-devtools] [data-tab="isolates"]')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(page.locator('[data-isoloop-devtools] [data-view="isolates"]')).toBeVisible();
+    await expect(page.locator('[data-isoloop-devtools] [data-tab="isolates"]')).toBeFocused();
+  });
+});
+
+// The pool members publish on `pooled.v1` after each record they read, so
+// rows are picked by topic.
+const log = (page: Page, topic = 'feed.v1') =>
+  page.locator(`[data-isoloop-devtools] [data-log-table] tbody tr[data-log-topic="${topic}"]`);
+const rows = (page: Page) => page.locator('[data-isoloop-devtools] [data-log-table] tbody tr');
+const publish = (page: Page, topic: string, value: unknown) =>
+  page.evaluate(([t, v]) => window.kernel.publish({ name: t }, { value: v }), [
+    topic,
+    value,
+  ] as const);
+
+test.describe('devtools: live record log (M4b task 10)', () => {
+  test.beforeEach(async ({ page }) => {
+    await openPage(page);
+    await page.locator('[data-isoloop-devtools] button[data-health]').click();
+    await page.locator('[data-isoloop-devtools] [data-tab="log"]').click();
+    await expect(page.locator('[data-isoloop-devtools] [data-view="log"]')).toBeVisible();
+  });
+
+  test('shows records as they are appended, newest first, and filters by topic', async ({
+    page,
+  }) => {
+    await publish(page, 'feed.v1', 41);
+    await publish(page, 'feed.v1', 42);
+    await expect(log(page)).toHaveCount(2);
+    // Newest first.
+    await expect(log(page).first()).toContainText('42');
+    await expect(log(page).nth(1)).toContainText('41');
+
+    await page.locator('[data-isoloop-devtools] [data-log-filter]').fill('notes.*');
+    await page.locator('[data-isoloop-devtools] [data-log-apply]').click();
+    await expect(page.locator('[data-isoloop-devtools] [data-view="log"]')).toContainText(
+      'Tapping notes.*',
+    );
+    await publish(page, 'feed.v1', 777);
+    await publish(page, 'notes.v1', 'hello');
+    await expect(rows(page).first()).toContainText('hello');
+    await expect(rows(page).first()).toHaveAttribute('data-log-topic', 'notes.v1');
+    await expect(log(page).filter({ hasText: '777' })).toHaveCount(0);
+  });
+
+  test('keeps logging through a bus restart', async ({ page }) => {
+    await publish(page, 'feed.v1', 1);
+    await expect(log(page)).toHaveCount(1);
+    await page.evaluate(async () => {
+      const ready = new Promise<void>((resolve) => {
+        const off = window.kernel.on('bus:ready', (e) => {
+          if (!e.first) {
+            off();
+            resolve();
+          }
+        });
+      });
+      window.kernel.debug.crashBus();
+      await ready;
+    });
+    await publish(page, 'feed.v1', 31_337);
+    await expect(log(page).first()).toContainText('31337');
+    await expect(log(page)).toHaveCount(2);
+  });
+
+  test('counts the records left out over the cap, from zero each time it opens', async ({
+    page,
+  }) => {
+    const counter = page.locator('[data-isoloop-devtools] [data-log-skipped]');
+    await expect(counter).toHaveText('50/s cap · 0 skipped');
+    await page.evaluate(() =>
+      Promise.all(
+        Array.from({ length: 200 }, (_, i) =>
+          window.kernel.publish({ name: 'notes.v1' }, { value: `n${i}` }),
+        ),
+      ),
+    );
+    await expect
+      .poll(async () => Number(await counter.getAttribute('data-log-skipped')), { timeout: 10_000 })
+      .toBeGreaterThan(0);
+    // Leaving the tab ends the tap; reopening starts the count again.
+    await page.locator('[data-isoloop-devtools] [data-tab="bus"]').click();
+    await page.locator('[data-isoloop-devtools] [data-tab="log"]').click();
+    await expect(counter).toHaveText('50/s cap · 0 skipped');
+  });
+});

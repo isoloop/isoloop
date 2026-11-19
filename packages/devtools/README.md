@@ -4,10 +4,10 @@ A devtools panel for Isoloop, drawn by a visual isolate in its own worker, so a 
 
 ```ts
 import { connectDevtools } from '@isoloop/devtools';
-// With @isoloop/vite, emit the panel like your own isolates:
-import panel from '@isoloop/devtools/panel?isolate';
 
-const disconnect = connectDevtools(kernel, { src: panel, position: 'bottom-right' });
+const disconnect = connectDevtools(kernel, { position: 'bottom-right' });
 ```
+
+With `@isoloop/vite` the default panel URL works in dev and in a build. With another bundler, pass `src`: the URL it serves `@isoloop/devtools/panel` at. See `docs/guide/devtools.md`.
 
 Alt+Shift+D opens and closes it. Its open state, size and corner are kept in IndexedDB.

@@ -4,7 +4,8 @@
  * merged in as they come; an event is appended to the recent events and
  * fetches a fresh snapshot shortly after, for the isolate and pool states it
  * changed. `at` moves to the host time of the latest message, so ages
- * (a memory figure's, say) read against it. Message types this build doesn't know are ignored (decision 7).
+ * (a memory figure's, say) read against it. Message types this build
+ * doesn't know are ignored (ADR 0020, decision 7).
  */
 import type {
   InspectMessage,
