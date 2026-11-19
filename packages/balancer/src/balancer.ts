@@ -169,6 +169,9 @@ const median = (xs: number[]): number => {
 
 const isQuarantine = (pool: string): boolean => pool.startsWith(`${QUARANTINES}-`);
 
+/** Offended at least once, and not yet forgiven (decision 5). */
+const offender = (m: { offences: number }): boolean => m.offences > 0;
+
 const isOurs = (pool: string): boolean => pool.startsWith(`${POOLS}-`);
 
 /** Load as a share of one core over `beats`, if they cover at least 90 % of `windowMs`. */
@@ -315,10 +318,21 @@ export function createBalancer<M extends ManifestLike>(
   /**
    * Workers counted against `maxWorkers`: the balancer's pools and any
    * quarantine worker beyond the first, which is allowed on top. Workers the
-   * app runs itself don't count (ADR 0017, amended).
+   * app runs itself don't count (ADR 0017, amended). A pool a move has
+   * claimed counts before its worker runs (M3j), so two moves in one
+   * decision can't each take the last worker.
    */
-  const ownWorkers = (): number =>
-    kernel.pools().filter((p) => p.running && isOurs(p.name) && p.name !== QUARANTINE).length;
+  const ownWorkers = (): number => {
+    const names = new Set(
+      kernel
+        .pools()
+        .filter((p) => p.running && isOurs(p.name))
+        .map((p) => p.name),
+    );
+    for (const m of members.values()) if (m.state !== 'failed') names.add(m.pool);
+    names.delete(QUARANTINE);
+    return [...names].filter((n) => isOurs(n)).length;
+  };
 
   const ownPools = (): string[] =>
     [
@@ -777,15 +791,20 @@ export function createBalancer<M extends ManifestLike>(
   /**
    * Makes room for a backlog (M3j): the quarantine pool beyond the first
    * with the fewest members folds into the first, all of it, which frees
-   * its worker. Only a pool of offenders, who share the first anyway:
-   * a bisect's suspects never join offenders. A bisect whose halves meet
-   * again ends. False when there's no such pool.
+   * its worker. Only like into like: offenders into a first quarantine that
+   * holds only offenders (or none), or members that never offended into one
+   * that holds none, such as a bisect's two halves meeting again. Anyone
+   * who hasn't offended never joins an offender (decision 3). A bisect
+   * whose halves meet ends. False when there's no such pool.
    */
   const fold = (): boolean => {
+    const first = membersOf(QUARANTINE);
+    const fits = (here: Member<M>[]): boolean =>
+      here.every(offender) ? first.every(offender) : !here.some(offender) && !first.some(offender);
     const extra = [...new Set([...members.values()].map((m) => m.pool))]
       .filter((n) => isQuarantine(n) && n !== QUARANTINE)
       .map((n) => ({ n, here: membersOf(n) }))
-      .filter((c) => c.here.length > 0 && c.here.every((m) => movable(m) && m.offences > 0))
+      .filter((c) => c.here.length > 0 && c.here.every(movable) && fits(c.here))
       .toSorted((a, b) => a.here.length - b.here.length)[0];
     if (!extra) return false;
     for (const m of extra.here) {
