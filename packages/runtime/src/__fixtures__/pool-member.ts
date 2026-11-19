@@ -1,11 +1,12 @@
 // Test pool member (M2c): headless. Publishes its own id on its own bus port,
 // so a test can tell which member reached which port; throws in start() when
-// its config asks for it.
+// its config asks for it, and takes 300 ms over its shutdown on
+// 'slow-shutdown'.
 type Ctx = {
   id: string;
   config: unknown;
   bus: { publish(topic: { name: string }, rec: { value: unknown }): Promise<void> };
-  onShutdown(fn: () => void): void;
+  onShutdown(fn: () => void | Promise<void>): void;
 };
 
 const own = (): string => 'own';
@@ -31,6 +32,8 @@ function isData(o: object, key: PropertyKey): boolean {
 export default {
   start(ctx: Ctx): void {
     if (ctx.config === 'throw') throw new Error(`start failed in ${ctx.id}`);
+    if (ctx.config === 'slow-shutdown')
+      ctx.onShutdown(() => new Promise((resolve) => setTimeout(resolve, 300)));
     if (ctx.config === 'patch') {
       // Built-ins are frozen in a pool: patching one fails, overriding an
       // inherited property on an instance still works.
