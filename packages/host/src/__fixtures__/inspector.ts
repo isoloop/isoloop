@@ -10,7 +10,10 @@ type Insp = {
   snapshot(): Promise<{ isolates: { id: string }[]; bus: { restarts: number } }>;
   on(fn: (m: Msg) => void): () => void;
   records(topic: string, o: { last: number }): Promise<Rec[]>;
-  tap(o: { topics: string[] }, fn: (r: Rec) => void): () => void;
+  tap(
+    o: { topics: string[]; maxPerSec?: number; onSkipped?: (count: number) => void },
+    fn: (r: Rec) => void,
+  ): () => void;
   restart(id: string): Promise<void>;
   kill(id: string): Promise<void>;
   block(id: string, ms: number): Promise<void>;
@@ -74,6 +77,23 @@ export default {
         });
         say('tapping');
         return;
+      case 'tap-skipped': {
+        // A cap of 1 a second, so a burst is mostly skipped.
+        let total = 0;
+        ins.tap(
+          {
+            topics: ['count.v1'],
+            maxPerSec: 1,
+            onSkipped: (n) => {
+              total += n;
+              say('skipped', total);
+            },
+          },
+          () => undefined,
+        );
+        say('tapping');
+        return;
+      }
       case 'control': {
         const { action = 'restart', target = '', ms = 0 } = cfg;
         const done = action === 'block' ? ins.block(target, ms) : ins[action](target);

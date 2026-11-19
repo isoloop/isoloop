@@ -233,4 +233,25 @@ test.describe('devtools: live record log (M4b task 10)', () => {
     await expect(log(page).first()).toContainText('31337');
     await expect(log(page)).toHaveCount(2);
   });
+
+  test('counts the records left out over the cap, from zero each time it opens', async ({
+    page,
+  }) => {
+    const counter = page.locator('[data-isoloop-devtools] [data-log-skipped]');
+    await expect(counter).toHaveText('50/s cap · 0 skipped');
+    await page.evaluate(() =>
+      Promise.all(
+        Array.from({ length: 200 }, (_, i) =>
+          window.kernel.publish({ name: 'notes.v1' }, { value: `n${i}` }),
+        ),
+      ),
+    );
+    await expect
+      .poll(async () => Number(await counter.getAttribute('data-log-skipped')), { timeout: 10_000 })
+      .toBeGreaterThan(0);
+    // Leaving the tab ends the tap; reopening starts the count again.
+    await page.locator('[data-isoloop-devtools] [data-tab="bus"]').click();
+    await page.locator('[data-isoloop-devtools] [data-tab="log"]').click();
+    await expect(counter).toHaveText('50/s cap · 0 skipped');
+  });
 });
