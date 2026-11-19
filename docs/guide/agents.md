@@ -184,6 +184,6 @@ Both browsers that have WebMCP keep it behind a flag, and no mainstream agent ca
 | What the agent sees when a call fails | "Tool execution failed"; the `BusError` is only in the page's console | the `BusError`'s message |
 
 - **Hints are sent only when true,** because Firefox lists a tool as read-only whenever `readOnlyHint` is present, even as `false`. The draft's defaults are false, so Chromium lists the same thing.
-- **Firefox's agent doesn't see `consequentialHint`,** so it can't tell a consequential tool from any other that isn't read-only. If that matters, ask the user in the page.
+- **Firefox's agent doesn't see `consequentialHint` or `untrustedContentHint`,** so it can't tell a consequential tool from any other that isn't read-only, or know that a reply can carry third-party text. Descriptions aren't edited to make up for it. If confirmation matters, ask the user in the page.
 - **Cancelling in Chromium** names only the tool, so it aborts every call of that tool in flight.
 - **A tool name registered twice:** a `connectWebMCP` whose tools an earlier one on the page registered, and hasn't unregistered, throws `KernelError('invalid_config')` naming the tool, and registers nothing. That's the same on both browsers; on their own, Chromium rejects the name and Firefox replaces the tool.
