@@ -1,6 +1,6 @@
 # M3j: Balancer gaps
 
-**Status:** in progress (grilled 2026-11-17; decisions 14–17 added 2026-11-18, and 18–21 after the bench run the same day). An amendment to [ADR 0017](../adr/0017-opt-in-balancer.md) was accepted on 2026-11-17, and a second (decisions 14–16) on 2026-11-18. An amendment to [ADR 0016](../adr/0016-fewer-messages-per-record.md) (decision 18) is proposed. The balancer change is built in `isoloop/isoloop`, and the processor changes and the measurement in `isoloop/web`. M3j ships as a `0.1.0-next.N` prerelease, then `processor-v0.3.0`, tagged by the user.
+**Status:** in progress (grilled 2026-11-17; decisions 14–17 added 2026-11-18, 18–21 after the bench run the same day, and 22–25 after the re-run on 2026-11-19). An amendment to [ADR 0017](../adr/0017-opt-in-balancer.md) was accepted on 2026-11-17, a second (decisions 14–16) on 2026-11-18, and a third (decision 22) on 2026-11-19. An amendment to [ADR 0016](../adr/0016-fewer-messages-per-record.md) (decision 18) was accepted on 2026-11-18 and shipped in `0.1.0-next.3`. The balancer change is built in `isoloop/isoloop`, and the processor changes and the measurement in `isoloop/web`. M3j ships as a `0.1.0-next.N` prerelease, then `processor-v0.3.0`, tagged by the user.
 
 **Goal:** `@isoloop/balancer` sees work its busy time misses, packs quiet members back while work keeps arriving, lets members out of the quarantine, and stops placing or reviving an isolate the kernel has given up on.
 
@@ -137,6 +137,20 @@ The diagnosis ran on the same server (`~/bench/diag-run.sh`). Without bench mode
 20. **The balancer's start stays as it is:** never-measured processors share one quarantine pool until they're measured. The bus fix alone stops the loss. If the re-run shows harm at start-up, it's a follow-up.
 21. **The bench runs again in full** on `0.1.0-next.3` (task 6b), about 3.5 h, so v0.3.0 is one run. The write-up (task 7) reports that run, and this one and its bug in its details.
 
+### Found by the re-run (2026-11-18)
+
+Task 6b ran on hauseserver from 16:48 to 20:04 UTC on web `2b7e4d6` (`@isoloop/*@0.1.0-next.3`), set up as before. All 98 pages ran.
+
+- **No file was lost.** In all 16 balancer runs with faults (10 fault runs and 6 faults-then-calm runs), on both engines, every file produced got a result, and the corrupt file was reported each time. In the faults-then-calm runs the balancer did 50.1 files a second on 3 or 4 workers, against `own`'s 9, with a p95 of 66 to 124 ms against `own`'s 37 to 51 ms.
+- **The fault runs were slow:** a p95 of 8.5 to 20 s, against `own`'s 0.4 to 0.6 s, with up to 722 files queued when the generator stopped and up to 31 s to drain them. On next.2 the files behind the given-up processors never finished, so they weren't in its p95.
+- **The cause is the cap, not the work.** The corrupt file crashes each image processor once, so both go to quarantine. The quarantine lags, and a bisect gives image-2 a second quarantine pool, which counts toward `maxWorkers: 2`. With `balancer-1`, that fills the cap. The other processors are left sharing one worker (all six of them in 4 of the 10 fault runs) and fall behind: their backlog peaks between 38 and 457, and the balancer reports them `behind` 4 to 12 times a run, with nowhere to move them. On next.2 this was hidden: the given-up image processors freed their workers.
+- **One `ready-timeout`:** in 1 of the 16 runs (Firefox, faults), a restarted image processor sent no `ready` within 10 s, alone in its pool, and the kernel gave up on it. The other image processor did every file.
+
+22. **A rising backlog outranks a second quarantine worker** ([ADR 0017](../adr/0017-opt-in-balancer.md), decision 5, amended): a quarantine pool of offenders beyond the first folds into the first, with the move reason `room`, and for 10 s no new quarantine pool takes a freed worker. A bisect's suspects never fold in with offenders (task 2d).
+23. **The `ready-timeout` is a spike, later:** seen once in 16 runs, its cause isn't clear from this data. It doesn't block M3j. The inspection feed (M4b) can show what the worker was doing.
+24. **The dead-letter topic stays in [would-like](../would-like.md)** (decision 19). The write-up names the limitation.
+25. **Release `0.1.0-next.4` and re-run only the fault mixes** (tasks 3d, 5d, 6c), about 2.5 h. The normal and faults-then-calm runs on next.3 had no losses and no trouble, so the write-up reports them from task 6b and the fault runs from task 6c.
+
 ## Tasks
 
 | # | Task | Repo | Review |
@@ -154,6 +168,10 @@ The diagnosis ran on the same server (`~/bench/diag-run.sh`). Without bench mode
 | 3c | A `0.1.0-next.3` prerelease with task 2c | isoloop | Run by the user |
 | 5c | web on `0.1.0-next.3` | web | Self-merge on green, after task 3c |
 | 6b | The bench-server run again, in full (decision 21) | web | Self-merge on green, after task 5c |
+| 2d | `@isoloop/balancer`: decision 22, with unit tests on the simulated kernel, the guide and a changeset ([#268](https://github.com/isoloop/isoloop/pull/268)) | isoloop | Self-merge on green |
+| 3d | A `0.1.0-next.4` prerelease with task 2d | isoloop | Run on the user's word |
+| 5d | web on `0.1.0-next.4` | web | Self-merge on green, after task 3d |
+| 6c | The bench-server run of the fault mixes only (decision 25) | web | Self-merge on green, after task 5d |
 | 7 | The write-up, in the results page layout (findings first, then the tables, then details) | web | User |
 | 8 | Roadmap: M3j done; `processor-v0.3.0` | isoloop, web | User pushes the tag |
 
@@ -164,10 +182,13 @@ The diagnosis ran on the same server (`~/bench/diag-run.sh`). Without bench mode
 - **Packing with a backlog can bounce.** A packed member whose queue then rises triggers a backlog move out. The 40 % bar, the 60 s steady window and the move budget keep that to a move each way at most a few times in 5 minutes.
 - **Fewer bisects can mean slower culprit-finding.** With no quarantine pool free, a slow pool waits as `behind`, rather than being split.
 - **The lost files may not be #211's.** If the E2E test or the re-run still loses files, M3j stays open for a diagnosis task. (They weren't: the bench run found ADR 0016's point 12, decision 18.)
-- **The re-run may still lose files.** If it does, M3j stays open for another diagnosis.
+- **The re-run may still lose files.** If it does, M3j stays open for another diagnosis. (It didn't: task 6b lost none.)
+- **Folding the quarantine puts offenders together.** One that blocks takes the others in the first quarantine down with it, and each counts a crash. That was already so for offenders sharing it; the fold only adds those from a second pool.
+- **A `ready-timeout` may come back** under load (decision 23). If it does more than once, it moves up.
 
 ## Follow-ups
 
+- **The `ready-timeout` spike** (decision 23).
 - **The kernel counting promise continuations** with `AsyncContext`, once browsers ship it ([would-like](../would-like.md)).
 - **Replicas**, which M3i left for later, are still in [would-like](../would-like.md).
 - **Restart settings per isolate** ([would-like](../would-like.md), Supervision) would let an app give pool members a looser crash-loop guard. M3j doesn't need it.

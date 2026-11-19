@@ -88,7 +88,7 @@ The balancer listens to the kernel's `isolate:beat` event: every heartbeat of ev
 | Crash | A member's error restarted its pool | That member goes to quarantine | `crash` |
 | Kill, culprit unknown | A member blocked until the supervisor killed the pool, so no beat named it | Half the pool's members go to quarantine on restart; whichever half blocks again holds the culprit | `bisect` |
 | Backlog | The app's reported backlog rose over two 10 s windows in a row, and is above 0 | A pool of its own if the cap allows, else a pool with less load than its pool-mates; with neither, `behind` (but see the next row) | `backlog` |
-| Room for a backlog | A member sharing a pool has a rising backlog and nowhere to go, and a quarantine pool beyond the first, holding only offenders, has a worker | That quarantine pool folds into `balancer-quarantine-1`, all of it, and the backlog move follows once its worker has stopped | `room` |
+| Room for a backlog | A member sharing a pool has a rising backlog and nowhere to go, and a quarantine pool beyond the first holds only offenders, so its worker can be freed | That quarantine pool folds into `balancer-quarantine-1`, all of it, and the backlog move follows once its worker has stopped | `room` |
 | Quiet again | An offender's quiet window passed | Back to a pool with room | `steady` |
 | Packing back | Every member of its pool steady for 60 s | Into another of the balancer's pools that stays under 40 % with the whole pool, one member at a time | `pack` |
 
