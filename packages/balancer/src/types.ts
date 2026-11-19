@@ -170,8 +170,8 @@ export type Placement = {
  * unnamed culprit), `steady` (back out of quarantine), `backlog` (its
  * reported backlog kept rising, M3i), `pack` (a quiet member joining
  * another pool to free a worker, M3i) or `room` (a quarantine pool of
- * offenders beyond the first folding into the first, so a member whose backlog is rising gets
- * its worker, M3j).
+ * offenders beyond the first folding into the first, so a member whose
+ * backlog is rising gets its worker, M3j).
  */
 export type MoveReason =
   | 'spike'
