@@ -1,6 +1,6 @@
 # ADR 0018: Tools for agents
 
-- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all). What its implementation (isoloop#242) added was grilled on 2026-11-18 (Q1–Q5, yes to all) and is recorded in decisions 1–4 and 8. Amended on 2026-11-19 for Firefox's WebMCP and three details of Chromium's (decision 8, *Browsers that differ*); the amendment was grilled the same day (Q1–Q6, yes to all).
+- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all). What its implementation (isoloop#242) added was grilled on 2026-11-18 (Q1–Q5, yes to all) and is recorded in decisions 1–4 and 8. Amended on 2026-11-19 for Firefox's WebMCP and three details of Chromium's (decision 8, *Browsers that differ*); the amendment was grilled the same day (Q1–Q6, yes to all). Its code, and the `firefox-webmcp` Playwright project, follow in isoloop#267.
 - **Date:** 2026-11-17
 - **Amends:** [ADR 0003](0003-schema-format-standard-schema.md). A contract may describe a tool, and the host makes JSON Schema at run time through the same vendored interface that decision 21 uses for `isoloop contracts export`, not only at export.
 - **Plan:** [M4a](../plans/m4a-agents.md), grilled 2026-11-17 (decisions 1–8, 10, 11 and 14 there). Background: the [AI-enablers investigation](../investigations/ai-enablers.md).
@@ -170,7 +170,7 @@ Firefox's WebMCP is behind prefs and not shipped, so this follows it the way the
 - **Two new `BusError` codes (`aborted`, `no_responder`), one `KernelError` code (`not_exposable`), one kernel event (`agents:unmatched`), one host-to-bus envelope and one optional field on request records.** All additions.
 - **A consequential tool runs on agent input.** The annotations tell the agent; asking the user first is the agent's job (WebMCP leaves it to the agent too). The docs say both, plainly.
 - **`@isoloop/webmcp` follows a moving draft.** [M7](../plans/m7-webmcp-stable.md) follows it to its ship and amends this ADR when it drops `@experimental`.
-- **No mainstream agent may call WebMCP tools by 0.1,** so the in-browser path may only be proven under Playwright (Chromium with `--enable-features=WebMCP`, Firefox with `dom.modelcontext.enabled`).
+- **No mainstream agent may call WebMCP tools by 0.1,** so the in-browser path may only be proven under Playwright: Chromium with `--enable-features=WebMCP`, and, from isoloop#267, Firefox with `dom.modelcontext.enabled`.
 - **`via` is self-declared.** Any code on the main thread can call `kernel.request` with any `via`, so it's a label for logging and policy between cooperating code on one page, not a security boundary. The page is one trust domain, and the kernel can't tell its callers apart without a token scheme. The Agents guide says handlers must not authorize anything by `via`.
 
 ## Alternatives considered
