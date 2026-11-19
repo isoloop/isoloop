@@ -38,18 +38,19 @@ Markets also calls `connectWebMCP(kernel)` when the browser has WebMCP, so its t
 
 ## What the feed costs
 
-Measured on the plant dashboard at 5 kHz, a reader on the feed for the whole run against no reader, 5 interleaved rounds per engine on the dedicated bench machine ([the investigation](../investigations/inspect-feed-cost.md), raw results in [isoloop/web#170](https://github.com/isoloop/web/pull/170)). Median gap, with the lowest-to-highest spread over the rounds:
+Measured on the plant dashboard at 5 kHz, a reader on the feed for the whole run against no reader, 5 interleaved rounds per engine, on the dedicated bench machine (AMD Ryzen 7 5825U, 4 pinned cores at 2.0 GHz), Playwright 1.65 (Chromium 158), library at `ce4dc9a`, the same code as `0.1.0-next.3` ([the investigation](../investigations/inspect-feed-cost.md), raw results in [isoloop/web#170](https://github.com/isoloop/web/pull/170)). Median gap, with the lowest-to-highest spread over the rounds:
 
 | Figure | Chromium, cross-origin isolated | Chromium | Firefox |
 | --- | --- | --- | --- |
 | CPU, all threads | +1 pp (−7 to +1) | −3 pp (−13 to +7) | – |
 | Main-thread CPU | −0 pp (−2 to +1) | +0 pp (0 to +0) | – |
 | Memory, first reading, before GC | +3 MB (−3 to +7) | +4 MB (+2 to +7) | – |
+| Memory, first reading, after GC | +1 MB (−9 to +4) | −1 MB (−3 to +10) | – |
 | Typing, median of 5 | +8 ms (−9 to +25) | +1 ms (−10 to +24) | +16 ms (−33 to +33) |
 | Recovery after a 3 s block | +75 ms (−63 to +130) | +55 ms (−84 to +88) | −110 ms (−297 to −4) |
 
 - **Most spreads cross zero,** so five rounds can't separate those gaps from round-to-round variation.
-- **Two lean one way:** memory before GC on headless Chromium was higher with the feed open in every round, and Firefox recovered faster with it open in every round, which isn't explained yet.
+- **Three lean one way:** all-thread CPU on isolated Chromium, at +1 pp, the top of its spread; memory before GC on headless Chromium, higher with the feed open in every round (after GC both straddle zero); and Firefox's recovery, faster with the feed open in every round, which isn't explained yet.
 - **The ring buffer** of the last 200 events, kept from the kernel's start whether anyone reads it, was about 18 KB as JSON on Chromium and 15 KB on Firefox.
 
 These runs measure the feed with a reader that only counts. The panel's own drawing, in its worker, and an open live log aren't in them. No budget is set yet; CI's report-only `inspect` job collects runs first.
