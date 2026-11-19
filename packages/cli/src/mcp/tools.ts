@@ -20,6 +20,12 @@ export const MAX_REQUEST_MS = 30_000;
 export const MAX_BLOCK_MS = 10_000;
 /** ADR 0020, decision 3. */
 export const MAX_RECORDS = 100;
+/** `isoloop_tap`'s longest sample, like `block`'s cap. */
+export const MAX_TAP_MS = 10_000;
+/** `isoloop_tap`'s sample when `ms` isn't given. */
+export const DEFAULT_TAP_MS = 3_000;
+/** ADR 0020, decision 3: a tap's default rate. */
+export const TAP_PER_SEC = 50;
 /** ADR 0020, decision 5: the ring buffer's size. */
 export const MAX_EVENTS = 200;
 
@@ -148,6 +154,60 @@ export const BUILTIN_TOOLS: readonly BuiltinTool[] = [
       return typeof last === 'string' ? last : { op: 'records', topic, last };
     },
     timeoutMs: () => READ_MS,
+  },
+  {
+    name: 'isoloop_tap',
+    write: false,
+    mcp: {
+      name: 'isoloop_tap',
+      title: 'Live records',
+      description:
+        `A live sample of the records published to some topics, for ms milliseconds (default ${DEFAULT_TAP_MS}, at most ` +
+        `${MAX_TAP_MS}), stopping early once it has max records (default and at most ${MAX_RECORDS}). The sample is ` +
+        `capped at ${TAP_PER_SEC} records a second: skipped is how many the bus left out over that cap (reported once a ` +
+        'second, so the last second can be missing), and ms is how long it listened. Each record has its topic, offset, ' +
+        `key, time, producer, request id and via, size in bytes, and the value as a preview of at most 2 KB. ${UNTRUSTED_SENTENCE}`,
+      inputSchema: schema(
+        {
+          topics: {
+            type: 'array',
+            items: { type: 'string' },
+            minItems: 1,
+            description: 'The topic names, such as markets.quote.v1.',
+          },
+          ms: {
+            type: 'integer',
+            minimum: 1,
+            maximum: MAX_TAP_MS,
+            description: `How long to listen, in ms. Default ${DEFAULT_TAP_MS}.`,
+          },
+          max: {
+            type: 'integer',
+            minimum: 1,
+            maximum: MAX_RECORDS,
+            description: `Stop after this many records. Default ${MAX_RECORDS}.`,
+          },
+        },
+        ['topics'],
+      ),
+      annotations: read,
+    },
+    op: (args) => {
+      const t = args['topics'];
+      if (
+        !Array.isArray(t) ||
+        t.length === 0 ||
+        !t.every((x): x is string => typeof x === 'string' && x.length > 0)
+      ) {
+        return 'topics must be a non-empty list of topic names';
+      }
+      const ms = intArg(args, 'ms', MAX_TAP_MS, DEFAULT_TAP_MS);
+      if (typeof ms === 'string') return ms;
+      const max = intArg(args, 'max', MAX_RECORDS, MAX_RECORDS);
+      if (typeof max === 'string') return max;
+      return { op: 'tap', topics: t, ms, max };
+    },
+    timeoutMs: (op) => (op.op === 'tap' ? op.ms : 0) + READ_MS,
   },
   {
     name: 'isoloop_events',

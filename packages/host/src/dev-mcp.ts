@@ -32,6 +32,7 @@ import {
   type DevMcpOp,
   type DevMcpResult,
   type DevMcpTool,
+  type InspectRecord,
   type InspectSnapshot,
   type PageToCli,
   type TopicRef,
@@ -114,6 +115,67 @@ function eventsOf(s: InspectSnapshot, last: number): unknown {
   };
 }
 
+/**
+ * `isoloop_tap`: a live sample of `topics` for `ms`, at the tap's default
+ * 50 records a second, stopping early at `max` records. `skipped` is what the
+ * bus left out over that rate, as reported (at most once a second, so up to
+ * the last second's count can be missing). The tap always ends: at `ms`, at
+ * `max`, or when the call is cancelled or the page disconnects.
+ */
+function tapFor(
+  inspector: Inspector,
+  op: Extract<DevMcpOp, { op: 'tap' }>,
+  signal: AbortSignal,
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const records: InspectRecord[] = [];
+    const started = Date.now();
+    let skipped = 0;
+    let done = false;
+    let stop: (() => void) | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const end = (): boolean => {
+      if (done) return false;
+      done = true;
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
+      stop?.();
+      return true;
+    };
+    const finish = (): void => {
+      if (end()) resolve({ records, skipped, ms: Date.now() - started });
+    };
+    function onAbort(): void {
+      if (end()) reject(new BusError({ code: 'aborted', message: 'the tap was cancelled' }));
+    }
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener('abort', onAbort);
+    try {
+      stop = inspector.tap(
+        {
+          topics: [...op.topics],
+          onSkipped: (count) => {
+            if (!done) skipped += count;
+          },
+        },
+        (r) => {
+          if (done) return;
+          records.push(r);
+          if (records.length >= op.max) finish();
+        },
+      );
+    } catch (e) {
+      if (end()) reject(e instanceof Error ? e : new Error(String(e)));
+      return;
+    }
+    if (done) stop?.();
+    else timer = setTimeout(finish, op.ms);
+  });
+}
+
 /** One of the CLI's own tools (`op`), answered from the inspector and the kernel. */
 async function runOp(
   kernel: Pick<Kernel, 'request'> & Partial<Pick<Kernel, 'publish'>>,
@@ -128,6 +190,8 @@ async function runOp(
       return topicsOf(inspector.snapshot());
     case 'records':
       return { records: await inspector.records(op.topic, { last: op.last }) };
+    case 'tap':
+      return tapFor(inspector, op, signal);
     case 'events':
       return eventsOf(inspector.snapshot(), op.last);
     case 'restart':
