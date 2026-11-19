@@ -20,6 +20,11 @@ export type Harness = {
   connectDevMCP(kernel: Kernel, options: { token: string; url?: string }): Promise<() => void>;
   /** `connectWebMCP` from `@isoloop/webmcp` (M4a), loaded on first use. */
   connectWebMCP(kernel: Kernel): Promise<() => void>;
+  /** `connectDevtools` from `@isoloop/devtools` (M4b), loaded on first use. */
+  connectDevtools(
+    kernel: Kernel,
+    options: { src: string; position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' },
+  ): Promise<() => Promise<void>>;
 };
 
 declare global {
@@ -63,6 +68,10 @@ window.harness = {
   async connectWebMCP(kernel) {
     const { connectWebMCP } = await import('@isoloop/webmcp');
     return connectWebMCP(kernel);
+  },
+  async connectDevtools(kernel, options) {
+    const { connectDevtools } = await import('@isoloop/devtools');
+    return connectDevtools(kernel, options);
   },
 };
 document.body.dataset['ready'] = 'true';

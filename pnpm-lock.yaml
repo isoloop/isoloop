@@ -346,6 +346,9 @@ importers:
       '@isoloop/bus':
         specifier: workspace:*
         version: link:../../packages/bus
+      '@isoloop/devtools':
+        specifier: workspace:*
+        version: link:../../packages/devtools
       '@isoloop/host':
         specifier: workspace:*
         version: link:../../packages/host

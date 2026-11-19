@@ -19,5 +19,7 @@
     "docs/diagrams"
   ],
   // The harness page and the adapter fixtures have their own DOM tsconfigs.
-  "exclude": ["e2e/harness/src", "e2e/isolates/adapters", "e2e/isolates/loops"]
+  // The harness build copies the devtools panel's source as an asset (its
+  // default `new URL('./panel.js', import.meta.url)`), so its output stays out.
+  "exclude": ["e2e/harness/src", "e2e/harness/dist", "e2e/isolates/adapters", "e2e/isolates/loops"]
 }
