@@ -1,8 +1,13 @@
 # The isoloop command line
 
-Every command of `isoloop`, with its usage and its flags.
+Every command of `isoloop`, with its usage and its flags, as its own `--help` gives them.
 
-`isoloop --help` lists the commands, `isoloop <command> --help` shows one, and `isoloop --version` prints the version.
+## Options for every command
+
+| Flag | Description |
+| --- | --- |
+| `-h, --help` | Show help (also after a command). |
+| `-v, --version` | Show the version. |
 
 ## `isoloop contracts export`
 

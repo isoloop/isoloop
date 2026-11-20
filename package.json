@@ -30,7 +30,7 @@
     "release:version": "changeset version",
     "release:status": "changeset status",
     "docs:check": "node scripts/docs/check.ts",
-    "docs:api": "node --experimental-transform-types --no-warnings=ExperimentalWarning scripts/docs/api.ts"
+    "docs:api": "node scripts/docs/api.ts"
   },
   "devDependencies": {
     "@changesets/cli": "catalog:",

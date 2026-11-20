@@ -19,9 +19,9 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { registerHooks } from 'node:module';
+import { execFileSync } from 'node:child_process';
 import { join, relative, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { entryFiles, parseMap, USER_FACING, type DocsMap } from './check.ts';
 import {
   readApi,
@@ -332,14 +332,58 @@ export function renderPage(
 
 // --- The CLI page ------------------------------------------------------------
 
-type Flag = { type: 'string' | 'boolean'; short?: string; description: string; value?: string };
+/** One flag as `--help` prints it: `-o, --out <file>` and its description. */
+export type CliFlag = { flag: string; description: string };
 export type CliCommand = {
-  path: readonly string[];
-  summary: string;
+  /** The command's words and what follows them: `contracts export <module>`. */
   usage: string;
-  details?: string;
-  flags: Readonly<Record<string, Flag>>;
+  words: string;
+  summary: string;
+  details: string;
+  flags: readonly CliFlag[];
 };
+export type Cli = { options: readonly CliFlag[]; commands: readonly CliCommand[] };
+
+/** The `Options:` lines of a help text. */
+function flagLines(help: string): CliFlag[] {
+  const at = help.indexOf('\nOptions:\n');
+  if (at < 0) return [];
+  return help
+    .slice(at + '\nOptions:\n'.length)
+    .split('\n')
+    .flatMap((l) => {
+      const m = /^\s+(-\S.*?)\s{2,}(\S.*)$/.exec(l);
+      return m ? [{ flag: (m[1] ?? '').trim(), description: (m[2] ?? '').trim() }] : [];
+    });
+}
+
+/**
+ * Reads the CLI from its own `--help` (decision 29): the top-level help lists
+ * the commands, and each command's help gives its usage, summary, details and
+ * flags. `helpOf` runs `isoloop <words> --help`.
+ */
+export function parseCli(top: string, helpOf: (words: string) => string): Cli {
+  const list =
+    top.slice(top.indexOf('\nCommands:\n') + '\nCommands:\n'.length).split('\n\n')[0] ?? '';
+  const commands = list.split('\n').flatMap((l) => {
+    const words = /^\s+(\S.*?)\s{2,}\S/.exec(l)?.[1];
+    if (!words) return [];
+    const help = helpOf(words);
+    const usage = /^Usage: isoloop (.*?)(?: \[options\])?$/m.exec(help)?.[1] ?? words;
+    const body = help.slice(help.indexOf('\n') + 1, help.indexOf('\nOptions:\n')).trim();
+    const [summary = '', ...rest] = body.split(/\n\s*\n/);
+    return [
+      {
+        words,
+        usage,
+        summary: summary.trim(),
+        details: rest.join('\n\n').trim(),
+        flags: flagLines(help),
+      },
+    ];
+  });
+  return { options: flagLines(top), commands };
+}
 
 /** Help text as Markdown: paragraphs at blank lines, `<` escaped so `<module>` shows. */
 const helpText = (s: string): string =>
@@ -356,25 +400,25 @@ const helpText = (s: string): string =>
 
 const sentence = (s: string): string => (/[.!?]$/.test(s) ? s : `${s}.`);
 
-/** The page for the `isoloop` command line, from its commands (decision 29). */
-export function renderCli(commands: readonly CliCommand[]): string {
+const flagTable = (flags: readonly CliFlag[]): string =>
+  [
+    '| Flag | Description |',
+    '| --- | --- |',
+    ...flags.map((f) => `| \`${f.flag}\` | ${cell(sentence(f.description))} |`),
+  ].join('\n');
+
+/** The page for the `isoloop` command line (decision 29). */
+export function renderCli(cli: Cli): string {
   const parts = [
     '# The isoloop command line',
-    'Every command of `isoloop`, with its usage and its flags.',
-    '`isoloop --help` lists the commands, `isoloop <command> --help` shows one, and `isoloop --version` prints the version.',
+    'Every command of `isoloop`, with its usage and its flags, as its own `--help` gives them.',
   ];
-  for (const c of commands) {
-    const words = c.path.join(' ');
-    parts.push(`## \`isoloop ${words}\``, helpText(sentence(c.summary)));
-    parts.push(`\`\`\`sh\nisoloop ${words}${c.usage ? ` ${c.usage}` : ''} [options]\n\`\`\``);
+  if (cli.options.length > 0) parts.push('## Options for every command', flagTable(cli.options));
+  for (const c of cli.commands) {
+    parts.push(`## \`isoloop ${c.words}\``, helpText(sentence(c.summary)));
+    parts.push(`\`\`\`sh\nisoloop ${c.usage} [options]\n\`\`\``);
     if (c.details) parts.push(helpText(c.details));
-    const rows = Object.entries(c.flags).map(([name, f]) => {
-      const short = f.short ? `-${f.short}, ` : '';
-      const value = f.type === 'string' ? ` <${f.value ?? 'value'}>` : '';
-      return `| \`${short}--${name}${value}\` | ${cell(sentence(f.description))} |`;
-    });
-    if (rows.length > 0)
-      parts.push(['| Flag | Description |', '| --- | --- |', ...rows].join('\n'));
+    if (c.flags.length > 0) parts.push(flagTable(c.flags));
   }
   parts.push(GENERATED);
   return `${parts.join('\n\n')}\n`;
@@ -401,7 +445,7 @@ export function renderAll(
   api: ApiModel,
   map: DocsMap,
   guideTitle: (slug: string) => string,
-  commands: readonly CliCommand[],
+  cli: Cli,
 ): Map<string, string> {
   const pages = new Map<string, string>();
   const guides = guideLinks(map, guideTitle);
@@ -419,52 +463,16 @@ export function renderAll(
     const page = `${pkg}.md`;
     pages.set(page, renderPage(`@isoloop/${pkg}`, lead, sections, { pageOf, page, guides }));
   }
-  pages.set('cli.md', renderCli(commands));
+  pages.set('cli.md', renderCli(cli));
   return pages;
 }
 
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
-
-const isFlag = (v: unknown): v is Flag =>
-  isRecord(v) &&
-  (v['type'] === 'string' || v['type'] === 'boolean') &&
-  typeof v['description'] === 'string';
-
-/** A command as the CLI defines it (`packages/cli/src/command.ts`), as far as its page needs. */
-function isCommand(v: unknown): v is CliCommand {
-  return (
-    isRecord(v) &&
-    Array.isArray(v['path']) &&
-    v['path'].every((w) => typeof w === 'string') &&
-    typeof v['summary'] === 'string' &&
-    typeof v['usage'] === 'string' &&
-    (v['details'] === undefined || typeof v['details'] === 'string') &&
-    isRecord(v['flags']) &&
-    Object.values(v['flags']).every(isFlag)
-  );
-}
-
-/** The CLI's commands, read from its source: the extension-less imports there resolve to `.ts`. */
-async function cliCommands(root: string): Promise<CliCommand[]> {
-  const src = pathToFileURL(join(root, 'packages/cli/src/')).href;
-  registerHooks({
-    resolve(specifier, context, next) {
-      if (
-        context.parentURL?.startsWith(src) &&
-        /^\.\.?\//.test(specifier) &&
-        !/\.\w+$/.test(specifier)
-      ) {
-        return next(`${specifier}.ts`, context);
-      }
-      return next(specifier, context);
-    },
-  });
-  const mod: unknown = await import(pathToFileURL(join(root, 'packages/cli/src/main.ts')).href);
-  const commands = isRecord(mod) ? mod['COMMANDS'] : undefined;
-  if (!Array.isArray(commands) || !commands.every(isCommand))
-    throw new Error('api: packages/cli/src/main.ts exports no COMMANDS list');
-  return commands;
+/** The built CLI's help, read through `--help`. */
+function cliFromHelp(root: string): Cli {
+  const cli = join(root, 'packages/cli/dist/cli.js');
+  const run = (args: string[]): string =>
+    execFileSync(process.execPath, [cli, ...args], { encoding: 'utf8', cwd: root });
+  return parseCli(run(['--help']), (words) => run([...words.split(' '), '--help']));
 }
 
 /** A guide's title, its h1. */
@@ -488,7 +496,7 @@ async function main(): Promise<void> {
     return;
   }
   const map = parseMap(readFileSync(join(root, 'docs/guide/map.json'), 'utf8'));
-  const pages = renderAll(readApi(files, root), map, titleOf(root), await cliCommands(root));
+  const pages = renderAll(readApi(files, root), map, titleOf(root), cliFromHelp(root));
   const dir = join(root, API_DIR);
   if (check) {
     const onDisk = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.md')) : [];

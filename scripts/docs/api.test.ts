@@ -5,6 +5,7 @@ import {
   anchor,
   GENERATED,
   ordered,
+  parseCli,
   parseDoc,
   renderCli,
   renderExport,
@@ -139,23 +140,79 @@ describe('the page', () => {
 });
 
 describe('the CLI page', () => {
-  it('lists every command with its usage, help and flags', () => {
-    const md = renderCli([
+  const top = [
+    'Usage: isoloop <command> [options]',
+    '',
+    'Commands:',
+    '  contracts export  Write JSON Schema',
+    '  mcp               Run the server',
+    '',
+    'Options:',
+    '  -h, --help     Show help (also after a command)',
+    '  -v, --version  Show the version',
+    '',
+  ].join('\n');
+  const help: Record<string, string> = {
+    'contracts export': [
+      'Usage: isoloop contracts export <module> [options]',
+      '',
+      'Write JSON Schema',
+      '',
+      '<module> is the module.',
+      'It prints JSON.',
+      '',
+      'Second paragraph.',
+      '',
+      'Options:',
+      '  -o, --out <file>  Write to a file',
+      '  -h, --help        Show this help',
+      '',
+    ].join('\n'),
+    mcp: [
+      'Usage: isoloop mcp [options]',
+      '',
+      'Run the server',
+      '',
+      'Options:',
+      '      --port <port>  The port (default 4317)',
+      '',
+    ].join('\n'),
+  };
+
+  it("reads the commands, their usage, help and flags from the CLI's --help", () => {
+    const cli = parseCli(top, (words) => help[words] ?? '');
+    expect(cli.options).toEqual([
+      { flag: '-h, --help', description: 'Show help (also after a command)' },
+      { flag: '-v, --version', description: 'Show the version' },
+    ]);
+    expect(cli.commands).toEqual([
       {
-        path: ['contracts', 'export'],
+        words: 'contracts export',
+        usage: 'contracts export <module>',
         summary: 'Write JSON Schema',
-        usage: '<module>',
         details: '<module> is the module.\nIt prints JSON.\n\nSecond paragraph.',
-        flags: {
-          out: { type: 'string', short: 'o', value: 'file', description: 'Write to a file' },
-          help: { type: 'boolean', short: 'h', description: 'Show this help' },
-        },
+        flags: [
+          { flag: '-o, --out <file>', description: 'Write to a file' },
+          { flag: '-h, --help', description: 'Show this help' },
+        ],
+      },
+      {
+        words: 'mcp',
+        usage: 'mcp',
+        summary: 'Run the server',
+        details: '',
+        flags: [{ flag: '--port <port>', description: 'The port (default 4317)' }],
       },
     ]);
+  });
+
+  it('renders every command with its usage, help and flags', () => {
+    const md = renderCli(parseCli(top, (words) => help[words] ?? ''));
+    expect(md).toContain('## Options for every command');
     expect(md).toContain('## `isoloop contracts export`\n\nWrite JSON Schema.');
     expect(md).toContain('```sh\nisoloop contracts export <module> [options]\n```');
     expect(md).toContain('\\<module> is the module. It prints JSON.\n\nSecond paragraph.');
     expect(md).toContain('| `-o, --out <file>` | Write to a file. |');
-    expect(md).toContain('| `-h, --help` | Show this help. |');
+    expect(md).toContain('| `--port <port>` | The port (default 4317). |');
   });
 });
