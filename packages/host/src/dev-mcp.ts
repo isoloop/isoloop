@@ -237,7 +237,15 @@ function send(socket: WebSocket, m: PageToCli): void {
  * CLI's `--allow-write` writes (restart, kill, block, publish, request). The
  * CLI enforces `--allow-write`; the page runs what the paired CLI sends, since
  * only a CLI holding the token on 127.0.0.1 can send it.
- * Returns a function that disconnects and aborts the calls in flight.
+ * @param kernel The page's kernel.
+ * @param options The CLI's URL, the token, and the page's title.
+ * @returns A function that disconnects and aborts the calls in flight.
+ * @example
+ * ```ts
+ * import { connectDevMCP } from '@isoloop/host/dev-mcp';
+ *
+ * if (import.meta.env.DEV) connectDevMCP(kernel, { token: import.meta.env.VITE_ISOLOOP_MCP_TOKEN });
+ * ```
  * @experimental
  */
 export function connectDevMCP(

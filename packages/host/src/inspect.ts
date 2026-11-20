@@ -38,54 +38,73 @@ import {
 import { memoryByIsolate, type MeasureMemory, type MemoryWorker } from './memory';
 
 /**
- * A reader of the inspection feed (ADR 0020, decision 1), from
- * `kernel.inspect()`. Every message is plain, structured-cloneable data, the
- * same as an isolate with the `inspect` grant gets over its port.
+ * A reader of the inspection feed, from `kernel.inspect()`. Every message is
+ * plain, structured-cloneable data, the same as an isolate with the `inspect`
+ * grant gets over its port.
  * @experimental
  */
 export interface Inspector {
-  /** Isolates, pools, the bus, and the last 200 events. */
+  /**
+   * The feed's state now.
+   * @returns Isolates, pools, the bus, and the last 200 events.
+   */
   snapshot(): InspectSnapshot;
   /**
    * Feed messages from now on: events at once, beats and bus metrics about
-   * once a second. Returns the function that stops them.
+   * once a second.
+   * @param fn Called with each message.
+   * @returns The function that stops them.
    */
   on(fn: (m: InspectMessage) => void): () => void;
   /**
-   * Copies records appended to matching topics to `fn` as they arrive, at most
-   * `maxPerSec` a second (default 50), each value cut to a 2 KB preview. A tap
-   * isn't a consumer: it isn't in the bus figures. It's opened again after a
-   * bus restart; records appended while no bus runs aren't seen. Returns the
-   * function that ends it. Throws `bus_unavailable` without contracts.
-   *
-   * `onSkipped` gets each count of records the bus left out over
-   * `maxPerSec`, at most once a second (ADR 0020, decision 6, amended
-   * 2026-11-19). @experimental
+   * Copies records appended to matching topics to `fn` as they arrive, each
+   * value cut to a 2 KB preview. A tap isn't a consumer: it isn't in the bus
+   * figures. It's opened again after a bus restart; records appended while no
+   * bus runs aren't seen.
+   * @param o `topics`: topic names or patterns (`*` matches one or more
+   *   characters). `maxPerSec`: at most this many records a second, default 50.
+   *   `onSkipped`: gets each count of records the bus left out over
+   *   `maxPerSec`, at most once a second.
+   * @param fn Called with each record.
+   * @returns The function that ends the tap.
+   * @throws `BusError` `bus_unavailable` when the kernel has no contracts.
+   * @experimental
    */
   tap(
     o: { topics: string[]; maxPerSec?: number; onSkipped?: (count: number) => void },
     fn: (r: InspectRecord) => void,
   ): () => void;
   /**
-   * The last `last` records of `topic` still retained (at most 100), oldest
-   * first, as previews. Rejects with a `BusError`.
+   * The last records of a topic still retained, oldest first, as previews.
+   * @param topic The topic's name.
+   * @param o `last`: how many, at most 100.
+   * @returns The records.
+   * @throws Rejects with a `BusError`, for example `unknown_topic` or `bus_unavailable`.
    */
   records(topic: string, o: { last: number }): Promise<InspectRecord[]>;
   /**
-   * Restarts an isolate: calls `kernel.restart(id)`. Like `kill` and `block`,
-   * it rejects for an unknown id, and after `close()`.
+   * Restarts an isolate, as `kernel.restart(id)` does.
+   * @param id The isolate's id.
+   * @returns Resolves once the restart has started.
+   * @throws Rejects for an unknown id, and after `close()`.
    */
   restart(id: string): Promise<void>;
   /**
    * Ends an isolate's worker as a crash (`worker_error`), so the supervisor
    * restarts it like any other. For a pooled isolate that ends the pool's
    * worker: every member crashes and restarts, and the feed shows each one.
-   * Resolves once the kill is sent, not when the isolate is back.
+   * @param id The isolate's id.
+   * @returns Resolves once the kill is sent, not when the isolate is back.
+   * @throws Rejects for an unknown id, and after `close()`.
    */
   kill(id: string): Promise<void>;
   /**
-   * Busy-loops an isolate's worker for `ms` (at most 10 s), so you can watch
-   * containment work. For a pooled isolate it blocks the whole worker.
+   * Busy-loops an isolate's worker, so you can watch containment work. For a
+   * pooled isolate it blocks the whole worker.
+   * @param id The isolate's id.
+   * @param ms How long, at most 10 000 (10 s).
+   * @returns Resolves once the block is sent.
+   * @throws Rejects for an unknown id, and after `close()`.
    */
   block(id: string, ms: number): Promise<void>;
   /**

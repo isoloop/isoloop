@@ -1,9 +1,10 @@
 import type { SerializedEvent } from '@isoloop/protocol';
 
 /**
- * Host side of a render format (design §4.5). The compositor is the only
- * caller of `apply`. Bridges wire their own delegated events for now; task 8
- * moves that, with default actions, to an EventBridge using `idFor`.
+// Design §4.5; task 8 moves event wiring, with default actions, to an EventBridge using `idFor`.
+/**
+ * Host side of a render format. The compositor is the only caller of
+ * `apply`. Bridges wire their own delegated events.
  *
  * @internal
  */

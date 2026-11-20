@@ -10,9 +10,11 @@
 import type { SerializedEvent } from '@isoloop/protocol';
 import type { HostRenderBridge } from './render/bridge';
 
+/** One isolate's surface, as the compositor sees it: `IsolateSnapshot.surface`. */
 export type SurfaceStats = {
   /** Batches waiting for a frame. */
   queued: number;
+  /** Batches applied since the surface was made. */
   applied: number;
   /** Batches the bridge refused as malformed. */
   rejected: number;
@@ -41,10 +43,13 @@ export type CompositorOptions = {
   onWrite?: (phase: 'start' | 'end') => void;
 };
 
-/** What a failed isolate's fallback shows (design §4.3). */
+/** What a failed isolate's fallback is given to show. */
 export type FallbackInfo = {
+  /** The isolate's id. */
   id: string;
+  /** Why it failed: the last crash's `CrashReason`. */
   reason: string;
+  /** The last crash's message. */
   message: string;
   /** Respawns the isolate, resetting its restart window. */
   respawn: () => void;

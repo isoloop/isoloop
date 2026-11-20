@@ -1,10 +1,13 @@
 import { envelopeGuard, type Envelope, type MessageTypes } from './envelope';
 import type { CallResult } from './errors';
 
-/** One record in a topic's log (design §6.1). */
+/** One record in a topic's log. */
 export type BusRecord = {
+  /** Its place in the topic's log, from 0. */
   offset: number;
+  /** The key it was published with, if any. */
   key?: string;
+  /** The value, checked against the topic's schema. */
   value: unknown;
   /** `Date.now()` at append. */
   ts: number;
@@ -13,16 +16,15 @@ export type BusRecord = {
   /**
    * Set on a `bus.request` record: the caller's isolate id (`'host'` for
    * `kernel.request`) and its request id. A recipient answers with
-   * `reply { topic, offset }` (design §6.3). `via` names the agent transport
-   * that made the call (ADR 0018, decision 4); an isolate's own `bus.request`
-   * never sets it.
+   * `bus.reply(record, value)`. `via` names the agent transport that made the
+   * call; an isolate's own `bus.request` never sets it.
    */
   req?: RecordReq;
 };
 
 /**
- * The agent transports that call through `kernel.request` (ADR 0018, decision 4):
- * the dev MCP, WebMCP, and later the Builder.
+ * The agent transports that call through `kernel.request`: `mcp` (the dev
+ * MCP) and `webmcp` (WebMCP). Nothing in Isoloop sets `builder`.
  *
  * Self-declared by the caller: a label for logging and policy between
  * cooperating code on one page. Never authorize anything by it.
@@ -64,7 +66,12 @@ export function isRecordReq(x: unknown): x is RecordReq {
  */
 export type PublishId = { epoch?: number; seq?: number };
 
-/** Where a new subscription starts reading. */
+/**
+ * Where a new subscription starts reading: `latest`, only records appended
+ * from now on; `earliest`, the oldest record still retained; `committed`,
+ * after the last record this subscriber committed, or the oldest retained
+ * when it has committed none.
+ */
 export type StartPosition = 'latest' | 'earliest' | 'committed';
 
 /** Bus port: isolate → bus worker. */

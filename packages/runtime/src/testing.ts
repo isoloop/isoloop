@@ -22,35 +22,48 @@ type Sub = {
   opts: SubscribeOptions;
 };
 
+/** `createTestContext`'s options. */
 export type TestContextOptions = {
+  /** `ctx.id`. Default `'test'`. */
   id?: string;
+  /** `ctx.config`. Default `null`. */
   config?: unknown;
-  /** The render root, e.g. an element on the test page; omit for a headless context. */
+  /** The render root, for example an element on the test page. Default: none, a headless context. */
   root?: object;
-  /** Answers `bus.request`; default: reject with `timeout` after the request's `timeoutMs`. */
+  /** Answers `bus.request`. Default: reject with `timeout` after the request's `timeoutMs`. */
   respond?: (topic: string, value: unknown) => unknown;
-  /** Answers host calls; default: `measure` gives a zero rect, the rest resolve. */
+  /** Answers host calls. Default: `measure` gives a zero rect, the rest resolve. */
   host?: Partial<HostApi>;
 };
 
+/** A context to test an isolate with, and the handles to drive it and see what it did. */
 export type TestContext = {
+  /** The context to pass to `start(ctx)`, or to render a component with. */
   readonly ctx: IsolateContext;
   /** What `ctx.reportError` got, in order. */
   readonly errors: { error: unknown; fatal: boolean }[];
   /** Delivers a record to every subscription on `topic`, in order. */
   emit: (topic: string, value: unknown, key?: string) => void;
-  /** Runs `onReset` of every subscription on `topic` (a bus restart lost it, ADR 0007). */
+  /** Runs `onReset` of every subscription on `topic`, as when a bus restart loses a memory topic. */
   reset: (topic: string) => void;
   /** Every `publish`, in order. */
   readonly published: { topic: string; key?: string; value: unknown }[];
   /** Open subscriptions, by topic and start position. */
   subscriptions: () => { topic: string; from: string }[];
-  /** Runs the `onShutdown` handlers, as the runtime does on `stop`. */
+  /** Runs the `onShutdown` handlers, as the runtime does on `stop`. `reason` defaults to `'stop'`. */
   shutdown: (reason?: ShutdownReason) => Promise<void>;
 };
 
 const ZERO: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
+/**
+ * Makes an `IsolateContext` with no worker, bus or host behind it, for
+ * testing an isolate or a component on a page. The test drives the bus
+ * (`emit`, `reset`) and sees what the isolate did (`published`,
+ * `subscriptions`, `errors`). `ctx.inspector` is `undefined`.
+ * @param o The id, config, root, and how requests and host calls are answered.
+ * @returns The context and its handles.
+ */
 export function createTestContext(o: TestContextOptions = {}): TestContext {
   const subs = new Set<Sub>();
   const published: TestContext['published'] = [];

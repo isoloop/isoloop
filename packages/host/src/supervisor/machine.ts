@@ -16,6 +16,17 @@
 import { assertNever } from '@isoloop/protocol';
 import { backoffMs, DEFAULT_BACKOFF, slide, type Backoff } from './timers';
 
+/**
+ * Where an isolate is in its life:
+ * - `loading`: its worker is starting, and it hasn't sent `ready`;
+ * - `running`: ready and beating;
+ * - `blocked`: no beat for `heartbeat.blockedAfterMs`; its surface shows a busy overlay;
+ * - `stopped`: stopped by `kernel.stop` or its handle;
+ * - `crashed`: passed through on a crash, on the way to `restarting` or `failed`;
+ * - `restarting`: waiting out the backoff before a new worker;
+ * - `failed`: past the restart limit, or a crash a restart can't fix; it stays down and shows its fallback;
+ * - `suspended`: opt-in, idle, so its worker was shut down; it wakes on visibility, a record or `kernel.resume`.
+ */
 export type IsolateState =
   | 'loading'
   | 'running'
@@ -24,9 +35,23 @@ export type IsolateState =
   | 'crashed'
   | 'restarting'
   | 'failed'
-  /** Opt-in: idle, so its worker was shut down; wakes on visibility, a record or `resume` (ADR 0001). */
+  /** Opt-in: idle, so its worker was shut down; wakes on visibility, a record or `resume`. */
   | 'suspended';
 
+/**
+ * Why an isolate (or the bus) crashed:
+ * - `error`: the isolate reported a fatal error;
+ * - `worker_error`: the worker's `error` or `messageerror` event;
+ * - `ready_timeout`: no `ready` within `heartbeat.readyTimeoutMs` of the spawn;
+ * - `unresponsive`: blocked for `heartbeat.killAfterMs` without a beat, so the worker was terminated;
+ * - `spawn_failed`: `new Worker` threw;
+ * - `render_format_mismatch`: the isolate renders in a format this host doesn't read;
+ * - `bus_failed`: the bus couldn't load its contracts;
+ * - `runtime_too_old`: the isolate was built for a newer Isoloop than this host;
+ * - `isolate_too_old`: the isolate was built for an Isoloop older than this host still runs.
+ *
+ * The last four fail at once, without restarts, since a restart can't fix them.
+ */
 export type CrashReason =
   /** A fatal `error` message from the isolate. */
   | 'error'
@@ -38,13 +63,13 @@ export type CrashReason =
   | 'unresponsive'
   /** `new Worker` threw. */
   | 'spawn_failed'
-  /** `ready.renderFmt` isn't one the host speaks. Fails at once: a restart can't fix it (ADR 0011). */
+  /** `ready.renderFmt` isn't one the host speaks. Fails at once: a restart can't fix it. */
   | 'render_format_mismatch'
-  /** The bus couldn't load its contracts. Fails at once: the error is deterministic (ADR 0003). */
+  /** The bus couldn't load its contracts. Fails at once: the error is deterministic. */
   | 'bus_failed'
-  /** `ready.requires` is newer than this host's `VERSION`. Fails at once (ADR 0012). */
+  /** `ready.requires` is newer than this host's `VERSION`. Fails at once. */
   | 'runtime_too_old'
-  /** `ready.requires` is older than this host's `FLOOR`. Fails at once (ADR 0012). */
+  /** `ready.requires` is older than this host's `FLOOR`. Fails at once. */
   | 'isolate_too_old';
 
 export type SupervisorConfig = {

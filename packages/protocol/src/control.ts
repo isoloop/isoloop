@@ -58,11 +58,11 @@ export type SeedEvent =
     }
   | { kind: 'seeded'; topic: string; copied: number; rejected: number };
 
-/** Sampled every second on the control port (design §6.3). */
+/** The bus's figures, sampled every second: `bus:metrics`. */
 export type BusMetrics = {
   /**
-   * `head` is the next offset to be written; `retained` is how many records
-   * the topic still holds (ADR 0020, decision 2).
+   * Per topic: records and bytes a second; `head`, the next offset to be
+   * written; and `retained`, how many records the topic still holds.
    */
   topics: {
     topic: string;
@@ -71,8 +71,12 @@ export type BusMetrics = {
     head: number;
     retained: number;
   }[];
-  /** `lag` is `head − cursor`. */
+  /**
+   * Per consumer and topic: `lag` is `head − cursor`; `credit` is how many
+   * records may still be delivered before its next commit.
+   */
   subscriptions: { consumer: string; topic: string; lag: number; credit: number }[];
+  /** Rejected publishes by error code, since the bus worker started. */
   rejected: Partial<Record<ErrorCode, number>>;
   /** The origin's storage use, from `navigator.storage.estimate()`, while the bus keeps files. */
   storage?: { usage: number; quota: number };
@@ -88,20 +92,26 @@ export const DEFAULT_TAP_PER_SEC = 50;
 export const MAX_READ = 100;
 
 /**
- * A record as the inspection feed shows it (ADR 0020, decision 3): its value
- * as text, cut to `PREVIEW_CHARS`, with the value's estimated size in bytes.
+ * A record as the inspection feed shows it: its value as text, cut to 2,048
+ * characters, with the value's estimated size in bytes.
  * @experimental
  */
 export type RecordPreview = {
+  /** The topic's name. */
   topic: string;
+  /** Its place in the topic's log. */
   offset: number;
+  /** The key it was published with, if any. */
   key?: string;
+  /** `Date.now()` at append. */
   ts: number;
+  /** Who published it: an isolate's id, or the host. */
   producer: string;
+  /** For a request record: who asked, and the request's id. */
   req?: RecordReq;
   /** The value's estimated size, as the bus counts it for `too_large` and the byte rates. */
   bytes: number;
-  /** The value as JSON-like text, at most `PREVIEW_CHARS` characters. */
+  /** The value as JSON-like text, at most 2,048 characters. */
   preview: string;
   /** `preview` was cut short. */
   truncated: boolean;

@@ -3,7 +3,7 @@ import type { CallResult, ErrorPayload } from './errors';
 import type { SerializedEvent } from './events';
 import type { Grants } from './grants';
 
-/** Why the host asks an isolate to shut down. `suspend` keeps its offsets (M2, ADR 0001). */
+/** Why the host asks an isolate to shut down. `suspend` keeps its offsets, to replay what it missed on waking. */
 export type ShutdownReason = 'stop' | 'restart' | 'suspend';
 
 /** Calls an isolate can make to the host (design §4.7). */

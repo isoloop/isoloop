@@ -5,9 +5,14 @@
  */
 import type { CallResult, ErrorCode, HostMethod, IsolateToHost, Rect } from '@isoloop/protocol';
 
-/** A host call that failed, with the protocol's error code. */
+/** A host call (`ctx.host`) that failed, with an error code to branch on. */
 export class HostCallError extends Error {
+  /** What went wrong: `not_found`, `no_surface`, `forbidden`, `invalid`, `timeout`, … */
   readonly code: ErrorCode;
+  /**
+   * @param code What went wrong.
+   * @param message A sentence for people.
+   */
   constructor(code: ErrorCode, message: string) {
     super(message);
     this.name = 'HostCallError';
@@ -15,24 +20,50 @@ export class HostCallError extends Error {
   }
 }
 
-/** What `ctx.host` offers (design §4.7). */
+/**
+ * What `ctx.host` offers: calls the host runs on the main thread for the
+ * isolate. Each runs after the DOM changes made before it, and rejects with a
+ * `HostCallError`: `timeout` after 5 s without an answer, `not_found` for a
+ * node that isn't rendered, `no_surface` in a headless isolate.
+ */
 export type HostApi = {
   /**
-   * Asks the host to navigate (ADR 0002). Needs `grants.navigate`, else
-   * `forbidden`. `/x` resolves against the host's `basePath`. Resolves with
-   * the host's answer: `true` accepted, `false` refused.
+   * Asks the host to navigate. `/x` resolves against the host's `basePath`.
+   * @param href Where to go: same-origin.
+   * @param o `replace` the current history entry rather than push one, and the `state` to set.
+   * @returns The host's answer: `true` accepted, `false` refused.
+   * @throws `HostCallError` `forbidden` without `grants.navigate`, or
+   *   `routing_disabled` when the host turned routing off.
    */
   navigate(href: string, o?: { replace?: boolean; state?: unknown }): Promise<boolean>;
-  /** The node's box relative to the surface, after pending patches apply. */
+  /**
+   * Measures a rendered node, after pending changes apply.
+   * @param node A node this isolate rendered.
+   * @returns Its box relative to the surface, in CSS pixels.
+   */
   measure(node: unknown): Promise<Rect>;
+  /**
+   * Focuses a rendered node on the page.
+   * @param node A node this isolate rendered.
+   * @returns Resolves once the host has focused it.
+   */
   focus(node: unknown): Promise<void>;
+  /**
+   * Scrolls the page so a rendered node is in view.
+   * @param node A node this isolate rendered.
+   * @param opts As the DOM's `scrollIntoView` takes them.
+   * @returns Resolves once the host has scrolled.
+   */
   scrollIntoView(node: unknown, opts?: ScrollIntoViewOptionsLike): Promise<void>;
   /**
-   * Hands a rendered `<canvas>` to the isolate as an `OffscreenCanvas`
-   * (design §4.7), at `size` in canvas pixels if given. Draw on it from the
-   * worker. The element then gets `resize` events with its CSS `width` and
-   * `height`, the first at once. Each canvas goes once; a second request
-   * rejects with `invalid`, a headless isolate's with `no_surface`.
+   * Hands a rendered `<canvas>` to the isolate as an `OffscreenCanvas`. Draw
+   * on it from the worker. The element then gets `resize` events with its CSS
+   * `width` and `height`, the first at once.
+   * @param node A `<canvas>` this isolate rendered.
+   * @param size Its size in canvas pixels, if given.
+   * @returns The canvas, transferred to the worker.
+   * @throws `HostCallError` `invalid` for a canvas already handed over (each
+   *   goes once), `no_surface` in a headless isolate.
    */
   requestCanvas(
     node: unknown,
@@ -40,9 +71,13 @@ export type HostApi = {
   ): Promise<OffscreenCanvas>;
 };
 
+/** `scrollIntoView`'s options, typed here since worker code has no DOM types. */
 export type ScrollIntoViewOptionsLike = {
+  /** Default `'auto'`. */
   behavior?: 'auto' | 'instant' | 'smooth';
+  /** Default `'start'`. */
   block?: 'start' | 'center' | 'end' | 'nearest';
+  /** Default `'nearest'`. */
   inline?: 'start' | 'center' | 'end' | 'nearest';
 };
 

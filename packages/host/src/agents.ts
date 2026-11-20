@@ -15,7 +15,8 @@ import {
 } from '@isoloop/protocol';
 
 /**
- * `KernelConfig.agents` (ADR 0018, decision 2): the topics agents may call.
+ * `KernelConfig.agents`: the topics agents may call, as tools, through the dev
+ * MCP or WebMCP.
  * @experimental
  */
 export type AgentsConfig = {
@@ -28,25 +29,28 @@ export type AgentsConfig = {
    * through the `agents:unmatched` event.
    */
   readonly expose: readonly string[];
-  /** How long transports wait for a tool's reply, in ms. Default 10 s (ADR 0018, decision 5). */
+  /** How long transports wait for a tool's reply, in ms. Default 10 000 (10 s). */
   readonly timeoutMs?: number;
 };
 
-/** `agents.timeoutMs` when not set (ADR 0018, decision 5). */
+// `agents.timeoutMs` when not set (ADR 0018, decision 5).
+/** `agents.timeoutMs` when not set: 10 s. */
 export const DEFAULT_AGENT_TIMEOUT_MS = 10_000;
 
 /** A JSON Schema document, draft 2020-12. */
 export type ToolJsonSchema = { readonly [key: string]: unknown };
 
 /**
- * An exposed tool, as `kernel.tools()` lists it (ADR 0018, decision 2).
- * Everything but `topic` is plain data a transport can send as is.
+ * An exposed tool, as `kernel.tools()` lists it. Everything but `topic` is
+ * plain data a transport can send as is.
  * @experimental
  */
 export type AgentTool = {
   /** The topic's name, which is the tool's name (`markets.quote.v1`). */
   readonly name: string;
+  /** The tool's title, from the topic's `tool.title`. Absent when the topic gives none. */
   readonly title?: string;
+  /** What the tool does, from the topic's `tool.description`. */
   readonly description: string;
   /** WebMCP and MCP `readOnlyHint`. */
   readonly readOnly: boolean;
@@ -64,17 +68,18 @@ export type AgentTool = {
   readonly topic: TopicRef<unknown, unknown, unknown, unknown>;
 };
 
-/** `kernel.request`'s options (ADR 0018, decision 4). @experimental */
+/** `kernel.request`'s options. @experimental */
 export type KernelRequestOptions = {
+  /** The request record's key. Default: none. */
   key?: string;
-  /** Default 30 s, the bus's. Transports pass `agents.timeoutMs` (`AgentTool.timeoutMs`). */
+  /** How long to wait for a reply, in ms. Default 30 000 (30 s), the bus's. Transports pass `agents.timeoutMs` (`AgentTool.timeoutMs`). */
   timeoutMs?: number;
-  /** Aborting rejects the call with `BusError('aborted')`. */
+  /** Aborting rejects the call with `BusError('aborted')`. Default: none. */
   signal?: AbortSignal;
   /**
    * The transport making the call, set on the record as `req.via`. A label
    * for logging and policy between cooperating code on one page; never
-   * authorize anything by it.
+   * authorize anything by it. Default: none.
    */
   via?: RequestVia;
 };

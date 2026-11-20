@@ -23,7 +23,8 @@ import { version } from '../package.json';
 
 /**
  * What a render root offers, structurally, so DOM-typed isolate code can pass
- * its own nodes. Use `defineIsolate<HTMLElement>(…)` to get the DOM's types.
+ * its own nodes. Each member works as the DOM's. Use
+ * `defineIsolate<HTMLElement>(…)` to get the DOM's types instead.
  */
 export interface IsolateRoot {
   append(...nodes: (object | string)[]): void;
@@ -36,60 +37,82 @@ export interface IsolateRoot {
   addEventListener(type: string, fn: (event: never) => void, options?: unknown): void;
 }
 
+/** An isolate's whole world, as `start(ctx)` gets it. */
 export type IsolateContext<Root = IsolateRoot> = {
+  /** The isolate's id, from the manifest. */
   readonly id: string;
   /** `manifest.config`, passed through. */
   readonly config: unknown;
-  /** The render target; `undefined` for a headless isolate (ADR 0008). */
+  /** The render target inside the surface; `undefined` for a headless isolate. */
   readonly root: Root | undefined;
   /**
    * A container inside `root` for modals, tooltips, toasts and menus that
    * libraries would otherwise render into `document.body`, which reaches no
-   * surface (ADR 0015, decision 11). Made on first use, typically from a
-   * component while it renders, and added as `root`'s last child once that
-   * render has committed; `undefined` for a headless isolate.
+   * surface. Made on first use, typically from a component while it renders,
+   * and added as `root`'s last child once that render has committed;
+   * `undefined` for a headless isolate.
    */
   readonly portalRoot: Root | undefined;
+  /** Calls the host runs on the main thread: navigate, measure, focus, scroll, hand over a canvas. */
   readonly host: HostApi;
-  /** The log bus, on its own port to the bus worker (design §5). */
+  /** The bus, on its own port to the bus worker. */
   readonly bus: BusClient;
   /**
-   * The inspection feed and its controls (ADR 0020, decision 6), on a port of
-   * its own to the host; `undefined` unless the isolate holds `inspect: true`.
+   * The inspection feed and its controls, on a port of its own to the host;
+   * `undefined` unless the isolate holds `inspect: true`.
    * @experimental
    */
   readonly inspector: IsolateInspector | undefined;
-  /** Adds stylesheets to the surface (design §4.8); a no-op when headless. */
+  /**
+   * Adds stylesheets to the surface; a no-op when headless.
+   * @param css One stylesheet's text, or several.
+   */
   styles(css: string | readonly string[]): void;
   /**
    * Sets an `<input>`'s, `<textarea>`'s or `<select>`'s value. The host owns
-   * a focused input's value (design §4.6), so a plain `input.value = …` waits
-   * until the user leaves it; with `force` the host applies it at once and
-   * keeps the caret at the end, e.g. to clear a chat box after sending.
+   * a focused input's value, so a plain `input.value = …` waits until the
+   * user leaves it; with `force` the host applies it at once and keeps the
+   * caret at the end, for example to clear a chat box after sending.
+   * @param node The element, as this isolate rendered it.
+   * @param value The new value.
+   * @param opts `force`: apply it even while the user is in the field. Default false.
    */
   setValue(node: unknown, value: string, opts?: { force?: boolean }): void;
   /**
    * Reports an error as this isolate's own: framework adapters call it for a
    * render error their boundary caught, so in a pool it crashes only this
-   * member, not the whole worker (ADR 0015, decision 8). `fatal` (the
-   * default) crashes the isolate, which the host restarts as usual.
+   * member, not the whole worker.
+   * @param error What was thrown.
+   * @param opts `fatal`: crash the isolate, which the host restarts as usual.
+   *   Default true. With false the host emits `isolate:error` and the isolate
+   *   keeps running.
    */
   reportError(error: unknown, opts?: { fatal?: boolean }): void;
-  /** Runs on stop, within the host's grace period, before the worker goes. */
+  /**
+   * Adds a handler that runs on stop, within the host's grace period (1 s),
+   * before the worker goes.
+   * @param fn Gets why the isolate is stopping; may return a promise.
+   */
   onShutdown(fn: (reason: ShutdownReason) => void | Promise<void>): void;
   /**
-   * Holds the isolate against suspension (ADR 0001); call the result to
-   * release. Only matters for isolates spawned with `suspend`.
+   * Holds the isolate against suspension. Only matters for isolates spawned
+   * with `suspend`.
+   * @returns The function that releases the hold.
    */
   keepAwake(): () => void;
 };
 
+/** An isolate module's default export: what `defineIsolate` returns. */
 export type IsolateDefinition<Root = IsolateRoot> = {
+  /**
+   * Runs once, when the isolate starts in its worker. A `start` that throws,
+   * or whose promise rejects, crashes the isolate.
+   */
   start(ctx: IsolateContext<Root>): void | Promise<void>;
   /**
    * The Isoloop `major.minor` it was built against, stamped by
-   * `defineIsolate` (ADR 0012). The host fails an isolate outside its
-   * `[FLOOR, VERSION]`; a definition without one isn't checked.
+   * `defineIsolate`. The host fails an isolate built for a newer Isoloop, or
+   * for one older than it still runs; a definition without one isn't checked.
    */
   requires?: string;
 };
@@ -103,7 +126,23 @@ export const REQUIRES: string = majorMinor(version) ?? '0.0';
 
 /**
  * Types an isolate module's default export and stamps it with the version
- * it was built against. `Root` defaults to the structural `IsolateRoot`.
+ * it was built against.
+ * @param def The isolate: its `start(ctx)`.
+ * @returns The definition, with `requires` set to this build's `major.minor`.
+ * @example
+ * ```ts
+ * import { defineIsolate } from '@isoloop/runtime';
+ * import { count } from './topics';
+ *
+ * export default defineIsolate<HTMLElement>({
+ *   start(ctx) {
+ *     const button = document.createElement('button');
+ *     button.textContent = 'Add one';
+ *     button.addEventListener('click', () => void ctx.bus.publish(count, { value: 1 }));
+ *     ctx.root?.append(button);
+ *   },
+ * });
+ * ```
  */
 export function defineIsolate<Root = IsolateRoot>(
   def: IsolateDefinition<Root>,

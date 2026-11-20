@@ -10,15 +10,22 @@
  */
 import { routeTopic, type CallResult, type ErrorCode, type RouteValue } from '@isoloop/protocol';
 
+/** A navigation an isolate asked for, or a link click, as `onNavigate` gets it. */
 export type NavigateRequest = {
-  /** Absolute, same-origin. */
+  /** Where to go: an absolute, same-origin URL. */
   href: string;
+  /** True to replace the current history entry rather than push one. */
   replace: boolean;
+  /** The `history.state` to set, when the isolate gave one. */
   state?: unknown;
   /** The isolate that asked, or whose link was clicked. */
   from: string;
 };
 
+/**
+ * `KernelConfig.onNavigate`: decides a navigation. Returns, or resolves with,
+ * `true` once accepted (not when finished) and `false` to refuse.
+ */
 export type OnNavigate = (req: NavigateRequest) => boolean | Promise<boolean>;
 
 export type RouterOptions = {

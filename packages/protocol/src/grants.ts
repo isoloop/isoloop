@@ -1,14 +1,13 @@
-/** What an isolate may do on the bus and the host (design §3). */
+/** What an isolate may do on the bus and the host: `IsolateManifest.grants`. */
 export type Grants = {
-  /** Topic patterns the isolate may publish to. */
+  /** Topic patterns the isolate may publish to. `*` matches one or more characters, dots included. */
   publish: string[];
-  /** Topic patterns the isolate may subscribe to. */
+  /** Topic patterns the isolate may subscribe to, the same way. */
   subscribe: string[];
-  /** Programmatic `navigate()` allowed (ADR 0002). Default false. */
+  /** `ctx.host.navigate()` allowed. Default false. */
   navigate?: boolean;
   /**
-   * The inspection feed and its controls (ADR 0020, decision 6): the isolate
-   * gets `ctx.inspector` on a port of its own, which reads the feed and can
+   * The inspection feed and its controls: the isolate gets `ctx.inspector` on a port of its own, which reads the feed and can
    * restart, kill and block isolates. Default false. Never in a pool: spawning
    * a pooled isolate with it fails with `invalid_config`, since a pool merges
    * its members' grants.

@@ -40,52 +40,76 @@ import {
   type TypedRecord,
 } from '@isoloop/protocol';
 
-/** `request`'s options. @experimental */
+/** `bus.request`'s options. @experimental */
 export type RequestOptions = {
-  /** The request record's key. */
+  /** The request record's key. Default: none. */
   key?: string;
-  /** Default 30 s: the call rejects with `BusError('timeout')` after it. */
+  /** How long to wait for a reply, in ms; the call then rejects with `BusError('timeout')`. Default 30 000 (30 s). */
   timeoutMs?: number;
 };
 
+/** `bus.subscribe`'s options. */
 export type SubscribeOptions = {
   /**
-   * Default `latest`. With `group`, it applies only while the group has no
-   * committed offset: a group that has committed resumes after it, and a
-   * member joining a group that has members takes records from where the
-   * group is (ADR 0016, point 14).
+   * Where to start. Default `latest`. With `group`, it applies only while the
+   * group has no committed offset: a group that has committed resumes after
+   * it, and a member joining a group that has members takes records from
+   * where the group is.
    */
   from?: StartPosition;
-  /** Share the topic with other subscribers of the same group: each record goes to one of them. @experimental */
+  /** Share the topic with other subscribers of the same group: each record goes to one of them. Default: none. @experimental */
   group?: string;
-  /** Default true: commit each record once its handler settles. @experimental */
+  /** Commit each record once its handler settles. Default true. @experimental */
   autoCommit?: boolean;
   /**
-   * A bus restart lost this memory topic (ADR 0007). Clear what was built
-   * from it; records from the new bus follow.
+   * A bus restart lost this memory topic. Clear what was built from it;
+   * records from the new bus follow. Default: none.
    */
   onReset?: () => void;
   /**
    * Records in `[from, to]` were dropped by retention before they reached
-   * this subscription (design §6.3), e.g. while the isolate was suspended.
+   * this subscription, for example while the isolate was suspended. Default: none.
    */
   onGap?: (gap: { from: number; to: number }) => void;
 };
 
+/** An isolate's side of the bus: `ctx.bus`, on its own port to the bus worker. */
 export interface BusClient {
-  /** Resolves once the broker appended the record; rejects with a `BusError`. */
+  /**
+   * Appends a record to a topic.
+   * @param topic The topic, from the contracts.
+   * @param rec The record's `value`, and its `key` if any.
+   * @returns Resolves once the broker has appended the record.
+   * @throws Rejects with a `BusError`, for example `forbidden` without a
+   *   publish grant, `invalid` when the value fails the schema, or
+   *   `bus_unavailable` while 1,000 calls wait for an answer.
+   */
   publish<In>(topic: TopicRef<In, any, any, any>, rec: { key?: string; value: In }): Promise<void>;
-  /** Returns the unsubscribe function. */
+  /**
+   * Delivers a topic's records to `fn`, one at a time, in order: the next
+   * waits until `fn`'s promise settles. One subscription per topic:
+   * subscribing again replaces the last one.
+   * @param topic The topic, from the contracts.
+   * @param fn Called with each record.
+   * @param opts Where to start, the group, and the reset and gap handlers.
+   * @returns The function that unsubscribes.
+   */
   subscribe<Out>(
     topic: TopicRef<any, Out, any, any>,
     fn: (r: TypedRecord<Out>) => void | Promise<void>,
     opts?: SubscribeOptions,
   ): () => void;
   /**
-   * Topics with a `reply` schema only. Rejects with `timeout` after
-   * `timeoutMs` (default 30 s), or with `dropped` at once when the topic's
-   * retention removed the request before the bus delivered it to any
-   * subscriber.
+   * Appends a request record to a topic with a `reply` schema and waits for
+   * the first valid reply.
+   * @param topic A topic with a `reply` schema.
+   * @param value The request's value, checked against the topic's schema.
+   * @param opts The key and the timeout.
+   * @returns The reply's value, checked against the `reply` schema.
+   * @throws Rejects with a `BusError`: `timeout` after `timeoutMs` (default
+   *   30 s); `dropped` at once when the topic's retention removed the request
+   *   before the bus delivered it to any subscriber; `not_requestable`,
+   *   `forbidden`, `invalid` or `reply_invalid` from the broker.
    * @experimental
    */
   request<In, ROut>(
@@ -94,13 +118,20 @@ export interface BusClient {
     opts?: RequestOptions,
   ): Promise<ROut>;
   /**
-   * Answers a request record delivered to this isolate; the broker checks `value` against the topic's `reply` schema.
+   * Answers a request record delivered to this isolate.
+   * @param record The request, as the subscription delivered it.
+   * @param value The answer; the broker checks it against the topic's `reply` schema.
+   * @returns Resolves once the broker has the reply.
+   * @throws `Error` for a record not delivered to this isolate; rejects with a
+   *   `BusError` (`reply_invalid`, …) from the broker.
    * @experimental
    */
   reply(record: TypedRecord<unknown>, value: unknown): Promise<void>;
   /**
    * Commits a record by hand, for `autoCommit: false`: that record and every
    * one delivered before it on its subscription count as settled.
+   * @param record A record this isolate's subscription delivered.
+   * @throws `Error` for a record not delivered to this isolate.
    * @experimental
    */
   commit(record: TypedRecord<unknown>): void;

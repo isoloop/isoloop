@@ -1,4 +1,5 @@
-/** Every error code on the wire (design §3, §4.7, §6.1, §6.3; ADRs 0002, 0003, 0007, 0008). */
+// Design §3, §4.7, §6.1, §6.3; ADRs 0002, 0003, 0007, 0008.
+/** Every error code the bus and the host answer with. */
 export const ERROR_CODES = [
   // Handshake
   'protocol_mismatch',
@@ -19,7 +20,7 @@ export const ERROR_CODES = [
   'too_large',
   'invalid',
   'not_encodable',
-  /** The origin's storage is full: persistent publishes reject, memory topics carry on (M2b). */
+  /** The origin's storage is full: persistent publishes reject, memory topics carry on. */
   'quota_exceeded',
   'bus_unavailable',
   'not_requestable',
@@ -30,7 +31,7 @@ export const ERROR_CODES = [
   'aborted',
   /** No isolate that could answer the request is alive: none has a subscribe grant for it, or all of them are stopped or `failed`. */
   'no_responder',
-  /** Retention removed the request before the bus delivered it to any subscriber (ADR 0018, decision 5). */
+  /** Retention removed the request before the bus delivered it to any subscriber. */
   'dropped',
   // Contracts (ADR 0003): fatal, never retried
   'contracts_failed',
@@ -42,6 +43,19 @@ export const ERROR_CODES = [
   'seed_pending',
 ] as const;
 
+/**
+ * An error code a `BusError` or `HostCallError` carries. By where it comes from:
+ * - host calls: `timeout`, `no_surface`, `forbidden`, `not_found`, `unsupported`;
+ * - routing: `cross_origin`, `routing_disabled`, `navigate_failed`;
+ * - the broker: `unknown_topic`, `too_large`, `invalid`, `not_encodable`,
+ *   `quota_exceeded`, `bus_unavailable`, `not_requestable`, `already_replied`,
+ *   `reply_invalid`;
+ * - `kernel.request`: `aborted`, `no_responder`, `dropped`;
+ * - the contracts, fatal and never retried: `contracts_failed`,
+ *   `contracts_invalid`, `contracts_mismatch`, `reserved_topic`;
+ * - seeding: `seed_async`, `seed_pending`;
+ * - the version handshake: `protocol_mismatch`.
+ */
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
 const codes: ReadonlySet<string> = new Set(ERROR_CODES);
@@ -50,7 +64,7 @@ export function isErrorCode(x: unknown): x is ErrorCode {
   return typeof x === 'string' && codes.has(x);
 }
 
-/** A schema issue, as reported with `invalid` (design §6.3). */
+/** A schema issue, as reported with `invalid`: what's wrong, and where in the value. */
 export type Issue = { message: string; path: (string | number)[] };
 
 export type CallError = { code: ErrorCode; message: string; issues?: Issue[] };
