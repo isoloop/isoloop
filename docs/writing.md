@@ -84,12 +84,12 @@ Limits, defaults, options and behaviour live in the guide, not the README, so th
 
 ## TSDoc
 
-The API reference is generated from the TSDoc of the published `.d.ts`, so TSDoc is docs and follows the voice rules above. From the API freeze on, the check enforces items 1 and 2 on every export, and item 3 on the entry points it names. **(checked)**
+The API reference is generated from the TSDoc of the published `.d.ts`, so TSDoc is docs and follows the voice rules above. `docs:check` reads each public declaration once, where it's declared (`@internal` ones and the internal entries left out), and fails on the items marked **(checked)**. The steward reviews the rest.
 
-1. **Every exported function, class and const** has a lead sentence, `@param` for each parameter, `@returns` when it returns something, and `@throws` naming its error codes (`not_exposable`, `no_responder`, …).
-2. **Every field of an exported options or config type** (`KernelConfig`, a topic's options, `connectDevtools`' options) has its own comment, with its default.
-3. **`@example` on the main entry points:** `createKernel`, `defineIsolate` (react, preact, dom), `topic`, `contracts`, `isoloop()`, `kernel.request`, `connectDevtools`, `connectWebMCP` and `createBalancer`. Examples are type-checked like the guides' fences.
+1. **Every exported function, class and const** has a lead sentence, `@param` for each parameter, `@returns` when it returns something, and `@throws` naming its error codes (`not_exposable`, `no_responder`, …). The lead, and `@param` and `@returns` on functions and on consts you call, are **(checked)**. `@throws` and a class constructor's `@param`s are the steward's, since the `.d.ts` doesn't show what a function throws.
+2. **Every field of an exported options or config type** (`KernelConfig`, a topic's options, `connectDevtools`' options) has its own comment, with its default. A type whose name ends in `Options` or `Config` counts. The comment is **(checked)**; the default is the steward's.
+3. **`@example` on the main entry points:** `createKernel`, `defineIsolate` (react, preact, dom), `topic`, `contracts`, `isoloop()`, `kernel.request`, `connectDevtools`, `connectWebMCP` and `createBalancer`. Put the code in a ` ```ts ` fence. Examples are type-checked like the guides' fences, next to the same example app. **(checked)**
 4. **`@experimental`** on anything that may change before 1.0. The site marks it with the Experimental pill.
 5. **`@internal`** keeps a declaration out of the API check and the reference. Use it for exports that exist only for other `@isoloop/*` packages.
 6. **No `@see` to guides.** The reference gets those links from `docs/guide/map.json`.
-7. **No ADRs or plans,** as in the guides: no links to them, no `ADR 0001`, no decision numbers. A `//` comment in the code may name them for contributors. Checked from the API freeze, with items 1 and 2.
+7. **No ADRs or plans,** as in the guides: no links to them, no `ADR 0001`, no milestone (`M3h`), no decision numbers. A `//` comment in the code may name them for contributors. **(checked)**
