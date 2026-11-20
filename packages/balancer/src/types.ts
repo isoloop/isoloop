@@ -48,69 +48,107 @@ export type PoolLike = { name: string; members: readonly string[]; running: bool
 /** The fields of the kernel's `isolate:crash` event the balancer reads. @internal */
 export type CrashLike = { id: string; reason: string; pool?: string };
 
-/** The fields of the kernel's `isolate:failed` event the balancer reads (M3j). @internal */
+/** The fields of the kernel's `isolate:failed` event the balancer reads. @internal */
 export type FailedLike = { id: string; reason: string; pool?: string };
 
 /**
  * Where the balancer keeps each isolate's measured load between page loads,
- * so a reload places from history (M3h, Q17). The app supplies it; the
- * creator backs it with a persistent topic. `get` returning `undefined`
- * means "never measured": the isolate starts in quarantine.
+ * so a reload places it from history instead of measuring it again. The app
+ * supplies it, for example backed by a persistent topic.
  * @experimental
  */
 export interface LoadStore {
+  /**
+   * The load saved for `id`.
+   * @param id The isolate's id.
+   * @returns Its share of one core (0–100), or `undefined` if it was never
+   *   measured, in which case the isolate starts in quarantine.
+   */
   get(id: string): number | undefined;
+  /**
+   * Saves `id`'s measured load. The balancer calls it every 10 s when a
+   * load has moved by 5 points or more since it was saved, and when the
+   * isolate stops. The app can call it too, with `measure()`'s figure.
+   * @param id The isolate's id.
+   * @param loadPct Its share of one core, 0–100.
+   */
   set(id: string, loadPct: number): void;
 }
 
-/** @experimental */
+/** The options of `createBalancer`: its worker allowance and the thresholds that move isolates. @experimental */
 export type BalancerOptions = {
   /**
-   * The balancer's own allowance of workers (ADR 0017, amended): its
-   * `balancer-N` pools, plus any quarantine worker beyond the first. The
-   * quarantine, `balancer-quarantine-1`, is allowed on top, and workers the
-   * app runs itself don't count; the kernel's budget stays the page-wide
+   * The balancer's own allowance of workers: its `balancer-N` pools, plus any
+   * quarantine worker beyond the first. The quarantine,
+   * `balancer-quarantine-1`, is allowed on top, and workers the app runs
+   * itself don't count; the kernel's worker budget stays the page-wide
    * warning. Default `max(2, navigator.hardwareConcurrency - 2)`; at least 1.
    */
   maxWorkers?: number;
   /**
-   * A beat with the pool's `lagMs` above this is a spike, put on the member
-   * that was busiest in it. A first spike is only reported (`spike`, action
-   * `noted`); a second from the same member within 60 s sends it to
-   * quarantine (M3i). Default 100.
+   * When a long task is a spike. A first spike from a member is only
+   * reported (`spike`, action `noted`); a second from the same member within
+   * 60 s sends it to quarantine.
    */
-  spike?: { lagMs?: number };
+  spike?: {
+    /**
+     * A beat with the pool's `lagMs` above this is a spike, put on the member
+     * that was busiest in it. Default `100`.
+     */
+    lagMs?: number;
+  };
   /**
-   * The pool's median `lagMs` above `lagMs` over `forMs` moves its heaviest
-   * member out. Default 50 ms over 3,000 ms. So does a pool whose members'
-   * busy time adds up to 80 % of a core or more over the same window, whatever
-   * its lag (a fixed threshold, above `headroom`).
+   * When a pool's lag stays high. The pool's heaviest member moves out. So
+   * does a pool whose members' busy time adds up to 80 % of a core or more
+   * over the same window, whatever its lag (a fixed threshold, above
+   * `headroom`).
    */
-  sustained?: { lagMs?: number; forMs?: number };
-  /** An isolate joins a pool only while pool load + its load stays under `loadPct`. Default 60. */
-  headroom?: { loadPct?: number };
+  sustained?: {
+    /** The pool's median `lagMs` that counts as high. Default `50`. */
+    lagMs?: number;
+    /** How long it has to stay high, in milliseconds. Default `3000`. */
+    forMs?: number;
+  };
+  /** How much room a pool keeps. */
+  headroom?: {
+    /**
+     * An isolate joins a pool only while the pool's load plus its own stays
+     * under this share of one core. Default `60`.
+     */
+    loadPct?: number;
+  };
   /**
-   * Leaving quarantine: an isolate there only to be measured leaves once it
+   * Leaving quarantine. An isolate there only to be measured leaves once it
    * has 3 s of beats there, or, if a bisect moved it there, once that bisect
-   * ends. An offender leaves after `steadyMs` (default 30,000 ms) with no
-   * spike and no crash, whatever its load; each offence doubles the window
-   * (30, 60, 120 s), capped at 2 minutes (or `steadyMs`, if longer). Back in
-   * a balancer pool, an offender loses one offence for each quiet window it
-   * completes there (M3j). After `maxReturns` returns (default 3) the next
-   * offence keeps it apart for good. Either goes where the placement rule
-   * finds room, or stays, flagged `atCap`, until there is.
+   * ends. An offender leaves after a quiet window with no spike and no crash,
+   * whatever its load; each offence doubles the window (30, 60, 120 s),
+   * capped at 2 minutes (or `steadyMs`, if longer). Back in a balancer pool,
+   * an offender loses one offence for each quiet window it completes there.
+   * Either goes where the placement rule finds room, or stays, flagged
+   * `atCap`, until there is.
    */
-  quarantine?: { steadyMs?: number; maxReturns?: number };
+  quarantine?: {
+    /** An offender's first quiet window, in milliseconds. Default `30000`. */
+    steadyMs?: number;
+    /** After this many returns, the next offence keeps it apart for good. Default `3`. */
+    maxReturns?: number;
+  };
+  /**
+   * Where measured loads are kept between page loads. Default: none, so
+   * every isolate starts in quarantine to be measured.
+   */
   loads?: LoadStore;
   /**
-   * Packing back (M3i; whole pools since M3j): a pool whose members have
-   * all been steady for 60 s (no spike, crash, lagging or full pool, and a
-   * backlog no higher than 60 s before) empties into another of the
-   * balancer's pools if both together stay under 40 % of a core, one member
-   * per pack, freeing a worker once the last is in. At most one pack every
-   * 60 s. On by default.
+   * Packing back. A pool whose members have all been steady for 60 s (no
+   * spike, crash, lagging or full pool, and a backlog no higher than 60 s
+   * before) empties into another of the balancer's pools if both together
+   * stay under 40 % of a core, one member per pack, freeing a worker once the
+   * last is in. At most one pack every 60 s.
    */
-  pack?: { enabled?: boolean };
+  pack?: {
+    /** Pack pools back together. Default `true`. */
+    enabled?: boolean;
+  };
 };
 
 /**
@@ -127,8 +165,8 @@ export type Report = {
   backlog?: number;
   /**
    * Milliseconds of work the app measured for the isolate since it started:
-   * a running total, so a late or missed report still counts (M3j). For work
-   * the kernel's `busyMs` misses, such as slices resumed after `await`. The
+   * a running total, so a late or missed report still counts. For work the
+   * kernel's `busyMs` misses, such as slices resumed after `await`. The
    * balancer takes its difference over the 3 s window and uses the larger of
    * that and the beats' figure. A total that goes down is taken as a restart
    * of the count.
@@ -137,24 +175,33 @@ export type Report = {
 };
 
 /**
- * `failed`: the kernel gave up on the isolate (past its restart limit, M3j).
- * The balancer never moves or restarts it; after `kernel.restart(id)` it's
- * placed again as new.
+ * Where an isolate stands:
+ * - `placed`: in one of the balancer's pools;
+ * - `quarantined`: in a quarantine pool, to be measured or after an offence;
+ * - `kept-apart`: an offender past `quarantine.maxReturns`, kept out of the
+ *   shared pools for good;
+ * - `moving`: stopped, and being spawned in its new pool;
+ * - `failed`: the kernel gave up on it (past its restart limit). The balancer
+ *   never moves or restarts it; after `kernel.restart(id)` it's placed again
+ *   as new.
  * @experimental
  */
 export type PlacementState = 'placed' | 'quarantined' | 'kept-apart' | 'moving' | 'failed';
 
-/** @experimental */
+/** Where the balancer has put an isolate, and what it knows of its load. @experimental */
 export type Placement = {
+  /** The isolate's id. */
   id: string;
+  /** The pool it's in. */
   pool: string;
+  /** Where it stands. */
   state: PlacementState;
   /**
    * Measured share of one core, 0–100: the larger of the beats' `busyMs` and
    * the app's reported `busyMs` over the last 3 s; `undefined` until measured.
    */
   loadPct: number | undefined;
-  /** The share of one core from the app's `busyMs` reports alone, while they're fresh (M3j). */
+  /** The share of one core from the app's `busyMs` reports alone, while they're fresh. */
   reportedPct?: number;
   /** No pool had room and the worker cap was reached: placed anyway, or left where it is. */
   atCap?: true;
@@ -177,10 +224,10 @@ export type Placement = {
  * (the pool's lag stayed high), `full` (the pool's members' busy time reached
  * 80 % of a core, whatever its lag), `crash`, `bisect` (looking for a pool's
  * unnamed culprit), `steady` (back out of quarantine), `backlog` (its
- * reported backlog kept rising, M3i), `pack` (a quiet member joining
- * another pool to free a worker, M3i) or `room` (a quarantine pool beyond
- * the first folding into the first, like with like, so a member whose
- * backlog is rising gets its worker, M3j).
+ * reported backlog kept rising), `pack` (a quiet member joining another pool
+ * to free a worker) or `room` (a quarantine pool beyond the first folding
+ * into the first, like with like, so a member whose backlog is rising gets
+ * its worker).
  * @experimental
  */
 export type MoveReason =
@@ -195,91 +242,162 @@ export type MoveReason =
   | 'room';
 
 /** A move, once the old copy has stopped and the new one is spawned. @experimental */
-export type MoveEvent = { id: string; from: string; to: string; reason: MoveReason };
+export type MoveEvent = {
+  /** The isolate's id. */
+  id: string;
+  /** The pool it left. */
+  from: string;
+  /** The pool it was spawned in. */
+  to: string;
+  /** Why it moved. */
+  reason: MoveReason;
+};
 
 /**
- * A moved member's first beat in its new pool (M3i). `costMs` is the time from
- * the balancer stopping it to that beat: what the move cost the isolate. It
- * follows `move`, which fires before the cost is known; a member stopped or
- * moved again before it beats never arrives.
+ * A moved member's first beat in its new pool. It follows `move`, which fires
+ * before the cost is known; a member stopped or moved again before it beats
+ * never arrives.
  * @experimental
  */
-export type ArrivedEvent = MoveEvent & { costMs: number };
+export type ArrivedEvent = MoveEvent & {
+  /** The time from the balancer stopping it to that beat, in milliseconds: what the move cost the isolate. */
+  costMs: number;
+};
 
 /**
- * A spike put on a member (M3i): `noted` for a first one (nothing moves), or
+ * A spike put on a member: `noted` for a first one (nothing moves), or
  * `quarantined` when it sends the member to quarantine, or restarts the quiet
  * window of one already there.
  * @experimental
  */
 export type SpikeEvent = {
+  /** The member the spike was put on: the busiest in the beat. */
   id: string;
+  /** Its pool. */
   pool: string;
+  /** The pool's lag in that beat, in milliseconds. */
   lagMs: number;
+  /** What the balancer did. */
   action: 'noted' | 'quarantined';
 };
 
 /**
  * A member's reported backlog keeps rising, but it already has its pool to
- * itself or the balancer has no worker or pool to give it (M3i). Also when
- * its pool's trouble needs a bisect and no quarantine pool is free for one
- * (M3j). Emitted when it first happens, then at most every 30 s while it
- * lasts. `backlog` is the latest fresh report, or 0.
+ * itself or the balancer has no worker or pool to give it. Also when its
+ * pool's trouble needs a bisect and no quarantine pool is free for one.
+ * Emitted when it first happens, then at most every 30 s while it lasts.
  * @experimental
  */
-export type BehindEvent = { id: string; pool: string; backlog: number };
+export type BehindEvent = {
+  /** The isolate's id. */
+  id: string;
+  /** Its pool. */
+  pool: string;
+  /** The latest fresh backlog report, or 0. */
+  backlog: number;
+};
 
 /**
- * The kernel gave up on a member (`isolate:failed`, M3j). It drops out of its
+ * The kernel gave up on a member (`isolate:failed`). It drops out of its
  * pool's load and any bisect, and no move restarts it.
  * @experimental
  */
-export type FailedEvent = { id: string; pool: string; reason: string };
+export type FailedEvent = {
+  /** The isolate's id. */
+  id: string;
+  /** The pool it was in. */
+  pool: string;
+  /** The kernel's reason for giving up. */
+  reason: string;
+};
 
 /** An isolate the balancer didn't place turned up in one of its pools (see `Placement.foreign`). @experimental */
-export type ForeignEvent = { id: string; pool: string };
+export type ForeignEvent = {
+  /** The isolate's id. */
+  id: string;
+  /** The balancer's pool it turned up in. */
+  pool: string;
+};
 
 /** The events `Balancer.on` takes, by name. @experimental */
 export type BalancerEvents = {
+  /** An isolate moved. */
   move: MoveEvent;
+  /** A moved isolate beat in its new pool. */
   arrived: ArrivedEvent;
+  /** A spike was put on an isolate. */
   spike: SpikeEvent;
+  /** An isolate is behind and has nowhere to go. */
   behind: BehindEvent;
+  /** The kernel gave up on an isolate. */
   failed: FailedEvent;
+  /** An isolate the balancer didn't place is in one of its pools. */
   foreign: ForeignEvent;
 };
 
 /**
  * The balancer `createBalancer` returns. Pools are named `balancer-1`,
  * `balancer-2`…; the quarantine is `balancer-quarantine-1`, and `-2`, `-3`…
- * when a suspect needs a worker of its own. `createBalancer` throws
- * `balancer_exists` if the kernel has one.
+ * when a suspect needs a worker of its own.
  * @experimental
  */
 export interface Balancer {
-  /** Like `kernel.spawn`, but the balancer picks `pool`; `manifest.pool` must be absent. */
+  /**
+   * Spawns an isolate like `kernel.spawn`, but the balancer picks its pool:
+   * from its saved load if `loads` has one, else the quarantine, to be
+   * measured.
+   * @param manifest The isolate's manifest, without `pool`.
+   * @returns Where it was placed.
+   * @throws {TypeError} When `manifest.pool` is set, when the id is already
+   *   running under this balancer, or after `dispose()`. Otherwise it throws
+   *   what `kernel.spawn` throws for the manifest.
+   */
   spawn(manifest: IsolateManifest): Placement;
+  /**
+   * Stops an isolate and saves its load to `loads`. For an isolate the
+   * balancer didn't place, it's `kernel.stop(id)`.
+   * @param id The isolate's id.
+   * @returns A promise that resolves once it has stopped.
+   */
   stop(id: string): Promise<void>;
+  /**
+   * Every isolate in the balancer's pools, its own and any foreign ones.
+   * @returns One placement each.
+   */
   placements(): Placement[];
   /**
    * `id`'s load over the last 3 s, as a share of one core (0–100), whether
    * the balancer placed it or not: a preview's, for `loads.set` on Save.
-   * `undefined` until 3 s of beats have been seen.
+   * @param id The isolate's id.
+   * @returns The load, or `undefined` until 3 s of beats have been seen.
    */
   measure(id: string): number | undefined;
-  /** Leaves `id` where it is until the returned function is called (a widget open for editing). */
+  /**
+   * Leaves `id` where it is, for example while a widget is open for editing.
+   * Holds stack.
+   * @param id The isolate's id.
+   * @returns The function that releases this hold.
+   */
   hold(id: string): () => void;
   /**
-   * The app's view of `id`'s queued work (M3i) and of its own busy time (M3j).
-   * A backlog that rose over two 10 s windows in a row (M3j), and is above 0,
-   * moves the isolate somewhere with more CPU. A reported `busyMs` total
-   * counts toward its load wherever the balancer reads one. A report older
-   * than 10 s counts as none, so report at least every few seconds. Throws a
-   * `TypeError` for a report with neither field, or a field that isn't a
-   * finite number of 0 or more. Ignored for isolates the balancer didn't place
-   * and ones the kernel gave up on.
+   * The app's view of `id`'s queued work and of its own busy time. A backlog
+   * that rose over two 10 s windows in a row, and is above 0, moves the
+   * isolate somewhere with more CPU. A reported `busyMs` total counts toward
+   * its load wherever the balancer reads one. A report older than 10 s counts
+   * as none, so report at least every few seconds. Ignored for isolates the
+   * balancer didn't place and ones the kernel gave up on.
+   * @param id The isolate's id.
+   * @param report Its backlog, its busy time, or both.
+   * @throws {TypeError} For a report with neither field, or a field that
+   *   isn't a finite number of 0 or more.
    */
   report(id: string, report: Report): void;
+  /**
+   * Listens for one of the balancer's events.
+   * @param event The event's name.
+   * @param fn Called with each event.
+   * @returns The function that stops listening.
+   */
   on<E extends keyof BalancerEvents>(event: E, fn: (e: BalancerEvents[E]) => void): () => void;
   /**
    * Stops watching and gives back the kernel's claim, so another balancer

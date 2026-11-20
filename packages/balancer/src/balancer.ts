@@ -186,14 +186,31 @@ const average = (beats: Beat[], windowMs: number, t: number): number | undefined
 };
 
 /**
- * Automatic placement for isolates spawned through it (M3h, ADR 0017).
+ * Automatic placement for isolates spawned through it: it places each in a
+ * pool with room by measured load, moves one out when its pool lags or is
+ * full, and keeps one that blocks or crashes in a quarantine pool until it's
+ * quiet again.
  *
+ * It decides on the main thread, from every heartbeat (`isolate:beat`), and
+ * moves an isolate by stopping it and spawning it again with another `pool`;
+ * the kernel never pools on its own. Isolates spawned with `kernel.spawn` are
+ * never touched, and don't count toward `maxWorkers`. One balancer per kernel
+ * at a time: `dispose()` frees the kernel for another.
+ *
+ * @param kernel The kernel to place isolates in.
+ * @param opts The worker allowance and thresholds. Default: all defaults.
+ * @returns The balancer.
+ * @throws {KernelError} `balancer_exists` when the kernel already has a
+ *   balancer that hasn't been disposed.
+ * @example
+ * ```ts
+ * import { createBalancer } from '@isoloop/balancer';
+ *
+ * const balancer = createBalancer(kernel, { maxWorkers: 4 });
+ * balancer.spawn({ id: 'task-1', src: '/isolates/task.js' });
+ * balancer.on('move', (e) => console.log(e.id, e.from, '→', e.to, e.reason));
+ * ```
  * @experimental The policy and its options may change before 1.0.
- *
- * It decides on the main thread, from every heartbeat (`isolate:beat`), and moves an
- * isolate by stopping it and spawning it again with another `pool`; the
- * kernel itself never pools on its own (ADR 0001). Isolates spawned with
- * `kernel.spawn` are never touched, and don't count toward `maxWorkers`.
  */
 export function createBalancer(kernel: Kernel, opts: BalancerOptions = {}): Balancer {
   return balance(kernel, opts);

@@ -7,10 +7,13 @@
  */
 import type { Plugin } from 'vite';
 
+/** The production build's check for the dev MCP. */
 export type DevMcpGuardOptions = {
   /**
-   * Let a production build contain `@isoloop/host/dev-mcp`. Off by default:
-   * the dev MCP is for development.
+   * Let a production build contain `@isoloop/host/dev-mcp`. Default `false`:
+   * a production build whose output still uses `connectDevMCP` fails, since
+   * the dev MCP is for development. Import it behind
+   * `if (import.meta.env.DEV)` and the build drops it.
    * @experimental
    */
   allowDevMcp?: boolean;

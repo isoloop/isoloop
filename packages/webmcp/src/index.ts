@@ -108,16 +108,17 @@ function follow(target: AbortController, signals: readonly AbortSignal[]): () =>
  * what it does; asking the user before a consequential call is the agent's
  * job.
  *
- * ```ts
- * import { connectWebMCP } from '@isoloop/webmcp';
- * const disconnect = connectWebMCP(kernel);
- * ```
- *
  * @param kernel A kernel created with `agents.expose` (only `tools()` and
  *   `request()` are used).
  * @returns A function that unregisters the tools.
  * @throws {KernelError} `invalid_config` when one of the tools is already
  *   registered by an earlier `connectWebMCP` on this page.
+ * @example
+ * ```ts
+ * import { connectWebMCP } from '@isoloop/webmcp';
+ *
+ * const disconnect = connectWebMCP(kernel);
+ * ```
  * @experimental
  */
 export function connectWebMCP(kernel: Pick<Kernel, 'tools' | 'request'>): () => void {
