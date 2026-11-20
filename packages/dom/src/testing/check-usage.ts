@@ -27,9 +27,20 @@ export const TOLERATED_MISSING: Readonly<Record<string, string>> = {
     'React reads it on event targets for old IE’s SVG <use> instances and falls back to the target itself.',
 };
 
+/**
+ * Runs a usage fixture worker and checks its log. Fails the test if the
+ * framework reached for members the subset doesn't have (other than
+ * `TOLERATED_MISSING`), or if the log differs from the committed one. Runs in
+ * Vitest's browser mode.
+ *
+ * @param worker A worker running a usage fixture (`trackUsage()`, then `reportUsage()`). It's terminated when the log arrives.
+ * @param logPath The committed log, relative to the repo root, e.g. `packages/dom/usage/preact-10.json`.
+ * @param write Rewrite the committed log with this run's before comparing.
+ * @returns The log.
+ * @throws {Error} when the fixture worker throws or fails to load.
+ */
 export async function checkDomUsage(
   worker: Worker,
-  /** Relative to the repo root, e.g. `packages/dom/usage/preact-10.json`. */
   logPath: string,
   write: boolean,
 ): Promise<UsageLog> {

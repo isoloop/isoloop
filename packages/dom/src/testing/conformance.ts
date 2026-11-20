@@ -16,9 +16,21 @@ export type ConformanceEvent = {
 
 /** The host side of a bridge, as the compositor drives it. */
 export interface ConformanceHost {
+  /**
+   * Starts rendering into `root`.
+   *
+   * @param root The shadow root the suite gives the bridge.
+   * @param send Sends an event to the isolate side.
+   */
   mount(root: ShadowRoot, send: (event: ConformanceEvent) => void): void;
-  /** Applies one batch. Returns false and changes nothing if the batch is malformed. */
+  /**
+   * Applies one batch.
+   *
+   * @param batch A batch from `IsolateDriver.flush()`, after `structuredClone`.
+   * @returns `false`, with nothing changed, if the batch is malformed.
+   */
   apply(batch: unknown): boolean;
+  /** Stops rendering and removes what was rendered. */
   unmount(): void;
 }
 
@@ -33,7 +45,9 @@ export type Handle = { readonly __handle: true };
 export interface IsolateDriver {
   /** An element with `class="cf-root"` that the suite builds under. Already inserted. */
   readonly root: Handle;
+  /** `document.createElement(tag)`. */
   el(tag: string): Handle;
+  /** `document.createTextNode(data)`. */
   text(data: string): Handle;
   /** `document.createComment(data)`. */
   comment(data: string): Handle;
@@ -43,12 +57,15 @@ export interface IsolateDriver {
   childCount(parent: Handle): number;
   /** Inserts `child` into `parent` before `before`, or at the end. Moves it if it's already in the tree. */
   insert(parent: Handle, child: Handle, before?: Handle | null): void;
+  /** `child.remove()`. */
   remove(child: Handle): void;
-  /** `null` removes the attribute. */
+  /** `el.setAttribute(name, value)`; `null` removes the attribute. */
   setAttr(el: Handle, name: string, value: string | null): void;
+  /** Sets a text or comment node's `data`. */
   setText(text: Handle, data: string): void;
   /** Sets the `value` property, as a framework does on a controlled input; `force` overrides a focused host input. */
   setValue(el: Handle, value: string, force?: boolean): void;
+  /** Adds a listener for `type` on `el`. */
   listen(el: Handle, type: string): void;
   /** `el.classList`: `add`, `remove`, `toggle` (with `force`) or `contains`; returns whether `el` has the token after. */
   classList(
@@ -71,19 +88,25 @@ export interface IsolateDriver {
   handleFor(nodeId: string): Handle | undefined;
 }
 
-/** Host-side node-id lookups (design §4.5). Optional until every bridge has them. */
+/** Host-side node-id lookups. Optional until every bridge has them. */
 export interface NodeIds {
+  /** The id the bridge gave a host node, or `undefined` if it has none. */
   idFor(node: Node): string | undefined;
+  /** The host element with this id, or `undefined`. */
   nodeFor(id: string): Element | undefined;
 }
 
+/** One bridge under test: its host side and its isolate side, freshly made. */
 export interface BridgePair {
+  /** The host side, with the node-id lookups if the bridge has them. */
   host: ConformanceHost & Partial<NodeIds>;
+  /** The isolate side. */
   isolate: IsolateDriver;
   /** Attributes the bridge writes for its own bookkeeping, left out when trees are compared. */
   internalAttr?: (name: string) => boolean;
 }
 
+/** Makes a fresh `BridgePair`; the suite calls it once per case. */
 export type MakeBridgePair = () => BridgePair;
 
 /** Cases a bridge may declare as known gaps; they run as expected failures. */
@@ -109,12 +132,17 @@ export const CASES = {
   forced: 'a forced value replaces a focused input’s value, caret at the end',
 } as const;
 
+/** The name of one case in the suite, a key of `CASES`. */
 export type CaseName = keyof typeof CASES;
 
 /**
- * The suite every render bridge must pass, with no known gaps for the
- * isoloop-dom bridge. Known gaps can be marked per bridge. Batches go through
- * `structuredClone`, as they would through `postMessage`.
+ * Registers the suite every render bridge must pass, as Vitest tests. Known
+ * gaps can be marked per bridge, and run as expected failures. Batches go
+ * through `structuredClone`, as they would through `postMessage`.
+ *
+ * @param name The bridge's name, used for the `describe` block.
+ * @param makePair Makes a fresh bridge for each case.
+ * @param opts `knownGaps`: the cases expected to fail for this bridge. Default none.
  */
 export function runBridgeConformance(
   name: string,

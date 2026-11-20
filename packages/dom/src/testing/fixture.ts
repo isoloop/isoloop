@@ -16,6 +16,7 @@ const OPEN: SanitisePolicy = {
 
 const EVENTS = ['click', 'input', 'change', 'keydown'];
 
+/** The page side of a mounted fixture worker. */
 export type FixtureHost = {
   /** What the worker rendered, under a `<div>` in the document. */
   readonly container: HTMLElement;
@@ -32,6 +33,14 @@ export type FixtureHost = {
 const isMessage = (x: unknown): x is FixtureMessage =>
   typeof x === 'object' && x !== null && typeof Reflect.get(x, 't') === 'string';
 
+/**
+ * Applies a fixture worker's batches (from `serveFixture()`) under a new
+ * `<div>` in the document, through the real applier, and sends the
+ * container's `click`, `input`, `change` and `keydown` events back.
+ *
+ * @param worker A worker that calls `serveFixture()`.
+ * @returns The container, a way to wait until it settles, and `dispose()`.
+ */
 export function mountFixture(worker: Worker): FixtureHost {
   const container = document.createElement('div');
   document.body.append(container);
@@ -80,7 +89,11 @@ export function mountFixture(worker: Worker): FixtureHost {
 /**
  * The page side of `servePoolFixture(n)`: one container per member, each
  * with its own applier, getting only that member's batches and sending its
- * events back for that member (ADR 0015, M2d task 2).
+ * events back for that member.
+ *
+ * @param worker A worker that calls `servePoolFixture(n)`.
+ * @param n How many members it serves.
+ * @returns One container per member, in member order.
  */
 export function mountMembers(worker: Worker, n: number): HTMLElement[] {
   const surfaces = Array.from({ length: n }, (_, member) => {
@@ -142,7 +155,13 @@ export const SMOKE_STEPS: readonly { name: string; act(root: Element): void }[] 
   { name: 'toggle back', act: (r) => one(r, 'button[name=toggle]', HTMLButtonElement).click() },
 ];
 
-/** What the smoke tests compare: the markup, and the controls' live values. */
+/**
+ * What the smoke tests compare: the markup, and the controls' live values.
+ *
+ * @param root The container the fixture app rendered into.
+ * @returns Its `innerHTML`, the input's value and the select's value.
+ * @throws {Error} when the app rendered no `<input>` or `<select>`.
+ */
 export function snapshot(root: Element): { html: string; input: string; select: string } {
   return {
     html: root.innerHTML,

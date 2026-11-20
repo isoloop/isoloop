@@ -1,4 +1,4 @@
-/** `@isoloop/dom/testing`: the bridge conformance suite (ADR 0011). Needs Vitest. */
+// `@isoloop/dom/testing`: the bridge conformance suite (ADR 0011). Needs Vitest.
 export {
   CASES,
   runBridgeConformance,

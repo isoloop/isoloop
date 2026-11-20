@@ -15,6 +15,8 @@ const noop = (): void => {};
  * The isolate side of isoloop-dom for the conformance suite: the real
  * worker-side subset, run in the test page without installing globals.
  * Batches are collected and handed over on `flush()`.
+ *
+ * @returns The driver, with the `WorkerDom` it drives.
  */
 export function createIsoloopDomDriver(): IsolateDriver & { dom: WorkerDom } {
   const batches: DomBatch[] = [];

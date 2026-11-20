@@ -13,10 +13,12 @@ export type NodeId = number;
 /** @internal */
 export const ROOT_ID: NodeId = 0;
 
+/** The namespace an element was created in. */
 export type Namespace = 'html' | 'svg';
 
 /** Element properties that are synced as properties, not attributes. */
 export type SyncedProp = 'value' | 'checked' | 'selected';
+/** Every `SyncedProp`, in a fixed order. */
 export const SYNCED_PROPS: readonly SyncedProp[] = ['value', 'checked', 'selected'];
 
 /** A new subtree, as `insert` carries it. */
@@ -33,9 +35,10 @@ export type SerializedNode =
       children: SerializedNode[];
     }
   | { k: 'text'; id: NodeId; data: string }
-  /** A comment (ADR 0010 amendment, M3a): inert on the host. */
+  /** A comment: inert on the host. */
   | { k: 'comment'; id: NodeId; data: string };
 
+/** One change to the tree, as the worker records it and the host applies it. */
 export type DomRecord =
   /** A new subtree under `parent`, before `before` or at the end. */
   | ['insert', parent: NodeId, node: SerializedNode, before: NodeId | null]
@@ -48,7 +51,7 @@ export type DomRecord =
   /** `null` removes the attribute. */
   | ['attr', node: NodeId, name: string, value: string | null]
   /**
-   * `force` (ADR 0010 amendment, M3a): apply even to a host-owned input the
+   * `force`: apply even to a host-owned input the
    * user is focused on, e.g. to clear a chat box after sending.
    */
   | ['prop', node: NodeId, name: SyncedProp, value: string | boolean, force?: true]
@@ -61,21 +64,30 @@ export type DomBatch = DomRecord[];
 /** Modifier keys, as an event record carries them. */
 export type DomMods = { alt: boolean; ctrl: boolean; meta: boolean; shift: boolean };
 
-/** A DOM event as the host sends it to the worker half (design §4.6). */
+/** A DOM event as the host sends it to the worker half. */
 export type DomEvent = {
+  /** The event type, such as `click` or `input`. */
   type: string;
+  /** The node the event happened on. */
   target: NodeId;
   /** The target and its ancestors that listen for `type`, innermost first. */
   currentTargets: NodeId[];
+  /** For a control: its value after the event, which the worker node takes on. */
   value?: string;
+  /** For a checkbox: whether it's checked after the event. */
   checked?: boolean;
+  /** For a keyboard event: `KeyboardEvent.key`. */
   key?: string;
+  /** For a keyboard event: `KeyboardEvent.code`. */
   code?: string;
+  /** The modifier keys held, for a mouse or keyboard event; all `false` otherwise. */
   mods: DomMods;
+  /** For a mouse event: `clientX` and `clientY`, in the viewport. */
   x?: number;
   y?: number;
+  /** For a mouse event: `MouseEvent.button`. */
   button?: number;
-  /** For `resize` on a transferred canvas: its new CSS size (design §4.7). */
+  /** For `resize` on a transferred canvas: its new CSS size. */
   width?: number;
   height?: number;
   /** For `scroll`: the scrolled element's offsets, mirrored on the worker node. */

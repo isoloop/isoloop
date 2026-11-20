@@ -44,8 +44,14 @@ export type UsageLog = {
   probed: string[];
 };
 
+/** The usage log being kept, from `trackUsage()`. */
 export type UsageTracker = {
-  /** The log so far, sorted. */
+  /**
+   * The log so far, sorted.
+   *
+   * @param framework The framework and version to record, e.g. `preact@10.29.8`.
+   * @returns The log.
+   */
   report(framework: string): UsageLog;
 };
 
@@ -101,10 +107,13 @@ const catchErrors = (): void => {
 };
 
 /**
- * A pooled fixture (ADR 0015, M2d): one subset document installed as this
- * worker's `document`, with `n` render roots, one per member. Each root's
- * batches are posted with its `member` index, and the page's events for a
- * member go to its root. Pair with `mountMembers()` on the page.
+ * A pooled fixture: one subset document installed as this worker's
+ * `document`, with `n` render roots, one per member. Each root's batches are
+ * posted with its `member` index, and the page's events for a member go to
+ * its root. Pair with `mountMembers()` on the page.
+ *
+ * @param n How many members, each with a render root.
+ * @returns The roots, in member order, to render each member into.
  */
 export function servePoolFixture(n: number): Element[] {
   const dom = createDom({ onBatch: () => {} });
@@ -127,7 +136,10 @@ export function servePoolFixture(n: number): Element[] {
  * Installs the subset as this worker's `document`, posts every batch, and
  * delivers the page's events. Import it before the framework: React decides
  * at load time whether it has a DOM. Uncaught errors are posted with their
- * stack, which a worker `error` event doesn't carry.
+ * stack, which a worker `error` event doesn't carry. Pair with
+ * `mountFixture()` on the page.
+ *
+ * @returns The worker DOM, and its root as an `Element` to render into.
  */
 export function serveFixture(): { dom: WorkerDom; container: Element } {
   const dom = createDom({ onBatch: (batch) => post({ t: 'batch', batch }) });
@@ -150,7 +162,14 @@ export function serveFixture(): { dom: WorkerDom; container: Element } {
   return { dom, container };
 }
 
-/** Starts logging. Call before the framework renders; it can't be undone. */
+/**
+ * Starts logging which members of the subset a framework uses, and which it
+ * reaches for that the subset doesn't have. Call it before the framework
+ * renders; it patches the subset's classes for the whole worker and can't be
+ * undone.
+ *
+ * @returns The tracker, whose `report()` gives the log.
+ */
 export function trackUsage(): UsageTracker {
   const used = new Set<string>();
   const missing = new Set<string>();
@@ -251,7 +270,11 @@ function find(from: WElement, tag: string, name?: string): WElement | null {
  * Drives the usage fixture the way a user would, through host events: the
  * fixture renders `<button name="toggle">` (hides and shows a conditional
  * child), `<button name="reorder">` (reverses a keyed list), a controlled
- * `<input>` and a `<select>`. `settle` waits for the framework to commit.
+ * `<input>` and a `<select>`.
+ *
+ * @param dom The worker DOM from `serveFixture()`.
+ * @param settle Resolves once the framework has committed.
+ * @throws {Error} when the fixture didn't render one of those controls.
  */
 export async function driveUsageFixture(
   dom: WorkerDom,
@@ -283,7 +306,14 @@ export async function driveUsageFixture(
   }
 }
 
-/** Runs the fixture, lets the framework settle, and posts the log (or the error). */
+/**
+ * Runs the fixture, lets the framework settle, and posts the log to the page,
+ * or the error if `run` throws.
+ *
+ * @param tracker From `trackUsage()`.
+ * @param framework The framework and version to record, e.g. `preact@10.29.8`.
+ * @param run Renders the fixture and drives it, for example with `driveUsageFixture()`.
+ */
 export async function reportUsage(
   tracker: UsageTracker,
   framework: string,
