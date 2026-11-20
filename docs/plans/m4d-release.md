@@ -16,7 +16,7 @@ The review counted 209 public exports in 17 typed entry points (231 with re-expo
    - The kernel event `'bus:durability_degraded'`.
    - Option values stay kebab-case: `'last-n'`, `'when-idle'`, `'bottom-right'`.
 2. **N2. `@isoloop/vite`'s `IsolateManifest` is renamed `BuildManifest`.** Host has a different public `IsolateManifest`, the spawn manifest. `BuildManifest` is `referenceOnly`.
-3. **N3. The `freeze` group in `docs/guide/map.json` `pending` (44 names) becomes `@internal`:**
+3. **N3. The `freeze` group in `docs/guide/map.json` `pending` (44 names) becomes `@internal`, except vite's `IsolateManifest`, the 44th, which N2 renames:**
    - host `HostRenderBridge`;
    - runtime `REQUIRES`;
    - bus's engine and storage (`Broker`, `TsEngine`, `LogStorage`, `MemoryStorage`, … 15 names), its helpers (`effectiveDurability`, `estimateSize`, `publishId`, `toIssues`, `topicConfig`, `isUnchecked`) and `isContracts`;
