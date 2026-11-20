@@ -82,6 +82,10 @@ These move to `isoloop/builder` when that repo is created, with the [decisions s
 
 - **tsrs as the type checker.** The Rust port of the TS 7 checker (`oxc-project/tsrs`). Switch `typecheck` from `tsc` once tsrs has a stable release for the TypeScript version we're on and is at least 2× faster than `tsc` on this repo. It's one script change. ([ADR 0009](adr/0009-toolchain.md))
 
+## Docs
+
+- **Versioned docs and redirects.** Before 1.0 the site shows one version of the docs, at the pinned published version, and a removed page returns the 404 page ([M4c](plans/m4c-docs.md), decision 4). Versions and redirects become worth it once a 1.x line has users on more than one minor.
+
 ## Getting started
 
 - **A way in for new and existing apps,** for developers (non-technical users get the [Isoloop Builder](plans/builder.md)). Two shapes to weigh once 0.1 is out: a starter template (`npm create isoloop`) for new apps, and an agent skill that adapts an existing app to Isoloop, splitting it into isolates and contracts (*2026-11-17:* the porting skill is now in [Towards 1.0](plans/README.md#towards-10); 0.1 ships a "build with Isoloop" skill for new code, [M4a](plans/m4a-agents.md) decision 17). They may share one source of truth for what an Isoloop app looks like. Whether the unscoped `isoloop` package also re-exports the main APIs, so users install one thing, is part of the same question; today it's the CLI only, published on `next` since M4a ([ADR 0004](adr/0004-npm-name.md)).
