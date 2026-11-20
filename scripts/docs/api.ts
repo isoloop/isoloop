@@ -22,7 +22,7 @@ import {
 import { execFileSync } from 'node:child_process';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { entryFiles, parseMap, USER_FACING, type DocsMap } from './check.ts';
+import { checkHistory, entryFiles, parseMap, USER_FACING, type DocsMap } from './check.ts';
 import {
   readApi,
   type ApiDecl,
@@ -498,6 +498,22 @@ async function main(): Promise<void> {
   const map = parseMap(readFileSync(join(root, 'docs/guide/map.json'), 'utf8'));
   const pages = renderAll(readApi(files, root), map, titleOf(root), cliFromHelp(root));
   const dir = join(root, API_DIR);
+  // The pages are public docs: no ADR or plan references, as in the guides. They come from the
+  // TSDoc, so the fix is there, followed by a fresh run.
+  const history = [...pages].flatMap(([f, md]) => checkHistory(`${API_DIR}/${f}`, md));
+  if (history.length > 0) {
+    for (const h of history)
+      console.log(
+        process.env.CI ? `::error file=${h.file}::${h.message}` : `error   ${h.file}: ${h.message}`,
+      );
+    console.log(
+      `docs:api: ${history.length} ADR or plan reference(s) in the TSDoc behind these pages`,
+    );
+    if (check) {
+      process.exitCode = 1;
+      return;
+    }
+  }
   if (check) {
     const onDisk = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.md')) : [];
     const stale = [
