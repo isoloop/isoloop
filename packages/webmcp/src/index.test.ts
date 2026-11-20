@@ -153,6 +153,18 @@ describe('connectWebMCP', () => {
     await expect(tools[0]?.tool.execute({})).rejects.toBe(err);
   });
 
+  it('rejects with dropped when retention removed the request', async () => {
+    const { tools } = fakeContext();
+    const err = Object.assign(
+      new Error(
+        "the request was dropped: the topic's retention was full; retry or raise retention",
+      ),
+      { code: 'dropped' },
+    );
+    connectWebMCP(fakeKernel([tool('a.v1')], () => Promise.reject(err)).kernel);
+    await expect(tools[0]?.tool.execute({})).rejects.toMatchObject({ code: 'dropped' });
+  });
+
   it("aborts a call when the browser's per-call signal aborts", async () => {
     const { tools } = fakeContext();
     const { kernel, calls } = fakeKernel([tool('a.v1')], untilAborted);

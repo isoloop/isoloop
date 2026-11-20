@@ -83,8 +83,8 @@ function follow(target: AbortController, signals: readonly AbortSignal[]): () =>
  * only when true). A call runs
  * `kernel.request(tool.topic, input, { timeoutMs: tool.timeoutMs, signal, via: 'webmcp' })`
  * and resolves with the reply; a failed call rejects with the kernel's
- * `BusError` (its `code` and `message`), for example `timeout` or
- * `no_responder`. Chromium shows the agent its own generic error; Firefox
+ * `BusError` (its `code` and `message`), for example `timeout`,
+ * `no_responder` or `dropped`. Chromium shows the agent its own generic error; Firefox
  * passes the message on.
  *
  * - Where neither exists (no WebMCP, or the flag off), it does nothing and
