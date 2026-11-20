@@ -1,6 +1,6 @@
 # Devtools panel
 
-`@isoloop/devtools` (`@experimental`) adds a panel to the page that shows its isolates, the bus and a live log of records, read from the inspection feed.
+`@isoloop/devtools` (`@experimental`) adds a panel to the page that shows its isolates, the bus, the kernel's own events and a live log of records, read from the inspection feed.
 
 ## When to use it
 
@@ -110,7 +110,8 @@ The records come from a tap ([ADR 0020](../adr/0020-inspection-feed.md), decisio
 - **It's `@experimental` in 0.1.**
 - **Nothing stops a production build from including it.** Keep `connectDevtools` out of production code yourself.
 - **Memory is measured only in Chromium, on a cross-origin isolated page** ([Isolates view](#isolates-view)).
-- **The log is a sample:** at most 50 records a second reach it, and it keeps the last 200 ([Log view](#log-view)).
+- **The messages are a sample:** at most 50 records a second reach the Messages tab, and it keeps the last 200 ([Messages view](#messages-view)).
+- **The events history is bounded:** this session's last 6,000 events, and the last 3 sessions before it in IndexedDB, about 5 MB in all. Events from before the panel connected come only from the feed's last 200, so connect it early ([Events view](#events-view)).
 - **Its settings need storage:** without IndexedDB (a private window, blocked site data), the panel starts from its defaults each time.
 
 ## See also

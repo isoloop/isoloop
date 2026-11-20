@@ -1,6 +1,6 @@
 /*
  * The messages tab: the live record log (M4b plan, item 2; ADR 0020, decision 3): records
- * appended to the bus, copied from a tap while the Log tab is open, newest
+ * appended to the bus, copied from a tap while the Messages tab is open, newest
  * first. A tap isn't a consumer, so it isn't in the bus figures, and the
  * host reopens it after a bus restart, so the log carries on. The tap sends
  * at most `MAX_PER_SEC` records a second; the header counts the records it
