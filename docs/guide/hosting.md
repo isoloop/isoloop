@@ -1,6 +1,10 @@
 # Hosting
 
-What the page that runs Isoloop, and the servers that serve isolates, need to send. The loader behind these rules is in [design §4.2](../design/system-design.md#42-loader).
+This page covers what the page that runs Isoloop, and the servers that serve its isolates, need to send: worker URLs, headers, the CSP and CORS.
+
+## When to use it
+
+Read it before deploying an app. In development, `@isoloop/vite` sends the headers for you ([below](#the-bus-worker-and-the-contracts-module)); production responses come from your own server, which has to send them itself. The loader behind these rules is in [design §4.2](../design/system-design.md#42-loader).
 
 ## How an isolate loads
 
@@ -32,7 +36,11 @@ const kernel = createKernel({
 });
 ```
 
-`isoloop()` also sends the Content-Security-Policy below on every dev and preview response, with Vite's HMR socket and injected styles allowed. Pass `isolateOrigins` for isolates on other origins, `csp` for a policy of your own (`false` for none), and `crossOriginIsolated: true` for COOP and COEP (needed for `SharedArrayBuffer`, and for the devtools' memory per isolate in Chromium, which `kernel.inspect()` measures only on a cross-origin isolated page, and only for workers started from `@isoloop/runtime/worker` as `virtual:isoloop/workers` gives it; without Vite, pass that entry's URL with `#isoloop-entry` appended to get the figures). Production responses come from your own server, which has to send the headers itself. Without Vite, `?worker&url` or your bundler's equivalent gives the two URLs.
+`isoloop()` also sends the Content-Security-Policy below on every dev and preview response, with Vite's HMR socket and injected styles allowed. Pass `isolateOrigins` for isolates on other origins, `csp` for a policy of your own (`false` for none), and `crossOriginIsolated: true` for COOP and COEP (needed for `SharedArrayBuffer`, and for the devtools' memory per isolate in Chromium, which `kernel.inspect()` measures only on a cross-origin isolated page, and only for workers started from `@isoloop/runtime/worker` as `virtual:isoloop/workers` gives it; without Vite, pass that entry's URL with `#isoloop-entry` appended to get the figures). Production responses come from your own server, which has to send the headers itself.
+
+`headersFor({ csp?, isolateOrigins?, crossOriginIsolated? })` from `@isoloop/vite` returns the headers `isoloop()` sends, as a plain object, and `devCsp(origins?)` returns its default policy on its own. Both are the development policy: it allows Vite's HMR socket (`ws:`, `wss:`) and injected styles (`style-src 'unsafe-inline'`). A production server sends the policy in [Content Security Policy](#content-security-policy) instead, or passes it as `csp`.
+
+Without Vite, `?worker&url` or your bundler's equivalent gives the two URLs.
 
 If the contracts module fails to load or is invalid (`contracts_failed`, `contracts_invalid`, `contracts_mismatch`, `reserved_topic`), it isn't retried. The kernel emits `bus:failed { code }`, every isolate fails with reason `bus-failed`, and later `spawn` calls throw `bus_failed`.
 
@@ -84,3 +92,17 @@ Without them the import fails and the isolate crashes with reason `error` and a 
 ## Stopping
 
 `kernel.stop(id)` sends `shutdown` with a 1 s grace period. The isolate answers `bye` when its shutdown handlers are done, and the kernel terminates it then, or when the grace period runs out.
+
+## Limits
+
+- **Memory topics don't survive a discarded tab;** only persistent topics do ([above](#persistent-topics-and-a-discarded-tab)).
+- **Only one tab's bus owns the files.** In other tabs, persistent topics run in memory.
+- **A contracts module that fails to load isn't retried:** the bus fails and every isolate with it ([above](#the-bus-worker-and-the-contracts-module)).
+- **The worker budget only warns.** It never blocks a spawn, and the right number depends on the device.
+
+## See also
+
+- [Design §4.2, the loader](../design/system-design.md#42-loader).
+- [ADR 0005](../adr/0005-bus-topology-message-channels.md) (the bus worker), [ADR 0003](../adr/0003-schema-format-standard-schema.md) (contracts) and [ADR 0007](../adr/0007-bus-worker-supervision.md) (persistence).
+- [ADR 0001](../adr/0001-one-worker-per-isolate.md) and [ADR 0015](../adr/0015-visual-pools.md), on placement.
+- [Worker pools](pools.md) and [the balancer](balancer.md).

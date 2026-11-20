@@ -1,6 +1,17 @@
 # Tools for agents
 
-An app can offer some of its requestable topics to AI agents as tools: a coding agent in development through the dev MCP, and a browser agent through WebMCP. Both call the same tool surface, and the isolate that answers doesn't know or care which one asked. The decisions are in [ADR 0018](../adr/0018-tools-for-agents.md). All of it is `@experimental` in 0.1.
+An app can offer some of its requestable topics to AI agents as tools, through the dev MCP in development and through WebMCP in the browser.
+
+## When to use it
+
+- **A coding agent in development** calls the app's tools through the dev MCP, and reads the running page through the dev MCP's own `isoloop_*` tools.
+- **A browser agent** calls them through WebMCP, where a browser has it.
+
+Both call the same tool surface, and the isolate that answers doesn't know or care which one asked. The decisions are in [ADR 0018](../adr/0018-tools-for-agents.md).
+
+To watch a running page without exposing any tool, read [the inspection guide](inspection.md) instead: the dev MCP's `isoloop_*` reads come from that feed.
+
+## A topic as a tool
 
 ```ts
 // contracts.ts: a requestable topic (it has a `reply`) with a tool description
@@ -26,8 +37,6 @@ const kernel = createKernel({ contracts, workers, agents: { expose: ['markets.qu
 ```
 
 The worked example throughout is the markets dashboard ([isoloop/web `apps/dashboards/markets`](https://github.com/isoloop/web/tree/main/apps/dashboards/markets)). It exposes two tools: `markets.quote.v1`, a read-only quote answered by the aggregator isolate, and `markets.alerts.create.v1`, which adds an alert rule through the alerts isolate.
-
-## A topic as a tool
 
 A tool is a topic with a `reply` schema and a `tool` field. Its name is always the topic's name.
 
@@ -131,13 +140,6 @@ It rejects with a `BusError`:
 
 **Size a tool's topic's retention for its largest burst of calls.** Requests are records in the topic's log, so its `retention` caps how many calls can wait at once. On a topic keeping 100 records, a burst of 1,000 calls at once gets 100 answers and 900 `dropped` ([isoloop#288](https://github.com/isoloop/isoloop/issues/288)). An isolate's own `bus.request` gets `dropped` the same way.
 
-## What the hints do and don't do
-
-- **They describe; they don't enforce.** `readOnly`, `consequential` and `untrustedContent` are passed to the agent as hints. Nothing in Isoloop stops a call because of them, apart from the dev MCP's `--allow-write` below.
-- **Asking the user is the agent's job.** A consequential tool runs on agent input. WebMCP also leaves confirmation to the agent. If a tool must not run without the user's say, the app has to ask in its own UI.
-- **`via` is not a security boundary.** Any code on the main thread can call `kernel.request` with any `via`. It's a label for logging and policy between cooperating code on one page. Don't authorize anything by it.
-- **An untrusted reply:** with `untrustedContent: true`, the reply can carry third-party text (markets' quotes don't; a tool returning user comments would). The agent should treat it as data, not instructions.
-
 ## In development: the dev MCP
 
 `isoloop mcp` (the `isoloop` package's CLI) is an MCP server over stdio for coding agents. Pages in development dial its WebSocket on `127.0.0.1`, and it lists their exposed tools plus its own `isoloop_*` tools for reading the page.
@@ -203,3 +205,21 @@ Both browsers that have WebMCP keep it behind a flag. It's tested under Playwrig
 - **Firefox's agent doesn't see `consequentialHint` or `untrustedContentHint`,** so it can't tell a consequential tool from any other that isn't read-only, or know that a reply can carry third-party text. Descriptions aren't edited to make up for it. If confirmation matters, ask the user in the page.
 - **Cancelling in Chromium** names only the tool, so it aborts every call of that tool in flight.
 - **A tool name registered twice:** a `connectWebMCP` whose tools an earlier one on the page registered, and hasn't unregistered, throws `KernelError('invalid_config')` naming the tool, and registers nothing. That's the same on both browsers; on their own, Chromium rejects the name and Firefox replaces the tool.
+
+## Limits
+
+- **All of it is `@experimental` in 0.1.**
+- **The hints describe; they don't enforce.** `readOnly`, `consequential` and `untrustedContent` are passed to the agent as hints. Nothing in Isoloop stops a call because of them, apart from the dev MCP's `--allow-write` ([above](#in-development-the-dev-mcp)).
+- **Asking the user is the agent's job.** A consequential tool runs on agent input. WebMCP also leaves confirmation to the agent. If a tool must not run without the user's say, the app has to ask in its own UI.
+- **`via` is not a security boundary.** Any code on the main thread can call `kernel.request` with any `via`. It's a label for logging and policy between cooperating code on one page. Don't authorize anything by it.
+- **An untrusted reply:** with `untrustedContent: true`, the reply can carry third-party text (markets' quotes don't; a tool returning user comments would). The agent should treat it as data, not instructions.
+- **The bus doesn't de-duplicate request records,** so handlers that change something must be idempotent by `req.id` ([above](#handlers-must-be-idempotent)).
+- **A tool's topic's retention caps a burst of calls** ([above](#calling-from-the-host-kernelrequest)).
+- **WebMCP is behind a flag** in both browsers that have it, and tested under Playwright only ([above](#in-the-browser-isoloopwebmcp)).
+
+## See also
+
+- [ADR 0018: tools for agents](../adr/0018-tools-for-agents.md), the decisions behind this page.
+- [The inspection feed](inspection.md), where the dev MCP's reads come from.
+- [The devtools panel](devtools.md), the same feed drawn in the page.
+- [WebMCP](https://webmachinelearning.github.io/webmcp/), the Community Group draft.

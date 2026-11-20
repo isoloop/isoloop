@@ -28,14 +28,7 @@ import { type Problem, withoutFences } from './markdown.ts';
  * skips them until M4c task 5 brings them to it and empties this list. Every
  * other check still runs on them.
  */
-export const SHAPE_PENDING: readonly string[] = [
-  'agents',
-  'balancer',
-  'devtools',
-  'hosting',
-  'inspection',
-  'pools',
-];
+export const SHAPE_PENDING: readonly string[] = [];
 
 /** The packages the docs cover, in the order the reference lists them (decision 28). */
 export const USER_FACING = [
