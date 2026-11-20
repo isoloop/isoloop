@@ -103,7 +103,7 @@ In every Isoloop placement the main thread stayed at 23–28% CPU at 5 kHz, agai
 
 ### On a mid-range phone
 
-On a mid-range phone (MediaTek MT8781V, 8 cores, 8 GB, 96 Hz screen, Android 15, Firefox 156; [`comparison/phone/ikko-mindone-focus156/`](https://github.com/isoloop/web/tree/main/apps/dashboards/plant/comparison/phone/ikko-mindone-focus156)), the number of workers decided the result more than anything else. Two rounds each, 96 frames/s at most:
+On a mid-range phone (8 cores, 8 GB, 96 Hz screen, Android 15, Firefox 156; [results](https://github.com/isoloop/web/tree/main/apps/dashboards/plant/comparison/phone/ikko-mindone-focus156)), the number of workers decided the result more than anything else. Two rounds each, 96 frames/s at most:
 
 | Placement | Workers | Frames/s, 1 and 5 kHz | Late frames | Typing median |
 | --- | --- | --- | --- | --- |
