@@ -31,7 +31,12 @@
     "devtools": {
       "paths": ["packages/devtools/src/"],
       "exports": {
-        "@isoloop/devtools": ["DevtoolsOptions", "DevtoolsPosition", "connectDevtools"]
+        "@isoloop/devtools": [
+          "DevtoolsOptions",
+          "DevtoolsPosition",
+          "HealthStatus",
+          "connectDevtools"
+        ]
       }
     },
     "getting-started": {
