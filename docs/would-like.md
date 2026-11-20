@@ -80,7 +80,7 @@ These move to `isoloop/builder` when that repo is created, with the [decisions s
 
 ## Tooling
 
-- **tsrs as the type checker.** The Rust port of the TS 7 checker (`oxc-project/tsrs`). Switch `typecheck` from `tsc` once tsrs has a stable release for the TypeScript version we're on and is at least 2× faster than `tsc` on this repo. It's one script change. *2026-11-20:* tsrs is already a dev dependency, pinned exactly, for the docs' `readApi` only ([M4c](plans/m4c-docs.md), decision 32). ([ADR 0009](adr/0009-toolchain.md))
+- **tsrs as the type checker.** The Rust port of the TS 7 checker (`oxc-project/tsrs`). Switch `typecheck` from `tsc` once tsrs has a stable release for the TypeScript version we're on and is at least 2× faster than `tsc` on this repo. It's one script change. *2026-11-20:* [M4c](plans/m4c-docs.md) task 3 adds tsrs as a dev dependency, pinned exactly, for the docs' `readApi` only (decision 32). ([ADR 0009](adr/0009-toolchain.md))
 
 ## Docs
 
