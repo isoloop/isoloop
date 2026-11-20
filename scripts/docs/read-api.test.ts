@@ -71,6 +71,22 @@ describe('readApi', () => {
     expect(get('beta', 'use').home).toBe('beta');
   });
 
+  it("gives each declaration's text, its doc comment and its named members", () => {
+    const [make] = get('alpha', 'make').decls;
+    expect(make?.text).toBe('export declare function make(o: MakeOptions): Made;');
+    expect(make?.doc).toMatch(/^\/\*\*\n \* Makes a thing\.[\s\S]*\*\/$/);
+    expect(get('alpha', 'LIMIT').decls[0]?.text).toBe('export declare const LIMIT: number;');
+    expect(get('alpha', 'LIMIT').decls[0]?.doc).toBe('');
+    const oops = get('alpha', 'Oops').decls[0];
+    expect(oops?.members.map((m) => [m.name, m.text])).toEqual([['code', 'code: string;']]);
+    const [inner] = get('alpha', 'MakeOptions').decls[0]?.members ?? [];
+    expect(inner).toEqual({
+      name: 'inner',
+      text: 'inner: Inner;',
+      doc: '/** Nested, so the graph has to follow fields. */',
+    });
+  });
+
   it('follows parameter, return, field and heritage types', () => {
     const from = reach(get('alpha', 'make').key);
     for (const n of ['MakeOptions', 'Inner', 'Made', 'Base'])

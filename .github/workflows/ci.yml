@@ -53,6 +53,8 @@ jobs:
       - run: pnpm docs:check
         env:
           DOCS_CHECK_BASE: HEAD^1
+      # The API reference matches the built .d.ts and the CLI (M4c decision 27).
+      - run: pnpm docs:api --check
 
   browser:
     needs: check
