@@ -12,7 +12,11 @@ If none of the limits below stop you, carry on with the [hosting guide](hosting.
 
 The worker has no layout, so it can't answer layout questions synchronously. The DOM an isolate sees ([ADR 0010](../adr/0010-own-render-bridge.md), decision 2) leaves these out on purpose, with no fake values:
 
-- **Sizes and positions:** `getBoundingClientRect()`, `getComputedStyle()`, `offsetWidth` and the other offset and client sizes don't exist on the worker's elements. Calling a missing method throws a `TypeError`, and a missing property reads `undefined`.
+- **Sizes, positions and animations:** these throw a `NotSupportedError` whose message says what to use instead, so a library that reaches for one fails at that line rather than on a `NaN` size later:
+  - the methods `getBoundingClientRect()`, `getClientRects()`, `animate()` and `getAnimations()` on every element, and `getComputedStyle()` on the worker's `window`;
+  - reading `offsetWidth`, `offsetHeight`, `offsetTop`, `offsetLeft`, `offsetParent`, `clientWidth`, `clientHeight`, `clientTop`, `clientLeft`, `scrollWidth` or `scrollHeight`.
+
+  The members exist, so a feature check such as `'animate' in el` finds them and the call then throws. Other members the worker's DOM doesn't have are absent: calling one throws a `TypeError`, and reading one gives `undefined`.
 - **Focus:** elements have no `focus()` method, and `document.activeElement` is always `null`.
 - **Scrolling:** `scrollTop` and `scrollLeft` are read only, as of the last `scroll` event the element got, and stay `0` until the element listens for `scroll`. The page owns scrolling.
 - **Selection and editing:** there's no `Range`, no selection API and no `contenteditable`.
