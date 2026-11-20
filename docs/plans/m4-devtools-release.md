@@ -4,7 +4,7 @@
 
 **Done when** (RFC 0001): `0.1.0` is published with a launch post, and each epic below has met its own done-when.
 
-**Status (2026-11-19):** M4a's tasks 1–11 and 13 and all of M4b (tasks 1–11; task 12 droppable) are done, on `0.1.0-next.5`; M4c is next, then M4d. Left in M4a: the skill (after the freeze) and the real-agent run with its write-up. The two fixes 0.1 waited for are in: the commit loss (#211, in `0.1.0-next.3`) and the stop-then-spawn race (#219).
+**Status (2026-11-19):** M4a's tasks 1–11 and 13 and all of M4b (tasks 1–11; task 12 droppable) are done, on `0.1.0-next.5`; M4c is next, then M4d. *2026-11-20:* M4c was grilled into a full plan, and its phase A starts before the freeze. Left in M4a: the skill (after the freeze) and the real-agent run with its write-up. The two fixes 0.1 waited for are in: the commit loss (#211, in `0.1.0-next.3`) and the stop-then-spawn race (#219).
 
 Comes after [M3e](m3e-live-widget-creator.md), [M3h](m3h-auto-placement.md), [M3i](m3i-balancer-scaling.md) and [M3g](m3g-federated-comparison.md) ([M3](m3-adapters-dashboard.md) and [M2b](m2b-durable-log.md) are done). 0.1 also waits for two bus and kernel fixes decided on 2026-11-17: the consumer-group commit loss ([#211](https://github.com/isoloop/isoloop/issues/211), [ADR 0016](../adr/0016-fewer-messages-per-record.md)'s amendment) and the stop-then-spawn race on one isolate id. The `0.0.0-next` prerelease workflow from [M3b](m3b-dashboard.md) task 1 is replaced by the Changesets pipeline in M4d.
 
@@ -34,7 +34,8 @@ flowchart LR
 
 - M4a's tool surface and M4b's inspection feed run in parallel. The dev MCP's inspection reads wait for M4b's feed.
 - The API freeze (M4d task 1) comes once M4a and M4b's public API is merged, and before M4c's API reference and before M4a's skill is finished.
-- M4c's guides that don't depend on frozen names (hosting, "What Isoloop can't hide") can start any time.
+- M4c's phase A (the site's docs section, the docs pipeline and the guides) doesn't wait for the freeze; its fence check makes the freeze's renames visible in the guides. Phase B (the TSDoc pass, the API and CLI reference, search) follows the freeze ([M4c](m4c-docs.md), decision 1, grilled 2026-11-20).
+- The freeze starts on the maintainer's word.
 
 ## Droppable if 0.1 slips
 
