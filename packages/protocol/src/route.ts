@@ -6,14 +6,18 @@ import {
   type SystemTopicDef,
 } from './system-topics';
 
-/** The current location, as the kernel publishes it (ADR 0002). */
+// The route topic's value (ADR 0002).
+/** The host page's current location, as the kernel publishes it on each navigation. */
 export type RouteValue = {
-  /** Absolute URL. */
+  /** The absolute URL. */
   href: string;
+  /** The URL's path, as `location.pathname` has it. */
   pathname: string;
   /** `pathname` relative to `basePath`, starting with `/`; `null` outside it. */
   path: string | null;
+  /** The query string, with its `?`, or `''`. */
   search: string;
+  /** The fragment, with its `#`, or `''`. */
   hash: string;
   /** `history.state` as is; `null` when it was too large for the bus (`route:state_dropped`). */
   state: unknown;

@@ -6,7 +6,14 @@
 import type { HostApi } from '@isoloop/runtime';
 import { useIsolate } from '../context';
 
-/** `measure`, `focus`, `scrollIntoView` and `navigate`, as `ctx.host` has them. */
+/**
+ * The isolate's host calls (`ctx.host`): `measure`, `focus`, `scrollIntoView` and
+ * `navigate`. Pass them the elements a ref holds; the host acts on what it rendered for
+ * them, after pending changes are applied.
+ *
+ * @returns The host API.
+ * @throws `Error` outside a component that `defineIsolate` rendered.
+ */
 export function useHost(): HostApi {
   return useIsolate().host;
 }
