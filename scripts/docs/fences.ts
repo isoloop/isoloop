@@ -13,7 +13,7 @@
 // The fences sit next to a small example app, `scripts/docs/fence-app/`: its
 // prelude declares the few names a guide builds on (`kernel`, `contracts`,
 // `workers`), and its modules are what fences import as `./contracts`,
-// `./schemas` and `./alerts`. `@isoloop/vite/client` and `vite/client` give
+// `./schemas`, `./alerts` and `./topics`. `@isoloop/vite/client` and `vite/client` give
 // `virtual:isoloop/*`, `*?isolate` and `import.meta.env`.
 import { execFileSync } from 'node:child_process';
 import {
