@@ -18,6 +18,7 @@ import { healthOf, useFeed, type Health } from './feed';
 import type { DevtoolsPosition } from './index';
 import { loadUi, saveUi, type PanelMode, type UiState } from './persist';
 import { arcPath, arcsOf, checksOf, RING_SLOTS, summaryOf, type Arc, type Level } from './ring';
+import { createRecorder, type Recorder } from './event-store';
 import { Body } from './views';
 
 const POSITIONS: readonly DevtoolsPosition[] = [
@@ -269,6 +270,7 @@ type Drag = { x: number; y: number; width: number; height: number; axis: 'both' 
 function Dock(props: {
   ui: UiState;
   snap: InspectSnapshot | undefined;
+  recorder: Recorder;
   onClose: () => void;
   onMode: (mode: PanelMode) => void;
   onResize: (width: number, height: number, done: boolean) => void;
@@ -341,7 +343,7 @@ function Dock(props: {
         </button>
       </div>
       <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
-        <Body snap={props.snap} />
+        <Body snap={props.snap} recorder={props.recorder} />
       </div>
       {/* Stretched across the width, the top edge still sets the height. */}
       {ui.mode === 'max' ? null : (
@@ -404,6 +406,9 @@ function Panel({ config }: IsolateProps) {
     ctx.styles(RING_CSS);
   }, []);
   const snap = useFeed(ctx.inspector);
+  // Every kernel event of this page session, from the moment the panel connects.
+  const [recorder] = useState(createRecorder);
+  useEffect(() => (ctx.inspector ? recorder.start(ctx.inspector) : undefined), [ctx.inspector]);
   const [ui, setUi] = useState<UiState | undefined>(undefined);
   const latest = useRef<UiState | undefined>(undefined);
   latest.current = ui;
@@ -454,6 +459,7 @@ function Panel({ config }: IsolateProps) {
     <Dock
       ui={ui}
       snap={snap}
+      recorder={recorder}
       onClose={() => {
         update({ open: false });
       }}

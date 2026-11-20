@@ -14,7 +14,9 @@ import type { IsolateInspector } from '@isoloop/runtime';
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { BusView, type BusSub } from './bus-view';
-import { EventsView, problemCount } from './events-view';
+import { problemCount } from './event-level';
+import type { Recorder } from './event-store';
+import { EventsView } from './events-view';
 import { MessagesView } from './messages-view';
 import { SubTabs, subId, subPanelId, type SubItem } from './subtabs';
 
@@ -81,7 +83,9 @@ const CSS = `
   border: 1px solid #374151; border-radius: 4px; font: inherit; padding: 2px 6px; }
 .dt-log-bar button { box-sizing: border-box; background: #1f2937; color: #e5e7eb; border: 1px solid #374151;
   border-radius: 4px; font: inherit; font-size: 11px; padding: 1px 8px; cursor: pointer; }
-.dt-log-bar input:focus-visible, .dt-log-bar button:focus-visible { outline: 2px solid #60a5fa;
+.dt-log-bar select { box-sizing: border-box; background: #1f2937; color: #e5e7eb; border: 1px solid #374151;
+  border-radius: 4px; font: inherit; font-size: 11px; padding: 1px 4px; max-width: 14em; }
+.dt-log-bar input:focus-visible, .dt-log-bar select:focus-visible, .dt-log-bar button:focus-visible { outline: 2px solid #60a5fa;
   outline-offset: 1px; }
 .dt-table td.dt-value { white-space: normal; word-break: break-all; max-width: 40ch; }
 /* The log's columns with a known width keep it; the value takes the rest, on one line. */
@@ -394,7 +398,10 @@ const TABS: readonly { id: Tab; label: string }[] = [
 const tabId = (t: Tab): string => `dt-tab-${t}`;
 const panelId = (t: Tab): string => `dt-panel-${t}`;
 
-export function Body(props: { snap: InspectSnapshot | undefined }): JSX.Element {
+export function Body(props: {
+  snap: InspectSnapshot | undefined;
+  recorder: Recorder;
+}): JSX.Element {
   const ctx = useIsolate();
   const [tab, setTab] = useState<Tab>('isolates');
   // Each view's second-level tab, kept while the panel is open.
@@ -447,7 +454,7 @@ export function Body(props: { snap: InspectSnapshot | undefined }): JSX.Element 
       );
     }
     view = <BusView bus={snap.bus} sub={busSub} />;
-  } else if (tab === 'events') view = <EventsView snap={snap} />;
+  } else if (tab === 'events') view = <EventsView recorder={props.recorder} />;
   else if (tab === 'messages') view = <MessagesView />;
   else {
     // No pools, no Pools tab; a selected Pools tab falls back to the isolates.
