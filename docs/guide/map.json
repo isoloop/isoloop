@@ -216,6 +216,15 @@
           "Retention"
         ]
       }
+    },
+    "dev-tools": {
+      "paths": [
+        "packages/devtools/src/",
+        "packages/runtime/src/inspector.ts",
+        "packages/host/src/inspect.ts",
+        "packages/protocol/src/grants.ts"
+      ],
+      "exports": {}
     }
   },
   "referenceOnly": {
