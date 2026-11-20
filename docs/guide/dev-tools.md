@@ -141,9 +141,9 @@ export default defineIsolate({
 ```
 
 - **Previews.** A record's value comes as text of at most 2,048 characters, with its full size in `bytes` and `truncated` when it was cut.
-- **A sample.** At most `maxPerSec` records a second (default 50) arrive. `onSkipped` gets each count of records the bus left out over that, at most once a second, so your tool can tell a quiet topic from one over the cap. The devtools log shows it as `50/s cap · N skipped`.
+- **A sample.** At most `maxPerSec` records a second (default 50) arrive. `onSkipped` gets each count of records the bus left out over that, at most once a second, so your tool can tell a quiet topic from one over the cap. The devtools Messages tab shows it as `50/s cap · N skipped`.
 - **After a bus restart** the host opens the tap again. Records appended while no bus runs aren't seen.
-- **End it when you're done.** `tap` and `on` return the function that stops them. The panel's log taps only while its tab is open.
+- **End it when you're done.** `tap` and `on` return the function that stops them. The panel's Messages tab taps only while it is open.
 
 ### The controls
 
@@ -155,7 +155,7 @@ export default defineIsolate({
 
 - **A surface that takes no clicks.** The panel's surface covers the viewport with `pointer-events: none`, and the panel's own boxes turn them back on, so the page underneath stays usable.
 - **A fallback of your own.** An isolate that has `failed` shows the default fallback at the surface's top left. The panel passes a `fallback` that puts a Retry box in its corner, since its surface takes no clicks.
-- **`config`.** `kernel.spawn` takes a `config` value, which the isolate gets as `props.config` (`IsolateProps`). The panel uses it for its corner.
+- **`config`.** `kernel.spawn` takes a `config` value, which the isolate gets as `props.config` (`IsolateProps`). The panel uses it for its corner and for how its button shows health.
 - **A way out.** `kernel.stop(id)` ends the isolate, and removing the surface cleans up. `connectDevtools` returns a function that does both.
 
 ```ts
