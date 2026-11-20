@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/devtools",
-  "version": "0.1.0-next.6",
+  "version": "0.1.0-next.7",
   "description": "Devtools panel for Isoloop, drawn by an isolate of its own and fed by the inspection feed.",
   "license": "MIT",
   "type": "module",

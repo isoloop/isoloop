@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/webmcp",
-  "version": "0.1.0-next.6",
+  "version": "0.1.0-next.7",
   "description": "Registers an Isoloop app's exposed tools with the browser's WebMCP API (document.modelContext).",
   "license": "MIT",
   "type": "module",
