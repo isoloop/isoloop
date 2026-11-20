@@ -83,17 +83,17 @@ kernel.spawn({
 
 - **`publish(topic, { key?, value })`** resolves once the bus appended the record, and rejects with a `BusError` otherwise.
 - **`subscribe(topic, fn, opts?)`** runs `fn` for one record at a time, in order, and returns the function that unsubscribes. By default a record is committed once `fn` returns, so delivery is at least once: a handler that throws stops the subscription's commits, and that record is delivered again after a restart.
-- **`request(topic, value, opts?)`** sends a request on a topic with a `reply` schema and resolves with the first valid reply. It rejects with `timeout` after `timeoutMs` (30 s by default), or with `dropped` when the topic's retention removed the request before any subscriber got it.
-- **`reply(record, value)`** answers a request record this isolate received. The bus checks `value` against the topic's `reply` schema.
-- **`commit(record)`** settles a record by hand, for subscriptions with `autoCommit: false`.
+- **`request(topic, value, opts?)`** (`@experimental`) sends a request on a topic with a `reply` schema and resolves with the first valid reply. It rejects with `timeout` after `timeoutMs` (30 s by default), or with `dropped` when the topic's retention removed the request before any subscriber got it.
+- **`reply(record, value)`** (`@experimental`) answers a request record this isolate received. The bus checks `value` against the topic's `reply` schema.
+- **`commit(record)`** (`@experimental`) settles a record by hand, for subscriptions with `autoCommit: false`.
 
 The options of `subscribe`:
 
 | Option | Default | What it does |
 | --- | --- | --- |
 | `from` | `'latest'` | Where to start: `'latest'` (new records only), `'earliest'` (everything the topic still holds), or `'committed'` (after the last record this isolate committed). With `group`, it applies only while the group has no committed offset. |
-| `group` | none | Shares the topic with the other subscribers of the same group: each record goes to one of them. |
-| `autoCommit` | `true` | Commits each record once its handler settles. |
+| `group` | none | Shares the topic with the other subscribers of the same group: each record goes to one of them (`@experimental`). |
+| `autoCommit` | `true` | Commits each record once its handler settles (`@experimental`). |
 | `onReset` | none | Called when a bus restart lost this memory topic. Clear what you built from it; records from the new bus follow. |
 | `onGap` | none | Called with `{ from, to }` when retention dropped records before they reached this subscription, for example while the isolate was suspended. |
 
@@ -181,7 +181,7 @@ Both adapters have the same hooks, with the same signatures:
 | --- | --- |
 | `useTopic(topic, { from? })` | The latest value on `topic`, or `undefined` until one arrives. `from` is `'latest'` by default; `'earliest'` replays the topic, so a compacted one gives its current value at once. A bus restart that lost a memory topic clears it. |
 | `usePublish(topic)` | A function `(value, { key? }) => Promise<void>` that publishes to `topic`. |
-| `useRequest(topic)` | A function `(value, { key?, timeoutMs? }) => Promise<reply>` for topics with a `reply` schema. |
+| `useRequest(topic)` | A function `(value, { key?, timeoutMs? }) => Promise<reply>` for topics with a `reply` schema (`@experimental`; see [request and reply](bus.md#request-and-reply)). |
 | `useHost()` | `ctx.host`: `measure`, `focus`, `scrollIntoView`, `navigate` and `requestCanvas`. Pass the elements a ref holds. |
 | `useRoute()` | The host's current location (`href`, `pathname`, `path` relative to the base path, `search`, `hash`, `state`), or `undefined` until the first record or with routing off. The route topic is read only while a component uses the hook. |
 | `useIsolate()` | The isolate's context. Throws outside a component that `defineIsolate` rendered. |

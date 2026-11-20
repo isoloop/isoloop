@@ -7,8 +7,8 @@ The bus is a log of records per topic, in its own worker, with retention, replay
 Use the bus for everything that crosses between isolates, and between isolates and the host: feeds, state that other widgets read, commands, and questions that need an answer. An isolate never calls another isolate directly, so a crash in one doesn't reach the others, and the bus keeps what they missed.
 
 - **State others read:** a compacted topic keeps the latest record per key, so a widget that starts late reads the current value from `earliest`.
-- **Work to share out:** a consumer group splits a topic's records among its members.
-- **A question with one answer:** request and reply on a topic with a `reply` schema.
+- **Work to share out:** a consumer group splits a topic's records among its members (`@experimental`).
+- **A question with one answer:** request and reply on a topic with a `reply` schema (`@experimental`).
 - **State that must survive a reload:** a `persistent` topic.
 
 It isn't a database or a queue between tabs. Each tab has its own bus ([Limits](#limits)).
@@ -96,7 +96,7 @@ An isolate's place is kept under its id, so it survives the isolate's restarts. 
 
 A subscription runs its handler for one record at a time, in order, and waits for an async handler to finish. A record is **settled** when its handler returns, and the client reports settled offsets to the bus together, at most once per commit interval. The interval is `bus.commitIntervalMs` in the kernel config: an integer from 0 to 1,000, default 100.
 
-- **`autoCommit: false`** leaves settling to you: `ctx.bus.commit(record)` settles that record and every one delivered before it on the subscription.
+- **`autoCommit: false`** (`@experimental`) leaves settling to you: `ctx.bus.commit(record)` settles that record and every one delivered before it on the subscription.
 - **A handler that throws** is reported to the host as a non-fatal error, and the subscription stops committing. It's redelivered from the failed record the next time it starts with `from: 'committed'`.
 - **Credit:** the bus sends at most 1,000 records that haven't been settled. At that point it pauses the subscription, keeps only its position, and reads on from the log when settled records give credit back. A handler that never settles holds the subscription at that limit.
 
@@ -203,6 +203,8 @@ A persistent topic that the contracts no longer list stays on disk, reported by 
 
 ## Consumer groups
 
+Consumer groups are `@experimental` in 0.1: `group`, `autoCommit` and `ctx.bus.commit` may change before 1.0.
+
 By default every subscribing isolate gets every record. Give subscriptions the same `group` and the topic's records are shared out: each goes to one member.
 
 ```ts
@@ -239,6 +241,8 @@ export default defineIsolate({
 - **`from` applies only until the group first commits.** After that, a group resumes after its committed offset whatever `from` says, and a member joining a group that has members reads from where the group is. Group members don't need `from: 'committed'` to keep their place.
 
 ## Request and reply
+
+Request and reply are `@experimental` in 0.1: `ctx.bus.request`, `ctx.bus.reply`, a topic's `reply` schema and `useRequest` may change before 1.0.
 
 A topic with a `reply` schema can be requested. The requester sends a value and waits for one answer. The request is appended to the topic like a publish, with `req` set on the record; the reply goes straight back to the requester and isn't stored in a log.
 
@@ -344,6 +348,7 @@ If the new bus crashes while it loads, or within 2 s of becoming ready, twice in
 
 ## Limits
 
+- **Consumer groups and request and reply are `@experimental` in 0.1.** They may change before 1.0.
 - **At least once, not exactly once.** See [handlers must be idempotent](#handlers-must-be-idempotent).
 - **One bus per tab.** Tabs don't share a bus, and only one tab's bus owns the files. Persistent topics in other tabs run in memory.
 - **Memory topics are lost** on a reload, a discarded tab and a bus restart.

@@ -3,9 +3,9 @@
 '@isoloop/host': minor
 '@isoloop/runtime': minor
 '@isoloop/balancer': minor
-'@isoloop/react': patch
-'@isoloop/preact': patch
-'@isoloop/bus': patch
+'@isoloop/react': minor
+'@isoloop/preact': minor
+'@isoloop/bus': minor
 ---
 
 Names settled for the API freeze:
