@@ -83,7 +83,7 @@ The panel reads the feed on a port of its own, not through the bus, so none of t
 The Events tab is the kernel's own history, newest first: isolates changing state, crashing or failing, the bus restarting, and warnings about the bus's storage quota and durability and about the worker budget. It says why the ring changed colour. Each row has the time since the page started, the event, the isolate (or `bus`), and one line of what happened; click a row to see its data, with a Copy button. Rows are coloured like the ring: green for ready and running, amber for a crash, a stall or a warning, red for a failure.
 
 - **The whole session:** the feed itself keeps only its last 200 events, which start-up alone can use. The panel's worker records every event from the moment it connects, even with the panel closed, so the tab lists them all (up to 6,000 a session, the oldest going first), newest 500 at first with a Load older button.
-- **Earlier sessions:** the last 3 sessions are kept in IndexedDB (about 5 MB in all), so a crash that ended in a reload can be read back from the session selector. Clear forgets all of them. Without storage the tab still lists this session, from memory.
+- **Earlier sessions:** the last 3 sessions before this one are kept in IndexedDB, up to 6,000 events each, so a crash that ended in a reload can be read back from the session selector. Clear forgets all of them. Without storage the tab still lists this session, from memory.
 - **The count:** the tab shows the problems (amber and red events) you haven't acknowledged, as `99+` past 99. Acknowledge marks them as seen; the rows that were new lose their amber edge, and only later problems count again.
 - **Filter:** type to narrow by event, isolate or text, and Problems only hides the rest.
 - **Only what the host has seen:** events from before the panel connected come only from the feed's last 200, so connect it early.
@@ -111,7 +111,7 @@ The records come from a tap ([ADR 0020](../adr/0020-inspection-feed.md), decisio
 - **Nothing stops a production build from including it.** Keep `connectDevtools` out of production code yourself.
 - **Memory is measured only in Chromium, on a cross-origin isolated page** ([Isolates view](#isolates-view)).
 - **The messages are a sample:** at most 50 records a second reach the Messages tab, and it keeps the last 200 ([Messages view](#messages-view)).
-- **The events history is bounded:** this session's last 6,000 events, and the last 3 sessions before it in IndexedDB, about 5 MB in all. Events from before the panel connected come only from the feed's last 200, so connect it early ([Events view](#events-view)).
+- **The events history is bounded:** this session's last 6,000 events, and the last 3 sessions before it in IndexedDB, up to 6,000 events each (at most 24,000 in all). Events from before the panel connected come only from the feed's last 200, so connect it early ([Events view](#events-view)).
 - **Its settings need storage:** without IndexedDB (a private window, blocked site data), the panel starts from its defaults each time.
 
 ## See also

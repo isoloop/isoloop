@@ -84,10 +84,11 @@ describe('the events kept for the whole session', () => {
       // oxlint-disable-next-line no-await-in-loop -- session ids and start times need to differ
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
+    // The session that asks, and the last KEEP_SESSIONS before it.
     const kept = (await createRecorder().sessions()).map((s) => s.id);
-    expect(kept).toContain(made.at(-1)?.session);
+    expect(kept).toHaveLength(KEEP_SESSIONS + 1);
+    expect(kept).toEqual(expect.arrayContaining(made.slice(-KEEP_SESSIONS).map((r) => r.session)));
     expect(kept).not.toContain(made[0]?.session);
-    expect(kept.length).toBeLessThanOrEqual(KEEP_SESSIONS + 1);
   });
 
   it('forgets everything on clear, keeping this session going', async () => {

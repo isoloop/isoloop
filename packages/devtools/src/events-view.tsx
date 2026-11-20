@@ -160,7 +160,7 @@ export function EventsView(props: { recorder: Recorder; onAck: () => void }): JS
         <button
           type="button"
           data-events-clear=""
-          title={`Forget the stored events of every session. Kept in this browser (IndexedDB): the last ${KEEP_SESSIONS} sessions, up to ${PER_SESSION} events each.`}
+          title={`Forget the stored events of every session. Kept in this browser (IndexedDB): this session and the last ${KEEP_SESSIONS} before it, up to ${PER_SESSION} events each.`}
           onClick={() => {
             void recorder.clear().then(() => {
               setSession(recorder.session);

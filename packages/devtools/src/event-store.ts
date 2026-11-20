@@ -7,14 +7,16 @@
  * reload, say). Storage is best-effort like the panel's settings: without it
  * the tab shows this session from memory and nothing else.
  *
- * Limits: the last `KEEP_SESSIONS` sessions, `PER_SESSION` events each (the
- * oldest go first), about 5 MB in all.
+ * Limits: this session and the last `KEEP_SESSIONS` before it, `PER_SESSION`
+ * events each (the oldest go first), so at most
+ * `(KEEP_SESSIONS + 1) * PER_SESSION` events are stored.
  */
 import type { InspectEvent } from '@isoloop/protocol';
 import type { IsolateInspector } from '@isoloop/runtime';
 import { levelOfEvent } from './event-level';
 import { database, EVENTS_STORE, SESSIONS_STORE, settle } from './persist';
 
+/** How many earlier sessions are kept besides the current one. */
 export const KEEP_SESSIONS = 3;
 export const PER_SESSION = 6_000;
 
@@ -99,7 +101,7 @@ export function createRecorder(): Recorder {
   let acked = 0;
   let ready: Promise<boolean> | undefined;
 
-  /** Opens storage, notes this session and drops the sessions beyond the last few. */
+  /** Opens storage, notes this session and drops the sessions beyond the last few before it. */
   const open = (): Promise<boolean> => {
     ready ??= (async () => {
       try {
@@ -108,7 +110,7 @@ export function createRecorder(): Recorder {
         const sessions = tx.objectStore(SESSIONS_STORE);
         sessions.put({ id: session, started });
         const all = (await settle(sessions.getAll())).filter(isSession);
-        const old = all.toSorted((a, b) => b.started - a.started).slice(KEEP_SESSIONS);
+        const old = all.toSorted((a, b) => b.started - a.started).slice(KEEP_SESSIONS + 1);
         const events = tx.objectStore(EVENTS_STORE).index('session');
         for (const s of old) {
           sessions.delete(s.id);
