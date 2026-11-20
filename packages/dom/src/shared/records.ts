@@ -74,7 +74,10 @@ export type DomEvent = {
   currentTargets: NodeId[];
   /** For a control: its value after the event, which the worker node takes on. */
   value?: string;
-  /** For a checkbox: whether it's checked after the event. */
+  /**
+   * For a radio, or a checkbox whose state the worker doesn't know yet:
+   * whether it's checked after the event.
+   */
   checked?: boolean;
   /** For a keyboard event: `KeyboardEvent.key`. */
   key?: string;

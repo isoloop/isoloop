@@ -832,9 +832,9 @@ const MEASURE =
 const ANIMATE = 'animate with CSS transitions or animations, set through classes or `style`';
 
 /**
- * Layout members a worker can't have, by name, with what to use instead. They exist so a read or a call fails
- * with `NotSupportedError` and a hint, never with a fake value or a bare
- * `undefined`. `scrollTop` and `scrollLeft` aren't here: they read the offsets
+ * Layout members a worker can't have, by name, with what to use instead.
+ * They exist so a read or a call fails with `NotSupportedError` and a hint,
+ * never with a fake value or a bare `undefined`. `scrollTop` and `scrollLeft` aren't here: they read the offsets
  * of the last `scroll` event.
  */
 export const LAYOUT_METHODS: Readonly<Record<string, string>> = {

@@ -1,4 +1,4 @@
-/** `@isoloop/dom/worker`: the DOM subset and its recorder (ADR 0011). Internal to `@isoloop/runtime`. */
+// `@isoloop/dom/worker`: the DOM subset and its recorder (ADR 0011). Internal to `@isoloop/runtime`.
 export {
   ISOLOOP_DOM_FMT,
   ROOT_ID,

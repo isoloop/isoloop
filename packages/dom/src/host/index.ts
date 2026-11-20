@@ -1,4 +1,4 @@
-/** `@isoloop/dom/host`: the applier and node-id map (ADR 0011). Internal to `@isoloop/host`. */
+// `@isoloop/dom/host`: the applier and node-id map (ADR 0011). Internal to `@isoloop/host`.
 export {
   ISOLOOP_DOM_FMT,
   isDomBatch,

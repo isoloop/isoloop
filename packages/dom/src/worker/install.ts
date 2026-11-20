@@ -17,7 +17,7 @@ import {
 } from './dom';
 
 /**
- * The DOM globals the subset provides (ADR 0010 point 2), by their DOM names.
+ * The DOM globals the subset provides, by their DOM names.
  *
  * @internal
  */
