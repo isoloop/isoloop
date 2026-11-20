@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-03
+- **Amended:** 2026-11-20, the bus worker's restart limit is a default (see [the amendment](#amended-the-restart-limit-is-a-default-2026-11-20))
 - **Fills a gap in:** RFC 0001 (which covers isolate crashes only)
 - **Replaces:** the RFC's "Persistence (later): compacted topics written to IndexedDB"
 
@@ -24,7 +25,7 @@ We considered two ways to survive that:
 
 ### 1. Supervise the bus like an isolate
 
-The bus worker sends `beat` on its control port. The supervisor tracks it with the same blocked and kill timeouts, and restarts it up to 3 times in 60 s. Past the limit the kernel emits `bus:failed`, and isolates keep running with every publish rejected (`bus_unavailable`). The kernel emits `bus:ready { first }`, `bus:crash`, `bus:restart` and `bus:failed`. A contracts module that fails to load also ends in `bus:failed`, but with a `code`, and fails the isolates as well ([ADR 0003](0003-schema-format-standard-schema.md), decision 7).
+The bus worker sends `beat` on its control port. The supervisor tracks it with the same blocked and kill timeouts, and restarts it up to 3 times in 60 s by default (see [the amendment](#amended-the-restart-limit-is-a-default-2026-11-20)). Past the limit the kernel emits `bus:failed`, and isolates keep running with every publish rejected (`bus_unavailable`). The kernel emits `bus:ready { first }`, `bus:crash`, `bus:restart` and `bus:failed`. A contracts module that fails to load also ends in `bus:failed`, but with a `code`, and fails the isolates as well ([ADR 0003](0003-schema-format-standard-schema.md), decision 7).
 
 ### 2. Durability per topic
 
@@ -72,6 +73,10 @@ Sync access handles are exclusive, so the first tab takes a Web Lock (`isoloop-b
 - `open-failed`: `getDirectory()` or opening the files throws, as in Firefox's and Safari's private windows.
 
 Every major browser has had sync access handles in normal browsing since 2022 or 2023, so a second storage engine would serve only private windows and old browsers ([investigation](../investigations/opfs-support.md)). IndexedDB storage moves to [would-like](../would-like.md). It comes back if a major browser turns out to lack sync access in normal browsing.
+
+### Amended: the restart limit is a default (2026-11-20)
+
+"Up to 3 times in 60 s" is the default, not a fixed limit. The bus worker is supervised with the kernel's own `supervisor` config (`maxRestarts`, `withinMs`, `backoff`; `createKernel` hands it to the bus controller in `packages/host/src/kernel.ts`), so an app that sets those sets them for the bus worker too. Found while writing the M4c supervision guide (isoloop#320), which describes the code.
 
 ## Consequences
 
