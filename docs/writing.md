@@ -11,6 +11,7 @@ These rules apply to the guides in [`docs/guide`](guide/), the TSDoc that the AP
 - **British spelling:** behaviour, colour, sanitise, licence (the noun). Identifiers keep their own spelling (`color` in CSS).
 - **No em dashes.** Use a colon, a comma, brackets or a new sentence. **(checked)**
 - **Measurements, not adjectives.** Every performance figure names the device or machine, the build, the version or tag, and the date, and links the bench or results it came from: "71–86% less memory (20 headless isolates, [bench/pools](../bench/pools/README.md), 2026-11-08)". Give results in both directions, including the cases where native does as well or better.
+- **Devices are generic.** Describe a device by its class, its platform and the specs that matter ("a mid-range Android phone, 8 cores, 8 GB, Firefox 156"; "an older iOS phone, Safari 16.6"), never by brand, model or chip.
 - **Isoloop is never "faster than native".** Isoloop is a toolchain: containment, restart and catch-up, a bus with retention and replay, placement as a switch. Say what it gives, and say plainly what it costs in CPU, memory and start-up time.
 
 ### Banned phrases (checked)
