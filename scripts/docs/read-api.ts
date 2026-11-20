@@ -23,8 +23,10 @@ import {
   API,
   ModuleKind,
   ModuleResolutionKind,
+  SignatureKind,
   SymbolFlags,
   type Checker,
+  type Program,
   type Symbol,
 } from 'tsrs/sync';
 
@@ -124,22 +126,7 @@ function referencedName(n: Node): Node | undefined {
  * that exports it, in the order given.
  */
 export function readApi(files: readonly EntryFile[], cwd: string): ApiModel {
-  const api = new API({ cwd });
-  try {
-    const program = api.createProgram(
-      files.map((f) => f.file),
-      {
-        module: ModuleKind.NodeNext,
-        moduleResolution: ModuleResolutionKind.NodeNext,
-        noEmit: true,
-        skipLibCheck: true,
-        strict: true,
-      },
-    );
-    const checker = program.getProject().checker;
-    const target = (s: Symbol): Symbol =>
-      s.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(s) : s;
-
+  return withProgram(files, cwd, (program, checker, target) => {
     const raw: { entry: string; name: string; sym: Symbol; key: string }[] = [];
     const exporters = new Map<string, string[]>();
     for (const f of files) {
@@ -181,6 +168,31 @@ export function readApi(files: readonly EntryFile[], cwd: string): ApiModel {
     }
     const syms = raw.map((r) => r.sym);
     return { entries, refs: references(checker, target, syms, exporters, files) };
+  });
+}
+
+/** Opens one program over the entry points, runs `read`, and closes it. */
+function withProgram<T>(
+  files: readonly EntryFile[],
+  cwd: string,
+  read: (program: Program, checker: Checker, target: (s: Symbol) => Symbol) => T,
+): T {
+  const api = new API({ cwd });
+  try {
+    const program = api.createProgram(
+      files.map((f) => f.file),
+      {
+        module: ModuleKind.NodeNext,
+        moduleResolution: ModuleResolutionKind.NodeNext,
+        noEmit: true,
+        skipLibCheck: true,
+        strict: true,
+      },
+    );
+    const checker = program.getProject().checker;
+    const target = (s: Symbol): Symbol =>
+      s.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(s) : s;
+    return read(program, checker, target);
   } finally {
     api.close();
   }
@@ -237,6 +249,86 @@ function declOf(n: Node | undefined, path: string): ApiDecl | undefined {
       return name === undefined ? [] : [{ name, ...span(m, text) }];
     }),
   };
+}
+
+/** A doc comment: its text, without tags, and its tags. */
+export type DocComment = {
+  doc: string;
+  tags: readonly { name: string; text: string }[];
+};
+
+/** One signature: its parameters' names and whether it returns a value. */
+export type DocSignature = { params: readonly string[]; returns: boolean };
+
+/**
+ * One exported declaration's TSDoc, for docs:check item 7 (M4c, decision 30).
+ * Each declaration appears once, under its home entry point.
+ */
+export type DocExport = DocComment & {
+  entry: string;
+  name: string;
+  kind: ExportKind;
+  /** Call signatures (a function, a callable const); a class has none here. */
+  signatures: readonly DocSignature[];
+  /**
+   * The properties of an interface, a type alias's object type or a class's
+   * instances, declared in the packages read. `key` identifies the property's
+   * declaration, so a field shared through `extends` is the same field.
+   */
+  members: readonly (DocComment & { name: string; key: string })[];
+};
+
+const VOID = new Set(['void', 'undefined', 'never', 'Promise<void>', 'Promise<undefined>']);
+
+/** Reads the TSDoc of every exported declaration, `@internal` ones left out. */
+export function readDocs(files: readonly EntryFile[], cwd: string): DocExport[] {
+  return withProgram(files, cwd, (program, checker, target) => {
+    const dirs = files.map((f) => packageDir(f.file));
+    const comment = (s: Symbol): DocComment => ({
+      doc: checker.getDocumentationCommentOfSymbol(s).trim(),
+      tags: checker.getJsDocTagsOfSymbol(s).map((t) => ({ name: t.name, text: t.text ?? '' })),
+    });
+    const seen = new Set<string>();
+    const out: DocExport[] = [];
+    for (const f of files) {
+      const sf = program.getSourceFile(f.file);
+      if (!sf) throw new Error(`readDocs: ${f.file} isn't in the program`);
+      const mod = checker.getSymbolAtLocation(sf);
+      if (!mod) continue;
+      const own = packageDir(f.file);
+      for (const e of checker.getExportsOfModule(mod)) {
+        const t = target(e);
+        const key = keyOf(t);
+        if (!key || seen.has(key)) continue;
+        // A re-export is documented where it's declared, in its own package.
+        if (!key.startsWith(own) && dirs.some((d) => key.startsWith(d))) continue;
+        const c = comment(t);
+        if (c.tags.some((x) => x.name === 'internal')) continue;
+        seen.add(key);
+        const kind = kindOf(t.flags);
+        const signatures =
+          kind === 'function' || kind === 'const'
+            ? checker
+                .getSignaturesOfType(checker.getTypeOfSymbol(t), SignatureKind.Call)
+                .map((sig) => ({
+                  params: sig.getParameters().map((p) => p.name),
+                  returns: !VOID.has(checker.typeToString(checker.getReturnTypeOfSignature(sig))),
+                }))
+            : [];
+        const members =
+          kind === 'interface' || kind === 'type' || kind === 'class'
+            ? checker.getPropertiesOfType(checker.getDeclaredTypeOfSymbol(t)).flatMap((p) => {
+                const k = keyOf(p);
+                return k && dirs.some((d) => k.startsWith(d))
+                  ? [{ name: p.name, key: k, ...comment(p) }]
+                  : [];
+              })
+            : [];
+        out.push({ entry: f.entry, name: e.name, kind, ...c, signatures, members });
+      }
+    }
+    return out;
+  });
 }
 
 /** The references graph, from every exported declaration outwards, within the packages read. */

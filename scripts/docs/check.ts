@@ -11,6 +11,8 @@
 //   needs `pnpm build` first.
 // - Item 2 (fences that type-check, scripts/docs/fences.ts) runs `tsc` over
 //   the guides' `ts` and `tsx` fences; `--guides` runs it too.
+// - Item 7 (TSDoc, scripts/docs/tsdoc.ts) reads the built `.d.ts` through
+//   `readDocs`, and type-checks the main entry points' `@example`s.
 // - Item 5 (a guide naming a removed export) needs the PR's base built, so the
 //   API check runs it (scripts/ci/api-check.ts), with checkRemovedNames from
 //   ./markdown.ts.
@@ -19,7 +21,15 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkFences } from './fences.ts';
-import { isTypeKind, readApi, type ApiModel, type EntryFile, type ExportKind } from './read-api.ts';
+import {
+  isTypeKind,
+  readApi,
+  readDocs,
+  type ApiModel,
+  type EntryFile,
+  type ExportKind,
+} from './read-api.ts';
+import { checkExamples, checkTsdoc } from './tsdoc.ts';
 
 export type { Problem } from './markdown.ts';
 export { checkRemovedNames, withoutFences } from './markdown.ts';
@@ -504,6 +514,8 @@ function main(): void {
         });
       const base = baseText ? parseMap(baseText) : undefined;
       problems.push(...checkCoverage(map, readApi(files, root), base));
+      const tsdoc = checkTsdoc(readDocs(files, root));
+      problems.push(...tsdoc.problems, ...checkExamples(root, tsdoc.examples));
       const changed = git(root, ['diff', '--name-only', `${baseRef}...HEAD`]);
       if (changed !== undefined)
         notices.push(...mapNotices(map, changed.split('\n').filter(Boolean)));
