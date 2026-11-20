@@ -64,52 +64,69 @@ import {
   type SupervisorInput,
 } from './supervisor';
 
+/** What `createKernel` takes: the workers, the topics, and how isolates are supervised. */
 export type KernelConfig = {
   /**
-   * The topics (ADR 0003): `url` is the ES module the bus worker imports,
-   * `list` its default export, imported by the host. Needs `workers.bus`.
-   * Without both there is no bus worker: isolates get an unconnected port,
-   * and `kernel.publish` rejects with `bus_unavailable`.
+   * The topics: `url` is the ES module the bus worker imports, `list` its
+   * default export, imported by the host. Needs `workers.bus`. Without both
+   * there is no bus worker: isolates get an unconnected port, and
+   * `kernel.publish` rejects with `bus_unavailable`. Default: none.
    */
   contracts?: { url: string; list: ContractsList };
+  /** The worker scripts' URLs, and the worker budget. */
   workers: {
+    /** URL of the isolate bootstrap, the script every isolate worker starts from. Required. */
     isolateBootstrap: string;
-    /** `bus-worker.js` URL. */
+    /** URL of the bus worker's script (`bus-worker.js`). Needed with `contracts`. Default: none. */
     bus?: string;
-    /** Soft worker count: passing it warns once (`workers:budget`) and never blocks a spawn. Default 32 (ADR 0001). */
+    /**
+     * Soft worker count: going over it warns once (`workers:budget`) and never
+     * blocks a spawn. Default 32.
+     */
     budget?: number;
   };
-  /** Defaults: one-for-one, 3 restarts in 60 s, backoff 250 ms × 2ⁿ capped at 4 s. */
+  /** How crashed isolates are restarted. Defaults: one-for-one, 3 restarts in 60 s, backoff 250 ms × 2ⁿ capped at 4 s. */
   supervisor?: {
+    /** `one-for-one` restarts the isolate that crashed; `never` fails it on its first crash. Default `one-for-one`. */
     strategy?: 'one-for-one' | 'never';
+    /** Restarts allowed within `withinMs` before the isolate is `failed`. Default 3. */
     maxRestarts?: number;
+    /** The restart window, in ms. Default 60 000 (60 s). */
     withinMs?: number;
+    /** The wait before each restart. Default `{ initialMs: 250, factor: 2, maxMs: 4000 }`. */
     backoff?: Partial<Backoff>;
   };
-  /** Defaults: 100 / 400 / 10 000 ms, ready timeout 10 000 ms. */
+  /** How the host tells a busy or hung isolate from a working one. Defaults: 100 / 400 / 10 000 ms, ready timeout 10 000 ms. */
   heartbeat?: {
+    /** How often each worker beats, in ms. Default 100. */
     everyMs?: number;
+    /** No beat for this long marks the isolate `blocked`, in ms. Default 400. */
     blockedAfterMs?: number;
+    /** No beat for this long terminates the worker as `unresponsive`, in ms. Default 10 000 (10 s). */
     killAfterMs?: number;
+    /** No `ready` this long after the spawn crashes it as `ready_timeout`, in ms. Default 10 000 (10 s). */
     readyTimeoutMs?: number;
   };
-  /** Adopted into every surface's shadow root. */
+  /** Stylesheets adopted into every surface's shadow root. Default: none. */
   styles?: readonly CSSStyleSheet[];
-  /** DOM work per frame; default 8 ms. The first batch of a frame always applies (I8). */
+  /**
+   * `frameBudgetMs`: DOM work per frame, in ms. Default 8. The first batch of
+   * a frame always applies, so a frame does at most the budget plus one batch.
+   */
   compositor?: { frameBudgetMs: number };
   /**
-   * Host elements isolates may render by name (design §4.5), e.g.
+   * Host elements isolates may render by name, for example
    * `{ 'iso-button': { tag: 'ds-button', attributes: ['variant'] } }`.
-   * Malformed entries make `createKernel` throw `invalid_config`.
+   * Malformed entries make `createKernel` throw `invalid_config`. Default: none.
    */
   components?: Readonly<Record<string, HostComponent>>;
   /**
-   * Default true. With false the kernel adds no listeners, never publishes
-   * `isoloop.route.v1`, leaves link clicks alone, and `navigate` rejects with
-   * `routing_disabled` (ADR 0002).
+   * Whether the kernel takes part in routing. Default true. With false the
+   * kernel adds no listeners, never publishes `isoloop.route.v1`, leaves link
+   * clicks alone, and `navigate` rejects with `routing_disabled`.
    */
   routing?: boolean;
-  /** Default `/`. Must match the host router's `basename`; `/x` hrefs resolve against it. */
+  /** The app's base path. Must match the host router's `basename`; `/x` hrefs resolve against it. Default `/`. */
   basePath?: string;
   /**
    * Decides a navigation from an isolate or a link click. Return `true` once
@@ -117,84 +134,106 @@ export type KernelConfig = {
    * `history.pushState` / `replaceState`.
    */
   onNavigate?: OnNavigate;
-  /** Suspension: at most this many suspended isolates start at once (default 4, ADR 0001). */
+  /** Suspension. `maxConcurrentWakes`: at most this many suspended isolates start at once. Default 4. */
   suspend?: { maxConcurrentWakes?: number };
-  /** Dev checks: the bus checks every schema output with `structuredClone` (ADR 0003, decision 11). Default false. */
+  /**
+   * Development checks: the bus checks every schema output with
+   * `structuredClone`, and the console warns about a `keepAwake()` hold older
+   * than 10 minutes and about tags put into `document.head`. Default false.
+   */
   dev?: boolean;
   /**
-   * Tools for agents (ADR 0018, decision 2): which requestable topics agents
-   * may call through the dev MCP or WebMCP. Without it nothing is exposed.
+   * Tools for agents: which requestable topics agents may call through the
+   * dev MCP or WebMCP. Without it nothing is exposed. Default: none.
    * @experimental
    */
   agents?: AgentsConfig;
+  /** The bus's own settings. */
   bus?: {
     /**
      * How far behind the broker's record of what each subscriber handled may
-     * be (ADR 0016, decision 1): one `commits` message per port per interval,
-     * earlier at half a subscription's credit. An integer from 0 to 1,000;
-     * 0 is every task. A crash can redeliver up to one interval of records.
-     * Default 100.
+     * be, in ms: one `commits` message per port per interval, earlier at half
+     * a subscription's credit. An integer from 0 to 1,000; 0 is every task. A
+     * crash can redeliver up to one interval of records. Default 100.
      */
     commitIntervalMs?: number;
   };
 };
 
+/** One isolate to spawn: `kernel.spawn` takes it. */
 export type IsolateManifest = {
+  /** The isolate's id, unique among the kernel's isolates. */
   id: string;
-  /** Isolate module URL, resolved against the document. */
+  /** The isolate module's URL, resolved against the document. */
   src: string;
-  /** Where the isolate renders. Without one, the isolate is headless (ADR 0008). */
+  /** Where the isolate renders. Without one, the isolate is headless. Default: none. */
   surface?: Element;
+  /** Any value, passed to the isolate as `ctx.config`. Default: none. */
   config?: unknown;
+  /** The topics it may publish to and subscribe to, and its other grants. Default: none. */
   grants?: Grants;
-  /** Renders the fallback shown once the isolate has `failed`. Defaults to a message and a Retry button. */
+  /** Renders the fallback shown once the isolate has `failed`. Default: a message and a Retry button. */
   fallback?: FallbackRender;
   /**
-   * Named worker pool (ADR 0001, M2c, M2d): the isolate shares one worker
-   * with every other isolate naming the same pool, headless or visual (ADR
-   * 0015). Pool members share an event loop, globals and fate: a hang or
-   * crash restarts the pool. Visual members also share one document, so
-   * they can read each other's DOM and input: pool only trusted isolates,
-   * and keep widgets that handle secrets on their own worker.
+   * A named worker pool: the isolate shares one worker with every other
+   * isolate naming the same pool, headless or visual. Pool members share an
+   * event loop, globals and fate: a hang or crash restarts the pool. Visual
+   * members also share one document, so they can read each other's DOM and
+   * input: pool only trusted isolates, and keep widgets that handle secrets
+   * on their own worker. Default: a worker of its own.
    */
   pool?: string;
   /**
-   * Opt-in suspension (ADR 0001), default `'never'`. `'when-idle'` waits
-   * 60 s. Idle means: no visible surface (headless counts as never visible),
-   * nothing delivered for `afterMs`, no `ctx.keepAwake()` hold, and no host
-   * call or publish waiting for an answer.
+   * Opt-in suspension. Default `'never'`. `'when-idle'` waits 60 s. Idle
+   * means: no visible surface (headless counts as never visible), nothing
+   * delivered for `afterMs`, no `ctx.keepAwake()` hold, and no host call or
+   * publish waiting for an answer.
    */
   suspend?: 'never' | 'when-idle' | { whenIdle: { afterMs: number } };
   /**
    * After a bus restart, memory topics start empty and each subscription gets
-   * `reset` (ADR 0007). `onReset: 'restart'` restarts the isolate instead.
+   * `onReset`. `onReset: 'restart'` restarts the isolate instead. Default `'reset'`.
    */
   bus?: { onReset?: 'reset' | 'restart' };
 };
 
-/** Codes `createKernel` and `spawn` throw with (design §4.1). */
+/**
+ * The codes a `KernelError` carries:
+ * - `unsupported_browser`: the browser lacks a feature Isoloop needs; the message names them;
+ * - `invalid_manifest`: a manifest without an `id` or `src`, with an empty `pool`, an id the kernel reserves, or an unknown `suspend`;
+ * - `invalid_config`: a `KernelConfig` value out of range or malformed, or a pooled isolate holding `inspect`;
+ * - `bus_failed`: the bus couldn't load its contracts, so nothing can start;
+ * - `reserved_pool`: a `pool` name starting `balancer-`, which belongs to `@isoloop/balancer`;
+ * - `balancer_exists`: a second balancer on a kernel that already has one;
+ * - `not_exposable`: an `agents.expose` pattern matches a topic that can't be a tool (no `reply`, no `tool`, or a schema without Standard JSON Schema); the message names the topic. `@experimental`.
+ */
 export type KernelErrorCode =
   | 'unsupported_browser'
-  /** A manifest with `pool` and a `surface`: pools are for headless isolates (M2c; visual pools are M2d). */
+  /** A manifest without `id` or `src`, with an empty `pool`, a reserved id, or an unknown `suspend`. */
   | 'invalid_manifest'
   | 'invalid_config'
-  /** The bus couldn't load its contracts, so nothing can start (ADR 0003, decision 7). */
+  /** The bus couldn't load its contracts, so nothing can start. */
   | 'bus_failed'
-  /** A `pool` name starting `balancer-`: those belong to `@isoloop/balancer` (ADR 0017). */
+  /** A `pool` name starting `balancer-`: those belong to `@isoloop/balancer`. */
   | 'reserved_pool'
-  /** `claimPools` called while the kernel's claim is held: one balancer per kernel at a time (ADR 0017). */
+  /** A second balancer on the same kernel: one balancer per kernel at a time. */
   | 'balancer_exists'
   /**
    * An `agents.expose` pattern matches a topic that can't be a tool: no
-   * `reply`, no `tool`, or a schema without Standard JSON Schema (ADR 0018,
-   * decision 3). The message names the topic.
+   * `reply`, no `tool`, or a schema without Standard JSON Schema. The
+   * message names the topic.
    * @experimental
    */
   | 'not_exposable';
 
 /** An error the kernel API throws, with a code to branch on. */
 export class KernelError extends Error {
+  /** What went wrong, to branch on. */
   readonly code: KernelErrorCode;
+  /**
+   * @param code What went wrong.
+   * @param message A sentence for people, naming what to fix.
+   */
   constructor(code: KernelErrorCode, message: string) {
     super(message);
     this.name = 'KernelError';
@@ -202,32 +241,40 @@ export class KernelError extends Error {
   }
 }
 
+/** One isolate as the kernel sees it now: `kernel.isolates()` and `handle.snapshot()`. */
 export type IsolateSnapshot = {
+  /** The isolate's id. */
   id: string;
+  /** Where it is in its life. */
   state: IsolateState;
-  /** The pool it runs in (M2c, ADR 0001); absent for an own worker. */
+  /** The pool it runs in; absent for a worker of its own. */
   pool?: string;
   /** `performance.now()` of the last beat. */
   lastBeatAt: number;
+  /** How late its worker's last beat fired, past the heartbeat interval, in ms: a busy event loop shows here. */
   lagMs: number;
+  /** Restarts after a crash since it was spawned. A manual restart doesn't count. */
   restarts: number;
   /** The last crash, while restarting or failed. */
   reason?: CrashReason;
+  /** The last crash's message, while restarting or failed. */
   error?: string;
+  /** Its surface's batches, for an isolate with a surface. */
   surface?: SurfaceStats;
   /** Messages dropped because their `v` or `t` was unknown. */
   dropped: number;
-  /** Open `ctx.keepAwake()` holds, from the last beat (devtools). */
+  /** Open `ctx.keepAwake()` holds, from the last beat, with their age and where they were taken. */
   holds?: { ageMs: number; stack?: string }[];
   /**
    * Milliseconds its worker spent running its code during the last beat's
-   * interval (ADR 0017); see `IdleReport.busyMs`. Absent before its first beat.
+   * interval. Absent before its first beat, and from runtimes that don't report it.
    */
   busyMs?: number;
 };
 
-/** A named pool (M2c, ADR 0001), for devtools. */
+/** A named pool now: `kernel.pools()`. */
 export type PoolSnapshot = {
+  /** The pool's name. */
   name: string;
   /** Isolates naming this pool, not stopped, in spawn order. */
   members: string[];
@@ -240,10 +287,10 @@ export type PoolSnapshot = {
   grants: Grants;
   /**
    * True when a member has a surface: the pool's visual members render into
-   * one shared document (ADR 0015), so `warning` is set.
+   * one shared document, so `warning` is set.
    */
   sharesDocument: boolean;
-  /** For devtools, when `sharesDocument`: what that means for the members. */
+  /** When `sharesDocument`: what that means for the members, in a sentence for people. */
   warning?: string;
 };
 
@@ -253,16 +300,20 @@ const SHARED_DOCUMENT_WARNING = "Members of this pool can read each other's DOM 
 /** `bus:quota` fires once storage use reaches this share of the quota. */
 const QUOTA_WARN = 0.8;
 
+/** The kernel's events and what each carries; `kernel.on(event, fn)` listens to one. */
 export type KernelEvents = {
+  /** An isolate moved from `prev` to `state`. */
   'isolate:state': { id: string; state: IsolateState; prev: IsolateState };
+  /** An isolate is ready: its module loaded and it's about to run `start`. */
   'isolate:ready': { id: string };
-  /** `pool`: the isolate's pool, when it is a pool member (M2c); a pool's members crash together. */
+  /** An isolate crashed. `pool`: its pool, when it's a pool member; a pool's members crash together. */
   'isolate:crash': { id: string; reason: CrashReason; message: string; pool?: string };
   /** Past the restart limit, or strategy `never`: the isolate stays down. */
   'isolate:failed': { id: string; reason: CrashReason; message: string; pool?: string };
+  /** An isolate reported an error that wasn't fatal (`ctx.reportError(e, { fatal: false })`); it keeps running. */
   'isolate:error': { id: string; message: string };
   /**
-   * One isolate's heartbeat, as it arrives (ADR 0017): its worker's `lagMs`
+   * One isolate's heartbeat, as it arrives: its worker's `lagMs`
    * and, from runtimes that report it, its own `busyMs` for the interval the
    * beat covers. A pool's beat gives one event per member. `at` is the host's
    * `performance.now()` on receipt. Emitted only while someone listens, so
@@ -273,38 +324,37 @@ export type KernelEvents = {
   /** More live workers than `workers.budget`. Emitted once per kernel. */
   'workers:budget': { live: number; budget: number };
   /**
-   * `agents.expose` patterns that match no topic in the contracts (ADR 0018,
-   * decision 3). Emitted once, in the microtask after `createKernel`, so a
+   * `agents.expose` patterns that match no topic in the contracts. Emitted once, in the microtask after `createKernel`, so a
    * listener added right after it hears it.
    * @experimental
    */
   'agents:unmatched': { patterns: string[] };
   /** The bus worker loaded its contracts. `first` is false after a restart. */
   'bus:ready': { first: boolean };
+  /** The bus worker crashed. The kernel restarts it, within the supervisor's restart limit. */
   'bus:crash': { reason: CrashReason; message: string };
   /**
    * The bus crashed twice while loading, so it started in safe mode: each
-   * persistent topic's newest segment was set aside, renamed and kept
-   * (ADR 0007, decision 5). `quarantined` lists them as `<topic>/<file>`.
+   * persistent topic's newest segment was set aside, renamed and kept.
+   * `quarantined` lists them as `<topic>/<file>`.
    */
   'bus:recovered': { quarantined: string[] };
   /**
    * Persistent topics run in memory on this bus, so they won't survive a
-   * reload (ADR 0007, decision 6). `another_tab`: another tab's bus holds the
+   * reload. `another_tab`: another tab's bus holds the
    * origin's files; `no_sync_access`: OPFS sync access handles are missing;
    * `open_failed`: the files couldn't be opened.
    */
   'bus:durability_degraded': { reason: DurabilityDegraded };
   /**
-   * The origin's storage is 80 % used, once per crossing (M2b task 14). At
+   * The origin's storage is 80 % used, once per crossing. At
    * 100 % persistent publishes reject with `quota_exceeded`; memory topics
    * carry on.
    */
   'bus:quota': { usage: number; quota: number };
   /**
    * A source record a seed skipped: `map` threw or returned a promise
-   * (`seed_async`), or the topic's schema rejected the result (ADR 0003,
-   * decision 18). It stays in `from`. At most 10 a second per topic; the rest
+   * (`seed_async`), or the topic's schema rejected the result. It stays in `from`. At most 10 a second per topic; the rest
    * are counted in `bus:seeded`.
    */
   'bus:seed_rejected': {
@@ -318,68 +368,121 @@ export type KernelEvents = {
   'bus:seeded': { topic: string; copied: number; rejected: number };
   /**
    * Persistent topics on disk that the contracts no longer list, and their
-   * total size (ADR 0003, decision 19). They are kept, not opened; nothing is
+   * total size. They are kept, not opened; nothing is
    * deleted until `kernel.dropTopic`.
    */
   'bus:orphaned_topics': { names: string[]; bytes: number };
-  /** A new bus worker is starting; running isolates get a new bus port (ADR 0007). */
+  /** A new bus worker is starting; running isolates get a new bus port. `restarts` counts them. */
   'bus:restart': { restarts: number };
   /**
    * The bus is down for good. With `code`, its contracts couldn't be used and
-   * no isolate runs (ADR 0003); with `reason`, it crashed past the restart
-   * limit and isolates keep running with every publish rejected (ADR 0007).
+   * no isolate runs; with `reason`, it crashed past the restart limit and
+   * isolates keep running with every publish rejected.
    */
   'bus:failed': { code?: ErrorCode; reason?: CrashReason; message: string };
-  /** Sampled every second (design §6.3). */
+  /** The bus's figures, sampled every second: topics, subscriptions and rejected publishes. */
   'bus:metrics': BusMetrics;
-  /** `history.state` was too large for the route topic; it was published as `null` (ADR 0002). */
+  /** `history.state` was too large for the route topic; it was published as `null`. */
   'route:state_dropped': { bytes: number };
   /** `onNavigate` threw; the navigate call rejected with `navigate_failed`. */
   'route:navigate_error': { from: string; href: string; error: string };
 };
 
+/** A kernel event's name. */
 export type KernelEvent = keyof KernelEvents;
 
+/** A spawned isolate, from `kernel.spawn`: its id, and its own controls. */
 export interface IsolateHandle {
+  /** The isolate's id, from its manifest. */
   readonly id: string;
+  /**
+   * The isolate as the kernel sees it now.
+   * @returns The same as its entry in `kernel.isolates()`.
+   * @throws `Error` once the isolate has been stopped.
+   */
   snapshot(): IsolateSnapshot;
+  /**
+   * Stops the isolate, as `kernel.stop(id)` does.
+   * @returns Resolves once its worker is gone.
+   */
   stop(): Promise<void>;
+  /**
+   * Restarts the isolate, as `kernel.restart(id)` does.
+   * @returns Resolves once the restart has started.
+   */
   restart(): Promise<void>;
 }
 
+/** The kernel `createKernel` returns: it spawns and supervises isolates, and talks to the bus from the host. */
 export interface Kernel {
+  /**
+   * Starts an isolate in a worker of its own, or in its `pool`'s worker.
+   * @param manifest What to start and where it renders.
+   * @returns Its handle. The isolate starts loading at once; `isolate:ready` follows.
+   * @throws `KernelError` `invalid_manifest`, `reserved_pool`, `invalid_config`
+   *   (a pooled isolate holding `inspect`) or `bus_failed`; `Error` when an
+   *   isolate with the same id exists.
+   */
   spawn(manifest: IsolateManifest): IsolateHandle;
   /**
-   * Stops an isolate: its `onShutdown` handlers get the stop grace, then its
-   * worker goes. Resolves once the worker is gone. The id is free at once: a
-   * `spawn` with it before then starts when the old worker is gone.
+   * Stops an isolate: its `onShutdown` handlers get the stop grace (1 s), then
+   * its worker goes. The id is free at once: a `spawn` with it before then
+   * starts when the old worker is gone.
+   * @param id The isolate's id.
+   * @returns Resolves once the worker is gone.
+   * @throws `Error` for an unknown id.
    */
   stop(id: string): Promise<void>;
+  /**
+   * Restarts an isolate now, whatever its state, `failed` included, and
+   * clears its restart window.
+   * @param id The isolate's id.
+   * @returns Resolves once the restart has started.
+   * @throws `Error` for an unknown id.
+   */
   restart(id: string): Promise<void>;
-  /** Wakes a suspended isolate (ADR 0001); a no-op otherwise. */
+  /**
+   * Wakes a suspended isolate; a no-op otherwise.
+   * @param id The isolate's id.
+   * @returns Resolves once the wake is queued.
+   * @throws `Error` for an unknown id.
+   */
   resume(id: string): Promise<void>;
   /**
-   * Publishes from the host. Rejects with a `BusError`: `forbidden` for
-   * `isoloop.*` topics, or the broker's code (`invalid`, `bus_unavailable`, …).
+   * Publishes a record from the host.
+   * @param topic The topic, from the contracts.
+   * @param rec The record's `value`, and its `key` if any.
+   * @returns Resolves once the bus has appended the record.
+   * @throws Rejects with a `BusError`: `forbidden` for `isoloop.*` topics,
+   *   `bus_unavailable` without contracts, or the broker's code (`invalid`,
+   *   `quota_exceeded`, …).
    */
   publish<In>(topic: TopicRef<In, any, any, any>, rec: { key?: string; value: In }): Promise<void>;
   /**
-   * Deletes a persistent topic the contracts no longer list (ADR 0003,
-   * decision 19; see `bus:orphaned_topics`). Rejects with a `BusError`:
-   * `seed_pending` while a declared seed that reads it hasn't ended on this
-   * device, `invalid` for a topic the contracts list, or one whose rejected
-   * seed records are recorded unless `force` is set, `unknown_topic` when
-   * nothing is stored under the name.
+   * Deletes a persistent topic the contracts no longer list (see
+   * `bus:orphaned_topics`).
+   * @param name The topic's name.
+   * @param opts `force`: delete it even when it holds seed records the topic
+   *   rejected. Default false.
+   * @returns Resolves once the topic's files are gone.
+   * @throws Rejects with a `BusError`: `seed_pending` while a declared seed that
+   *   reads it hasn't ended on this device, `invalid` for a topic the contracts
+   *   list (or one holding rejected seed records, without `force`),
+   *   `unknown_topic` when nothing is stored under the name, `bus_unavailable`
+   *   without contracts.
    */
   dropTopic(name: string, opts?: { force?: boolean }): Promise<void>;
   /**
-   * Requests from the host (ADR 0018, decision 4), the mirror of
-   * `bus.request`: appends a request record with `req: { from: 'host', id,
-   * via }` and resolves with the first valid reply. Works on any requestable
-   * topic, exposed to agents or not. An isolate that restarts within the
-   * timeout still gets the request and can answer it.
-   *
-   * Rejects with a `BusError`:
+   * Requests from the host, the mirror of `bus.request`: appends a request
+   * record with `req: { from: 'host', id, via }` and resolves with the first
+   * valid reply. Works on any requestable topic, exposed to agents or not. An
+   * isolate that restarts within the timeout still gets the request and can
+   * answer it.
+   * @param topic A topic with a `reply` schema.
+   * @param value The request's value, checked against the topic's schema.
+   * @param opts The key, the timeout, an abort signal and the `via` label.
+   * @returns The reply's value, checked against the `reply` schema.
+   * @throws Rejects with a `BusError`:
    * - `no_responder` at once when no isolate could answer: none has a
    *   subscribe grant for the topic, or every one that has is stopped or
    *   `failed`. A positive check doesn't promise a reply;
@@ -390,6 +493,13 @@ export interface Kernel {
    *   than the topic keeps);
    * - `forbidden` for `isoloop.*` topics, `unknown_topic`, `not_requestable`,
    *   `invalid`, `reply_invalid` and `bus_unavailable`, as `bus.request` does.
+   * @example
+   * ```ts
+   * // `quoteTool` is a topic with a `reply` schema; an isolate answers it with `bus.reply`.
+   * import { quoteTool } from './contracts';
+   *
+   * const { vwap } = await kernel.request(quoteTool, { symbol: 'ACME' }, { timeoutMs: 5_000 });
+   * ```
    * @experimental
    */
   request<In, ROut>(
@@ -398,44 +508,70 @@ export interface Kernel {
     opts?: KernelRequestOptions,
   ): Promise<ROut>;
   /**
-   * The tools exposed through `agents.expose` (ADR 0018, decision 2), with
-   * their JSON Schemas, made once at `createKernel`. Empty without `agents`.
-   * Transports list these and call them with `kernel.request`.
+   * The tools exposed through `agents.expose`, with their JSON Schemas, made
+   * once at `createKernel`. Transports list these and call them with
+   * `kernel.request`.
+   * @returns The tools, in contracts order. Empty without `agents`.
    * @experimental
    */
   tools(): readonly AgentTool[];
-  /** Subscribes from the host, from `latest` by default. Records cross the main thread only here. */
+  /**
+   * Subscribes from the host. Records cross the main thread only here.
+   * @param topic The topic, from the contracts.
+   * @param fn Called with each record, in order.
+   * @param opts `from`: where to start. Default `latest`.
+   * @returns The function that unsubscribes.
+   * @throws `Error` without contracts.
+   */
   subscribe<Out>(
     topic: TopicRef<any, Out, any, any>,
     fn: (r: TypedRecord<Out>) => void,
     opts?: { from?: StartPosition },
   ): () => void;
+  /**
+   * Listens to one of the kernel's events.
+   * @param event The event's name, a key of `KernelEvents`.
+   * @param fn Called with each event's data.
+   * @returns The function that stops listening.
+   */
   on<E extends KernelEvent>(event: E, fn: (e: KernelEvents[E]) => void): () => void;
+  /**
+   * Every isolate not stopped, as the kernel sees it now.
+   * @returns One snapshot per isolate, in spawn order.
+   */
   isolates(): IsolateSnapshot[];
-  /** Named pools with members (M2c): members, whether the worker runs, effective grants. */
+  /**
+   * The named pools that have members.
+   * @returns Each pool's members, whether its worker runs, and its members' grants together.
+   */
   pools(): PoolSnapshot[];
   /**
-   * A reader of the inspection feed (ADR 0020): a snapshot of isolates,
-   * pools, the bus and the last 200 events, then events as they happen, with
-   * beats and bus metrics coalesced to about one a second. Costs nothing
-   * until a reader listens, apart from the ring buffer of recent events the
-   * kernel always keeps.
+   * A reader of the inspection feed: a snapshot of isolates, pools, the bus
+   * and the last 200 events, then events as they happen, with beats and bus
+   * metrics coalesced to about one a second. Costs nothing until a reader
+   * listens, apart from the ring buffer of recent events the kernel always
+   * keeps.
+   * @returns A new reader; `close()` it when you're done.
    * @experimental
    */
   inspect(): Inspector;
   /**
-   * The host's router changed the URL: republish `isoloop.route.v1` if
-   * `href` or `state` differ (ADR 0002). Wire it once, e.g.
+   * Tells the kernel the host's router changed the URL: it republishes
+   * `isoloop.route.v1` if `href` or `state` differ. Wire it once, for example
    * `router.subscribe(() => kernel.syncRoute())`. A no-op with routing off.
    */
   syncRoute(): void;
+  /**
+   * Stops every isolate and the bus, and removes the kernel's listeners.
+   * @returns Resolves once every isolate's worker is gone.
+   */
   destroy(): Promise<void>;
   /**
    * @internal Test hooks; not part of the API. `messages()` counts what the
    * main thread received from isolate workers and the bus control port, by
-   * type, for invariant I7 (no topic record crosses the main thread).
+   * type, to check that no topic record crosses the main thread.
    * `onSurfaceWrite(fn)` calls `fn` when the compositor starts and stops
-   * writing to surfaces, for invariant I1 (only the compositor writes there).
+   * writing to surfaces, to check that only the compositor writes there.
    */
   readonly debug: {
     crashBus(): void;
@@ -579,9 +715,29 @@ function validate(m: IsolateManifest, reservedOk: boolean): void {
       throw new KernelError('invalid_manifest', `"${m.id}": unknown \`suspend\` value`);
   }
 }
-/** How often the supervisor judges heartbeats and timeouts (plan m1-kernel, task 2). */
+// How often the supervisor judges heartbeats and timeouts (plan m1-kernel, task 2).
 const TICK_MS = 50;
 
+/**
+ * Creates the kernel: it starts the bus worker, then starts, watches and
+ * restarts each isolate you spawn.
+ * @param config The workers, the contracts, and how isolates are supervised.
+ * @returns The kernel.
+ * @throws `KernelError` `unsupported_browser` when the browser lacks something
+ *   Isoloop needs, `invalid_config` for a malformed option, and
+ *   `not_exposable` when `agents.expose` matches a topic that can't be a tool.
+ * @example
+ * ```ts
+ * import { createKernel } from '@isoloop/host';
+ * import workers from 'virtual:isoloop/workers';
+ * import list from './contracts';
+ * import contractsUrl from './contracts?isolate';
+ * import cart from './cart?isolate';
+ *
+ * const kernel = createKernel({ contracts: { url: contractsUrl, list }, workers });
+ * kernel.spawn({ id: 'cart', src: cart, surface: document.querySelector('#cart')! });
+ * ```
+ */
 export function createKernel(config: KernelConfig): Kernel {
   const missing = missingFeatures();
   if (missing.length > 0)
@@ -1817,8 +1973,8 @@ const reservedSpawns = new WeakMap<Kernel, (manifest: IsolateManifest) => Isolat
 const claimed = new WeakSet<Kernel>();
 
 /**
- * Claims a kernel's reserved pools (`balancer-…`) for `@isoloop/balancer`
- * (ADR 0017). The returned `spawn` is `kernel.spawn` that may also name those
+ * Claims a kernel's reserved pools (`balancer-…`) for `@isoloop/balancer`.
+ * The returned `spawn` is `kernel.spawn` that may also name those
  * pools; a plain `kernel.spawn` with one throws `reserved_pool`. A kernel has
  * one claim at a time, so one balancer: a second claim throws
  * `balancer_exists` until the first is released. `release()` gives the claim

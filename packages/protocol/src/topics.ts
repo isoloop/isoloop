@@ -8,10 +8,16 @@ import type { Retention, TopicConfig } from './control';
  * fits them, and its schema types carry over.
  */
 
-/** A topic as `kernel.publish`, `kernel.subscribe` and `BusClient` take it. */
+/**
+ * A topic as `kernel.publish`, `kernel.subscribe` and `BusClient` take it:
+ * any `topic()` from `@isoloop/bus` fits, and its schema types carry over.
+ */
 export type TopicRef<In = unknown, Out = In, RIn = never, ROut = RIn> = {
+  /** The topic's name. */
   readonly name: string;
+  /** Its schema's types. */
   readonly schema: SchemaTypes<In, Out>;
+  /** Its `reply` schema's types, for a requestable topic. */
   readonly reply?: SchemaTypes<RIn, ROut>;
 };
 
@@ -45,20 +51,26 @@ export type ToolSpec = {
   readonly untrustedContent?: boolean;
 };
 
-/** The parts of a topic definition that make up its `TopicConfig`. */
+/** A topic as the host reads it from the contracts: any `topic()` from `@isoloop/bus` fits. */
 export type TopicShape = {
+  /** The topic's name. */
   readonly name: string;
   /**
    * The topic's Standard Schema. The host reads it only to make a tool's
-   * JSON Schema (ADR 0018, decision 1); it never validates with it.
+   * JSON Schema; it never validates with it.
    */
   readonly schema?: unknown;
+  /** How long it keeps its records. */
   readonly retention: Retention;
+  /** The largest value it takes, in bytes. Default 256 KiB. */
   readonly maxRecordBytes?: number;
+  /** `persistent` topics keep their records across reloads, on disk. Default `memory`. */
   readonly durability?: 'memory' | 'persistent';
+  /** The `reply` schema, for a requestable topic. */
   readonly reply?: unknown;
+  /** The topic it's seeded from, and whether it keeps following it. */
   readonly seed?: { readonly from: { readonly name: string }; readonly follow?: boolean };
-  /** Host only: never part of the `TopicConfig` (ADR 0018, decision 1). */
+  /** The topic as a tool for agents. The host keeps it; the bus never sees it. */
   readonly tool?: ToolSpec;
 };
 

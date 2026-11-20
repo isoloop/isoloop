@@ -17,47 +17,68 @@ import {
 
 /**
  * The inspection feed and its controls, as an isolate with `inspect: true`
- * sees them (ADR 0020, decision 6). `ctx.inspector` is `undefined` without
- * the grant.
+ * sees them: `ctx.inspector`, on a port of its own to the host. It's
+ * `undefined` without the grant.
  * @experimental
  */
 export type IsolateInspector = {
   /**
-   * Isolates, pools, the bus, and the last 200 events. Once the port has
-   * ended it resolves with the last snapshot it got, if any.
+   * The feed's state now.
+   * @returns Isolates, pools, the bus, and the last 200 events. Once the port
+   *   has ended, the last snapshot it got, if any.
    */
   snapshot(): Promise<InspectSnapshot>;
   /**
    * The host's feed messages from now on: events at once, beats and bus
-   * metrics about once a second. Returns the function that stops them.
+   * metrics about once a second.
+   * @param fn Called with each message.
+   * @returns The function that stops them.
    */
   on(fn: (m: InspectMessage) => void): () => void;
-  /** The last `last` retained records of `topic` (at most 100), oldest first, as previews. */
+  /**
+   * The last records of a topic still retained, oldest first, as previews.
+   * @param topic The topic's name.
+   * @param o `last`: how many, at most 100.
+   * @returns The records.
+   * @throws Rejects with a `BusError` from the bus.
+   */
   records(topic: string, o: { last: number }): Promise<InspectRecord[]>;
   /**
-   * Records appended to matching topics, at most `maxPerSec` a second
-   * (default 50), as previews. Not a consumer: it isn't in the bus figures.
-   * `onSkipped` gets each count of records left out over the cap, at most
-   * once a second (ADR 0020, decision 6, amended 2026-11-19). Returns the
-   * function that ends it.
+   * Records appended to matching topics, as previews. Not a consumer: it
+   * isn't in the bus figures.
+   * @param o `topics`: names or patterns. `maxPerSec`: at most this many a
+   *   second, default 50. `onSkipped`: gets each count of records left out
+   *   over the cap, at most once a second.
+   * @param fn Called with each record.
+   * @returns The function that ends it.
    */
   tap(
     o: { topics: string[]; maxPerSec?: number; onSkipped?: (count: number) => void },
     fn: (r: InspectRecord) => void,
   ): () => void;
   /**
-   * Restarts an isolate, as `kernel.restart(id)` does. Like `kill` and
-   * `block`, it rejects for an unknown id, and once the port has ended.
+   * Restarts an isolate, as `kernel.restart(id)` does.
+   * @param id The isolate's id.
+   * @returns Resolves once the restart has started.
+   * @throws Rejects for an unknown id, and once the port has ended.
    */
   restart(id: string): Promise<void>;
   /**
    * Ends an isolate's worker as a crash (`worker_error`), so the supervisor
    * restarts it. For a pooled isolate that ends the pool's worker: every
-   * member crashes and restarts, and the feed shows each one. Resolves once
-   * the kill is sent, not when the isolate is back.
+   * member crashes and restarts, and the feed shows each one.
+   * @param id The isolate's id.
+   * @returns Resolves once the kill is sent, not when the isolate is back.
+   * @throws Rejects for an unknown id, and once the port has ended.
    */
   kill(id: string): Promise<void>;
-  /** Busy-loops an isolate's worker for `ms`, at most 10 s. */
+  /**
+   * Busy-loops an isolate's worker.
+   * @param id The isolate's id.
+   * @param ms How long, at most 10 000 (10 s).
+   * @returns Resolves once the block is sent.
+   * @throws Rejects for an unknown id, and once the port has ended.
+   */
   block(id: string, ms: number): Promise<void>;
 };
 

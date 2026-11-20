@@ -4,12 +4,16 @@
  * tests drive them with plain numbers.
  */
 
+/**
+ * The wait before each restart in the restart window: `initialMs × factorⁿ`,
+ * capped at `maxMs`, where n is the number of restarts already in the window.
+ */
 export type Backoff = {
-  /** Delay before the first restart in a window. Default 250 ms. */
+  /** Delay before the first restart in a window, in ms. Default 250. */
   initialMs: number;
   /** Growth per restart already in the window. Default 2. */
   factor: number;
-  /** Cap. Default 4 s. */
+  /** The longest delay, in ms. Default 4 000 (4 s). */
   maxMs: number;
 };
 

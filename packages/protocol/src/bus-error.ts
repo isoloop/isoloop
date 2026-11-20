@@ -5,9 +5,12 @@ import type { CallError, ErrorCode, Issue } from './errors';
  * `reply`): the broker's error code, and the schema issues for `invalid`.
  */
 export class BusError extends Error {
+  /** What went wrong, to branch on: `invalid`, `forbidden`, `timeout`, `bus_unavailable`, … */
   readonly code: ErrorCode;
+  /** For `invalid`: where the value failed its schema, and why. */
   readonly issues: readonly Issue[] | undefined;
 
+  /** @param error The broker's error: its code, message and issues. */
   constructor(error: CallError) {
     super(error.message);
     this.name = 'BusError';

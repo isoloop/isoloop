@@ -18,14 +18,21 @@ import type { Grants } from './grants';
  * @experimental
  */
 export type InspectIsolate = {
+  /** The isolate's id. */
   id: string;
+  /** Its `IsolateState`. */
   state: string;
+  /** The pool it runs in; absent for a worker of its own. */
   pool?: string;
   /** `performance.now()` on the host when its last beat arrived. */
   lastBeatAt: number;
+  /** How late its worker's last beat fired, past the heartbeat interval, in ms. */
   lagMs: number;
+  /** Restarts after a crash since it was spawned. */
   restarts: number;
+  /** The last crash's `CrashReason`, while restarting or failed. */
   reason?: string;
+  /** The last crash's message, while restarting or failed. */
   error?: string;
   /** Compositor figures for a visual isolate (`SurfaceStats`). */
   surface?: {
@@ -35,12 +42,14 @@ export type InspectIsolate = {
     dropped: number;
     lastFrameMs: number;
   };
+  /** Messages from its worker dropped because their version or type was unknown. */
   dropped: number;
+  /** Open `ctx.keepAwake()` holds, from the last beat. */
   holds?: { ageMs: number; stack?: string }[];
+  /** Milliseconds its worker spent running its code during the last beat's interval. */
   busyMs?: number;
   /**
-   * Its worker's memory, from the host's last measurement (ADR 0020, decision
-   * 4). Absent when the page isn't cross-origin isolated, in engines without
+   * Its worker's memory, from the host's last measurement. Absent when the page isn't cross-origin isolated, in engines without
    * `performance.measureUserAgentSpecificMemory()` (Firefox, Safari), and
    * before the first measurement.
    */
@@ -48,13 +57,13 @@ export type InspectIsolate = {
 };
 
 /**
- * One isolate's memory (ADR 0020, decision 4): the bytes the browser
- * attributes to its worker. Coarse, and seconds old: Chromium answers a
+ * One isolate's memory: the bytes the browser attributes to its worker. Coarse, and seconds old: Chromium answers a
  * measurement at its next garbage collection. A reader shows its age and
  * labels it "Chromium, cross-origin isolated".
  * @experimental
  */
 export type InspectMemory = {
+  /** The bytes the browser attributes to the worker. */
   bytes: number;
   /** `performance.now()` on the host when the measurement came back. */
   at: number;
@@ -64,32 +73,43 @@ export type InspectMemory = {
 
 /** One pool in the feed, as `kernel.pools()` has it. @experimental */
 export type InspectPool = {
+  /** The pool's name. */
   name: string;
+  /** Isolates naming this pool, not stopped, in spawn order. */
   members: string[];
+  /** True while the pool's worker runs. */
   running: boolean;
+  /** The union of its members' grants: what the pool can do in effect. */
   grants: Grants;
+  /** True when a member has a surface: the visual members share one document. */
   sharesDocument: boolean;
+  /** When `sharesDocument`: what that means for the members, in a sentence for people. */
   warning?: string;
 };
 
 /**
- * One kernel event, at once or from the ring buffer (ADR 0020, decisions 2
- * and 5). `event` is a `KernelEvents` name (`isolate:crash`, `bus:restart`, …)
+ * One kernel event, at once or from the ring buffer. `event` is a `KernelEvents` name (`isolate:crash`, `bus:restart`, …)
  * and `data` its payload. Beats and bus metrics come as their own messages.
  * @experimental
  */
 export type InspectEvent = {
   /** `performance.now()` on the host when it happened. */
   at: number;
+  /** The event's name, a `KernelEvents` key. */
   event: string;
+  /** The event's data, as `kernel.on` gives it. */
   data: Record<string, unknown>;
 };
 
 /** One isolate's latest beat in a `beats` message. @experimental */
 export type InspectBeat = {
+  /** The isolate's id. */
   id: string;
+  /** Its pool, when it's a pool member. */
   pool?: string;
+  /** How late its worker's beat fired, past the heartbeat interval, in ms. */
   lagMs: number;
+  /** Milliseconds its worker spent running its code during the beat's interval. */
   busyMs?: number;
   /** `performance.now()` on the host when it arrived. */
   at: number;
@@ -102,32 +122,37 @@ export type InspectBeat = {
  * @experimental
  */
 export type InspectBus = {
+  /** The bus supervisor's state, or `none`. */
   state: string;
+  /** Bus restarts since the kernel started. */
   restarts: number;
   /** The last `bus:metrics`, once one has arrived. */
   metrics?: BusMetrics;
 };
 
-/** What a reader gets first (ADR 0020, decision 2). @experimental */
+/** What a reader gets first: the feed's state at one moment. @experimental */
 export type InspectSnapshot = {
   /** `performance.now()` on the host when it was taken. */
   at: number;
+  /** Every isolate not stopped. */
   isolates: InspectIsolate[];
+  /** The named pools that have members. */
   pools: InspectPool[];
+  /** The bus. */
   bus: InspectBus;
   /** The ring buffer: the last 200 events since the kernel started, oldest first. */
   events: InspectEvent[];
 };
 
 /**
- * The feed's messages, in the usual envelope (ADR 0020, decision 7):
+ * The feed's messages, each `{ v, t, p }`: `t` names it and `p` carries it.
  * - `snapshot`, on request: an isolate's `ctx.inspector.snapshot()` gets it
  *   over its `inspect` port, as the reply to its `snapshot` call;
  * - `event`, a kernel event as it happens;
  * - `beats`, each isolate's latest beat, coalesced to about one a second;
  * - `metrics`, the latest `bus:metrics`, at most one a second;
  * - `memory`, each isolate's memory after a measurement, at most one every
- *   5 s, and only where the page is cross-origin isolated (decision 4).
+ *   5 s, and only where the page is cross-origin isolated.
  * @experimental
  */
 export type InspectMessage =
@@ -164,8 +189,8 @@ export const INSPECT_COALESCE_MS = 1_000;
 export const INSPECT_MEMORY_MS = 5_000;
 
 /**
- * One record from a tap or a read (ADR 0020, decision 3): its value cut to a
- * 2 KB preview, with its full size.
+ * One record from a tap or a read: its value cut to a 2 KB preview, with its
+ * full size.
  * @experimental
  */
 export type InspectRecord = RecordPreview;
