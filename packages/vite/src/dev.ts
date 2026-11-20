@@ -5,6 +5,7 @@
  */
 import type { Plugin, PreviewServer, ViteDevServer } from 'vite';
 
+/** @internal */
 export const WORKERS_ID = 'virtual:isoloop/workers';
 const RESOLVED = `\0${WORKERS_ID}`;
 

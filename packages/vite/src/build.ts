@@ -18,8 +18,10 @@ import type { Plugin, UserConfig } from 'vite';
 
 const QUERY = '?isolate';
 const PREFIX = '\0isolate:';
+/** @internal */
 export const ISOLATES_ID = 'virtual:isoloop/isolates';
 const RESOLVED = `\0${ISOLATES_ID}`;
+/** @internal */
 export const MANIFEST = 'isoloop-manifest.json';
 
 export type BuildOptions = {

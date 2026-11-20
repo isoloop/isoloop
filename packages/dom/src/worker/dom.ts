@@ -168,6 +168,7 @@ export class WEventTarget {
   }
 }
 
+/** @internal */
 export abstract class WNode extends WEventTarget {
   static readonly ELEMENT_NODE = 1;
   static readonly TEXT_NODE = 3;
@@ -296,12 +297,17 @@ export abstract class WCharacterData extends WNode {
   }
 }
 
+/** @internal */
 export class WText extends WCharacterData {
   readonly nodeType = 3;
   readonly nodeName = '#text';
 }
 
-/** A comment node (DOM group 1, ADR 0010): rendered on the host, inert there. */
+/**
+ * A comment node (DOM group 1, ADR 0010): rendered on the host, inert there.
+ *
+ * @internal
+ */
 export class WComment extends WCharacterData {
   readonly nodeType = 8;
   readonly nodeName = '#comment';
@@ -615,6 +621,8 @@ export abstract class WParentNode extends WNode {
  * `DocumentFragment` (DOM group 1, ADR 0010): a detached holder. Inserting
  * it inserts its children, in order, and empties it; it never reaches the
  * host itself.
+ *
+ * @internal
  */
 export class WDocumentFragment extends WParentNode {
   readonly nodeType = 11;
@@ -625,6 +633,7 @@ export class WDocumentFragment extends WParentNode {
   set nodeValue(_v: string | null) {}
 }
 
+/** @internal */
 export class WElement extends WParentNode {
   readonly nodeType = 1;
   readonly localName: string;
@@ -1023,6 +1032,7 @@ const HTML_CLASSES: Record<
   iframe: WHTMLIFrameElement,
 };
 
+/** @internal */
 export class WDocument extends WEventTarget {
   readonly nodeType = 9;
   readonly nodeName = '#document';
@@ -1168,6 +1178,7 @@ function forget(n: WNode, core: Core): void {
   for (const c of n.childNodes) forget(c, core);
 }
 
+/** @internal */
 export type WorkerDomOptions = {
   /** Receives each batch, in order. */
   onBatch(batch: DomBatch): void;
@@ -1292,6 +1303,7 @@ function recorder(
   };
 }
 
+/** @internal */
 export function createDom(opts: WorkerDomOptions): WorkerDom {
   const schedule = opts.schedule ?? ((fn: () => void) => queueMicrotask(fn));
   const core: Core = {

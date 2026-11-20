@@ -1,6 +1,10 @@
 import type { BusRecord, TopicConfig } from '@isoloop/protocol';
 
-/** A record before the engine gives it an offset. */
+/**
+ * A record before the engine gives it an offset.
+ *
+ * @internal
+ */
 export type NewRecord = Omit<BusRecord, 'offset'>;
 
 /** A publish's instance and counter, for deduplicating re-sends (ADR 0007, step 5). */
@@ -14,6 +18,8 @@ export type AppendId = { epoch: number; seq: number };
  * Retention: `last-n` is applied on append; `time` and `compacted` on
  * `compact()`, which the broker calls on a timer. An engine may also compact
  * a `compacted` topic on its own once enough records are superseded.
+ *
+ * @internal
  */
 export interface LogEngine {
   /** Throws if the topic exists. */
@@ -72,7 +78,11 @@ export interface LogEngine {
   page(topic: string, fromOffset: number): Promise<void>;
 }
 
-/** Options every engine takes. */
+/**
+ * Options every engine takes.
+ *
+ * @internal
+ */
 export type EngineOptions = {
   /** Clock for `time` retention. Default `Date.now`. */
   now?: () => number;
@@ -80,7 +90,11 @@ export type EngineOptions = {
   storage?: LogStorage;
 };
 
-/** What a storage found on open: per topic, the offsets it holds; per topic and consumer, commits. */
+/**
+ * What a storage found on open: per topic, the offsets it holds; per topic and consumer, commits.
+ *
+ * @internal
+ */
 export type StoredState = {
   topics: { topic: string; tail: number; head: number }[];
   offsets: Record<string, Record<string, number>>;
@@ -90,6 +104,8 @@ export type StoredState = {
  * Durable storage under the engine, for `durability: 'persistent'` topics
  * (design §6.2, ADR 0007). M2 ships `MemoryStorage`, which keeps nothing;
  * M2b adds `OpfsStorage`.
+ *
+ * @internal
  */
 export interface LogStorage {
   /** `memory` keeps nothing; reported in the bus `ready` message. */

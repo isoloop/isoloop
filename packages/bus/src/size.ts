@@ -3,6 +3,8 @@
  * §6.1). Strings count two bytes per UTF-16 unit, numbers eight, object keys
  * like strings, plus a little per entry. Cycles count once. Cheap rather than
  * exact: it only has to tell a 1 KiB record from a 1 MiB one.
+ *
+ * @internal
  */
 export function estimateSize(value: unknown, limit: number = Infinity): number {
   const seen = new Set<object>();

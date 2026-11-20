@@ -21,7 +21,11 @@ import {
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
-/** Decides what the applier may create and write. Supplied by the host; required. */
+/**
+ * Decides what the applier may create and write. Supplied by the host; required.
+ *
+ * @internal
+ */
 export interface SanitisePolicy {
   /** The host element to create for an isolate's tag. */
   element(tag: string, ns: Namespace): { tag: string; ns: Namespace };
@@ -34,6 +38,7 @@ export interface SanitisePolicy {
   property(el: Element, name: SyncedProp, value: string | boolean, force: boolean): boolean;
 }
 
+/** @internal */
 export interface Applier {
   /** Applies one batch. Returns false, changing nothing, if its shape is wrong. */
   apply(batch: unknown): boolean;
@@ -54,6 +59,7 @@ const nsOf = (el: Element): Namespace => (el.namespaceURI === SVG_NS ? 'svg' : '
 
 const NO_MODS: DomMods = { alt: false, ctrl: false, meta: false, shift: false };
 
+/** @internal */
 export function createApplier(container: Element, policy: SanitisePolicy): Applier {
   const nodes = new Map<NodeId, Node>([[ROOT_ID, container]]);
   const ids = new WeakMap<Node, NodeId>([[container, ROOT_ID]]);

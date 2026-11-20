@@ -13,6 +13,7 @@ import type {
 /** Default records per chunk. Chunk `i` holds offsets `[i * size, (i + 1) * size)`. */
 export const CHUNK = 4096;
 
+/** @internal */
 export type TsEngineOptions = EngineOptions & {
   /** Records per chunk. Default 4,096; tests use small chunks to cross boundaries often. */
   chunkSize?: number;
@@ -83,6 +84,8 @@ type Topic = {
  * The TypeScript `LogEngine` (design §6.2). Each topic is an array of
  * fixed-size chunks, so dropping old records frees a whole chunk at a time:
  * O(1) per chunk. Compacted topics keep a key → latest-offset index.
+ *
+ * @internal
  */
 export class TsEngine implements LogEngine {
   readonly name = 'ts';

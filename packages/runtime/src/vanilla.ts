@@ -94,7 +94,11 @@ export type IsolateDefinition<Root = IsolateRoot> = {
   requires?: string;
 };
 
-/** This build's stamp: `major.minor` of the package version, inlined when tsdown bundles it. */
+/**
+ * This build's stamp: `major.minor` of the package version, inlined when tsdown bundles it.
+ *
+ * @internal
+ */
 export const REQUIRES: string = majorMinor(version) ?? '0.0';
 
 /**
