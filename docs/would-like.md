@@ -78,6 +78,10 @@ These move to `isoloop/builder` when that repo is created, with the [decisions s
 - **Generated code in a sandbox.** Builder v1's agent writes specs only, so it can do only what the fixed operators and views can. Letting it write code, run in a sandboxed isolate (perhaps the [system design §11](design/system-design.md) iframe tier), would cover the rest; a non-technical user can't review that code, so it needs its own design.
 - **An online platform.** Builder dashboards are saved in the browser (a persistent topic in OPFS), with export and import as a file. A hosted place where people store and view them, across devices or shared with others, would need accounts and a backend, so it's outside the tab boundary and a separate product decision.
 
+## Benchmarks
+
+- **A native build with the same features.** The plant's native builds keep their data in a small store written for the app ([`plant/src/core/store.ts`](https://github.com/isoloop/web/blob/main/apps/dashboards/plant/src/core/store.ts)), with no bus. They don't contain a blocked widget, restart a crashed one, replay data to it, check grants or schemas, or keep acknowledged history, so the comparison measures what those features cost, not the same features done another way. A further native build on an off-the-shelf store (Redux Toolkit or Zustand), with persistence and retention, would show how close an app can get without Isoloop, and at what cost. New builds and new server runs; not tied to a milestone. The site's caption states the current baseline meanwhile.
+
 ## Tooling
 
 - **tsrs as the type checker.** The Rust port of the TS 7 checker (`oxc-project/tsrs`). Switch `typecheck` from `tsc` once tsrs has a stable release for the TypeScript version we're on and is at least 2× faster than `tsc` on this repo. It's one script change. *2026-11-20:* tsrs is a dev dependency since [M4c](plans/m4c-docs.md) task 3, pinned exactly, for the docs' `readApi` only (decision 32). ([ADR 0009](adr/0009-toolchain.md))
