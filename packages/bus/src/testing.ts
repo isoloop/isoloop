@@ -7,7 +7,9 @@ export type TopicSamples =
   | readonly unknown[]
   | { values: readonly unknown[]; replies?: readonly unknown[] };
 
+/** One problem `testContracts` found. */
 export type ContractProblem = {
+  /** The topic's name. */
   topic: string;
   /** `value` for the topic schema, `reply` for its reply schema. */
   schema: 'value' | 'reply';
@@ -18,7 +20,9 @@ export type ContractProblem = {
    * plain, structured-cloneable data. `no_samples`: the topic has none.
    */
   kind: 'invalid' | 'not_plain' | 'no_samples';
+  /** What is wrong, in one line. */
   message: string;
+  /** The schema's issues, for `invalid`. */
   issues?: Issue[];
 };
 
@@ -105,9 +109,13 @@ const isList = (s: TopicSamples): s is readonly unknown[] => Array.isArray(s);
 
 /**
  * Runs sample values through every schema in a contracts list and reports
- * samples the schema rejects and outputs that aren't plain, cloneable data
- * (ADR 0003, decision 11). The broker only checks cloneability in dev builds,
- * so run this in the contracts package's tests. An empty result means all good.
+ * samples the schema rejects and outputs that aren't plain, cloneable data.
+ * The bus only checks cloneability in dev builds, so run this in the contracts
+ * package's tests.
+ *
+ * @param list - The contracts list.
+ * @param samples - Sample values per topic name. A topic without samples is reported as `no_samples`.
+ * @returns Every problem found. An empty array means all good.
  */
 export async function testContracts(
   list: Contracts,

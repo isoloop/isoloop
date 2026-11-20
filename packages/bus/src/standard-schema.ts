@@ -1,10 +1,11 @@
 import type { Issue as WireIssue } from '@isoloop/protocol';
 
 /**
- * The Standard Schema V1 interface (https://standardschema.dev), vendored so
- * the bus depends on no schema library (ADR 0003, decision 1). Zod 4, Valibot
- * and ArkType implement it. Copied from the spec; keep it in step with it.
+ * The Standard Schema V1 interface (https://standardschema.dev), copied from
+ * the spec so the bus depends on no schema library. Zod 4, Valibot and ArkType
+ * implement it, so a schema from any of them works as a topic's schema.
  */
+// Copied from the spec: keep it in step with it.
 export interface StandardSchemaV1<Input = unknown, Output = Input> {
   readonly '~standard': StandardSchemaV1.Props<Input, Output>;
 }

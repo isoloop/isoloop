@@ -3,9 +3,22 @@ import type { CallResult, ErrorCode, ErrorPayload, Issue } from './errors';
 import type { PublishId, RecordReq, RequestVia } from './bus';
 import type { Grants } from './grants';
 
+/**
+ * What a topic's log keeps: `last-n`, the newest `n` records; `time`, the
+ * records younger than `ms` by their `ts`; `compacted`, the latest record per
+ * key.
+ */
 export type Retention =
-  | { kind: 'last-n'; n: number }
-  | { kind: 'time'; ms: number }
+  | {
+      kind: 'last-n';
+      /** How many records to keep, a positive integer. */
+      n: number;
+    }
+  | {
+      kind: 'time';
+      /** How long to keep a record, in milliseconds, a positive integer. */
+      ms: number;
+    }
   | { kind: 'compacted' };
 
 /**

@@ -12,54 +12,58 @@ import type { StandardSchemaV1 } from './standard-schema';
 
 export type { Retention, ToolSpec } from '@isoloop/protocol';
 
-/** Default `maxRecordBytes`: 256 KiB (design §6.1). */
+/** The default `maxRecordBytes`: 256 KiB. */
 export const DEFAULT_MAX_RECORD_BYTES: number = 256 * 1024;
 
 /**
- * A topic: its name, schema and log policy (design §6.1). Publishers are typed
- * with `In`, subscribers with `Out`, because the log stores the schema's
- * validated output (ADR 0003, decision 11). `RIn`/`ROut` type `bus.request`
- * replies; a topic without `reply` can't be requested.
+ * A topic: its name, its schemas and what its log keeps. Publishers are typed
+ * with `In` and subscribers with `Out`, because the log stores what the schema
+ * returns, not what was published. `RIn` and `ROut` type the replies to
+ * `bus.request`; a topic without `reply` can't be requested.
  */
 export type TopicDef<In, Out = In, RIn = never, ROut = RIn> = {
-  /** Carries the major version, e.g. `cart.items.v1` (ADR 0003, decision 17). */
+  /** The topic's name. By convention it ends in the major version, for example `cart.items.v1`. */
   readonly name: string;
-  /** Required. `unchecked<T>()` is the explicit opt-out. */
+  /** The Standard Schema that checks each published value. Required: `unchecked<T>()` is the explicit opt-out. */
   readonly schema: StandardSchemaV1<In, Out>;
-  /** Required for `bus.request`. @experimental */
+  /** The Standard Schema for replies. Required for `bus.request`. @experimental */
   readonly reply?: StandardSchemaV1<RIn, ROut>;
+  /** What the log keeps: the newest `n` records, the records younger than `ms`, or the latest record per key. Required. */
   readonly retention: Retention;
-  /** Rough structured size limit per record. Default 256 KiB. */
+  /** The largest record, by its rough structured size. A bigger one is rejected with `too_large`. Default 256 KiB. */
   readonly maxRecordBytes?: number;
   /**
-   * Default `memory`. `persistent` keeps the topic in OPFS (ADR 0007): it
-   * survives a bus crash and a reload. Where OPFS isn't available, or another
-   * tab holds it, it behaves as `memory` and the kernel emits
-   * `bus:durability_degraded`.
+   * Default `memory`. `persistent` keeps the topic in OPFS, so it survives a
+   * bus crash and a reload. Where OPFS isn't available, or another tab holds
+   * it, it behaves as `memory` and the kernel emits `bus:durability_degraded`.
    */
   readonly durability?: 'memory' | 'persistent';
   /**
-   * Starts this topic from an older one (ADR 0003, decision 18). On the first
-   * boot where this topic is empty and `from` has records, the bus copies
-   * them through `map` and this topic's schema before it opens: its publishes
-   * wait and its subscribers get nothing until then. `map` must be pure and
-   * synchronous. `follow` keeps mapping new `from` records afterwards.
+   * Starts this topic from an older one. On the first boot where this topic
+   * is empty and `from` has records, the bus copies them through `map` and
+   * this topic's schema before it opens: its publishes wait and its
+   * subscribers get nothing until then. `map` must be pure and synchronous.
+   * `follow` keeps mapping new `from` records afterwards.
    */
   readonly seed?: {
+    /** The older topic to copy from. */
     readonly from: AnyTopicDef;
+    /** Turns an older record's value into this topic's input. A record whose `map` throws or returns a promise is skipped, and the kernel emits `bus:seed_rejected`. */
     readonly map: (value: any, record: BusRecord) => In;
+    /** Keeps mapping new `from` records after the first copy. Default `false`. */
     readonly follow?: boolean;
   };
   /**
-   * Describes this topic as a tool for agents (ADR 0018, decision 1). Only a
-   * topic with `reply` can have one: without it this field's type is `never`.
-   * It exposes nothing by itself; the app's `agents.expose` does. The bus
-   * never sees it (not part of `topicConfig`).
+   * Describes this topic as a tool for agents. Only a topic with `reply` can
+   * have one: without it this field's type is `never`. It exposes nothing by
+   * itself; the app's `agents.expose` does. It stays on the host: the bus
+   * worker never sees it.
    * @experimental
    */
   readonly tool?: [RIn] extends [never] ? never : ToolSpec;
 };
 
+/** A topic of any types, as `contracts()` takes them. */
 export type AnyTopicDef = TopicDef<any, any, any, any>;
 
 /** What a publisher passes. */
@@ -71,7 +75,24 @@ export type ReplyInputOf<D> = D extends TopicDef<any, any, infer RIn, any> ? RIn
 /** What a requester receives. */
 export type ReplyOutputOf<D> = D extends TopicDef<any, any, any, infer ROut> ? ROut : never;
 
-/** Defines a topic. Types come from the schemas. */
+/**
+ * Defines a topic. Its types come from its schemas.
+ *
+ * @param name - The topic's name, for example `cart.items.v1`.
+ * @param def - The topic's schemas, retention and options.
+ * @returns The topic, frozen. List it in `contracts()` to use it.
+ *
+ * @example
+ * ```ts
+ * import { topic } from '@isoloop/bus';
+ * import { z } from 'zod';
+ *
+ * export const cartItems = topic('cart.items.v1', {
+ *   schema: z.object({ sku: z.string(), qty: z.number().int().positive() }),
+ *   retention: { kind: 'compacted' },
+ * });
+ * ```
+ */
 export function topic<In, Out = In, RIn = never, ROut = RIn>(
   name: string,
   def: Omit<TopicDef<In, Out, RIn, ROut>, 'name'>,
@@ -80,8 +101,10 @@ export function topic<In, Out = In, RIn = never, ROut = RIn>(
 }
 
 /**
- * A Standard Schema that accepts any value unchanged and only carries the type
- * (ADR 0003, decision 2). Tools list topics that use it.
+ * A Standard Schema that accepts any value unchanged and only carries the type.
+ * Tools list the topics that use it.
+ *
+ * @returns A schema whose input and output type is `T`.
  */
 export function unchecked<T>(): StandardSchemaV1<T, T> {
   return {
@@ -104,23 +127,35 @@ export function isUnchecked(schema: StandardSchemaV1): boolean {
 }
 
 /**
- * The default export of a contracts module (ADR 0003, decision 4). Built only
- * by `contracts()`, so the bus worker can tell it from any other export.
+ * The default export of a contracts module. Built only by `contracts()`, so
+ * the bus worker can tell it from any other export.
  */
 export type Contracts = {
   /** Brand, so the bus worker can tell a contracts list from any other export. */
   readonly '~isoloop': 'contracts';
+  /** The topics, in the order given to `contracts()`. */
   readonly topics: readonly AnyTopicDef[];
-  /** Looks a topic up by name. */
+  /**
+   * Looks a topic up by name.
+   *
+   * @param name - The topic's name.
+   * @returns The topic, or `undefined` if the list doesn't have it.
+   */
   get(name: string): AnyTopicDef | undefined;
 };
 
 /** A contracts list that can't be built: duplicate or reserved names, or a bad definition. */
 export class ContractsError extends Error {
+  /** `reserved_topic` for an `isoloop.*` name, `contracts_invalid` for anything else. */
   readonly code: ErrorCode;
   /** The topics at fault. */
   readonly topics: readonly string[];
 
+  /**
+   * @param code - The error code.
+   * @param message - What is wrong, naming the topics.
+   * @param topics - The topics at fault.
+   */
   constructor(code: ErrorCode, message: string, topics: readonly string[]) {
     super(message);
     this.name = 'ContractsError';
@@ -185,8 +220,27 @@ function problemOf(t: AnyTopicDef): string | undefined {
 }
 
 /**
- * Builds the contracts list. Rejects duplicate names and `isoloop.*` topics,
- * which belong to the kernel (ADR 0003, decisions 4 and 6).
+ * Builds the contracts list, the default export of a contracts module.
+ *
+ * @param topics - Every topic the app uses.
+ * @returns The list, frozen.
+ * @throws {ContractsError} `reserved_topic` for an `isoloop.*` name, which
+ *   belongs to the kernel. `contracts_invalid` for a duplicate name, a topic
+ *   without a valid schema or retention, a bad `tool` or `seed`, or seeds that
+ *   form a cycle.
+ *
+ * @example
+ * ```ts
+ * import { contracts, topic } from '@isoloop/bus';
+ * import { z } from 'zod';
+ *
+ * const prices = topic('markets.prices.v1', {
+ *   schema: z.object({ symbol: z.string(), last: z.number() }),
+ *   retention: { kind: 'last-n', n: 1_000 },
+ * });
+ *
+ * export default contracts(prices);
+ * ```
  */
 export function contracts(...topics: AnyTopicDef[]): Contracts {
   const reserved = topics.filter((t) => isSystemTopic(t.name)).map((t) => t.name);
