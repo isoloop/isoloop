@@ -1,5 +1,5 @@
 {
-  "$comment": "Which code each guide covers (M4c decision 21). paths: source a PR may change that the guide describes; a PR touching one without the guide gets a notice. exports: public exports per entry point that the guide documents. referenceOnly: public exports documented only in the generated API reference. Upkeep: .claude/skills/docs/SKILL.md.",
+  "$comment": "Which code each guide covers (M4c decision 21). paths: source a PR may change that the guide describes; a PR touching one without the guide gets a notice. exports: public exports per entry point that the guide documents. referenceOnly: public exports documented only in the generated API reference. Upkeep: .claude/skills/docs/SKILL.md. pending: exports no guide covers yet, grouped by the M4c task that will (or \"freeze\", decided at the API freeze); it only shrinks and is gone by M4c's done-when (decisions 37–40).",
   "guides": {
     "agents": {
       "paths": [
@@ -88,5 +88,165 @@
       }
     }
   },
-  "referenceOnly": {}
+  "referenceOnly": {
+    "@isoloop/dom/testing": [
+      "BridgePair",
+      "CASES",
+      "CaseName",
+      "ConformanceEvent",
+      "ConformanceHost",
+      "FixtureHost",
+      "FixtureMessage",
+      "Handle",
+      "IsolateDriver",
+      "MakeBridgePair",
+      "NodeIds",
+      "SMOKE_STEPS",
+      "TOLERATED_MISSING",
+      "UsageLog",
+      "checkDomUsage",
+      "createIsoloopDomDriver",
+      "mountFixture",
+      "mountMembers",
+      "runBridgeConformance",
+      "snapshot"
+    ],
+    "@isoloop/dom/testing/worker": [
+      "UsageTracker",
+      "driveUsageFixture",
+      "reportUsage",
+      "serveFixture",
+      "servePoolFixture",
+      "trackUsage"
+    ]
+  },
+  "pending": {
+    "5": {
+      "@isoloop/vite": ["devCsp", "headersFor"]
+    },
+    "13": {
+      "@isoloop/host": [
+        "HostComponent",
+        "KernelConfig",
+        "KernelError",
+        "KernelErrorCode",
+        "createKernel"
+      ]
+    },
+    "14": {
+      "@isoloop/runtime": ["HostApi", "HostCallError", "ScrollIntoViewOptionsLike"]
+    },
+    "15": {
+      "@isoloop/host": ["NavigateRequest", "OnNavigate"],
+      "@isoloop/runtime": [
+        "BusClient",
+        "IsolateContext",
+        "IsolateDefinition",
+        "IsolateRoot",
+        "SubscribeOptions",
+        "defineIsolate"
+      ],
+      "@isoloop/dom/worker": [
+        "DOM_GLOBALS",
+        "WComment",
+        "WDocument",
+        "WDocumentFragment",
+        "WElement",
+        "WNode",
+        "WText",
+        "WorkerDomOptions",
+        "createDom",
+        "install"
+      ],
+      "@isoloop/react": [
+        "IsolateProps",
+        "RequestOptions",
+        "RouteValue",
+        "UseTopicOptions",
+        "defineIsolate",
+        "useHost",
+        "useIsolate",
+        "usePublish",
+        "useRequest",
+        "useRoute",
+        "useTopic"
+      ],
+      "@isoloop/preact": [
+        "IsolateProps",
+        "RequestOptions",
+        "UseTopicOptions",
+        "defineIsolate",
+        "useHost",
+        "useIsolate",
+        "usePublish",
+        "useRequest",
+        "useRoute",
+        "useTopic"
+      ]
+    },
+    "16": {
+      "@isoloop/bus": [
+        "AnyTopicDef",
+        "Contracts",
+        "ContractsError",
+        "DEFAULT_MAX_RECORD_BYTES",
+        "InputOf",
+        "OutputOf",
+        "ReplyInputOf",
+        "ReplyOutputOf",
+        "StandardSchemaV1",
+        "TopicDef",
+        "contracts",
+        "topic",
+        "unchecked"
+      ]
+    },
+    "17": {
+      "@isoloop/host": ["BusError"],
+      "@isoloop/bus": [
+        "DEFAULT_REQUEST_TIMEOUT_MS",
+        "HOST_PRODUCER",
+        "KERNEL_PRODUCER",
+        "Retention"
+      ]
+    },
+    "18": {
+      "@isoloop/host": ["Backoff"]
+    },
+    "28": {
+      "@isoloop/runtime/testing": ["TestContext", "TestContextOptions", "createTestContext"],
+      "@isoloop/bus/testing": ["ContractProblem", "TopicSamples", "testContracts"]
+    },
+    "freeze": {
+      "@isoloop/host": ["HostRenderBridge"],
+      "@isoloop/runtime": ["REQUIRES"],
+      "@isoloop/bus": [
+        "Broker",
+        "BrokerOptions",
+        "BrokerStats",
+        "BusPort",
+        "EngineOptions",
+        "LogEngine",
+        "LogStorage",
+        "MemoryStorage",
+        "NewRecord",
+        "Publisher",
+        "StoredState",
+        "TapSink",
+        "Timers",
+        "TsEngine",
+        "TsEngineOptions",
+        "effectiveDurability",
+        "estimateSize",
+        "isContracts",
+        "isUnchecked",
+        "publishId",
+        "toIssues",
+        "topicConfig"
+      ],
+      "@isoloop/dom/worker": ["ISOLOOP_DOM_FMT", "ROOT_ID"],
+      "@isoloop/dom/host": ["Applier", "SanitisePolicy", "createApplier", "isDomBatch"],
+      "@isoloop/vite": ["ISOLATES_ID", "IsolateManifest", "MANIFEST", "WORKERS_ID"]
+    }
+  }
 }

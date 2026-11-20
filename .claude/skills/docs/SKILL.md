@@ -46,7 +46,9 @@ In `docs/guide/map.json`:
 - **A renamed or removed export** is renamed or removed there too.
 - **A new source file** that a guide describes goes in that guide's `paths`. A directory path ending in `/` covers every file under it.
 
-Every public export appears in a guide's `exports` or in `referenceOnly`.
+Every public export is covered: in a guide's `exports`, in `referenceOnly`, or (for an interface or type alias) reached from a covered export's signature. Re-exports count as the declaration they point at.
+
+**`pending`** lists the exports no guide covers yet, grouped by the M4c task that will cover them (or `freeze`, decided at the API freeze). It only shrinks: CI fails when a PR adds a name to it, so a new export goes straight into a guide or `referenceOnly`. When your guide covers a pending name, move it into the guide's `exports` and delete it from `pending`; the check fails while a name is in both, or is pending but already reached.
 
 ## 4. Add, rename or remove a guide
 
@@ -60,7 +62,7 @@ There are no redirects before 1.0: a removed page's URL returns the 404 page.
 
 ## 5. Check
 
-Run `pnpm docs:check` and `pnpm format:check`. `docs:check` checks the rules `docs/writing.md` marks **(checked)**: the skeleton and lead sentence, the type-checked fences, the links, the banned phrases, guides naming a removed export, and the map's coverage. It arrives with M4c tasks 3 and 4. Until then, check those rules by hand.
+Run `pnpm build`, then `pnpm docs:check` and `pnpm format:check`. `docs:check` checks the rules `docs/writing.md` marks **(checked)**: the skeleton and lead sentence, the links, the banned phrases and em dashes, and the map's coverage. The PR hook runs `pnpm docs:check --guides`, the Markdown part, and CI runs all of it. Two checks arrive with M4c task 4, the type-checked fences and guides naming a removed export; until then, check those by hand.
 
 The steward reviews the rest on the PR: whether each claim matches the code, the voice, and whether a guide the map flagged needed a change.
 
