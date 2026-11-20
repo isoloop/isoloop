@@ -131,6 +131,52 @@
           "unchecked"
         ]
       }
+    },
+    "isolates": {
+      "paths": [
+        "packages/runtime/src/vanilla.ts",
+        "packages/runtime/src/bus-client.ts",
+        "packages/runtime/src/bootstrap.ts",
+        "packages/react/src/",
+        "packages/preact/src/",
+        "packages/host/src/router.ts"
+      ],
+      "exports": {
+        "@isoloop/host": ["NavigateRequest", "OnNavigate"],
+        "@isoloop/runtime": [
+          "BusClient",
+          "IsolateContext",
+          "IsolateDefinition",
+          "IsolateRoot",
+          "SubscribeOptions",
+          "defineIsolate"
+        ],
+        "@isoloop/react": [
+          "IsolateProps",
+          "RequestOptions",
+          "RouteValue",
+          "UseTopicOptions",
+          "defineIsolate",
+          "useHost",
+          "useIsolate",
+          "usePublish",
+          "useRequest",
+          "useRoute",
+          "useTopic"
+        ],
+        "@isoloop/preact": [
+          "IsolateProps",
+          "RequestOptions",
+          "UseTopicOptions",
+          "defineIsolate",
+          "useHost",
+          "useIsolate",
+          "usePublish",
+          "useRequest",
+          "useRoute",
+          "useTopic"
+        ]
+      }
     }
   },
   "referenceOnly": {
@@ -166,53 +212,6 @@
     ]
   },
   "pending": {
-    "15": {
-      "@isoloop/runtime": [
-        "BusClient",
-        "IsolateContext",
-        "IsolateDefinition",
-        "IsolateRoot",
-        "SubscribeOptions",
-        "defineIsolate"
-      ],
-      "@isoloop/dom/worker": [
-        "DOM_GLOBALS",
-        "WComment",
-        "WDocument",
-        "WDocumentFragment",
-        "WElement",
-        "WNode",
-        "WText",
-        "WorkerDomOptions",
-        "createDom",
-        "install"
-      ],
-      "@isoloop/react": [
-        "IsolateProps",
-        "RequestOptions",
-        "RouteValue",
-        "UseTopicOptions",
-        "defineIsolate",
-        "useHost",
-        "useIsolate",
-        "usePublish",
-        "useRequest",
-        "useRoute",
-        "useTopic"
-      ],
-      "@isoloop/preact": [
-        "IsolateProps",
-        "RequestOptions",
-        "UseTopicOptions",
-        "defineIsolate",
-        "useHost",
-        "useIsolate",
-        "usePublish",
-        "useRequest",
-        "useRoute",
-        "useTopic"
-      ]
-    },
     "17": {
       "@isoloop/host": ["BusError"],
       "@isoloop/bus": ["DEFAULT_REQUEST_TIMEOUT_MS", "HOST_PRODUCER", "KERNEL_PRODUCER"]
@@ -248,7 +247,20 @@
         "toIssues",
         "topicConfig"
       ],
-      "@isoloop/dom/worker": ["ISOLOOP_DOM_FMT", "ROOT_ID"],
+      "@isoloop/dom/worker": [
+        "DOM_GLOBALS",
+        "ISOLOOP_DOM_FMT",
+        "ROOT_ID",
+        "WComment",
+        "WDocument",
+        "WDocumentFragment",
+        "WElement",
+        "WNode",
+        "WText",
+        "WorkerDomOptions",
+        "createDom",
+        "install"
+      ],
       "@isoloop/dom/host": ["Applier", "SanitisePolicy", "createApplier", "isDomBatch"],
       "@isoloop/vite": ["ISOLATES_ID", "IsolateManifest", "MANIFEST", "WORKERS_ID"]
     }
