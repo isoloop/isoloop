@@ -196,6 +196,26 @@
           "KernelEvents"
         ]
       }
+    },
+    "bus": {
+      "paths": [
+        "packages/bus/src/topic.ts",
+        "packages/bus/src/broker.ts",
+        "packages/bus/src/server.ts",
+        "packages/bus/src/engine/",
+        "packages/bus/src/storage/",
+        "packages/runtime/src/bus-client.ts",
+        "packages/host/src/bus/"
+      ],
+      "exports": {
+        "@isoloop/host": ["BusError"],
+        "@isoloop/bus": [
+          "DEFAULT_REQUEST_TIMEOUT_MS",
+          "HOST_PRODUCER",
+          "KERNEL_PRODUCER",
+          "Retention"
+        ]
+      }
     }
   },
   "referenceOnly": {
@@ -231,10 +251,6 @@
     ]
   },
   "pending": {
-    "17": {
-      "@isoloop/host": ["BusError"],
-      "@isoloop/bus": ["DEFAULT_REQUEST_TIMEOUT_MS", "HOST_PRODUCER", "KERNEL_PRODUCER"]
-    },
     "28": {
       "@isoloop/runtime/testing": ["TestContext", "TestContextOptions", "createTestContext"],
       "@isoloop/bus/testing": ["ContractProblem", "TopicSamples", "testContracts"]
