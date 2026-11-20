@@ -67,6 +67,18 @@
         "@isoloop/runtime": ["IsolateInspector"]
       }
     },
+    "limits": {
+      "paths": [
+        "packages/runtime/src/host-calls.ts",
+        "packages/host/src/events.ts",
+        "packages/host/src/features.ts",
+        "packages/host/src/render/registry.ts",
+        "packages/dom/src/worker/"
+      ],
+      "exports": {
+        "@isoloop/runtime": ["HostApi", "HostCallError", "ScrollIntoViewOptionsLike"]
+      }
+    },
     "pools": {
       "paths": ["packages/runtime/src/freeze.ts"],
       "exports": {
