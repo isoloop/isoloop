@@ -225,6 +225,13 @@
         "packages/protocol/src/grants.ts"
       ],
       "exports": {}
+    },
+    "testing": {
+      "paths": ["packages/runtime/src/testing.ts", "packages/bus/src/testing.ts"],
+      "exports": {
+        "@isoloop/runtime/testing": ["TestContext", "TestContextOptions", "createTestContext"],
+        "@isoloop/bus/testing": ["ContractProblem", "TopicSamples", "testContracts"]
+      }
     }
   },
   "referenceOnly": {
@@ -260,10 +267,6 @@
     ]
   },
   "pending": {
-    "28": {
-      "@isoloop/runtime/testing": ["TestContext", "TestContextOptions", "createTestContext"],
-      "@isoloop/bus/testing": ["ContractProblem", "TopicSamples", "testContracts"]
-    },
     "freeze": {
       "@isoloop/host": ["HostRenderBridge"],
       "@isoloop/runtime": ["REQUIRES"],
