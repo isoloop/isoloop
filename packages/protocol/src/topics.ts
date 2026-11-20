@@ -26,7 +26,7 @@ export type SchemaTypes<In, Out> = {
 export type TypedRecord<T> = Omit<BusRecord, 'value'> & { value: T };
 
 /**
- * Describes a requestable topic as a tool for agents (ADR 0018, decision 1).
+ * Describes a requestable topic as a tool for agents.
  * A `tool` field alone exposes nothing: the app's kernel config lists what
  * agents may call (`agents.expose`). It stays on the host and isn't part of
  * the `TopicConfig` the bus sees.
