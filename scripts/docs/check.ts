@@ -10,7 +10,8 @@
 // - Item 2 (fences that type-check, scripts/docs/fences.ts) runs `tsc` over
 //   the guides' `ts` and `tsx` fences; `--guides` runs it too.
 // - Item 5 (a guide naming a removed export) needs the PR's base built, so the
-//   API check runs it (scripts/ci/api-check.ts), with checkRemovedNames below.
+//   API check runs it (scripts/ci/api-check.ts), with checkRemovedNames from
+//   ./markdown.ts.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -18,7 +19,9 @@ import { fileURLToPath } from 'node:url';
 import { checkFences } from './fences.ts';
 import { isTypeKind, readApi, type ApiModel, type EntryFile, type ExportKind } from './read-api.ts';
 
-export type Problem = { file: string; message: string };
+export type { Problem } from './markdown.ts';
+export { checkRemovedNames, withoutFences } from './markdown.ts';
+import { type Problem, withoutFences } from './markdown.ts';
 
 /**
  * Guides that predate the skeleton and the lead rule (M4c decisions 9 and 19). Item 1
@@ -82,61 +85,12 @@ export function parseWritingRules(md: string): WritingRules {
 
 // --- Markdown helpers --------------------------------------------------------
 
-/** The Markdown with fenced blocks blanked (line count kept), for prose-only checks. */
-export function withoutFences(md: string): string {
-  const out: string[] = [];
-  let fence: string | undefined;
-  for (const line of md.split('\n')) {
-    const m = /^\s*(`{3,}|~{3,})/.exec(line);
-    if (fence) {
-      if (m && (m[1] ?? '').startsWith(fence)) fence = undefined;
-      out.push('');
-    } else if (m) {
-      fence = (m[1] ?? '').slice(0, 3);
-      out.push('');
-    } else out.push(line);
-  }
-  return out.join('\n');
-}
-
 /** Prose as a reader sees it: inline code removed, links reduced to their text. */
 const prose = (line: string): string =>
   line
     .replace(/`[^`]*`/g, ' ')
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/<[^>]+>/g, ' ');
-
-// --- Item 5: guides naming a removed export -----------------------------------
-
-/**
- * Each inline code span in the guide's prose that names one of `removed`
- * (`createKernel`, `kernel.request(…)`, `Kernel`), with its line. Fences are
- * item 2's: a removed name there fails the type check. The removed names come
- * from the API check (`scripts/ci/api-check.ts`), the one job that builds the
- * PR's base, so this item runs there.
- */
-export function checkRemovedNames(
-  file: string,
-  md: string,
-  removed: ReadonlySet<string>,
-): Problem[] {
-  if (removed.size === 0) return [];
-  const out: Problem[] = [];
-  withoutFences(md)
-    .split('\n')
-    .forEach((line, i) => {
-      for (const span of line.matchAll(/`([^`]+)`/g)) {
-        for (const id of (span[1] ?? '').match(/[A-Za-z_$][\w$]*/g) ?? []) {
-          if (removed.has(id))
-            out.push({
-              file: `${file}:${i + 1}`,
-              message: `names \`${id}\`, which is no longer exported: update the guide`,
-            });
-        }
-      }
-    });
-  return out;
-}
 
 // --- Item 1: the skeleton and the lead ---------------------------------------
 

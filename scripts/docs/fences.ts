@@ -26,7 +26,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join, relative } from 'node:path';
-import type { Problem } from './check.ts';
+import type { Problem } from './markdown.ts';
 
 export type Fence = {
   /** The guide, relative to the repo root. */

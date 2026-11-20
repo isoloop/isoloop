@@ -19,7 +19,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
-import { checkRemovedNames } from '../docs/check.ts';
+import { checkRemovedNames } from '../docs/markdown.ts';
 import { parseSiteImpact } from './site-impact-parse.ts';
 import { prBody } from './site-impact.ts';
 
