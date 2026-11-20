@@ -104,6 +104,33 @@
         "@isoloop/react": ["usePortalRoot"],
         "@isoloop/preact": ["usePortalRoot"]
       }
+    },
+    "contracts": {
+      "paths": [
+        "packages/bus/src/topic.ts",
+        "packages/bus/src/standard-schema.ts",
+        "packages/bus/src/json-schema.ts",
+        "packages/bus/src/seed.ts",
+        "packages/protocol/src/grants.ts",
+        "packages/cli/src/commands/contracts-export.ts"
+      ],
+      "exports": {
+        "@isoloop/bus": [
+          "AnyTopicDef",
+          "Contracts",
+          "ContractsError",
+          "DEFAULT_MAX_RECORD_BYTES",
+          "InputOf",
+          "OutputOf",
+          "ReplyInputOf",
+          "ReplyOutputOf",
+          "StandardSchemaV1",
+          "TopicDef",
+          "contracts",
+          "topic",
+          "unchecked"
+        ]
+      }
     }
   },
   "referenceOnly": {
@@ -186,31 +213,9 @@
         "useTopic"
       ]
     },
-    "16": {
-      "@isoloop/bus": [
-        "AnyTopicDef",
-        "Contracts",
-        "ContractsError",
-        "DEFAULT_MAX_RECORD_BYTES",
-        "InputOf",
-        "OutputOf",
-        "ReplyInputOf",
-        "ReplyOutputOf",
-        "StandardSchemaV1",
-        "TopicDef",
-        "contracts",
-        "topic",
-        "unchecked"
-      ]
-    },
     "17": {
       "@isoloop/host": ["BusError"],
-      "@isoloop/bus": [
-        "DEFAULT_REQUEST_TIMEOUT_MS",
-        "HOST_PRODUCER",
-        "KERNEL_PRODUCER",
-        "Retention"
-      ]
+      "@isoloop/bus": ["DEFAULT_REQUEST_TIMEOUT_MS", "HOST_PRODUCER", "KERNEL_PRODUCER"]
     },
     "28": {
       "@isoloop/runtime/testing": ["TestContext", "TestContextOptions", "createTestContext"],
