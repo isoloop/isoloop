@@ -1,5 +1,14 @@
 # @isoloop/webmcp
 
+## 0.1.0-next.9
+
+### Patch Changes
+
+- Updated dependencies [e5f3377]
+- Updated dependencies [5793b1a]
+- Updated dependencies [18972a8]
+  - @isoloop/host@0.1.0-next.9
+
 ## 0.1.0-next.8
 
 ### Patch Changes
