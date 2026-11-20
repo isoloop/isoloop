@@ -1,6 +1,6 @@
 # @isoloop/webmcp
 
-**Experimental.** Registers the tools an [Isoloop](https://github.com/isoloop/isoloop) app exposes (`agents.expose`) with the browser's [WebMCP](https://webmachinelearning.github.io/webmcp/) API, so an agent built into the browser can call them ([ADR 0018](https://github.com/isoloop/isoloop/blob/main/docs/adr/0018-tools-for-agents.md)).
+**Experimental.** Registers the tools an [Isoloop](https://github.com/isoloop/isoloop) app exposes (`agents.expose`) with the browser's [WebMCP](https://webmachinelearning.github.io/webmcp/) API, so an agent built into the browser can call them.
 
 ```sh
 npm install @isoloop/webmcp@next @isoloop/host@next

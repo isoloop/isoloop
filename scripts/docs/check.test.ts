@@ -139,6 +139,7 @@ describe('item 3b: how it works, not why it was decided', () => {
   it('fails an ADR named in the prose', () => {
     expect(history('As ADR 0015 says.')).toHaveLength(1);
     expect(history('ADRs 0007 and 0008')).toHaveLength(1);
+    expect(history('See ADR-0001, or ADR 17.')).toHaveLength(1);
   });
 
   it('passes ADRs in code and other links', () => {

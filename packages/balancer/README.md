@@ -1,6 +1,6 @@
 # @isoloop/balancer
 
-**Experimental.** Automatic placement for [Isoloop](https://github.com/isoloop/isoloop) isolates: spawn through the balancer instead of naming a pool, and it places, moves and quarantines each isolate by measured load ([ADR 0017](https://github.com/isoloop/isoloop/blob/main/docs/adr/0017-opt-in-balancer.md)).
+**Experimental.** Automatic placement for [Isoloop](https://github.com/isoloop/isoloop) isolates: spawn through the balancer instead of naming a pool, and it places, moves and quarantines each isolate by measured load.
 
 ```sh
 npm install @isoloop/balancer@next @isoloop/host@next

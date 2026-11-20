@@ -65,7 +65,7 @@ A package's `README.md` is what npm shows, so it says what the package is and se
 3. **One snippet:** the smallest call that uses it.
 4. **A link to its guide.**
 
-Limits, defaults, options and behaviour live in the guide, not the README, so there is one place to keep current. An internal package with no guide lists its entry points instead of the snippet and the link.
+Limits, defaults, options and behaviour live in the guide, not the README, so there is one place to keep current. Like the guides, a README doesn't link or name ADRs or plans. An internal package with no guide lists its entry points instead of the snippet and the link; its README is for contributors, so it may name the ADRs behind it.
 
 ## Code blocks
 

@@ -193,7 +193,7 @@ export function checkHistory(file: string, md: string): Problem[] {
             message: `line ${n + 1}: a guide doesn't link ADRs or plans ("${target}"); say how it works, not why it was decided`,
           });
       }
-      if (/\bADRs?\s+\d{4}\b/.test(prose(l)))
+      if (/\bADRs?[\s-]*\d{1,4}\b/.test(prose(l)))
         problems.push({
           file,
           message: `line ${n + 1}: a guide doesn't name ADRs; say how it works, not why it was decided`,
