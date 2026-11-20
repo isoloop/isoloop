@@ -9,6 +9,7 @@ import type { Plugin, PreviewServer, ViteDevServer } from 'vite';
 export const WORKERS_ID = 'virtual:isoloop/workers';
 const RESOLVED = `\0${WORKERS_ID}`;
 
+/** The headers `isoloop()` sends on every dev and preview response. */
 export type HeaderOptions = {
   /**
    * The Content-Security-Policy to send, or `false` for none. Default: the
@@ -17,18 +18,27 @@ export type HeaderOptions = {
    * injected styles).
    */
   csp?: string | false;
-  /** Origins that serve isolate modules or the contracts module. */
+  /** Origins that serve isolate modules or the contracts module, added to the default policy. Default: none. */
   isolateOrigins?: readonly string[];
-  /** Sends COOP `same-origin` and COEP `require-corp`, for `SharedArrayBuffer`. Default false. */
+  /** Sends COOP `same-origin` and COEP `require-corp`, for `SharedArrayBuffer`. Default `false`. */
   crossOriginIsolated?: boolean;
 };
 
+/** What `virtual:isoloop/workers` holds. */
 export type WorkersOptions = {
-  /** Include the bus worker's URL. Default true; an app without `contracts` can drop it. */
+  /** Include the bus worker's URL. Default `true`; an app without `contracts` can drop it. */
   bus?: boolean;
 };
 
-/** The policy for the dev server: the hosting guide's, plus Vite's HMR socket and injected styles. */
+/**
+ * The Content-Security-Policy `isoloop()` sends by default: the hosting
+ * guide's policy, plus what Vite's dev server needs (its HMR socket and
+ * injected styles).
+ *
+ * @param origins Origins that serve isolate modules or the contracts module,
+ *   added to `script-src` and `connect-src`. Default: none.
+ * @returns The policy, as one header value.
+ */
 export function devCsp(origins: readonly string[] = []): string {
   const extra = origins.length > 0 ? ` ${origins.join(' ')}` : '';
   return [
@@ -40,6 +50,15 @@ export function devCsp(origins: readonly string[] = []): string {
   ].join('; ');
 }
 
+/**
+ * The headers `isoloop()` sends on dev and preview responses, for the same
+ * options: the Content-Security-Policy (unless `csp` is `false`), and COOP and
+ * COEP when `crossOriginIsolated` is set. Use it to send the same headers
+ * from another server.
+ *
+ * @param o The header options, as passed to `isoloop()`.
+ * @returns The headers by name.
+ */
 export function headersFor(o: HeaderOptions): Record<string, string> {
   const headers: Record<string, string> = {};
   const csp = o.csp ?? devCsp(o.isolateOrigins);

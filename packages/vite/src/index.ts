@@ -20,8 +20,32 @@ export { ISOLATES_ID, MANIFEST, type BuildOptions, type BuildManifest } from './
 
 export type { DevMcpGuardOptions } from './guard';
 
+/** The options of `isoloop()`: headers, worker URLs, the isolate build and the dev MCP check. */
 export type IsoloopOptions = HeaderOptions & WorkersOptions & BuildOptions & DevMcpGuardOptions;
 
+/**
+ * The Vite plugins for an Isoloop app:
+ * - `virtual:isoloop/workers` gives the isolate bootstrap's and the bus
+ *   worker's URLs, for `createKernel({ workers })`;
+ * - `import url from './x.ts?isolate'` gives an isolate module's URL, for
+ *   `spawn({ src })`, and a build emits each as its own module with its
+ *   exports kept;
+ * - dev and preview responses carry the hosting guide's headers;
+ * - a production build that contains the dev MCP fails, unless
+ *   `allowDevMcp` is set.
+ *
+ * @param o The options. Default: none of them set.
+ * @returns The plugins, for `plugins` in the Vite config.
+ * @throws {Error} When `library` is set without any `isolates`. A production
+ *   build fails while its output still uses `connectDevMCP`.
+ * @example
+ * ```ts
+ * import { defineConfig } from 'vite';
+ * import { isoloop } from '@isoloop/vite';
+ *
+ * export default defineConfig({ plugins: [isoloop()] });
+ * ```
+ */
 export function isoloop(o: IsoloopOptions = {}): Plugin[] {
   return [buildPlugin(o), devMcpGuard(o), ...(o.library ? [] : [devPlugin(o)])];
 }

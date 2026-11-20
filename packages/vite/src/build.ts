@@ -24,15 +24,27 @@ const RESOLVED = `\0${ISOLATES_ID}`;
 /** @internal */
 export const MANIFEST = 'isoloop-manifest.json';
 
+/** The build options of `isoloop()`: which isolates to build as their own modules, and whether the build is only those. */
 export type BuildOptions = {
-  /** Isolate entries by name, relative to the Vite root. */
+  /**
+   * Isolate entries by name, relative to the Vite root. Each is built as its
+   * own ES module, with its exports kept, even if nothing imports it;
+   * `virtual:isoloop/isolates` maps the names to their URLs, and the build
+   * writes `isoloop-manifest.json`. Default: none.
+   */
   isolates?: Readonly<Record<string, string>>;
-  /** Build only the isolates (library mode), not an app. Needs `isolates`. */
+  /**
+   * Build only the isolates (library mode), not an app, for a repository that
+   * ships isolates to someone else's host. Needs `isolates`. Default `false`.
+   */
   library?: boolean;
 };
 
 /** What `isoloop-manifest.json` holds: each isolate's file, relative to the output directory. */
-export type BuildManifest = { isolates: Record<string, string> };
+export type BuildManifest = {
+  /** Each isolate's built file by its name in `isolates`, relative to the output directory. */
+  isolates: Record<string, string>;
+};
 
 export function buildPlugin(o: BuildOptions): Plugin {
   const isolates = o.isolates ?? {};

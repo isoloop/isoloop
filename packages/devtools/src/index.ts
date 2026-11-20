@@ -25,7 +25,7 @@ export type DevtoolsPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 't
  */
 export type HealthStatus = 'ring' | 'radar' | 'off';
 
-/** @experimental */
+/** The options of `connectDevtools`: where the panel sits, how its button shows health, and the panel's module and id. @experimental */
 export type DevtoolsOptions = {
   /**
    * The panel isolate's module URL. Defaults to the `panel.js` next to this
@@ -93,17 +93,24 @@ const fallbackFor =
  * Connects the devtools panel: a surface covering the viewport that takes no
  * pointer events itself (the panel's boxes are `position: fixed`), and the
  * panel isolate in its own worker with the `inspect` grant (never pooled).
- * Alt+Shift+D toggles it. Guide: `docs/guide/devtools.md`.
+ * The floating button and Alt+Shift+D (Option+Shift+D on a Mac) open and
+ * close it. Nothing keeps it out of a production build: leave the call out of
+ * production code yourself.
  *
- * ```ts
- * import { connectDevtools } from '@isoloop/devtools';
- * const disconnect = connectDevtools(kernel, { position: 'bottom-left' });
- * ```
- *
- * The floating button and Alt+Shift+D open and close it.
- *
+ * @param kernel The kernel to inspect.
+ * @param o Where the panel sits, how its button shows health, and the
+ *   panel's module and id. Default: all defaults.
  * @returns A function that disconnects: it stops the panel isolate and
  *   removes its surface, resolving once the worker is gone.
+ * @throws {Error} When an isolate with the panel's `id` already exists, for
+ *   example a second `connectDevtools` before the first disconnects.
+ * @throws {KernelError} `bus_failed` when the bus failed to load its contracts.
+ * @example
+ * ```ts
+ * import { connectDevtools } from '@isoloop/devtools';
+ *
+ * const disconnect = connectDevtools(kernel, { position: 'bottom-left' });
+ * ```
  * @experimental
  */
 export function connectDevtools(kernel: Kernel, o: DevtoolsOptions = {}): () => Promise<void> {
