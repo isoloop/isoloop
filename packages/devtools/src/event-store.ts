@@ -1,8 +1,8 @@
 /*
- * The kernel's events for the whole page session, and for the last few before
+ * The kernel's events for this page session (up to `PER_SESSION`), and for the last few before
  * it. The inspection feed keeps only its last 200 events, and start-up alone
  * can use them; the panel's worker is subscribed from the first moment, so it
- * keeps them all: in memory for this session (what the Events tab reads), and
+ * keeps them: in memory for this session (what the Events tab reads), and
  * in IndexedDB for the next sessions to look back at (a crash that ended in a
  * reload, say). Storage is best-effort like the panel's settings: without it
  * the tab shows this session from memory and nothing else.
