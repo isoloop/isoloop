@@ -67,11 +67,13 @@ test.describe('devtools: isolates view (M4b task 8)', () => {
     );
     await expect(row(page, 'headless').locator('[data-devtools-self]')).toHaveCount(0);
     await expect(row(page, 'member-a')).toContainText('pool p');
+    // Lag comes from beats; the column fills in once one has arrived.
+    await expect(row(page, 'headless').locator('[data-lag]')).toHaveText(/\d+ ms/);
+    // The pools are on their own sub-tab, under Isolates.
+    await page.locator('[data-isoloop-devtools] [data-subtab="pools"]').click();
     const pool = page.locator('[data-isoloop-devtools] tr[data-pool="p"]');
     await expect(pool).toContainText('member-a');
     await expect(pool).toContainText('member-b');
-    // Lag comes from beats; the column fills in once one has arrived.
-    await expect(row(page, 'headless').locator('[data-lag]')).toHaveText(/\d+ ms/);
   });
 
   test('Restart restarts the isolate', async ({ page }) => {
@@ -150,6 +152,8 @@ test.describe('devtools: bus view (M4b task 9)', () => {
     const topic = bus.locator('tr[data-topic="feed.v1"]');
     await expect(topic.locator('[data-head]')).toHaveText('3');
     await expect(topic.locator('[data-retained]')).toHaveText('3');
+    // Subscriptions and rejected publishes are sub-tabs of their own.
+    await page.locator('[data-isoloop-devtools] [data-subtab="subscriptions"]').click();
     await expect(bus.locator('tr[data-subscription="feed.v1"]')).not.toHaveCount(0);
     await expect(bus.locator('tr[data-subscription="feed.v1"] [data-lag]').first()).toHaveText(
       /^\d+$/,
@@ -157,6 +161,7 @@ test.describe('devtools: bus view (M4b task 9)', () => {
     await expect(bus.locator('tr[data-subscription="feed.v1"] [data-credit]').first()).toHaveText(
       /^\d+$/,
     );
+    await page.locator('[data-isoloop-devtools] [data-subtab="rejected"]').click();
     await expect(bus.locator('[data-rejected="invalid"]')).toContainText('1');
   });
 
@@ -188,8 +193,8 @@ test.describe('devtools: live record log (M4b task 10)', () => {
   test.beforeEach(async ({ page }) => {
     await openPage(page);
     await page.locator('[data-isoloop-devtools] button[data-health]').click();
-    await page.locator('[data-isoloop-devtools] [data-tab="log"]').click();
-    await expect(page.locator('[data-isoloop-devtools] [data-view="log"]')).toBeVisible();
+    await page.locator('[data-isoloop-devtools] [data-tab="messages"]').click();
+    await expect(page.locator('[data-isoloop-devtools] [data-view="messages"]')).toBeVisible();
   });
 
   test('shows records as they are appended, newest first, and filters by topic', async ({
@@ -204,7 +209,7 @@ test.describe('devtools: live record log (M4b task 10)', () => {
 
     await page.locator('[data-isoloop-devtools] [data-log-filter]').fill('notes.*');
     await page.locator('[data-isoloop-devtools] [data-log-apply]').click();
-    await expect(page.locator('[data-isoloop-devtools] [data-view="log"]')).toContainText(
+    await expect(page.locator('[data-isoloop-devtools] [data-view="messages"]')).toContainText(
       'Tapping notes.*',
     );
     await publish(page, 'feed.v1', 777);
@@ -251,7 +256,7 @@ test.describe('devtools: live record log (M4b task 10)', () => {
       .toBeGreaterThan(0);
     // Leaving the tab ends the tap; reopening starts the count again.
     await page.locator('[data-isoloop-devtools] [data-tab="bus"]').click();
-    await page.locator('[data-isoloop-devtools] [data-tab="log"]').click();
+    await page.locator('[data-isoloop-devtools] [data-tab="messages"]').click();
     await expect(counter).toHaveText('50/s cap · 0 skipped');
   });
 });
