@@ -1,13 +1,15 @@
 # @isoloop/devtools
 
-A devtools panel for Isoloop, drawn by a visual isolate in its own worker, so a crash or hang in the panel never touches the app. It reads the inspection feed (ADR 0020) through the `inspect` grant. `@experimental`.
+**Experimental.** A devtools panel for [Isoloop](https://github.com/isoloop/isoloop), drawn by a visual isolate in its own worker, so a crash or hang in the panel never touches the app. It reads the inspection feed ([ADR 0020](https://github.com/isoloop/isoloop/blob/main/docs/adr/0020-inspection-feed.md)).
+
+```sh
+npm install @isoloop/devtools@next @isoloop/host@next
+```
 
 ```ts
 import { connectDevtools } from '@isoloop/devtools';
 
-const disconnect = connectDevtools(kernel, { position: 'bottom-right', healthStatus: 'ring' });
+const disconnect = connectDevtools(kernel, { position: 'bottom-right' });
 ```
 
-With `@isoloop/vite` the default panel URL works in dev and in a build. With another bundler, pass `src`: the URL it serves `@isoloop/devtools/panel` at. See `docs/guide/devtools.md`.
-
-Alt+Shift+D opens and closes it. Closed, the button is ringed by twelve arcs that show the kernel's health; `healthStatus` is `'ring'` (the default), `'radar'` (the logo filled by the same colours) or `'off'` (a plain white ring). The panel has Isolates, Bus, Events (the kernel's history: up to 6,000 events of this session, and of the last three before it) and Messages (the records your app publishes) tabs. Its open state, size and corner, and the events history, are kept in IndexedDB.
+The options, the panel's tabs, the bundler setup and the limits are in the [devtools guide](https://github.com/isoloop/isoloop/blob/main/docs/guide/devtools.md).
