@@ -5,6 +5,7 @@ These rules apply to the guides in [`docs/guide`](guide/), the TSDoc that the AP
 ## Voice
 
 - **Plain English, short sentences.** One idea per sentence. Prefer the everyday word: "use", not "utilise"; "for example", not "e.g.".
+- **How it works and how to use it, not why it was decided.** Guides and public TSDoc don't link or name ADRs or plans, give decision numbers, or carry "amended" notes: the decisions live in the repo for contributors. A reason the reader needs in order to use a feature stays, as a plain sentence ("workers have no `localStorage`, so the panel keeps its state in IndexedDB"). Links to the bench results behind a figure stay. **(checked)**
 - **Say what the code does, as it is today.** Check each claim against the implementation before writing it. Don't write about plans ("later", "soon", "in a future version"). Plans live in [`docs/plans`](plans/README.md).
 - **Address the reader as "you"** in guides, and write in the present tense.
 - **Contractions are fine** ("it's", "doesn't").
@@ -51,7 +52,7 @@ One sentence: what this page covers and who it's for.
 - **The lead is the first paragraph:** one sentence of at most 200 characters. The site uses it as the page's description, in `llms.txt` and in link previews. **(checked)**
 - **`## When to use it`** says when the page's feature fits and when it doesn't, and which page to read instead.
 - **`## Limits`** lists what the feature doesn't do or can't hide. A limit that applies to Isoloop as a whole also goes in "What Isoloop can't hide".
-- **`## See also`** links related guides and the ADRs behind the page. The API reference links each symbol to its guides on its own (from `docs/guide/map.json`), so the guides don't link the reference symbol by symbol.
+- **`## See also`** links related guides. The API reference links each symbol to its guides on its own (from `docs/guide/map.json`), so the guides don't link the reference symbol by symbol.
 
 The API reference (`docs/api/`) is generated from TSDoc, so it's never edited by hand.
 
@@ -76,7 +77,8 @@ Limits, defaults, options and behaviour live in the guide, not the README, so th
 ## Links
 
 - **Between guides:** relative links (`[pools](pools.md)`). The site turns them into `/docs/…` URLs.
-- **To ADRs, plans, investigations, benches and source:** relative links too (`[ADR 0001](../adr/0001-one-worker-per-isolate.md)`). On GitHub they work as they are. The site makes them GitHub links at the version it was built from.
+- **To benches, results and source:** relative links too (`[bench/pools](../bench/pools/README.md)`). On GitHub they work as they are. The site makes them GitHub links at the version it was built from. An investigation is linked only when it backs a figure.
+- **Not to ADRs or plans.** They record why something was decided; a guide says how it works. **(checked)**
 - **To `isoloop/web`:** a GitHub link at a fixed sha, so the code it points at can't move.
 - **Every relative link resolves.** **(checked)**
 
@@ -90,3 +92,4 @@ The API reference is generated from the TSDoc of the published `.d.ts`, so TSDoc
 4. **`@experimental`** on anything that may change before 1.0. The site marks it with the Experimental pill.
 5. **`@internal`** keeps a declaration out of the API check and the reference. Use it for exports that exist only for other `@isoloop/*` packages.
 6. **No `@see` to guides.** The reference gets those links from `docs/guide/map.json`.
+7. **No ADRs or plans,** as in the guides: no links to them, no `ADR 0001`, no decision numbers. A `//` comment in the code may name them for contributors. Checked from the API freeze, with items 1 and 2.

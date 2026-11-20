@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   checkCoverage,
+  checkHistory,
   checkLinks,
   checkShape,
   checkWords,
@@ -120,6 +121,32 @@ describe('item 3: relative links', () => {
       'line 2: the link "pool.md" resolves to nothing',
       'line 4: the link "../adr/none.md" resolves to nothing',
     ]);
+  });
+});
+
+const history = (md: string): string[] => messages(checkHistory('docs/guide/g.md', md));
+
+describe('item 3b: how it works, not why it was decided', () => {
+  it('fails a link into the ADRs or the plans, relative or absolute', () => {
+    expect(history('See [the decision](../adr/0001-x.md).')).toHaveLength(1);
+    expect(history('See [ADR 0001](../adr/0001-x.md).')).toHaveLength(2);
+    expect(history('[the plan](../plans/m4c-docs.md)')).toHaveLength(1);
+    expect(
+      history('[x](https://github.com/isoloop/isoloop/blob/main/docs/adr/0001-x.md)'),
+    ).toHaveLength(1);
+  });
+
+  it('fails an ADR named in the prose', () => {
+    expect(history('As ADR 0015 says.')).toHaveLength(1);
+    expect(history('ADRs 0007 and 0008')).toHaveLength(1);
+  });
+
+  it('passes ADRs in code and other links', () => {
+    expect(
+      history(
+        'Pools are in [pools](pools.md) and [the bench](../../bench/pools/README.md). `ADR 0001`\n```\n// ADR 0001\n[a](../adr/0001-x.md)\n```',
+      ),
+    ).toEqual([]);
   });
 });
 

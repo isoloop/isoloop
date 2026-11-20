@@ -4,7 +4,9 @@
 //
 // - Items 1, 3 and 4 (each guide's skeleton and lead, its links, banned
 //   phrases and em dashes) need only the Markdown. `--guides` runs just these,
-//   for the PR hook.
+//   for the PR hook. So does the history rule: guides say how it works and how
+//   to use it, not why it was decided, so they don't link or name ADRs and
+//   plans (pre-live review, 2026-11-20).
 // - Item 6 (coverage) reads the built `dist/*.d.ts` through `readApi`, so it
 //   needs `pnpm build` first.
 // - Item 2 (fences that type-check, scripts/docs/fences.ts) runs `tsc` over
@@ -170,6 +172,34 @@ export function checkLinks(file: string, md: string, exists: (path: string) => b
       file,
       message: `line ${line}: the link "${target}" resolves to nothing`,
     }));
+}
+
+// --- Item 3b: how it works, not why it was decided ----------------------------
+
+/** A link into the ADRs or the plans, relative or absolute. */
+const HISTORY_LINK = /(?:^|\/)docs\/(?:adr|plans)\/|^(?:\.\.\/)+(?:adr|plans)\/|^(?:adr|plans)\//;
+
+export function checkHistory(file: string, md: string): Problem[] {
+  const problems: Problem[] = [];
+  withoutFences(md)
+    .split('\n')
+    .forEach((l, n) => {
+      const line = l.replace(/`[^`]*`/g, ' ');
+      for (const m of line.matchAll(/\]\(\s*<?([^)\s>]+)>?/g)) {
+        const target = m[1] ?? '';
+        if (HISTORY_LINK.test(target.replace(/^\.\//, '')))
+          problems.push({
+            file,
+            message: `line ${n + 1}: a guide doesn't link ADRs or plans ("${target}"); say how it works, not why it was decided`,
+          });
+      }
+      if (/\bADRs?\s+\d{4}\b/.test(prose(l)))
+        problems.push({
+          file,
+          message: `line ${n + 1}: a guide doesn't name ADRs; say how it works, not why it was decided`,
+        });
+    });
+  return problems;
 }
 
 // --- Item 4: banned phrases and em dashes -------------------------------------
@@ -410,6 +440,7 @@ function main(): void {
     problems.push(
       ...(SHAPE_PENDING.includes(slug) ? [] : checkShape(file, md, rules, { skeleton: true })),
       ...checkLinks(file, md, (p) => existsSync(join(root, p))),
+      ...checkHistory(file, md),
       ...checkWords(file, md, rules),
     );
   }

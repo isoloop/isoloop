@@ -4,13 +4,13 @@ What changes for code that runs in an isolate, what Isoloop costs, and what it d
 
 ## When to use it
 
-Read this page before you move existing code into isolates, or before you pick a third-party library for one. Most of what follows comes from one fact: an isolate runs in a worker, and a worker has no DOM, no layout and no synchronous line to the page. Isoloop's render bridge sends each isolate's changes to the page, which applies them ([ADR 0010](../adr/0010-own-render-bridge.md)). Code that only builds and updates DOM works as it does on the page. Code that asks the page a question and needs the answer at once doesn't.
+Read this page before you move existing code into isolates, or before you pick a third-party library for one. Most of what follows comes from one fact: an isolate runs in a worker, and a worker has no DOM, no layout and no synchronous line to the page. Isoloop's render bridge sends each isolate's changes to the page, which applies them. Code that only builds and updates DOM works as it does on the page. Code that asks the page a question and needs the answer at once doesn't.
 
 If none of the limits below stop you, carry on with the [hosting guide](hosting.md).
 
 ## Layout, focus and scrolling are asynchronous
 
-The worker has no layout, so it can't answer layout questions synchronously. The DOM an isolate sees ([ADR 0010](../adr/0010-own-render-bridge.md), decision 2) leaves these out on purpose, with no fake values:
+The worker has no layout, so it can't answer layout questions synchronously. The DOM an isolate sees leaves these out on purpose, with no fake values:
 
 - **Sizes, positions and animations:** these throw a `NotSupportedError` whose message says what to use instead, so a library that reaches for one fails at that line rather than on a `NaN` size later:
   - the methods `getBoundingClientRect()`, `getClientRects()`, `animate()` and `getAnimations()` on every element, and `getComputedStyle()` on the worker's `window`;
@@ -59,11 +59,11 @@ A library that measures on every render (tooltips that position themselves, virt
 
 ## Globals that libraries reach for
 
-In an isolate with a surface, `document` is the render bridge's DOM subset and `window` is the worker's own global ([ADR 0010](../adr/0010-own-render-bridge.md)). A headless isolate has neither. That breaks some libraries in ways that are easy to miss:
+In an isolate with a surface, `document` is the render bridge's DOM subset and `window` is the worker's own global. A headless isolate has neither. That breaks some libraries in ways that are easy to miss:
 
 - **`document.body`** is a detached element. A widget that appends a portal, a tooltip or a modal to it renders nothing on screen. Render it inside your own root instead.
 - **`localStorage` and `sessionStorage`** don't exist in workers. `IndexedDB` does. To keep state across a restart, publish it to a topic ([persistent topics](hosting.md#persistent-topics-and-a-discarded-tab) survive a reload).
-- **The page's `window`** isn't there: no `innerWidth`, `matchMedia` or `history`, and `location` is the worker script's URL. Navigation goes through `host.navigate`, with the `navigate` grant ([ADR 0002](../adr/0002-host-owns-routing.md)).
+- **The page's `window`** isn't there: no `innerWidth`, `matchMedia` or `history`, and `location` is the worker script's URL. Navigation goes through `host.navigate`, with the `navigate` grant ([contracts and grants](contracts.md)).
 - **Tags the page won't create.** The page builds only allow-listed HTML and SVG tags: an unknown tag becomes a `div` (`g` inside SVG), and `script`, `iframe`, `style` and `on*` attributes are never created. URLs are limited to `http(s):`, `mailto:` and relative ones ([design §4.5](../design/system-design.md)). A widget that injects a `<script>` or an embed doesn't work in an isolate.
 
 ## Input arrives a moment later
@@ -71,7 +71,7 @@ In an isolate with a surface, `document` is the render bridge's DOM subset and `
 The page listens for input and forwards it to the isolate as a message ([design §4.6](../design/system-design.md)). Only these events are forwarded, and only to a node that listens for them: `click`, `dblclick`, `input`, `change`, `keydown`, `keyup`, `submit`, `focusin`, `focusout`, `pointerdown`, `pointerup`, `pointermove` (once per animation frame) and `scroll` (once per frame per node). A canvas handed over by `requestCanvas` also gets `resize`. What follows from that:
 
 - **Drag and drop doesn't work.** `dragstart`, `dragover` and `drop` are never forwarded, and a `DataTransfer` can't cross to the worker. Build drag with pointer events, or keep it on the page.
-- **`preventDefault()` comes too late.** By the time the isolate runs its handler, the page has already done the default action. The page prevents two defaults itself: every `submit`, and, with routing on, plain clicks on same-origin links, which go to the router ([ADR 0002](../adr/0002-host-owns-routing.md)).
+- **`preventDefault()` comes too late.** By the time the isolate runs its handler, the page has already done the default action. The page prevents two defaults itself: every `submit`, and, with routing on, plain clicks on same-origin links, which go to the router.
 - **Pointer timing is coarser.** Moves are coalesced to one per frame, and each reply takes a round trip. Drawing that follows the pointer (a freehand canvas, a slider dragged across a chart) lags by about a frame more than the same code on the page.
 - **Every interaction has a fixed cost.** In Chromium, a worker's reply to an input waits until after the next frame ([engine constraints §3](../investigations/engine-constraints.md#3-chromium-holds-a-workers-reply-until-after-the-next-frame-following-input)). In the markets dashboard at Heavy, that came to about 30 ms of typing latency in every Isoloop variant, against 5–10 ms for native, on Chromium and WebKit (Playwright 1.64.1 on a 32-core WSL2 machine, 2026-11-08, [§2](../investigations/engine-constraints.md#2-webkit-presents-worker-drawn-canvas-frames-through-the-main-thread)).
 - **Events from the page are never trusted.** `isTrusted` is always `false` in the worker, including for forwarded input, so code that checks it treats every event as synthetic.
@@ -100,7 +100,7 @@ Every recorded run, in both directions, is in [`isoloop/web`'s plant comparison]
 
 ## Browsers and the first paint
 
-- **Supported browsers:** Chrome 108, Firefox 114 and Safari 16.4 or later ([ADR 0009](../adr/0009-toolchain.md), rule 7). `createKernel` checks module workers, `MessageChannel`, adopted stylesheets and the origin private file system first, and throws a `KernelError` with code `unsupported_browser` naming what's missing. Catch it and show a plain-HTML version of the page.
+- **Supported browsers:** Chrome 108, Firefox 114 and Safari 16.4 or later. `createKernel` checks module workers, `MessageChannel`, adopted stylesheets and the origin private file system first, and throws a `KernelError` with code `unsupported_browser` naming what's missing. Catch it and show a plain-HTML version of the page.
 - **Checks before your app loads** go in a script file from your own origin. The policy in the [hosting guide](hosting.md#content-security-policy) allows no inline scripts.
 - **No server-side rendering.** An isolate's content appears once its worker has started and rendered. Put anything that must be there at first paint in the page's own HTML.
 
@@ -108,7 +108,7 @@ Every recorded run, in both directions, is in [`isoloop/web`'s plant comparison]
 
 Isolates run on the page's origin. An isolate can `fetch` with the page's cookies and read that origin's `IndexedDB`. Isoloop contains failures (a crash, a hang, a runaway loop) from code you trust but that may break: other teams' widgets, generated code you've reviewed. It doesn't contain hostile code. For code you don't trust at all, use a cross-origin iframe.
 
-Pooled isolates also share a worker's globals, and visual members share one document, so they can read each other's DOM and input ([pools](pools.md), [ADR 0015](../adr/0015-visual-pools.md)).
+Pooled isolates also share a worker's globals, and visual members share one document, so they can read each other's DOM and input ([pools](pools.md)).
 
 ## Limits
 
@@ -118,6 +118,3 @@ This page is the list of limits for Isoloop as a whole. Each guide's own `## Lim
 
 - [Hosting](hosting.md): the headers, CSP and CORS a page that runs Isoloop needs.
 - [Worker pools](pools.md): what pooled isolates share.
-- [ADR 0010](../adr/0010-own-render-bridge.md): the DOM an isolate sees, and what it leaves out.
-- [ADR 0001](../adr/0001-one-worker-per-isolate.md): why each isolate gets its own worker by default, and what the browser still controls.
-- [Engine constraints](../investigations/engine-constraints.md): the browser limits behind these costs, with repros.

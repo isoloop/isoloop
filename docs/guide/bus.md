@@ -13,11 +13,11 @@ Use the bus for everything that crosses between isolates, and between isolates a
 
 It isn't a database or a queue between tabs. Each tab has its own bus ([Limits](#limits)).
 
-To declare topics and schemas, see the contracts module in [ADR 0003](../adr/0003-schema-format-standard-schema.md). To give the kernel the bus worker and the contracts module, see [hosting](hosting.md#the-bus-worker-and-the-contracts-module).
+To declare topics and schemas, see [contracts and grants](contracts.md). To give the kernel the bus worker and the contracts module, see [hosting](hosting.md#the-bus-worker-and-the-contracts-module).
 
 ## Where the bus runs
 
-The kernel starts the bus worker before any isolate. Each isolate gets a `MessageChannel` of its own to it, so records go from an isolate's worker to the bus worker and on to the subscribers' workers without passing through the main thread ([ADR 0005](../adr/0005-bus-topology-message-channels.md)). The records that do reach the main thread are the host's own: `kernel.publish`, `kernel.subscribe` and `kernel.request`.
+The kernel starts the bus worker before any isolate. Each isolate gets a `MessageChannel` of its own to it, so records go from an isolate's worker to the bus worker and on to the subscribers' workers without passing through the main thread. The records that do reach the main thread are the host's own: `kernel.publish`, `kernel.subscribe` and `kernel.request`.
 
 The bus worker runs only Isoloop's code, never an isolate's. It checks each publish against the isolate's **grants**, the topic's schema and size limit, and appends the validated output to the topic's log ([diagram: a record through the bus](../diagrams/bus-publish.html)).
 
@@ -94,7 +94,7 @@ An isolate's place is kept under its id, so it survives the isolate's restarts. 
 
 ### Handlers and commits
 
-A subscription runs its handler for one record at a time, in order, and waits for an async handler to finish. A record is **settled** when its handler returns, and the client reports settled offsets to the bus together, at most once per commit interval. The interval is `bus.commitIntervalMs` in the kernel config: an integer from 0 to 1,000, default 100 ([ADR 0016](../adr/0016-fewer-messages-per-record.md)).
+A subscription runs its handler for one record at a time, in order, and waits for an async handler to finish. A record is **settled** when its handler returns, and the client reports settled offsets to the bus together, at most once per commit interval. The interval is `bus.commitIntervalMs` in the kernel config: an integer from 0 to 1,000, default 100.
 
 - **`autoCommit: false`** leaves settling to you: `ctx.bus.commit(record)` settles that record and every one delivered before it on the subscription.
 - **A handler that throws** is reported to the host as a non-fatal error, and the subscription stops committing. It's redelivered from the failed record the next time it starts with `from: 'committed'`.
@@ -166,7 +166,7 @@ export default defineIsolate({
 
 ## Durability
 
-By default a topic's log lives in the bus worker's memory. Set `durability: 'persistent'` and the bus also writes it to the origin's private file system (OPFS), in append-only segment files ([ADR 0007](../adr/0007-bus-worker-supervision.md)).
+By default a topic's log lives in the bus worker's memory. Set `durability: 'persistent'` and the bus also writes it to the origin's private file system (OPFS), in append-only segment files.
 
 ```ts
 import { topic } from '@isoloop/bus';
@@ -236,7 +236,7 @@ export default defineIsolate({
 - **Order holds while membership is stable.** If a record's member has no credit left, the group waits for it instead of sending the record to another member. When a member joins or leaves, a key may move.
 - **Offsets belong to the group**, kept as `group:<name>`. The group's offset moves only past records every member has settled.
 - **A member that leaves** (it stops, crashes or unsubscribes) hands its unsettled records to the others, who get them before anything new. If it was the last member, the group's offset waits for the next one.
-- **`from` applies only until the group first commits.** After that, a group resumes after its committed offset whatever `from` says, and a member joining a group that has members reads from where the group is. Group members don't need `from: 'committed'` to keep their place ([ADR 0016](../adr/0016-fewer-messages-per-record.md), point 14).
+- **`from` applies only until the group first commits.** After that, a group resumes after its committed offset whatever `from` says, and a member joining a group that has members reads from where the group is. Group members don't need `from: 'committed'` to keep their place.
 
 ## Request and reply
 
@@ -282,7 +282,7 @@ The rules:
 - **The first valid reply wins.** The bus checks it against the `reply` schema. A later reply rejects with `already_replied`. A reply that fails the schema rejects for the responder with `invalid`, and the requester gets `reply_invalid` at once.
 - **Only an isolate that was delivered the request may reply.** Others get `forbidden`. Several subscribers all see the request; use a group when only one should.
 - **`timeout`:** a request waits `timeoutMs`, 30 s by default (`DEFAULT_REQUEST_TIMEOUT_MS`). The bus then forgets it, and a late reply gets `timeout`. A reply to a requester that has gone is dropped.
-- **`dropped`:** a request is a record, so retention can remove it. When a burst of requests pushes older ones out of the log before the bus handed them to any subscriber, their requesters get `dropped` at once, rather than waiting for the timeout. A request already delivered is its responder's to answer. Size a requestable topic's `retention` for its largest burst ([ADR 0018](../adr/0018-tools-for-agents.md), decision 5).
+- **`dropped`:** a request is a record, so retention can remove it. When a burst of requests pushes older ones out of the log before the bus handed them to any subscriber, their requesters get `dropped` at once, rather than waiting for the timeout. A request already delivered is its responder's to answer. Size a requestable topic's `retention` for its largest burst.
 - **A responder that restarts within the timeout** gets the request again when it subscribes with `from: 'committed'` or `earliest`, and can answer it.
 
 From the host, `kernel.request` is the same call, with two more codes: `no_responder` at once when no isolate that could answer is alive, and `aborted` when its `signal` aborts. It's `@experimental`. See [tools for agents](agents.md#calling-from-the-host-kernelrequest).
@@ -340,7 +340,7 @@ Isolates keep running. Each one gets a new port to the new bus as soon as it boo
 
 A **memory topic** is gone with the old bus. Each subscription to it gets `onReset`, then records from the new bus. Clear whatever you built from the topic there (`useTopic` in the React and Preact adapters does). An isolate that can't handle that sets `bus: { onReset: 'restart' }` in its manifest, and the kernel restarts it instead.
 
-If the new bus crashes while it loads, or within 2 s of becoming ready, twice in a row, the next one starts in **safe mode**. For each persistent topic it sets the newest segment aside, renamed to `<segment>.quarantined` and never deleted, and starts from the one before. The kernel emits `bus:recovered` with the quarantined names ([ADR 0007](../adr/0007-bus-worker-supervision.md), decision 5).
+If the new bus crashes while it loads, or within 2 s of becoming ready, twice in a row, the next one starts in **safe mode**. For each persistent topic it sets the newest segment aside, renamed to `<segment>.quarantined` and never deleted, and starts from the one before. The kernel emits `bus:recovered` with the quarantined names.
 
 ## Limits
 
@@ -361,9 +361,4 @@ If the new bus crashes while it loads, or within 2 s of becoming ready, twice in
 - [Tools for agents](agents.md): `kernel.request` and the retention a tool's topic needs.
 - [The inspection feed](inspection.md): per-subscription lag and the records on a topic, live.
 - [Worker pools](pools.md): how a pool's members resubscribe after a crash.
-- [ADR 0003](../adr/0003-schema-format-standard-schema.md): topics, schemas and contracts.
-- [ADR 0005](../adr/0005-bus-topology-message-channels.md): why isolates talk to the bus worker directly.
-- [ADR 0007](../adr/0007-bus-worker-supervision.md): bus supervision, the durable log, reattach and safe mode.
-- [ADR 0016](../adr/0016-fewer-messages-per-record.md): combined commits and consumer groups.
-- [ADR 0018](../adr/0018-tools-for-agents.md): request and reply from the host, and `dropped`.
-- [Design §6](../design/system-design.md): the bus in full.
+- [Contracts and grants](contracts.md): declaring topics, their schemas and who may publish.

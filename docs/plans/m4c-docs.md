@@ -33,7 +33,7 @@
 7. **The Markdown engine is `markdown-it`,** the only dependency, behind our own `renderMarkdown(src) → { html, title, description, headings, links }` with a conformance suite. Its token stream gives heading ids, the TOC and link rewriting without plugins.
 8. **Code highlighting is our own:** the site's build-time tokenizer (`apps/site/src/pages/code.tsx`, ts and shell today) is extended to tsx, json and html. No highlighting dependency, so `isoloop/web` ADR 0002 decision 12 ("one dependency at most") holds. Shiki's inline `style` attributes wouldn't pass the CSP anyway.
 9. **No front matter.** The title is the `# h1`. The description (for `llms.txt` and the link preview) is the first paragraph, one sentence of at most 200 characters. Order and sections come from a `docs.json` manifest in `isoloop/web`. The build fails if a fetched guide isn't listed or a listed one is missing.
-10. **Links are rewritten at build.** Relative links to other guides become `/docs/…` URLs. Links to ADRs, plans, investigations or source become GitHub links at the pinned sha. A relative link that resolves to nothing fails the build.
+10. **Links are rewritten at build.** Relative links to other guides become `/docs/…` URLs. Links to ADRs, plans, investigations or source become GitHub links at the pinned sha. A relative link that resolves to nothing fails the build. *Amended 2026-11-20 (maintainer, pre-live review):* guides don't link ADRs or plans at all (decision 20's amendment), so the rewrite only meets links to benches, results, investigations that back a figure, design notes and source.
 
 ### Pages
 
@@ -80,7 +80,9 @@
     - `## See also`
 
     The six guides drafted before this plan (agents, balancer, devtools, hosting, inspection, pools) get one pass to match. Reference pages are generated and never hand-edited.
-20. **The writing rules have one home, `docs/writing.md` (task 2):** plain English, short sentences, bold lead-ins on bullets, British spelling, and neutral language (measurements with device, build and tag; never "faster than native"). It also lists the banned phrases ("simply", "just", "blazing", "faster than native"). The `docs` skill, the steward and the user-facing skill all point to it. `isoloop/web`'s `docs/brand.md` keeps the messaging for marketing copy.
+
+    *Amended 2026-11-20 (maintainer, pre-live review):* `## See also` links related guides only, not the ADRs behind the page.
+20. **The writing rules have one home, `docs/writing.md` (task 2):** plain English, short sentences, bold lead-ins on bullets, British spelling, and neutral language (measurements with device, build and tag; never "faster than native"). It also lists the banned phrases ("simply", "just", "blazing", "faster than native"). The `docs` skill, the steward and the user-facing skill all point to it. `isoloop/web`'s `docs/brand.md` keeps the messaging for marketing copy. *Amended 2026-11-20 (maintainer, pre-live review):* public docs say how it works and how to use it, not why it was decided. Guides and public TSDoc don't link or name ADRs or plans, give decision numbers, or carry "amended" notes; a reason the reader needs stays as a plain sentence, and links to the results behind a figure stay. `docs:check` enforces it for the guides, and for TSDoc from task 21; the steward checks the site's copy.
 21. **The docs map,** `docs/guide/map.json`, lists for each guide the source paths and exports it covers (for example `bus.md`: `packages/bus/src/topic.ts`, `topic`, `contracts`).
     - **A notice:** a PR that changes a mapped path without touching that guide gets a CI notice naming it, and the steward judges whether it needed a change.
     - **Coverage, which fails:** every user-facing package and every public export appears in at least one guide's map, or is listed as reference only.

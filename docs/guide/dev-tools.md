@@ -243,5 +243,3 @@ Add the topic to the contracts, list it in `agents.expose`, and give the isolate
 - [The devtools panel](devtools.md), the worked example, and its source in `packages/devtools/src/`.
 - [The inspection feed](inspection.md): every call, message and control.
 - [Tools for agents](agents.md): exposing topics as tools, and the dev MCP.
-- [ADR 0020: the inspection feed](../adr/0020-inspection-feed.md), the decisions behind `ctx.inspector`.
-- [ADR 0018: tools for agents](../adr/0018-tools-for-agents.md).
