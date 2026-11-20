@@ -1,5 +1,14 @@
 # @isoloop/host
 
+## 0.1.0-next.8
+
+### Patch Changes
+
+- 6fc09f6: `AgentsConfig.expose`'s TSDoc describes grant patterns as they work: `*` matches one or more characters, dots included. It had described a one-segment `*` and a `>`, which the matcher doesn't have.
+- Updated dependencies [c0884d2]
+  - @isoloop/dom@0.1.0-next.8
+  - @isoloop/protocol@0.1.0-next.8
+
 ## 0.1.0-next.7
 
 ### Patch Changes

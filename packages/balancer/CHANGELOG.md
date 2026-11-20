@@ -1,5 +1,12 @@
 # @isoloop/balancer
 
+## 0.1.0-next.8
+
+### Patch Changes
+
+- Updated dependencies [6fc09f6]
+  - @isoloop/host@0.1.0-next.8
+
 ## 0.1.0-next.7
 
 ### Patch Changes
