@@ -1,7 +1,11 @@
+import type { IsolateManifest } from '@isoloop/host';
+
 /**
  * The part of the kernel the balancer uses: the public API only (`spawn`,
  * `stop`, `pools`, and the `isolate:beat`, `isolate:crash` and
  * `isolate:failed` events), so `@isoloop/host`'s `Kernel` fits it as is.
+ * The tests' simulated kernel is one too.
+ * @internal
  */
 export interface KernelLike<M extends ManifestLike = ManifestLike> {
   spawn(manifest: M): unknown;
@@ -20,10 +24,10 @@ export interface KernelLike<M extends ManifestLike = ManifestLike> {
   claimPools?(owner: 'balancer'): { spawn(manifest: M): unknown; release?(): void };
 }
 
-/** What the balancer reads from an isolate manifest: its id, and the pool it sets. */
+/** What the balancer reads from an isolate manifest: its id, and the pool it sets. @internal */
 export type ManifestLike = { id: string; pool?: string };
 
-/** The kernel's `isolate:beat` event (ADR 0017). */
+/** The kernel's `isolate:beat` event (ADR 0017). @internal */
 export type BeatLike = {
   id: string;
   pool?: string;
@@ -38,13 +42,13 @@ export type BeatLike = {
   at: number;
 };
 
-/** The fields of `PoolSnapshot` the balancer reads. */
+/** The fields of `PoolSnapshot` the balancer reads. @internal */
 export type PoolLike = { name: string; members: readonly string[]; running: boolean };
 
-/** The fields of the kernel's `isolate:crash` event the balancer reads. */
+/** The fields of the kernel's `isolate:crash` event the balancer reads. @internal */
 export type CrashLike = { id: string; reason: string; pool?: string };
 
-/** The fields of the kernel's `isolate:failed` event the balancer reads (M3j). */
+/** The fields of the kernel's `isolate:failed` event the balancer reads (M3j). @internal */
 export type FailedLike = { id: string; reason: string; pool?: string };
 
 /**
@@ -52,12 +56,14 @@ export type FailedLike = { id: string; reason: string; pool?: string };
  * so a reload places from history (M3h, Q17). The app supplies it; the
  * creator backs it with a persistent topic. `get` returning `undefined`
  * means "never measured": the isolate starts in quarantine.
+ * @experimental
  */
 export interface LoadStore {
   get(id: string): number | undefined;
   set(id: string, loadPct: number): void;
 }
 
+/** @experimental */
 export type BalancerOptions = {
   /**
    * The balancer's own allowance of workers (ADR 0017, amended): its
@@ -110,6 +116,7 @@ export type BalancerOptions = {
 /**
  * What the app tells the balancer about an isolate (`report`): its queued
  * work, its own measured busy time, or both. At least one must be given.
+ * @experimental
  */
 export type Report = {
   /**
@@ -133,9 +140,11 @@ export type Report = {
  * `failed`: the kernel gave up on the isolate (past its restart limit, M3j).
  * The balancer never moves or restarts it; after `kernel.restart(id)` it's
  * placed again as new.
+ * @experimental
  */
 export type PlacementState = 'placed' | 'quarantined' | 'kept-apart' | 'moving' | 'failed';
 
+/** @experimental */
 export type Placement = {
   id: string;
   pool: string;
@@ -172,6 +181,7 @@ export type Placement = {
  * another pool to free a worker, M3i) or `room` (a quarantine pool beyond
  * the first folding into the first, like with like, so a member whose
  * backlog is rising gets its worker, M3j).
+ * @experimental
  */
 export type MoveReason =
   | 'spike'
@@ -184,7 +194,7 @@ export type MoveReason =
   | 'pack'
   | 'room';
 
-/** A move, once the old copy has stopped and the new one is spawned. */
+/** A move, once the old copy has stopped and the new one is spawned. @experimental */
 export type MoveEvent = { id: string; from: string; to: string; reason: MoveReason };
 
 /**
@@ -192,6 +202,7 @@ export type MoveEvent = { id: string; from: string; to: string; reason: MoveReas
  * the balancer stopping it to that beat: what the move cost the isolate. It
  * follows `move`, which fires before the cost is known; a member stopped or
  * moved again before it beats never arrives.
+ * @experimental
  */
 export type ArrivedEvent = MoveEvent & { costMs: number };
 
@@ -199,6 +210,7 @@ export type ArrivedEvent = MoveEvent & { costMs: number };
  * A spike put on a member (M3i): `noted` for a first one (nothing moves), or
  * `quarantined` when it sends the member to quarantine, or restarts the quiet
  * window of one already there.
+ * @experimental
  */
 export type SpikeEvent = {
   id: string;
@@ -213,18 +225,21 @@ export type SpikeEvent = {
  * its pool's trouble needs a bisect and no quarantine pool is free for one
  * (M3j). Emitted when it first happens, then at most every 30 s while it
  * lasts. `backlog` is the latest fresh report, or 0.
+ * @experimental
  */
 export type BehindEvent = { id: string; pool: string; backlog: number };
 
 /**
  * The kernel gave up on a member (`isolate:failed`, M3j). It drops out of its
  * pool's load and any bisect, and no move restarts it.
+ * @experimental
  */
 export type FailedEvent = { id: string; pool: string; reason: string };
 
-/** An isolate the balancer didn't place turned up in one of its pools (see `Placement.foreign`). */
+/** An isolate the balancer didn't place turned up in one of its pools (see `Placement.foreign`). @experimental */
 export type ForeignEvent = { id: string; pool: string };
 
+/** The events `Balancer.on` takes, by name. @experimental */
 export type BalancerEvents = {
   move: MoveEvent;
   arrived: ArrivedEvent;
@@ -235,13 +250,15 @@ export type BalancerEvents = {
 };
 
 /**
- * Pools are named `balancer-1`, `balancer-2`…; the quarantine is
- * `balancer-quarantine-1`, and `-2`, `-3`… when a suspect needs a worker of
- * its own. `createBalancer` throws `balancer_exists` if the kernel has one.
+ * The balancer `createBalancer` returns. Pools are named `balancer-1`,
+ * `balancer-2`…; the quarantine is `balancer-quarantine-1`, and `-2`, `-3`…
+ * when a suspect needs a worker of its own. `createBalancer` throws
+ * `balancer_exists` if the kernel has one.
+ * @experimental
  */
-export interface Balancer<M extends ManifestLike = ManifestLike> {
+export interface Balancer {
   /** Like `kernel.spawn`, but the balancer picks `pool`; `manifest.pool` must be absent. */
-  spawn(manifest: M): Placement;
+  spawn(manifest: IsolateManifest): Placement;
   stop(id: string): Promise<void>;
   placements(): Placement[];
   /**
@@ -271,3 +288,11 @@ export interface Balancer<M extends ManifestLike = ManifestLike> {
    */
   dispose(): void;
 }
+
+/**
+ * `Balancer` for any `KernelLike`'s manifest (the tests' simulated kernel).
+ * @internal
+ */
+export type BalancerOf<M extends ManifestLike = ManifestLike> = Omit<Balancer, 'spawn'> & {
+  spawn(manifest: M): Placement;
+};

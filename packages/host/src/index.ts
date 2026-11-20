@@ -15,7 +15,7 @@ export {
 export type { Backoff, CrashReason, IsolateState } from './supervisor';
 export type { FallbackInfo, FallbackRender, SurfaceStats } from './compositor';
 export type { NavigateRequest, OnNavigate } from './router';
-export type { AgentsConfig, AgentTool, RequestOptions, ToolJsonSchema } from './agents';
+export type { AgentsConfig, AgentTool, KernelRequestOptions, ToolJsonSchema } from './agents';
 export type { RequestVia } from '@isoloop/protocol';
 export type { Inspector } from './inspect';
 export type {

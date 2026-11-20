@@ -1,7 +1,7 @@
 // connectWebMCP against a fake document.modelContext (Chromium's shape) and a
 // fake navigator.modelContext (Firefox 159's); the real ones are covered by
 // the chromium-webmcp and firefox-webmcp E2E projects (e2e/webmcp.spec.ts).
-import type { AgentTool, RequestOptions } from '@isoloop/host';
+import type { AgentTool, KernelRequestOptions } from '@isoloop/host';
 import { KernelError } from '@isoloop/host';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { connectWebMCP } from './index';
@@ -64,14 +64,18 @@ const tool = (name: string, extra: Partial<AgentTool> = {}): AgentTool => ({
   ...extra,
 });
 
-type Call = { name: string; value: unknown; opts: RequestOptions | undefined };
+type Call = { name: string; value: unknown; opts: KernelRequestOptions | undefined };
 
 function fakeKernel(tools: AgentTool[], answer?: (c: Call) => Promise<unknown>) {
   const calls: Call[] = [];
   const kernel: Parameters<typeof connectWebMCP>[0] = {
     tools: () => tools,
     // The real request is generic in the reply; the fake answers `unknown`.
-    request: <R>(topic: { name: string }, value: unknown, opts?: RequestOptions): Promise<R> => {
+    request: <R>(
+      topic: { name: string },
+      value: unknown,
+      opts?: KernelRequestOptions,
+    ): Promise<R> => {
       const c = { name: topic.name, value, opts };
       calls.push(c);
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the tests read the reply as unknown

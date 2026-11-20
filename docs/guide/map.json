@@ -13,7 +13,7 @@
         "@isoloop/host": [
           "AgentTool",
           "AgentsConfig",
-          "RequestOptions",
+          "KernelRequestOptions",
           "RequestVia",
           "ToolJsonSchema"
         ],
@@ -153,12 +153,12 @@
           "IsolateContext",
           "IsolateDefinition",
           "IsolateRoot",
+          "RequestOptions",
           "SubscribeOptions",
           "defineIsolate"
         ],
         "@isoloop/react": [
           "IsolateProps",
-          "RequestOptions",
           "RouteValue",
           "UseTopicOptions",
           "defineIsolate",
@@ -171,7 +171,6 @@
         ],
         "@isoloop/preact": [
           "IsolateProps",
-          "RequestOptions",
           "UseTopicOptions",
           "defineIsolate",
           "useHost",
@@ -269,11 +268,7 @@
       "serveFixture",
       "servePoolFixture",
       "trackUsage"
-    ]
-  },
-  "pending": {
-    "freeze": {
-      "@isoloop/vite": ["IsolateManifest"]
-    }
+    ],
+    "@isoloop/vite": ["BuildManifest"]
   }
 }

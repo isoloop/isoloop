@@ -1,7 +1,9 @@
 import { claimPools } from './claim';
+import type { Kernel } from '@isoloop/host';
 import type {
   Balancer,
   BalancerEvents,
+  BalancerOf,
   BalancerOptions,
   BeatLike,
   BehindEvent,
@@ -193,10 +195,18 @@ const average = (beats: Beat[], windowMs: number, t: number): number | undefined
  * kernel itself never pools on its own (ADR 0001). Isolates spawned with
  * `kernel.spawn` are never touched, and don't count toward `maxWorkers`.
  */
-export function createBalancer<M extends ManifestLike>(
+export function createBalancer(kernel: Kernel, opts: BalancerOptions = {}): Balancer {
+  return balance(kernel, opts);
+}
+
+/**
+ * `createBalancer` for any `KernelLike`: the tests' simulated kernel.
+ * @internal
+ */
+export function balance<M extends ManifestLike>(
   kernel: KernelLike<M>,
   opts: BalancerOptions = {},
-): Balancer<M> {
+): BalancerOf<M> {
   // One balancer per kernel at a time; throws `balancer_exists` for a second
   // until the first is disposed.
   const claim = claimPools(kernel, 'balancer');
