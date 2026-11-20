@@ -80,6 +80,9 @@ const fill = (ui: UiState): string => {
 const FAB_SIZE = 70;
 const FAB_MARK = 46;
 
+/** The ring's thickness: it sits on the button's outer edge, with nothing outside it. */
+const RING_WIDTH = 4;
+
 /** Seconds for the wave to go once around the ring. */
 const RING_PERIOD = 2.4;
 
@@ -182,7 +185,7 @@ function Fab(props: {
           aria-label={`Open Isoloop devtools (Alt+Shift+D). ${props.summary}`}
           title={`Isoloop devtools (Alt+Shift+D)\n${props.summary}`}
           onClick={props.onOpen}
-          style={`position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:${FAB_SIZE / 2}px;border:0;background:#111827;box-shadow:0 0 0 1px rgb(255 255 255 / 0.28),0 0 0 4px rgb(0 0 0 / 0.35),0 4px 14px rgb(0 0 0 / 0.7);color:#e5e7eb;cursor:pointer;padding:0;overflow:hidden;${font}`}
+          style={`position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:${FAB_SIZE / 2}px;border:0;background:#111827;box-shadow:0 0 0 3px rgb(0 0 0 / 0.35),0 4px 14px rgb(0 0 0 / 0.7);color:#e5e7eb;cursor:pointer;padding:0;overflow:hidden;${font}`}
         >
           <svg
             class="dt-ring"
@@ -196,9 +199,9 @@ function Fab(props: {
               <path
                 key={c.id}
                 data-level={c.level}
-                d={arcPath(i, FAB_SIZE / 2, FAB_SIZE / 2, FAB_SIZE / 2 - 4)}
+                d={arcPath(i, FAB_SIZE / 2, FAB_SIZE / 2, FAB_SIZE / 2 - RING_WIDTH / 2)}
                 stroke={LEVEL_COLOR[c.level]}
-                stroke-width="3"
+                stroke-width={RING_WIDTH}
                 stroke-linecap="butt"
                 fill="none"
                 style={`animation-delay:-${((i / RING_SLOTS) * RING_PERIOD).toFixed(2)}s;`}
