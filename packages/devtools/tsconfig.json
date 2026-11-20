@@ -4,7 +4,7 @@
     // The host entry runs on the page; the panel runs in a worker, rendering
     // through the DOM subset installed as `document`, so Preact's types need
     // the DOM's.
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
     // The panel bundles Preact 11, from packages/preact's alias (one copy).

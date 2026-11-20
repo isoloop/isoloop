@@ -116,8 +116,10 @@ function Rejected(props: { metrics: BusMetrics }) {
   );
 }
 
-export function BusView(props: { bus: InspectBus }): JSX.Element {
-  const { bus } = props;
+export type BusSub = 'topics' | 'subscriptions' | 'rejected';
+
+export function BusView(props: { bus: InspectBus; sub: BusSub }): JSX.Element {
+  const { bus, sub } = props;
   const m = bus.metrics;
   return (
     <div class="dt-view" data-view="bus">
@@ -127,12 +129,16 @@ export function BusView(props: { bus: InspectBus }): JSX.Element {
       </p>
       {m ? (
         <>
-          <h3 class="dt-h">Topics</h3>
-          <Topics metrics={m} />
-          <h3 class="dt-h">Subscriptions</h3>
-          <Subscriptions metrics={m} />
-          <h3 class="dt-h">Rejected publishes, since the bus worker started</h3>
-          <Rejected metrics={m} />
+          {sub === 'topics' ? <Topics metrics={m} /> : null}
+          {sub === 'subscriptions' ? <Subscriptions metrics={m} /> : null}
+          {sub === 'rejected' ? (
+            <>
+              <p class="dt-muted" style="margin:0 0 4px;">
+                Publishes rejected since the bus worker started.
+              </p>
+              <Rejected metrics={m} />
+            </>
+          ) : null}
         </>
       ) : (
         <p class="dt-muted">

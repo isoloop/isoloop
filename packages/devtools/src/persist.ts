@@ -14,10 +14,19 @@ export type UiState = {
   width: number;
   height: number;
   position: DevtoolsPosition;
+  /** `wide` stretches the panel across the viewport's width; `max` fills the viewport. */
+  mode: PanelMode;
 };
+
+export type PanelMode = 'normal' | 'wide' | 'max';
+
+const isMode = (v: unknown): v is PanelMode => v === 'normal' || v === 'wide' || v === 'max';
 
 const DB = 'isoloop-devtools';
 const STORE = 'settings';
+/** The kernel events of each page session, and the sessions themselves (`event-store.ts`). */
+export const EVENTS_STORE = 'events';
+export const SESSIONS_STORE = 'sessions';
 const KEY = 'panel';
 
 const POSITIONS: ReadonlySet<string> = new Set([
@@ -41,11 +50,13 @@ export function parseUi(v: unknown): Partial<UiState> {
   if (typeof width === 'number' && Number.isFinite(width)) out.width = width;
   if (typeof height === 'number' && Number.isFinite(height)) out.height = height;
   if (isPosition(position)) out.position = position;
+  const mode: unknown = Reflect.get(v, 'mode');
+  if (isMode(mode)) out.mode = mode;
   return out;
 }
 
 /** Settles with a request's result; rejects on its error. */
-const settle = <T>(req: IDBRequest<T>): Promise<T> =>
+export const settle = <T>(req: IDBRequest<T>): Promise<T> =>
   new Promise((resolve, reject) => {
     req.addEventListener('success', () => {
       resolve(req.result);
@@ -56,12 +67,31 @@ const settle = <T>(req: IDBRequest<T>): Promise<T> =>
   });
 
 function openDb(): Promise<IDBDatabase> {
-  const req = indexedDB.open(DB, 1);
+  const req = indexedDB.open(DB, 2);
   req.addEventListener('upgradeneeded', () => {
-    req.result.createObjectStore(STORE);
+    const d = req.result;
+    if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE);
+    if (!d.objectStoreNames.contains(EVENTS_STORE)) {
+      d.createObjectStore(EVENTS_STORE, { keyPath: 'id', autoIncrement: true }).createIndex(
+        'session',
+        'session',
+      );
+    }
+    if (!d.objectStoreNames.contains(SESSIONS_STORE)) {
+      d.createObjectStore(SESSIONS_STORE, { keyPath: 'id' });
+    }
+  });
+  const opened = settle(req).then((d) => {
+    // Another tab upgrading or deleting the database waits for this connection
+    // to close. Let it go, and open again the next time storage is used.
+    d.addEventListener('versionchange', () => {
+      d.close();
+      db = undefined;
+    });
+    return d;
   });
   return Promise.race([
-    settle(req),
+    opened,
     new Promise<never>((_resolve, reject) => {
       req.addEventListener('blocked', () => {
         reject(new Error('indexedDB.open blocked'));
@@ -70,8 +100,9 @@ function openDb(): Promise<IDBDatabase> {
   ]);
 }
 
+/** The open connection, shared; reset when the database is closed from under it. */
 let db: Promise<IDBDatabase> | undefined;
-const database = (): Promise<IDBDatabase> => {
+export const database = (): Promise<IDBDatabase> => {
   db ??= openDb();
   return db;
 };

@@ -5,9 +5,9 @@ A devtools panel for Isoloop, drawn by a visual isolate in its own worker, so a 
 ```ts
 import { connectDevtools } from '@isoloop/devtools';
 
-const disconnect = connectDevtools(kernel, { position: 'bottom-right' });
+const disconnect = connectDevtools(kernel, { position: 'bottom-right', healthStatus: 'ring' });
 ```
 
 With `@isoloop/vite` the default panel URL works in dev and in a build. With another bundler, pass `src`: the URL it serves `@isoloop/devtools/panel` at. See `docs/guide/devtools.md`.
 
-Alt+Shift+D opens and closes it. Its open state, size and corner are kept in IndexedDB.
+Alt+Shift+D opens and closes it. Closed, the button is ringed by twelve arcs that show the kernel's health; `healthStatus` is `'ring'` (the default), `'radar'` (the logo filled by the same colours) or `'off'` (a plain white ring). The panel has Isolates, Bus, Events (the kernel's history: up to 6,000 events of this session, and of the last three before it) and Messages (the records your app publishes) tabs. Its open state, size and corner, and the events history, are kept in IndexedDB.

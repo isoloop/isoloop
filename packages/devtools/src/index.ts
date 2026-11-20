@@ -15,6 +15,16 @@ import type { FallbackRender, Kernel } from '@isoloop/host';
 /** The corner the floating button and the docked panel sit in. @experimental */
 export type DevtoolsPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
+/**
+ * How the closed button shows the kernel's health:
+ * - `'ring'`: a ring of twelve arcs, one stretch of isolates each, coloured by
+ *   their worst state, with a wave of brightness running round it;
+ * - `'radar'`: the same ring, with the logo filled by the same twelve colours;
+ * - `'off'`: a plain white ring, with no status on the button.
+ * @experimental
+ */
+export type HealthStatus = 'ring' | 'radar' | 'off';
+
 /** @experimental */
 export type DevtoolsOptions = {
   /**
@@ -26,6 +36,8 @@ export type DevtoolsOptions = {
   src?: string;
   /** Where the closed button and the opened panel sit. Default `'bottom-right'`. */
   position?: DevtoolsPosition;
+  /** How the closed button shows the kernel's health. Default `'ring'`. */
+  healthStatus?: HealthStatus;
   /** The panel isolate's id in the kernel. Default `'isoloop-devtools'`. */
   id?: string;
 };
@@ -33,9 +45,23 @@ export type DevtoolsOptions = {
 /** The attribute the panel puts on its open and close buttons. */
 const TOGGLE = '[data-isoloop-devtools-toggle]';
 
+/** The attribute a panel button puts its text on, for the page to copy. */
+const COPY = 'data-isoloop-copy';
+
 /** Alt+Shift+D (Option+Shift+D on a Mac) opens and closes the panel. */
 const isShortcut = (e: KeyboardEvent): boolean =>
   e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyD';
+
+/**
+ * A page-side clipboard write for the panel's Copy buttons: the panel runs in a
+ * worker, which has none. The button carries its text; the click is the user's
+ * own, so the browser allows the write.
+ */
+const onCopy = (e: MouseEvent): void => {
+  const button = e.composedPath().find((n) => n instanceof Element && n.hasAttribute(COPY));
+  const text = button instanceof Element ? button.getAttribute(COPY) : null;
+  if (text !== null) void navigator.clipboard.writeText(text).catch(() => undefined);
+};
 
 const panelUrl = (): string => new URL('./panel.js', import.meta.url).href;
 
@@ -83,6 +109,7 @@ const fallbackFor =
 export function connectDevtools(kernel: Kernel, o: DevtoolsOptions = {}): () => Promise<void> {
   const id = o.id ?? 'isoloop-devtools';
   const position = o.position ?? 'bottom-right';
+  const healthStatus = o.healthStatus ?? 'ring';
   const surface = document.createElement('div');
   surface.setAttribute('data-isoloop-devtools', '');
   // Inline, so it wins over the shadow root's `:host` rule.
@@ -96,7 +123,7 @@ export function connectDevtools(kernel: Kernel, o: DevtoolsOptions = {}): () => 
     id,
     src: o.src ?? panelUrl(),
     surface,
-    config: { position },
+    config: { position, healthStatus },
     grants: { publish: [], subscribe: [], inspect: true },
     fallback: fallbackFor(position),
   });
@@ -106,6 +133,7 @@ export function connectDevtools(kernel: Kernel, o: DevtoolsOptions = {}): () => 
     const button = surface.querySelector('iso-surface')?.shadowRoot?.querySelector(TOGGLE);
     if (button instanceof HTMLElement) button.click();
   };
+  surface.addEventListener('click', onCopy);
   const onKey = (e: KeyboardEvent): void => {
     if (!isShortcut(e)) return;
     e.preventDefault();
@@ -117,6 +145,7 @@ export function connectDevtools(kernel: Kernel, o: DevtoolsOptions = {}): () => 
   return () => {
     gone ??= (async () => {
       window.removeEventListener('keydown', onKey);
+      surface.removeEventListener('click', onCopy);
       await kernel.stop(id);
       surface.remove();
     })();
