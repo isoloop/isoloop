@@ -1,5 +1,13 @@
 # @isoloop/webmcp
 
+## 0.1.0-next.10
+
+### Patch Changes
+
+- 23c1bb4: Every public export of `@isoloop/vite`, `@isoloop/balancer`, `@isoloop/devtools` and `@isoloop/webmcp` has its reference comment: a lead sentence, its parameters, what it returns and throws, and each option's default. `isoloop()`, `createBalancer`, `connectDevtools` and `connectWebMCP` each have an example.
+- Updated dependencies [b303cb3]
+  - @isoloop/host@0.1.0-next.10
+
 ## 0.1.0-next.9
 
 ### Patch Changes

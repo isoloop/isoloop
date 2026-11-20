@@ -1,5 +1,15 @@
 # isoloop
 
+## 0.1.0-next.10
+
+### Patch Changes
+
+- Updated dependencies [e9b3d2b]
+- Updated dependencies [b303cb3]
+- Updated dependencies [799ca7e]
+  - @isoloop/bus@0.1.0-next.10
+  - @isoloop/protocol@0.1.0-next.10
+
 ## 0.1.0-next.9
 
 ### Patch Changes

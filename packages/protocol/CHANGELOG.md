@@ -1,5 +1,12 @@
 # @isoloop/protocol
 
+## 0.1.0-next.10
+
+### Patch Changes
+
+- b303cb3: TSDoc for every public export of `@isoloop/host`, `@isoloop/host/dev-mcp`, `@isoloop/runtime` and `@isoloop/runtime/testing`, and for the shared types they use (`BusError`, the inspection feed's types, `Grants`, `ErrorCode`, `TopicRef`): a lead sentence, `@param`, `@returns` and `@throws` with their error codes, every config and option field with its default, and examples on `createKernel`, `kernel.request`, `defineIsolate` and `connectDevMCP`. `Kernel`, `KernelConfig`, `IsolateHandle`, `IsolateState` and `CrashReason` are documented for the first time.
+- 799ca7e: The React and Preact adapters' doc comments are complete: each export says what it does, its parameters, what it returns and the error codes it rejects with, and `defineIsolate` has an example. `RouteValue` documents each field.
+
 ## 0.1.0-next.9
 
 ### Minor Changes

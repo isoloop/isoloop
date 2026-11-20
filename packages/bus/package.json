@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/bus",
-  "version": "0.1.0-next.9",
+  "version": "0.1.0-next.10",
   "description": "Log bus that runs in its own worker: topics, schemas, offsets, replay.",
   "license": "MIT",
   "type": "module",

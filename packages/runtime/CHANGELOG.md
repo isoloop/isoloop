@@ -1,5 +1,16 @@
 # @isoloop/runtime
 
+## 0.1.0-next.10
+
+### Patch Changes
+
+- b303cb3: TSDoc for every public export of `@isoloop/host`, `@isoloop/host/dev-mcp`, `@isoloop/runtime` and `@isoloop/runtime/testing`, and for the shared types they use (`BusError`, the inspection feed's types, `Grants`, `ErrorCode`, `TopicRef`): a lead sentence, `@param`, `@returns` and `@throws` with their error codes, every config and option field with its default, and examples on `createKernel`, `kernel.request`, `defineIsolate` and `connectDevMCP`. `Kernel`, `KernelConfig`, `IsolateHandle`, `IsolateState` and `CrashReason` are documented for the first time.
+- Updated dependencies [8e03048]
+- Updated dependencies [b303cb3]
+- Updated dependencies [799ca7e]
+  - @isoloop/dom@0.1.0-next.10
+  - @isoloop/protocol@0.1.0-next.10
+
 ## 0.1.0-next.9
 
 ### Minor Changes
