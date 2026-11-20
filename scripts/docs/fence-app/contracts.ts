@@ -1,7 +1,14 @@
 // The example app's contracts module, which the guides' fences import as
 // `./contracts` (its default export is the list) and `./contracts?isolate`.
 import { contracts, topic } from '@isoloop/bus';
+import { z } from 'zod';
 import * as s from './schemas';
+
+// Getting started's topic, which later guides build on.
+export const cartItems = topic('cart.items.v1', {
+  schema: z.object({ sku: z.string(), qty: z.number().int().positive() }),
+  retention: { kind: 'compacted' },
+});
 
 export const quoteTool = topic('markets.quote.v1', {
   schema: s.quoteRequest,
@@ -17,4 +24,4 @@ export const createAlertTool = topic('markets.alerts.create.v1', {
   tool: { description: 'Adds an alert rule.', readOnly: false, consequential: true },
 });
 
-export default contracts(quoteTool, createAlertTool);
+export default contracts(cartItems, quoteTool, createAlertTool);
