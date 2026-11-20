@@ -1,5 +1,9 @@
 # @isoloop/protocol
 
+## 0.1.0-next.8
+
+No changes in this release.
+
 ## 0.1.0-next.7
 
 ### Minor Changes

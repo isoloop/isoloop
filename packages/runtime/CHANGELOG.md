@@ -1,5 +1,13 @@
 # @isoloop/runtime
 
+## 0.1.0-next.8
+
+### Patch Changes
+
+- Updated dependencies [c0884d2]
+  - @isoloop/dom@0.1.0-next.8
+  - @isoloop/protocol@0.1.0-next.8
+
 ## 0.1.0-next.7
 
 ### Patch Changes
