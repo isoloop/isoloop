@@ -4,9 +4,9 @@
  * through `ctx.inspector` (ADR 0020, decision 6).
  *
  * Its surface covers the viewport and takes no pointer events, so the panel
- * places itself: closed, a floating button in its corner, with a dot amber
- * while an isolate is `restarting`, `crashed` or `blocked` and red once one
- * has `failed`;
+ * places itself: closed, a floating button in its corner, ringed by twelve
+ * checks (green, amber for unwell, red for failed, grey without data), with a
+ * wave of brightness running round the ring;
  * open, a panel docked in that corner, resizable from its inner corner.
  * Open state, size and corner are kept across reloads (`persist.ts`).
  */
@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { healthOf, useFeed, type Health } from './feed';
 import type { DevtoolsPosition } from './index';
 import { loadUi, saveUi, type PanelMode, type UiState } from './persist';
+import { arcPath, arcsOf, checksOf, RING_SLOTS, summaryOf, type Arc, type Level } from './ring';
 import { Body } from './views';
 
 const POSITIONS: readonly DevtoolsPosition[] = [
@@ -74,15 +75,35 @@ const fill = (ui: UiState): string => {
   return `${wide}${tall}${width}${height}max-width:100%;max-height:100%;`;
 };
 
-const DOT: Record<Health, string | undefined> = {
-  ok: undefined,
-  unwell: '#f59e0b',
-  failed: '#dc2626',
-};
-
 /** The closed button: a round tile of 70px, the mark inside at 58px. */
 const FAB_SIZE = 70;
-const FAB_MARK = 58;
+const FAB_MARK = 46;
+
+/** Seconds for the wave to go once around the ring. */
+const RING_PERIOD = 2.4;
+
+/**
+ * The wave: every arc fades up and down on the same clock, each a step behind
+ * the last (the delays are set per arc), so brightness runs around the ring.
+ * A failing arc pulses faster; a grey one sits still. Reduced motion: no motion.
+ */
+const RING_CSS = `
+@keyframes dt-flow { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+@keyframes dt-alarm { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+.dt-ring path { animation: dt-flow ${RING_PERIOD}s ease-in-out infinite; }
+.dt-ring path[data-level="failed"] { animation: dt-alarm 0.9s ease-in-out infinite; }
+.dt-ring path[data-level="unknown"] { animation: none; opacity: 0.45; }
+@media (prefers-reduced-motion: reduce) {
+  .dt-ring path, .dt-ring path[data-level="failed"] { animation: none; opacity: 1; }
+}
+`;
+
+const LEVEL_COLOR: Record<Level, string> = {
+  ok: '#22c55e',
+  unwell: '#f59e0b',
+  failed: '#ef4444',
+  unknown: '#64748b',
+};
 
 const STEP: Record<DevtoolsPosition, Record<'horizontal' | 'vertical', DevtoolsPosition>> = {
   'bottom-left': { horizontal: 'bottom-right', vertical: 'top-left' },
@@ -107,10 +128,11 @@ const arrowStyle =
 function Fab(props: {
   position: DevtoolsPosition;
   health: Health;
+  arcs: Arc[];
+  summary: string;
   onOpen: () => void;
   onMove: (to: DevtoolsPosition) => void;
 }) {
-  const dot = DOT[props.health];
   const [hover, setHover] = useState(false);
   const [v, h] = props.position.split('-');
   // The arrows point to the free sides: from the bottom-left corner, right and up.
@@ -153,20 +175,37 @@ function Fab(props: {
           type="button"
           data-isoloop-devtools-toggle=""
           data-health={props.health}
-          aria-label="Open Isoloop devtools (Alt+Shift+D)"
-          title="Isoloop devtools (Alt+Shift+D)"
+          aria-label={`Open Isoloop devtools (Alt+Shift+D). ${props.summary}`}
+          title={`Isoloop devtools (Alt+Shift+D)\n${props.summary}`}
           onClick={props.onOpen}
           style={`position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:${FAB_SIZE / 2}px;border:0;background:#111827;box-shadow:0 0 0 1px rgb(255 255 255 / 0.28),0 0 0 4px rgb(0 0 0 / 0.35),0 4px 14px rgb(0 0 0 / 0.7);color:#e5e7eb;cursor:pointer;padding:0;overflow:hidden;${font}`}
         >
+          <svg
+            class="dt-ring"
+            width={FAB_SIZE}
+            height={FAB_SIZE}
+            viewBox={`0 0 ${FAB_SIZE} ${FAB_SIZE}`}
+            aria-hidden="true"
+            style="position:absolute;inset:0;"
+          >
+            {props.arcs.map((c, i) => (
+              <path
+                key={c.id}
+                data-level={c.level}
+                d={arcPath(i, FAB_SIZE / 2, FAB_SIZE / 2, FAB_SIZE / 2 - 4)}
+                stroke={LEVEL_COLOR[c.level]}
+                stroke-width="3"
+                stroke-linecap="round"
+                fill="none"
+                style={`animation-delay:-${((i / RING_SLOTS) * RING_PERIOD).toFixed(2)}s;`}
+              >
+                <title>{c.label}</title>
+              </path>
+            ))}
+          </svg>
           <svg width={FAB_MARK} height={FAB_MARK} viewBox="0 0 100 100" aria-hidden="true">
             <path d={MARK} fill="#fff" fill-rule="evenodd" />
           </svg>
-          {dot ? (
-            <span
-              data-dot={props.health}
-              style={`position:absolute;top:${FAB_SIZE / 10}px;right:${FAB_SIZE / 10}px;width:12px;height:12px;border-radius:6px;background:${dot};border:2px solid #111827;`}
-            />
-          ) : null}
         </button>
         {hover ? (
           <>
@@ -361,6 +400,9 @@ function Dock(props: {
 
 function Panel({ config }: IsolateProps) {
   const ctx = useIsolate();
+  useEffect(() => {
+    ctx.styles(RING_CSS);
+  }, []);
   const snap = useFeed(ctx.inspector);
   const [ui, setUi] = useState<UiState | undefined>(undefined);
   const latest = useRef<UiState | undefined>(undefined);
@@ -397,6 +439,8 @@ function Panel({ config }: IsolateProps) {
       <Fab
         position={ui.position}
         health={healthOf(snap)}
+        arcs={arcsOf(snap)}
+        summary={summaryOf(arcsOf(snap), checksOf(snap))}
         onOpen={() => {
           update({ open: true });
         }}

@@ -146,7 +146,7 @@ describe('@isoloop/devtools (M4b task 7)', () => {
       src: new URL('./__fixtures__/throws.ts', import.meta.url).href,
       grants: { publish: [], subscribe: [] },
     });
-    await waitFor(() => find('[data-dot="failed"]'), 15_000);
+    await waitFor(() => find('button[data-health="failed"]'), 15_000);
   });
 
   it('restarts after a crash, like any isolate', async () => {
