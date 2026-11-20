@@ -133,9 +133,6 @@
         "createKernel"
       ]
     },
-    "14": {
-      "@isoloop/runtime": ["HostApi", "HostCallError", "ScrollIntoViewOptionsLike"]
-    },
     "15": {
       "@isoloop/host": ["NavigateRequest", "OnNavigate"],
       "@isoloop/runtime": [
