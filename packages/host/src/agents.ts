@@ -20,7 +20,7 @@ import {
  */
 export type AgentsConfig = {
   /**
-   * Grant matchers (`*` for one segment, `>` for the rest) naming the topics
+   * Grant patterns (`*` matches one or more characters, dots included) naming the topics
    * agents may call, for example `['markets.quote.v1', 'markets.alerts.*']`.
    * Each topic matched needs a `reply`, a `tool`, and schemas that make JSON
    * Schema (Standard JSON Schema; not `unchecked()`), or `createKernel`
