@@ -4,9 +4,9 @@
 
 ## When to use it
 
-The balancer places each isolate in a pool with room, moves one out when its pool can't keep up, and keeps an isolate that blocks or crashes in a quarantine pool until it has been quiet for a while. The decisions are in [ADR 0017](../adr/0017-opt-in-balancer.md).
+The balancer places each isolate in a pool with room, moves one out when its pool can't keep up, and keeps an isolate that blocks or crashes in a quarantine pool until it has been quiet for a while.
 
-The kernel doesn't place anything on its own ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). Without the balancer nothing changes; with it, only the isolates you spawn through it are ever moved.
+The kernel doesn't place anything on its own. Without the balancer nothing changes; with it, only the isolates you spawn through it are ever moved.
 
 | Use the balancer | Place by hand ([pools guide](pools.md)) |
 | --- | --- |
@@ -123,7 +123,7 @@ One shared pool, `balancer-quarantine-1`, outside normal placement and outside `
 
 ### Packing back
 
-A pool whose members have all been steady for 60 s empties into another of the balancer's pools, one member per pack, which frees its worker once the last one is in. Steady means no spike, crash, sustained or full trigger, and a backlog no higher than 60 s before: a queue that holds steady while work arrives is fine, a growing one isn't. The pool it joins must stay under 40 % of a core with the whole pool, below the 60 % placement line so it doesn't trip at once, and must not have a member moving, in trouble in the last 60 s, or with a growing backlog. The lightest such pool goes first, its lightest member first, into the fullest pool that fits; a merge under way is finished before another starts, and at most one member packs per minute. Never a pool with a held, `kept-apart` or out-of-budget member. A pool of one is the M3i case: a single pack frees its worker. `pack: { enabled: false }` turns it off.
+A pool whose members have all been steady for 60 s empties into another of the balancer's pools, one member per pack, which frees its worker once the last one is in. Steady means no spike, crash, sustained or full trigger, and a backlog no higher than 60 s before: a queue that holds steady while work arrives is fine, a growing one isn't. The pool it joins must stay under 40 % of a core with the whole pool, below the 60 % placement line so it doesn't trip at once, and must not have a member moving, in trouble in the last 60 s, or with a growing backlog. The lightest such pool goes first, its lightest member first, into the fullest pool that fits; a merge under way is finished before another starts, and at most one member packs per minute. Never a pool with a held, `kept-apart` or out-of-budget member. For a pool of one, a single pack frees its worker. `pack: { enabled: false }` turns it off.
 
 ### Isolates the kernel gave up on
 
@@ -135,7 +135,7 @@ A move is `stop`, then `spawn` again with the same id and the new pool. There's 
 
 - **State comes back from the bus,** within each topic's retention, as after any restart. Subscriptions start where their `from` says; give isolates that must not lose their place `from: 'committed'` or a compacted topic to read from `'earliest'`. Consumer groups keep their place without it: a group that has committed resumes after its committed offset whatever `from` says, and a member joining a group that has members takes records from where the group is. A consumer group's records that a moved member hadn't committed go to the group's other members, or come back to it if it was the only one. Some of them may have been handled already, since delivery is at least once, so a group's consumers must tolerate repeats.
 - **A visual isolate goes blank until it redraws,** with a fresh surface. Show something meanwhile: the interactive dashboards put a "Moving…" overlay on the widget until it draws again.
-- **The old copy's timers don't follow it.** Once a pool member's `onShutdown` handlers settle, none of its timers, animation frames, idle callbacks, queued microtasks or port listeners run again ([ADR 0015](../adr/0015-visual-pools.md), decision 9), so a move doesn't leave work behind in the pool it left.
+- **The old copy's timers don't follow it.** Once a pool member's `onShutdown` handlers settle, none of its timers, animation frames, idle callbacks, queued microtasks or port listeners run again, so a move doesn't leave work behind in the pool it left.
 
 ## `busyMs`: what's measured
 
@@ -149,7 +149,7 @@ How it's attributed:
 
 Its limits:
 
-- Promise continuations, other libraries' own schedulers, and work shared by the whole worker (GC) belong to no isolate; they show up only in the worker's `lagMs`. Work that resumes after `await` is the common case: in M3i's measurement each File processor did its work in slices resumed after `await` and measured 0 to 8 % of a core while its pool fell behind.
+- Promise continuations, other libraries' own schedulers, and work shared by the whole worker (GC) belong to no isolate; they show up only in the worker's `lagMs`. Work that resumes after `await` is the common case: in the File processor's measurement each one did its work in slices resumed after `await` and measured 0 to 8 % of a core while its pool fell behind.
 - **For work it misses, report your own.** If the app times its work (the processor times each slice of a file), `balancer.report(id, { busyMs })` with a running total since the isolate started, and the balancer uses the larger figure. A running total means a late or missed report still counts at the next one; a total that goes down is taken as a restart of the count.
 - An equal split can make one isolate look lighter or heavier than it is.
 - The clock is coarse on pages that aren't cross-origin isolated (100 µs). Short callbacks average out over a window; long tasks are measured almost exactly.
@@ -164,7 +164,7 @@ So `busyMs` is a placement guide, not a profiler.
 
 `maxWorkers` defaults to `max(2, navigator.hardwareConcurrency − 2)`. In a container or VM, `hardwareConcurrency` can report the host's threads rather than the cores the page may use. On the bench server it reported 16 in a container pinned to 4 cores, so the balancer allowed itself up to 8 pools. Set `maxWorkers` yourself there.
 
-M3h measured these on the processor example's File processor, on 4 cores at 2.0 GHz: one pool with a balancer that watches every beat but never moves anything differs from one pool with no balancer by 0 to 1 point of CPU, a few MB and a few milliseconds of typing, within the rounds' spread. The figures, and what the balancer did with faults, are in the [File processor write-up](https://github.com/isoloop/web/tree/main/apps/processor/comparison).
+Measured on the processor example's File processor, on 4 cores at 2.0 GHz: one pool with a balancer that watches every beat but never moves anything differs from one pool with no balancer by 0 to 1 point of CPU, a few MB and a few milliseconds of typing, within the rounds' spread. The figures, and what the balancer did with faults, are in the [File processor write-up](https://github.com/isoloop/web/tree/main/apps/processor/comparison).
 
 ## Inspecting it
 
@@ -184,7 +184,5 @@ M3h measured these on the processor example's File processor, on 4 cores at 2.0 
 
 ## See also
 
-- [ADR 0017: an opt-in balancer](../adr/0017-opt-in-balancer.md), the decisions behind this page.
 - [Worker pools](pools.md), for placing by hand.
-- [ADR 0001](../adr/0001-one-worker-per-isolate.md) and [ADR 0015](../adr/0015-visual-pools.md), on placement and on pool members' timers.
 - [The inspection feed](inspection.md), for reading pools and isolates from a tool.

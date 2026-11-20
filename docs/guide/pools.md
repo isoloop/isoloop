@@ -4,7 +4,7 @@ A **pool** puts several isolates, headless or visual, in one worker, which saves
 
 ## When to use it
 
-By default every isolate gets its own worker ([ADR 0001](../adr/0001-one-worker-per-isolate.md)): its own thread, heap and copy of the runtime, so one isolate that blocks or crashes affects only itself. A pool trades some of that isolation for memory and start-up time.
+By default every isolate gets its own worker: its own thread, heap and copy of the runtime, so one isolate that blocks or crashes affects only itself. A pool trades some of that isolation for memory and start-up time.
 
 | Pool | Keep in its own worker |
 |---|---|
@@ -47,12 +47,12 @@ For 8 React widgets fed at the plant dashboard's data rate ([bench/visual-pools]
 - **Fate.** If a member stops responding or its worker errors (an exception from a timer, say), every member crashes with it and the pool restarts in a new worker. Each member's `isolate:crash` names the `pool`, and the message names the member that caused it. Each member then subscribes again, and each subscription starts where its `from` says: `committed` reads on after its last commit, so records it had read but not committed come again (at least once, as after any restart); `earliest` reads everything the topic still retains; `latest`, the default, starts with new records only. A member's own fatal error (`start()` throwing, a ready timeout, a version mismatch) crashes only that member.
 - **Globals.** Members run in the same realm. A pool worker freezes the built-ins before its first member loads, so `Array.prototype.x = …` throws instead of changing arrays for the neighbours; overriding an inherited property on your own objects (`this.name = 'MyError'`) still works. Other globals (`globalThis.foo`, caches in shared libraries) are still shared.
 - **Grants, in effect.** Each member keeps its own grants on the bus, but code in one member can reach the others' bus ports, so treat a pool as holding the union of its members' grants. `kernel.pools()` lists that union with the members.
-- **Leftovers.** When one member is stopped or restarted alone, the pool stops routing messages and records to it. Once its `ctx.onShutdown` handlers settle, none of the timers, animation frames, idle callbacks, queued microtasks or port listeners it registered run again ([ADR 0015](../adr/0015-visual-pools.md), decision 9). Not covered: work started outside its code (module evaluation, a framework scheduler shared with other members) and promise continuations, and a pending `setTimeout` keeps its closure until it would have fired. Clearing timers in `ctx.onShutdown` is still good practice, but no longer required.
+- **Leftovers.** When one member is stopped or restarted alone, the pool stops routing messages and records to it. Once its `ctx.onShutdown` handlers settle, none of the timers, animation frames, idle callbacks, queued microtasks or port listeners it registered run again. Not covered: work started outside its code (module evaluation, a framework scheduler shared with other members) and promise continuations, and a pending `setTimeout` keeps its closure until it would have fired. Clearing timers in `ctx.onShutdown` is still good practice, but no longer required.
 - **Suspension.** A pool suspends only as a whole: when every member asks for `suspend` and all of them are idle. A record or `kernel.resume` for any member wakes the whole pool. Registering a member that asks for `suspend` next to one that never suspends warns once.
 
 ## Visual pools
 
-Widgets in a pool each render into their own surface, but inside the worker they share one document, as widgets on one page do ([ADR 0015](../adr/0015-visual-pools.md)). On top of everything above, that means:
+Widgets in a pool each render into their own surface, but inside the worker they share one document, as widgets on one page do. On top of everything above, that means:
 
 - **Members of a pool can read each other's DOM and input.** A member can find another member's nodes through `document`, including what users type into its fields, and a key listener on `document` or `window` hears keystrokes in every member's fields. `kernel.pools()` says so for every pool with a visual member (`sharesDocument`, `warning`). **Keep widgets that handle secrets (passwords, tokens, payment details) on their own worker.**
 - **One focus.** `document.activeElement` is the pool's, as on a page.
@@ -60,7 +60,7 @@ Widgets in a pool each render into their own surface, but inside the worker they
 - **Nodes stay with their member.** Moving a node from one member's root into another's throws, in the code doing the move.
 - **Render errors stay the member's own.** The React and Preact adapters catch a render error at the member's root and report it with `ctx.reportError`, so only that widget crashes and restarts. An error thrown from a timer or a shared scheduler can't be traced to a member, so the whole pool restarts.
 - **Headless and visual members can share a pool,** for example a machine's feed with its widgets. They share fate like any members: if the feed hangs, its widgets restart with it.
-- **React and Preact widgets can share a pool,** but the memory saving comes from members sharing one framework instance, so prefer one framework per pool. Widgets built apart from the host ([ADR 0012](../adr/0012-isolates-built-apart.md)) bring their own framework copy and save less.
+- **React and Preact widgets can share a pool,** but the memory saving comes from members sharing one framework instance, so prefer one framework per pool. Widgets built apart from the host ([isolates built apart](isolates.md#isolates-built-apart)) bring their own framework copy and save less.
 
 ### Modals, tooltips and toasts
 
@@ -137,7 +137,7 @@ That's why the plant's default is `matched`: on this phone `split` was the slowe
 
 ## Inspecting pools
 
-- `kernel.isolates()`: each member's `pool`, its worker's `lagMs`, and its own `busyMs`, the time the worker spent running that member's code in the last heartbeat interval ([ADR 0017](../adr/0017-opt-in-balancer.md)). `lagMs` is the same for every member of a pool; `busyMs` is what tells them apart.
+- `kernel.isolates()`: each member's `pool`, its worker's `lagMs`, and its own `busyMs`, the time the worker spent running that member's code in the last heartbeat interval. `lagMs` is the same for every member of a pool; `busyMs` is what tells them apart.
 - `kernel.on('isolate:beat', fn)`: every heartbeat as it arrives, `{ id, pool?, lagMs, busyMs?, at }`, once per member. The kernel emits it only while something listens. What `busyMs` covers and its limits are in the [balancer guide](balancer.md#busyms-whats-measured).
 - `kernel.pools()`: each pool's members, whether its worker runs, its effective grants, and whether its members share a document (`sharesDocument`, with a `warning`).
 - A pool counts as one worker against `workers.budget`.
@@ -151,7 +151,4 @@ That's why the plant's default is `matched`: on this phone `split` was the slowe
 
 ## See also
 
-- [ADR 0001](../adr/0001-one-worker-per-isolate.md), one worker per isolate by default.
-- [ADR 0015](../adr/0015-visual-pools.md), visual pools, and [ADR 0012](../adr/0012-isolates-built-apart.md), isolates built apart.
 - [The balancer](balancer.md), for placing by measured load.
-- [The plant memory investigation](../investigations/plant-memory.md), where the per-pool costs come from.

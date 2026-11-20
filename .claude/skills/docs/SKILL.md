@@ -37,6 +37,8 @@ Done when every item on both lists has its guides named, or is marked "reference
 
 TSDoc follows the bar in `docs/writing.md` § TSDoc.
 
+Write how it works and how to use it, not why it was decided: no links to ADRs or plans, no `ADR 0001`, no decision numbers (`docs/writing.md` § Voice). `docs:check` fails a guide that has them.
+
 **The changeset** says what changed, as shipped. It gives a limit, a default or a count only with the exact figure the guide gives; otherwise it leaves it to the guide.
 
 **An ADR the change makes stale** is fixed in its own PR, since ADR changes go to the maintainer. Open it as a draft that says "after #N" (the code PR), with no date, and rebase it once #N merges: only then does the ADR describe code that exists.

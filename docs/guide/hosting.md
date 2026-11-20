@@ -14,10 +14,10 @@ Read it before deploying an app. In development, `@isoloop/vite` sends the heade
 
 ## The bus worker and the contracts module
 
-The bus runs in its own worker, which the kernel starts before any isolate ([ADR 0005](../adr/0005-bus-topology-message-channels.md)). It needs two URLs, given together:
+The bus runs in its own worker, which the kernel starts before any isolate. It needs two URLs, given together:
 
 - **`workers.bus`:** the bus worker bundle, `bus-worker.js` from `@isoloop/bus/worker`. Like the bootstrap, it's a module worker, so the host app serves it from its own origin.
-- **`contracts.url`:** the contracts module ([ADR 0003](../adr/0003-schema-format-standard-schema.md)). The bus worker `import()`s it to get the topic schemas. The host imports the same module for `contracts.list`. It can be on another origin, with the same CORS headers as an isolate module.
+- **`contracts.url`:** the contracts module ([contracts and grants](contracts.md)). The bus worker `import()`s it to get the topic schemas. The host imports the same module for `contracts.list`. It can be on another origin, with the same CORS headers as an isolate module.
 
 Give both or neither. One without the other makes `createKernel` throw `invalid_config`. With neither there is no bus: isolates still run, but `kernel.publish` rejects with `bus_unavailable`.
 
@@ -46,9 +46,9 @@ If the contracts module fails to load or is invalid (`contracts_failed`, `contra
 
 ## Persistent topics and a discarded tab
 
-Topics with `durability: 'persistent'` live in the origin's private file system, so they survive a reload, a closed tab and a bus worker crash ([ADR 0007](../adr/0007-bus-worker-supervision.md)). A publish to one is acknowledged once its batch is on disk; batches are written every 5 ms. When the page freezes or goes away (the Page Lifecycle `freeze` event, or `pagehide`), the kernel asks the bus to write what it has pending at once.
+Topics with `durability: 'persistent'` live in the origin's private file system, so they survive a reload, a closed tab and a bus worker crash. A publish to one is acknowledged once its batch is on disk; batches are written every 5 ms. When the page freezes or goes away (the Page Lifecycle `freeze` event, or `pagehide`), the kernel asks the bus to write what it has pending at once.
 
-Memory topics don't survive a discarded tab. A browser may freeze a hidden tab and later discard it to save memory ([ADR 0001](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls)); when the user comes back, the page loads afresh, and only persistent topics still hold their records. Make a topic persistent if losing it on a discard would be a problem.
+Memory topics don't survive a discarded tab. A browser may freeze a hidden tab and later discard it to save memory; when the user comes back, the page loads afresh, and only persistent topics still hold their records. Make a topic persistent if losing it on a discard would be a problem.
 
 Only one tab's bus owns the files. In a second tab, and where the browser has no sync access handles or the files can't be opened (some private windows), persistent topics run in memory and the kernel emits `bus:durability_degraded { reason }`.
 
@@ -84,8 +84,8 @@ Without them the import fails and the isolate crashes with reason `error` and a 
 
 ## Placement rules
 
-- **One worker per isolate by default** ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). An isolate, headless or visual, can name a pool (`manifest.pool`) and share a worker with the other isolates naming it; pool members share an event loop, globals and fate: if one stops responding or takes the worker down, the whole pool restarts (each member's `isolate:crash` names the `pool`); a member's own fatal error restarts only that member. Visual members also share one document, so they can read each other's DOM and input: keep widgets that handle secrets on their own worker ([ADR 0015](../adr/0015-visual-pools.md)). A pool suspends only as a whole, when every member is idle and opts in, and any member's wake wakes it. See [Worker pools](pools.md) for when to pool and what members share. Pool names starting with `balancer-` are reserved for the opt-in [balancer](balancer.md), which places isolates by measured load; `kernel.spawn` rejects them with `reserved_pool`.
-- **Suspension is opt-in.** `manifest.suspend: 'when-idle'` (60 s) or `{ whenIdle: { afterMs } }` lets an idle isolate's worker be shut down and woken later (ADR 0001); the default `'never'` keeps it running, in a hidden tab too.
+- **One worker per isolate by default.** An isolate, headless or visual, can name a pool (`manifest.pool`) and share a worker with the other isolates naming it; pool members share an event loop, globals and fate: if one stops responding or takes the worker down, the whole pool restarts (each member's `isolate:crash` names the `pool`); a member's own fatal error restarts only that member. Visual members also share one document, so they can read each other's DOM and input: keep widgets that handle secrets on their own worker ([pools](pools.md)). A pool suspends only as a whole, when every member is idle and opts in, and any member's wake wakes it. See [Worker pools](pools.md) for when to pool and what members share. Pool names starting with `balancer-` are reserved for the opt-in [balancer](balancer.md), which places isolates by measured load; `kernel.spawn` rejects them with `reserved_pool`.
+- **Suspension is opt-in.** `manifest.suspend: 'when-idle'` (60 s) or `{ whenIdle: { afterMs } }` lets an idle isolate's worker be shut down and woken later; the default `'never'` keeps it running, in a hidden tab too.
 - **Worker budget.** Passing `workers.budget` live workers (32 by default) logs one warning and emits `workers:budget`. It never blocks a spawn. Each worker has its own heap, so the right number depends on the device.
 - **Spawn failures.** If `new Worker` throws (say, the browser is out of memory), the isolate crashes with reason `spawn_failed`, then gets the normal backoff and restart limit.
 
@@ -102,7 +102,5 @@ Without them the import fails and the isolate crashes with reason `error` and a 
 
 ## See also
 
-- [Design §4.2, the loader](../design/system-design.md#42-loader).
-- [ADR 0005](../adr/0005-bus-topology-message-channels.md) (the bus worker), [ADR 0003](../adr/0003-schema-format-standard-schema.md) (contracts) and [ADR 0007](../adr/0007-bus-worker-supervision.md) (persistence).
-- [ADR 0001](../adr/0001-one-worker-per-isolate.md) and [ADR 0015](../adr/0015-visual-pools.md), on placement.
+- [Getting started](getting-started.md) and [the bus](bus.md).
 - [Worker pools](pools.md) and [the balancer](balancer.md).

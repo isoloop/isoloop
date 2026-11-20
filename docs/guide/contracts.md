@@ -67,7 +67,7 @@ const kernel = createKernel({ contracts: { url: contractsUrl, list }, workers })
 | --- | --- | --- |
 | `schema` | required | A [Standard Schema](https://standardschema.dev) V1: Zod 4, Valibot and ArkType all implement it. `unchecked<T>()` is the explicit opt-out. |
 | `retention` | required | How much of the topic the bus keeps: `{ kind: 'last-n', n }`, `{ kind: 'time', ms }`, or `{ kind: 'compacted' }` (the latest record per key). |
-| `durability` | `'memory'` | `'persistent'` keeps the topic in OPFS, so it survives a bus crash and a reload ([ADR 0007](../adr/0007-bus-worker-supervision.md)). Where OPFS isn't available, or another tab holds it, the topic behaves as `'memory'` and the kernel emits `bus:durability_degraded`. |
+| `durability` | `'memory'` | `'persistent'` keeps the topic in OPFS, so it survives a bus crash and a reload. Where OPFS isn't available, or another tab holds it, the topic behaves as `'memory'` and the kernel emits `bus:durability_degraded`. |
 | `maxRecordBytes` | 256 KiB (`DEFAULT_MAX_RECORD_BYTES`) | A record over it rejects with `too_large`. |
 | `reply` | none | A schema for replies, which makes the topic requestable ([below](#request-and-reply)). |
 | `seed` | none | Starts the topic from an older one ([below](#versions-and-migrations)). |
@@ -159,7 +159,7 @@ export const cartItemsV2 = topic('cart.items.v2', {
 
 The seed may read a v1 that the contracts no longer list: the bus keeps it on disk for the seed without opening it to isolates. At boot, persistent topics on disk that no contract lists are kept and reported with `bus:orphaned_topics`. Nothing is deleted on its own. `kernel.dropTopic(name)` deletes one, and rejects with `seed_pending` while a seed still reads from it.
 
-A migration that `map` can't express (joining topics, calling a server) is a headless isolate that subscribes to v1 from `committed` and publishes to v2 ([ADR 0003](../adr/0003-schema-format-standard-schema.md), decision 20).
+A migration that `map` can't express (joining topics, calling a server) is a headless isolate that subscribes to v1 from `committed` and publishes to v2.
 
 ## Request and reply
 
@@ -228,7 +228,7 @@ kernel.spawn({
 - **The bus enforces them.** Publishing without a publish grant, or subscribing without a subscribe grant, rejects with `forbidden`.
 - **A request is a publish,** so the caller needs a publish grant for the topic. The isolate that answers needs a subscribe grant.
 - **`isoloop.*` topics** belong to the kernel. Isolates and host code can't publish to them (`forbidden`).
-- **`navigate: true`** lets the isolate call `navigate()` ([ADR 0002](../adr/0002-host-owns-routing.md)). Default false.
+- **`navigate: true`** lets the isolate call `navigate()`. Default false.
 - **`inspect: true`** gives the isolate the inspection feed and its controls (`@experimental`, [inspection guide](inspection.md)). Default false.
 - **A pool's members share a worker,** so in effect the pool can do what any of its members may: the union of their grants. That's why an isolate holding `inspect` can't be pooled (`invalid_config`). See [pools](pools.md).
 
@@ -278,6 +278,3 @@ Commit the export and review its diff in CI: a change that isn't adding an optio
 - [Inspection feed](inspection.md): the `inspect` grant.
 - [Pools](pools.md): what sharing a worker does to grants.
 - [Hosting](hosting.md): serving the contracts module and the workers.
-- [ADR 0003](../adr/0003-schema-format-standard-schema.md): Standard Schema, the contracts module, versioning and seeding.
-- [ADR 0018](../adr/0018-tools-for-agents.md): tools on contracts.
-- [ADR 0007](../adr/0007-bus-worker-supervision.md): durability and bus restarts.

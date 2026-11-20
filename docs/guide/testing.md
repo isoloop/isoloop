@@ -84,7 +84,7 @@ The context is driven by the test, so nothing arrives on its own.
 - **`emit(topic, value, key?)`:** delivers a record to every subscription on `topic`, in the order they subscribed. The records get offsets 0, 1, 2 and so on, the current time and the producer `'test'`.
 - **`published`:** every `publish` the isolate made, in order, as `{ topic, key?, value }`. The `key` is there only when the isolate passed one.
 - **`subscriptions()`:** the subscriptions still open, as `{ topic, from }`. `from` is the start position the isolate asked for, `'latest'` when it gave none.
-- **`reset(topic)`:** runs the `onReset` of every subscription on `topic`, as after a bus restart lost a memory topic ([ADR 0007](../adr/0007-bus-worker-supervision.md)).
+- **`reset(topic)`:** runs the `onReset` of every subscription on `topic`, as after a bus restart lost a memory topic.
 
 Topics are matched by name, so `emit` takes the name (`'cart.items.v1'`), not the topic.
 
@@ -189,7 +189,7 @@ For every topic in the list, `testContracts` runs each sample through the schema
 - **`not_plain`:** the schema accepted the sample, but its output isn't plain data that structured cloning keeps whole: a function, a symbol, or an instance of a class (a transform that returns `new Money(…)`, say). `message` names the first such part, for example `output is an instance of Money`. Plain objects, arrays, `Map`, `Set`, `Date`, `RegExp`, `ArrayBuffer` and its views pass.
 - **`no_samples`:** the topic has no `values`. Its `sample` is `-1`, and its `schema` is `'value'`.
 
-The `not_plain` check matters because the bus stores a schema's output, not what was published ([ADR 0003](../adr/0003-schema-format-standard-schema.md), decision 11). A persistent topic rejects an output that can't be encoded, with `not_encodable`. For a memory topic, the broker checks cloneability only when `KernelConfig.dev` is set, so a bad output could first show up in production. Running `testContracts` in your contracts package's tests finds it first.
+The `not_plain` check matters because the bus stores a schema's output, not what was published. A persistent topic rejects an output that can't be encoded, with `not_encodable`. For a memory topic, the broker checks cloneability only when `KernelConfig.dev` is set, so a bad output could first show up in production. Running `testContracts` in your contracts package's tests finds it first.
 
 Give each topic samples that cover its schema's branches: a value with every optional field, one with none, the values your transforms and defaults change. Samples for names that aren't in the list are ignored, and a `reply` schema without `replies` isn't checked, so list the replies of every topic that has one.
 
@@ -219,5 +219,3 @@ Isoloop ships no helper for these. A test starts the kernel in a browser, as you
 - [Getting started](getting-started.md): the contracts module, the kernel and a first isolate.
 - [What Isoloop can't hide](limits.md): what works differently inside an isolate.
 - [Hosting](hosting.md): the headers to check in a browser test.
-- [ADR 0003](../adr/0003-schema-format-standard-schema.md): contracts, schemas and the plain-data rule.
-- [ADR 0007](../adr/0007-bus-worker-supervision.md): bus restarts, which `reset` stands in for.

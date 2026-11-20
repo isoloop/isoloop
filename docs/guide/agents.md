@@ -7,7 +7,7 @@ An app can offer some of its requestable topics to AI agents as tools, through t
 - **A coding agent in development** calls the app's tools through the dev MCP, and reads the running page through the dev MCP's own `isoloop_*` tools.
 - **A browser agent** calls them through WebMCP, where a browser has it.
 
-Both call the same tool surface, and the isolate that answers doesn't know or care which one asked. The decisions are in [ADR 0018](../adr/0018-tools-for-agents.md).
+Both call the same tool surface, and the isolate that answers doesn't know or care which one asked.
 
 To watch a running page without exposing any tool, read [the inspection guide](inspection.md) instead: the dev MCP's `isoloop_*` reads come from that feed.
 
@@ -192,7 +192,7 @@ const disconnect = connectWebMCP(kernel);
 - **Disconnecting** unregisters every tool and aborts the calls still in flight.
 - **Without WebMCP** it does nothing and returns a function that does nothing. There's no shim; in development the dev MCP covers other browsers.
 
-Both browsers that have WebMCP keep it behind a flag. It's tested under Playwright only: Chromium with `--enable-features=WebMCP`, and Firefox with `dom.modelcontext.enabled`. The two differ, and `connectWebMCP` follows the features each one has, not its name ([ADR 0018](../adr/0018-tools-for-agents.md), decision 8, amended 2026-11-19):
+Both browsers that have WebMCP keep it behind a flag. It's tested under Playwright only: Chromium with `--enable-features=WebMCP`, and Firefox with `dom.modelcontext.enabled`. The two differ, and `connectWebMCP` follows the features each one has, not its name:
 
 | | Chromium 158 | Firefox 159 |
 | --- | --- | --- |
@@ -219,7 +219,6 @@ Both browsers that have WebMCP keep it behind a flag. It's tested under Playwrig
 
 ## See also
 
-- [ADR 0018: tools for agents](../adr/0018-tools-for-agents.md), the decisions behind this page.
 - [The inspection feed](inspection.md), where the dev MCP's reads come from.
 - [The devtools panel](devtools.md), the same feed drawn in the page.
 - [WebMCP](https://webmachinelearning.github.io/webmcp/), the Community Group draft.

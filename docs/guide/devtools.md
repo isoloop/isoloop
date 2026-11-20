@@ -4,7 +4,7 @@
 
 ## When to use it
 
-Use the panel to watch a page while you develop it, and to restart, kill or block an isolate by hand. It reads the inspection feed ([ADR 0020](../adr/0020-inspection-feed.md)). The panel is a visual isolate in its own worker, so a crash or hang in the panel doesn't reach the app, and the supervisor restarts it like any other isolate. It is never pooled. It gets the feed through the `inspect` grant, on a port of its own, not through bus topics.
+Use the panel to watch a page while you develop it, and to restart, kill or block an isolate by hand. It reads the [inspection feed](inspection.md). The panel is a visual isolate in its own worker, so a crash or hang in the panel doesn't reach the app, and the supervisor restarts it like any other isolate. It is never pooled. It gets the feed through the `inspect` grant, on a port of its own, not through bus topics.
 
 - **To build a tool of your own** on the same feed, read [the inspection guide](inspection.md).
 - **To let a coding agent read the page,** use the dev MCP ([agents guide](agents.md#in-development-the-dev-mcp)).
@@ -53,7 +53,7 @@ Hover the button and two small arrows appear, pointing to the free sides: they m
 The panel opens on the isolates view. Each row is one isolate:
 - **State** comes from the supervisor.
 - **Lag** is from the isolate's last beat.
-- **Busy** is the busy time from its last beat ([ADR 0017](../adr/0017-opt-in-balancer.md)).
+- **Busy** is the busy time from its last beat.
 - **Memory** is only measured in Chromium on a cross-origin isolated page. It shows how old the figure is, and for a pool member it's the whole pool's worker.
 - **Restarts** counts crash restarts. A restart you ask for doesn't count.
 - **Queue** is the patch batches waiting for the compositor.
@@ -98,12 +98,12 @@ The Messages tab shows the records your app publishes, as they are appended to t
 
 Click a row, or its chevron, to open it into two panels: **Value** (indented and coloured) and **Record** (the exact time, topic, offset, key, producer, size and the request that produced it, if any). Each has a Copy button; the page does the copying, since the panel's worker has no clipboard.
 
-The records come from a tap ([ADR 0020](../adr/0020-inspection-feed.md), decision 3):
+The records come from a tap on the bus:
 - **Topics:** every topic by default. Type patterns (`orders.*`, several separated by commas or spaces) and Apply to narrow it. Rows already in the list stay; Clear removes them.
 - **Rate:** at most 50 records a second reach the panel. The header shows the cap and how many records the bus left out over it since the tab was opened (`50/s cap · N skipped`); it starts again from zero when the tab is reopened.
 - **No consumer:** the tap isn't a consumer, so it isn't in the bus figures.
 - **Only while open:** the tap runs only while the Messages tab is open. Leaving the tab, or closing the panel, ends it and clears the list. Pause stops it, and Clear empties the list.
-- **Bus restarts:** the host reopens the tap after a bus restart, so the list carries on. Memory topics start empty again, so their offsets start from 0. The panel doesn't publish to the bus ([M4b plan](../plans/m4b-devtools.md), devtools decision 7).
+- **Bus restarts:** the host reopens the tap after a bus restart, so the list carries on. Memory topics start empty again, so their offsets start from 0. The panel doesn't publish to the bus.
 
 ## Limits
 
@@ -116,7 +116,5 @@ The records come from a tap ([ADR 0020](../adr/0020-inspection-feed.md), decisio
 
 ## See also
 
-- [ADR 0020: the inspection feed](../adr/0020-inspection-feed.md), the decisions behind the panel.
 - [The inspection feed](inspection.md), the API the panel reads.
 - [Tools for agents](agents.md), whose dev MCP reads the same feed.
-- [The M4b plan](../plans/m4b-devtools.md), where the panel was built.

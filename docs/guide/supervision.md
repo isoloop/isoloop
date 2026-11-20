@@ -4,7 +4,7 @@ The kernel watches every isolate's heartbeat, restarts one that blocks or crashe
 
 ## When to use it
 
-Supervision is on for every isolate, with defaults, and you don't call anything to get it. Read this page to tune the limits, to react to a crash or a failure in the page, or to change what a failed widget shows. The decisions are in [ADR 0001](../adr/0001-one-worker-per-isolate.md) (one worker per isolate, pools, suspension) and [ADR 0007](../adr/0007-bus-worker-supervision.md) (the bus worker).
+Supervision is on for every isolate, with defaults, and you don't call anything to get it. Read this page to tune the limits, to react to a crash or a failure in the page, or to change what a failed widget shows.
 
 - **To keep a crash from taking neighbours down,** you already have it: each isolate has its own worker unless it names a [pool](pools.md).
 - **To watch or trigger crashes from a tool,** use the [inspection feed](inspection.md) and its `restart`, `kill` and `block` controls.
@@ -39,15 +39,15 @@ A crash also comes from the other causes in `CrashReason`:
 | `ready_timeout` | No `ready` within `heartbeat.readyTimeoutMs` (10 000 ms) of the spawn. | Yes |
 | `unresponsive` | No beat for `killAfterMs`. | Yes |
 | `spawn_failed` | `new Worker` threw. Before each retry the kernel suspends every idle isolate that opted in, to free memory. | Yes |
-| `render_format_mismatch` | The isolate speaks a render format the host doesn't ([ADR 0011](../adr/0011-dom-package.md)). | No |
-| `runtime_too_old`, `isolate_too_old` | The isolate's required runtime version is outside what this host supports ([ADR 0012](../adr/0012-isolates-built-apart.md)). | No |
-| `bus_failed` | The contracts module couldn't load, so no isolate can run ([ADR 0003](../adr/0003-schema-format-standard-schema.md)). | No |
+| `render_format_mismatch` | The isolate speaks a render format the host doesn't. | No |
+| `runtime_too_old`, `isolate_too_old` | The isolate's required runtime version is outside what this host supports. | No |
+| `bus_failed` | The contracts module couldn't load, so no isolate can run. | No |
 
 A restart can't fix the last four, so they fail the isolate on the first crash.
 
 **Non-fatal errors only get reported.** An exception caught in a bus handler, or `ctx.reportError(e, { fatal: false })`, emits `isolate:error` and changes no state.
 
-**A hidden tab isn't judged.** While `document.hidden` is true, nothing becomes `blocked` or is killed, and the ready timeout waits. Worker errors are still handled. When the tab is visible again, or the page resumes after being frozen, every heartbeat clock starts from zero, so coming back never kills an isolate for beats missed while away ([ADR 0001](../adr/0001-one-worker-per-isolate.md)).
+**A hidden tab isn't judged.** While `document.hidden` is true, nothing becomes `blocked` or is killed, and the ready timeout waits. Worker errors are still handled. When the tab is visible again, or the page resumes after being frozen, every heartbeat clock starts from zero, so coming back never kills an isolate for beats missed while away.
 
 ## What it does about them
 
@@ -183,7 +183,7 @@ Persistent topics replay the same way after a page reload. A pool restart does t
 
 ## The bus worker
 
-The bus worker is supervised like an isolate, with the same `supervisor` and `heartbeat` settings ([ADR 0007](../adr/0007-bus-worker-supervision.md)). When it crashes:
+The bus worker is supervised like an isolate, with the same `supervisor` and `heartbeat` settings. When it crashes:
 
 1. **The kernel emits `bus:crash` and `bus:restart`,** and starts a new bus worker after the backoff.
 2. **Running isolates keep running.** They get a new bus port, re-send their subscriptions and carry on. Persistent topics resume after the committed offset; memory topics are gone, so each subscription gets a `reset` and starts again from `earliest`. An isolate that can't handle a reset sets `bus: { onReset: 'restart' }` in its manifest and is restarted instead.
@@ -196,7 +196,9 @@ If the bus crashes twice while loading, it starts in safe mode and sets aside th
 
 An isolate can opt in to being shut down while idle, with `suspend: 'when-idle'` (60 s) or `{ whenIdle: { afterMs } }` in its manifest. It becomes `suspended`, and wakes into `loading` when a visual isolate's surface is visible again, when a headless isolate's topic gets a record, or when you call `kernel.resume(id)`. A restart wakes every suspended headless isolate, as the new bus has lost what they were waiting for. At most `suspend.maxConcurrentWakes` (4) isolates start at once.
 
-Suspension never touches the restart window. A pool suspends only as a whole. [ADR 0001](../adr/0001-one-worker-per-isolate.md) has the rules for what counts as idle.
+An isolate is **idle** when all of these hold: its surface isn't visible (off-screen, `display: none` or in a hidden tab; a headless isolate never is), nothing has been delivered to it for `afterMs`, it holds no `ctx.keepAwake()`, and no host call or unacknowledged publish of its own is in flight. A `keepAwake()` hold has no time limit; with `KernelConfig.dev` set, the kernel warns once one has been held for 10 minutes.
+
+Suspension never touches the restart window. A pool suspends only as a whole, when every member has `suspend` set and is idle.
 
 ## Limits
 
@@ -216,4 +218,3 @@ Suspension never touches the restart window. A pool suspends only as a whole. [A
 - [The inspection feed](inspection.md): `restart`, `kill` and `block` for watching containment work.
 - [The balancer](balancer.md): moves isolates out of a pool that blocks or crashes.
 - [What Isoloop can't hide](limits.md)
-- [ADR 0001: one worker per isolate](../adr/0001-one-worker-per-isolate.md), [ADR 0007: bus worker supervision](../adr/0007-bus-worker-supervision.md) and the [design notes](../design/system-design.md) (§4.3, §7.4 to §7.6).

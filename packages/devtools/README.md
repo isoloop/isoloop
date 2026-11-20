@@ -1,6 +1,6 @@
 # @isoloop/devtools
 
-**Experimental.** A devtools panel for [Isoloop](https://github.com/isoloop/isoloop), drawn by a visual isolate in its own worker, so a crash or hang in the panel never touches the app. It reads the inspection feed ([ADR 0020](https://github.com/isoloop/isoloop/blob/main/docs/adr/0020-inspection-feed.md)).
+**Experimental.** A devtools panel for [Isoloop](https://github.com/isoloop/isoloop), drawn by a visual isolate in its own worker, so a crash or hang in the panel never touches the app. It reads the [inspection feed](https://github.com/isoloop/isoloop/blob/main/docs/guide/inspection.md).
 
 ```sh
 npm install @isoloop/devtools@next @isoloop/host@next

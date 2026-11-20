@@ -43,7 +43,7 @@ Add `/// <reference types="@isoloop/vite/client" />` to a `.d.ts` file in your a
 
 ## The contracts
 
-The contracts module lists every topic: its name, its schema and how long the bus keeps its records. The host, the isolates and the bus worker all import it, and the bus validates every record against it ([ADR 0003](../adr/0003-schema-format-standard-schema.md)).
+The contracts module lists every topic: its name, its schema and how long the bus keeps its records. The host, the isolates and the bus worker all import it, and the bus validates every record against it.
 
 ```ts
 // contracts.ts
@@ -178,5 +178,3 @@ This app runs its parts as Isoloop isolates, each on its own worker. Docs: https
 - [What Isoloop can't hide](limits.md): what works differently inside an isolate.
 - [Pools](pools.md): several isolates in one worker.
 - [Agents](agents.md): tools for agents, the dev MCP and WebMCP.
-- [ADR 0001](../adr/0001-one-worker-per-isolate.md): one worker per isolate, and the supervisor.
-- [ADR 0003](../adr/0003-schema-format-standard-schema.md): contracts and schemas.

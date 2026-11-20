@@ -6,7 +6,7 @@ How to write an isolate's module in plain DOM, Preact or React, and what it can 
 
 Read this when you write the code that runs inside an isolate: a widget, a data feed, or a headless worker that answers requests. Each isolate runs in a worker of its own, or as a member of a [pool](pools.md), and talks to the rest of the app only through the bus and the host calls on its context.
 
-- **The app's side** (`createKernel`, the Vite plugin, the contracts module) is in the [README's getting started](../../README.md#getting-started) and the [hosting guide](hosting.md).
+- **The app's side** (`createKernel`, the Vite plugin, the contracts module) is in [getting started](getting-started.md) and the [hosting guide](hosting.md).
 - **Where an isolate runs** (its own worker, a pool, the balancer) is a spawn option: see [pools](pools.md) and the [balancer](balancer.md).
 - **Code that has to read layout synchronously,** or that needs `window` and `localStorage`, belongs on the main thread. [What Isoloop can't hide](limits.md) says what an isolate can't do.
 
@@ -53,10 +53,10 @@ kernel.spawn({
 });
 ```
 
-- **`defineIsolate` stamps the module** with the Isoloop `major.minor` it was built against (`requires`). A host runs isolates built for its own version and for older ones back to a floor. One outside that range fails at once with a version mismatch, and isn't restarted ([ADR 0012](../adr/0012-isolates-built-apart.md)).
+- **`defineIsolate` stamps the module** with the Isoloop `major.minor` it was built against (`requires`). A host runs isolates built for its own version and for older ones back to a floor. One outside that range fails at once with a version mismatch, and isn't restarted.
 - **`defineIsolate<HTMLElement>`** types `ctx.root` with the DOM's types. Without the type argument, `ctx.root` is the structural `IsolateRoot`: `append`, `replaceChildren`, `appendChild`, `insertBefore`, `removeChild`, `childNodes`, `textContent` and `addEventListener`.
 - **`start` may be `async`.** A `start` that throws, or whose promise rejects, crashes the isolate, and the host restarts it as for any crash.
-- **An isolate without `surface` is headless** ([ADR 0008](../adr/0008-isolates-and-surfaces.md)): `ctx.root` and `ctx.portalRoot` are `undefined`, and there's no `document`. Use it for feeds, aggregators and request handlers.
+- **An isolate without `surface` is headless:** `ctx.root` and `ctx.portalRoot` are `undefined`, and there's no `document`. Use it for feeds, aggregators and request handlers.
 
 ## The context
 
@@ -79,7 +79,7 @@ kernel.spawn({
 
 ### The bus client
 
-`ctx.bus` talks to the bus worker directly, never through the main thread ([ADR 0005](../adr/0005-bus-topology-message-channels.md)). Topics are the ones in the app's contracts module, and each call is checked against the isolate's grants: a publish without a grant rejects with a `BusError` whose code is `forbidden`.
+`ctx.bus` talks to the bus worker directly, never through the main thread. Topics are the ones in the app's contracts module, and each call is checked against the isolate's grants: a publish without a grant rejects with a `BusError` whose code is `forbidden`.
 
 - **`publish(topic, { key?, value })`** resolves once the bus appended the record, and rejects with a `BusError` otherwise.
 - **`subscribe(topic, fn, opts?)`** runs `fn` for one record at a time, in order, and returns the function that unsubscribes. By default a record is committed once `fn` returns, so delivery is at least once: a handler that throws stops the subscription's commits, and that record is delivered again after a restart.
@@ -127,7 +127,7 @@ The worker has no layout, so sizes, focus and scrolling go through the host, whi
 
 ## The worker DOM
 
-In an isolate with a surface, `document`, `window` and the DOM classes (`Node`, `Element`, `HTMLElement`, `Text` and the rest) are Isoloop's DOM subset from `@isoloop/dom` ([ADR 0011](../adr/0011-dom-package.md)). It records each change and sends it to the host, which applies it inside the surface's shadow root on the next frame.
+In an isolate with a surface, `document`, `window` and the DOM classes (`Node`, `Element`, `HTMLElement`, `Text` and the rest) are Isoloop's DOM subset from `@isoloop/dom`. It records each change and sends it to the host, which applies it inside the surface's shadow root on the next frame.
 
 - **Building and changing nodes works as in the DOM:** creating elements, text and comments, attributes, classes, `style`, events on the elements you created, inputs and selects.
 - **Events are the host's, forwarded:** a listener runs a moment after the user acted, so `preventDefault` comes too late for some of them.
@@ -207,11 +207,11 @@ function Quote({ config }: IsolateProps) {
 export default defineIsolate(Quote);
 ```
 
-A render error is caught at the isolate's root and reported with `ctx.reportError`, so in a pool it crashes only that member, not the whole worker ([ADR 0015](../adr/0015-visual-pools.md)).
+A render error is caught at the isolate's root and reported with `ctx.reportError`, so in a pool it crashes only that member, not the whole worker ([pools](pools.md)).
 
 ## Isolates built apart
 
-An isolate module can come from another build, another repository or a CDN: the host's bootstrap holds the runtime and the DOM subset, and the module is loaded by URL ([ADR 0012](../adr/0012-isolates-built-apart.md)). It depends only on the topics in the contracts module, never on another isolate's code. What it needs is the `requires` stamp from `defineIsolate`, a version the host runs, and, when it's cross-origin, the headers in the [hosting guide](hosting.md#cors-for-cross-origin-isolates).
+An isolate module can come from another build, another repository or a CDN: the host's bootstrap holds the runtime and the DOM subset, and the module is loaded by URL. It depends only on the topics in the contracts module, never on another isolate's code. What it needs is the `requires` stamp from `defineIsolate`, a version the host runs, and, when it's cross-origin, the headers in the [hosting guide](hosting.md#cors-for-cross-origin-isolates).
 
 ## Limits
 
@@ -227,4 +227,3 @@ An isolate module can come from another build, another repository or a CDN: the 
 - [What Isoloop can't hide](limits.md): the worker DOM's limits and the host calls.
 - [Hosting](hosting.md): how an isolate's module loads.
 - [Agents](agents.md): exposing request topics as tools.
-- [ADR 0008](../adr/0008-isolates-and-surfaces.md) (isolates and surfaces), [ADR 0010](../adr/0010-own-render-bridge.md) (the render bridge and adapters), [ADR 0011](../adr/0011-dom-package.md) (the DOM package), [ADR 0012](../adr/0012-isolates-built-apart.md) (isolates built apart).

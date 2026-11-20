@@ -4,7 +4,7 @@
 
 ## When to use it
 
-Use it to build a tool that watches or controls a running page. The devtools panel ([devtools guide](devtools.md)) and the dev MCP's `isoloop_*` tools ([agents guide](agents.md#in-development-the-dev-mcp)) both read it, and an app can read it too. The decisions are in [ADR 0020](../adr/0020-inspection-feed.md).
+Use it to build a tool that watches or controls a running page. The devtools panel ([devtools guide](devtools.md)) and the dev MCP's `isoloop_*` tools ([agents guide](agents.md#in-development-the-dev-mcp)) both read it, and an app can read it too.
 
 - **To watch a page by hand,** add the devtools panel instead.
 - **A tool that reads only the app's own topics** doesn't need the feed: it subscribes like any isolate ([below](#the-inspect-grant-and-ctxinspector)).
@@ -121,7 +121,5 @@ Where the page is cross-origin isolated (COOP `same-origin` and COEP `require-co
 
 ## See also
 
-- [ADR 0020: the inspection feed](../adr/0020-inspection-feed.md), the decisions behind this page.
 - [The devtools panel](devtools.md) and [tools for agents](agents.md), which read the feed.
-- [What the feed costs](../investigations/inspect-feed-cost.md), the measurement above.
 - [Hosting](hosting.md), for the headers memory per isolate needs.
