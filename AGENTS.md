@@ -24,3 +24,11 @@ A change is done when all five hold:
 - **ADRs** record decisions; the maintainer reviews each one on its own, and it's committed once the review ends.
 - **The maintainer reviews** ADRs, docs-only PRs in this repo, and new public API. Forks merge their own code PRs on green.
 - **Tags and releases** are pushed by the maintainer, or on the maintainer's explicit word for that release.
+
+## Delegating work
+
+When a session hands a task to a subagent:
+
+- **A fork of the session** (same model, the whole conversation) for work that needs judgement: ADRs and other decisions, design, public API, generators and checks, changes across several packages, and anything that may contradict an ADR or a plan.
+- **A fresh agent on a smaller model** (Sonnet today) for a well-specified task with checks behind it: a guide from a plan's task row, site plumbing, a mechanical fix. It sees none of the conversation, so its brief names the task, the plan row, the files to read (this file, the docs rules, the skill it needs), its worktree, and what it may merge.
+- **Either way,** one PR per task, and the rest of this file applies as written.
