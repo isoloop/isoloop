@@ -1,0 +1,80 @@
+{
+  "$comment": "Which code each guide covers (M4c decision 21). paths: source a PR may change that the guide describes; a PR touching one without the guide gets a notice. exports: public exports per entry point that the guide documents. referenceOnly: public exports documented only in the generated API reference. Upkeep: .claude/skills/docs/SKILL.md.",
+  "guides": {
+    "agents": {
+      "paths": [
+        "packages/host/src/agents.ts",
+        "packages/host/src/dev-mcp.ts",
+        "packages/cli/src/mcp/",
+        "packages/cli/src/commands/mcp.ts",
+        "packages/webmcp/src/"
+      ],
+      "exports": {
+        "@isoloop/host": [
+          "AgentTool",
+          "AgentsConfig",
+          "RequestOptions",
+          "RequestVia",
+          "ToolJsonSchema"
+        ],
+        "@isoloop/host/dev-mcp": ["DevMcpOptions", "connectDevMCP"],
+        "@isoloop/bus": ["ToolSpec"],
+        "@isoloop/webmcp": ["connectWebMCP"]
+      }
+    },
+    "balancer": {
+      "paths": ["packages/balancer/src/", "packages/runtime/src/busy.ts"],
+      "exports": {
+        "@isoloop/balancer": ["createBalancer"]
+      }
+    },
+    "devtools": {
+      "paths": ["packages/devtools/src/"],
+      "exports": {
+        "@isoloop/devtools": ["DevtoolsOptions", "DevtoolsPosition", "connectDevtools"]
+      }
+    },
+    "hosting": {
+      "paths": [
+        "packages/host/src/loader.ts",
+        "packages/vite/src/",
+        "packages/runtime/src/bootstrap.ts"
+      ],
+      "exports": {
+        "@isoloop/vite": ["IsoloopOptions", "isoloop"]
+      }
+    },
+    "inspection": {
+      "paths": [
+        "packages/host/src/inspect.ts",
+        "packages/host/src/memory.ts",
+        "packages/runtime/src/inspector.ts",
+        "packages/bus/src/tap.ts",
+        "packages/bus/src/preview.ts"
+      ],
+      "exports": {
+        "@isoloop/host": [
+          "InspectBeat",
+          "InspectBus",
+          "InspectEvent",
+          "InspectIsolate",
+          "InspectMessage",
+          "InspectPool",
+          "InspectRecord",
+          "InspectSnapshot",
+          "Inspector"
+        ],
+        "@isoloop/runtime": ["IsolateInspector"]
+      }
+    },
+    "pools": {
+      "paths": ["packages/runtime/src/freeze.ts"],
+      "exports": {
+        "@isoloop/host": ["PoolSnapshot"],
+        "@isoloop/react": ["usePortalRoot"],
+        "@isoloop/preact": ["usePortalRoot"]
+      }
+    }
+  },
+  "referenceOnly": {}
+}
