@@ -73,7 +73,12 @@ export interface BusClient {
     fn: (r: TypedRecord<Out>) => void | Promise<void>,
     opts?: SubscribeOptions,
   ): () => void;
-  /** Topics with a `reply` schema only. Rejects with `timeout` after `timeoutMs` (default 30 s). */
+  /**
+   * Topics with a `reply` schema only. Rejects with `timeout` after
+   * `timeoutMs` (default 30 s), or with `dropped` at once when the topic's
+   * retention removed the request before the bus delivered it to any
+   * subscriber.
+   */
   request<In, ROut>(
     topic: TopicRef<In, any, any, ROut>,
     value: In,

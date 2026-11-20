@@ -113,7 +113,10 @@ It rejects with a `BusError`:
 - `no_responder` at once when no isolate could answer: none has a subscribe grant for the topic, or every one that has is stopped or `failed`. Passing this check doesn't promise a reply.
 - `timeout` after `timeoutMs`. An isolate that restarts within the timeout still gets the request and can answer it.
 - `aborted` when `signal` aborts.
+- `dropped` at once when the topic's retention removed the request before the bus handed it to any subscriber, as in a burst of more calls than the topic keeps. A request already delivered stays its responder's to answer.
 - `forbidden` for `isoloop.*` topics, and `unknown_topic`, `not_requestable`, `invalid`, `reply_invalid` and `bus_unavailable`, as `bus.request` does.
+
+**Size a tool's topic's retention for its largest burst of calls.** Requests are records in the topic's log, so its `retention` caps how many calls can wait at once. On a topic keeping 100 records, a burst of 1,000 calls at once gets 100 answers and 900 `dropped` ([isoloop#288](https://github.com/isoloop/isoloop/issues/288)). An isolate's own `bus.request` gets `dropped` the same way.
 
 ## What the hints do and don't do
 

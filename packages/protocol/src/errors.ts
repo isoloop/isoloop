@@ -30,6 +30,8 @@ export const ERROR_CODES = [
   'aborted',
   /** No isolate that could answer the request is alive: none has a subscribe grant for it, or all of them are stopped or `failed`. */
   'no_responder',
+  /** Retention removed the request before the bus delivered it to any subscriber (ADR 0018, decision 5). */
+  'dropped',
   // Contracts (ADR 0003): fatal, never retried
   'contracts_failed',
   'contracts_invalid',

@@ -276,6 +276,12 @@ export class Broker {
   readonly #conns = new Map<string, Connection>();
   readonly #groups = new Map<string, Group>();
   readonly #requests = new Map<string, Request>();
+  /**
+   * Open request offsets per topic that may not be delivered yet, and the
+   * tail last seen there: when retention moves the tail past one nobody was
+   * handed, its caller gets `dropped` (ADR 0018, decision 5).
+   */
+  readonly #undelivered = new Map<string, { offsets: number[]; tail: number }>();
   /** Consumers whose offsets were dropped by `detach { keepOffsets: false }`, per topic. */
   readonly #forgotten = new Set<string>();
   readonly #rejected: Partial<Record<ErrorCode, number>> = {};
@@ -921,6 +927,7 @@ export class Broker {
     if (p.req) this.#openRequest(name, offset, p.req);
     if (this.#engine.durable(name)) this.#ackDurable(name, offset, p);
     else p.settle({ ok: true, value: { offset } });
+    this.#dropEvicted(name);
     this.#fanOut(name);
     this.#wake(name);
     this.#follow(name, { ...rec, offset });
@@ -1039,6 +1046,50 @@ export class Broker {
       recipients: new Set(),
       done: false,
     });
+    let u = this.#undelivered.get(topic);
+    if (!u) {
+      u = { offsets: [], tail: this.#engine.tail(topic) };
+      this.#undelivered.set(topic, u);
+    }
+    u.offsets.push(offset);
+  }
+
+  /**
+   * Answers `dropped` to each caller whose request retention removed before
+   * the bus delivered it to any subscriber (ADR 0018, decision 5). A request
+   * already delivered stays its responder's to answer. Runs only when the
+   * topic's tail has moved.
+   */
+  #dropEvicted(topic: string): void {
+    const u = this.#undelivered.get(topic);
+    if (!u) return;
+    const tail = this.#engine.tail(topic);
+    if (tail === u.tail) return;
+    u.tail = tail;
+    const kept: number[] = [];
+    for (const offset of u.offsets) {
+      if (offset >= tail) {
+        kept.push(offset);
+        continue;
+      }
+      const req = this.#requests.get(reqKey(topic, offset));
+      if (!req || req.done || req.recipients.size > 0) continue;
+      req.done = true;
+      const callerAlive =
+        req.caller.host === true || this.#conns.get(req.caller.isolateId) === req.caller;
+      if (callerAlive) {
+        this.#post(
+          req.caller,
+          req.id,
+          fail(
+            'dropped',
+            "the request was dropped: the topic's retention was full; retry or raise retention",
+          ),
+        );
+      }
+    }
+    if (kept.length === 0) this.#undelivered.delete(topic);
+    else u.offsets = kept;
   }
 
   #reply(

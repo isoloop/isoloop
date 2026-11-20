@@ -385,6 +385,9 @@ export interface Kernel {
    *   `failed`. A positive check doesn't promise a reply;
    * - `timeout` after `timeoutMs` (default 30 s, the bus's);
    * - `aborted` when `signal` aborts;
+   * - `dropped` at once when the topic's retention removed the request
+   *   before the bus delivered it to any subscriber (a burst of more calls
+   *   than the topic keeps);
    * - `forbidden` for `isoloop.*` topics, `unknown_topic`, `not_requestable`,
    *   `invalid`, `reply_invalid` and `bus_unavailable`, as `bus.request` does.
    * @experimental

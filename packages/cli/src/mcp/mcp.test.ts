@@ -389,6 +389,17 @@ describe('isoloop mcp', () => {
     ]);
   });
 
+  it('returns dropped as a tool error with its message', async () => {
+    const mcp = await startMcp();
+    const message =
+      "the request was dropped: the topic's retention was full; retry or raise retention";
+    const p = await page(mcp.port, { answer: () => ({ ok: false, code: 'dropped', message }) });
+    await p.welcomed();
+    const r = await mcp.client.callTool({ name: 'markets.quote.v1', arguments: { symbol: 'BTC' } });
+    expect(r.isError).toBe(true);
+    expect(r.content).toEqual([{ type: 'text', text: `dropped: ${message}` }]);
+  });
+
   it('keeps tools that change something behind --allow-write', async () => {
     const ro = await startMcp();
     const p1 = await page(ro.port, { answer: priced });

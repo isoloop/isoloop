@@ -284,6 +284,9 @@ describe('a burst of requests past the retention', () => {
     await flush();
     for (let j = 0; j < opts.n; j++, i++) send(i);
     await flush();
+    const droppedBeforeTimeout = caller.inbox.filter(
+      (m) => m.t === 'result' && !m.p.ok && m.p.error.code === 'dropped',
+    ).length;
     let answered = 0;
     for (let round = 0; round < 50; round++) {
       const recs = responder.records(opts.on.name).slice(answered);
@@ -310,6 +313,8 @@ describe('a burst of requests past the retention', () => {
       delivered: answered,
       replied: results.filter((r) => r.ok).length,
       timedOut: results.filter((r) => !r.ok && r.error.code === 'timeout').length,
+      dropped: results.filter((r) => !r.ok && r.error.code === 'dropped').length,
+      droppedBeforeTimeout,
       gaps,
     };
   }
@@ -322,17 +327,37 @@ describe('a burst of requests past the retention', () => {
     });
   });
 
-  // Fails today (isoloop#288): requests appended past the retention before the
-  // responder is pumped are evicted undelivered. The responder gets a `gap`,
-  // nobody answers, and each caller waits out its own timeout. Flip to `it`
-  // once the decision on #288 lands.
-  it.fails('answers 1,000 calls at once on a topic keeping 100, with the full credit', async () => {
-    expect(await burst({ n: 1_000, on: price })).toMatchObject({ replied: 1_000, timedOut: 0 });
+  // isoloop#288, ADR 0018 decision 5: requests appended past the retention
+  // before the responder is handed them leave the log; their callers get
+  // `dropped` at once instead of waiting out the timeout.
+  it('answers what fits a topic keeping 100 and drops the rest of a 1,000 burst at once', async () => {
+    const r = await burst({ n: 1_000, on: price });
+    expect(r).toMatchObject({ replied: 100, dropped: 900, droppedBeforeTimeout: 900, timedOut: 0 });
   });
 
-  it.fails('answers 1,000 calls on a topic keeping 100 when 300 are still uncommitted', async () => {
+  it('drops only undelivered requests when 300 delivered ones are still uncommitted', async () => {
     const r = await burst({ n: 1_000, held: 300, on: price });
-    expect(r).toMatchObject({ replied: 1_300, timedOut: 0, gaps: [] });
+    expect(r.timedOut).toBe(0);
+    expect(r.replied + r.dropped).toBe(1_300);
+    expect(r.droppedBeforeTimeout).toBe(r.dropped);
+    expect(r.replied).toBe(r.delivered); // every delivered request is answered
+  });
+
+  it("answers a dropped caller with the ADR's message, the same for any requester", async () => {
+    const { broker } = setup();
+    const caller = connect(broker, 'C', all); // nobody subscribed: nothing is delivered
+    for (let i = 0; i < 101; i++) request(caller, { value: { sku: `s${i}` } }, `d${i}`);
+    await flush();
+    const first = caller.inbox.find((m) => m.t === 'result' && m.re === 'd0');
+    expect(first?.p).toEqual({
+      ok: false,
+      error: {
+        code: 'dropped',
+        message:
+          "the request was dropped: the topic's retention was full; retry or raise retention",
+      },
+    });
+    expect(caller.inbox.filter((m) => m.t === 'result' && !m.p.ok)).toHaveLength(1);
   });
 
   it('answers the same burst on a topic keeping 2,000', async () => {
