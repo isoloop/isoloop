@@ -21,5 +21,12 @@
   // The harness page and the adapter fixtures have their own DOM tsconfigs.
   // The harness build copies the devtools panel's source as an asset (its
   // default `new URL('./panel.js', import.meta.url)`), so its output stays out.
-  "exclude": ["e2e/harness/src", "e2e/harness/dist", "e2e/isolates/adapters", "e2e/isolates/loops"]
+  "exclude": [
+    "e2e/harness/src",
+    "e2e/harness/dist",
+    "e2e/isolates/adapters",
+    "e2e/isolates/loops",
+    // The guides' fence app declares globals for the fences; docs:check checks it with them.
+    "scripts/docs/fence-app"
+  ]
 }

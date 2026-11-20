@@ -34,7 +34,7 @@ Tools are only called through these root scripts, never as binaries ([ADR 0009](
 | `pnpm check` | Format check, lint, typecheck and unit tests. Run it before pushing. |
 | `pnpm format` / `pnpm format:check` | oxfmt. Markdown isn't formatted. |
 | `pnpm lint` | oxlint, type-aware. Every rule is an error or off. |
-| `pnpm docs:check` | The docs rules `docs/writing.md` marks (checked), and `docs/guide/map.json`'s coverage of the built `.d.ts` (run `pnpm build` first). `--guides` checks only the guides' Markdown, as the PR hook does. |
+| `pnpm docs:check` | The docs rules `docs/writing.md` marks (checked), and `docs/guide/map.json`'s coverage of the built `.d.ts` (run `pnpm build` first). `--guides` checks only the guides (their Markdown and their type-checked fences), as the PR hook does. A guide naming a removed export fails the API check instead. |
 | `pnpm typecheck` | TypeScript 7, `tsc --noEmit` in every package and for the root config and e2e files. |
 | `pnpm test` | Vitest: `protocol` and `bus` in Node; `dom`, `host` and `runtime` in Chromium; the bus worker and its storage (`*.browser.test.ts`) in Chromium, Firefox and WebKit. `test:node` and `test:browser` run each half. |
 | `pnpm e2e` | Playwright against the E2E harness and isolate servers in all three engines. `pnpm e2e --project=webkit` runs one. |

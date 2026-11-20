@@ -4,6 +4,9 @@ An app can offer some of its requestable topics to AI agents as tools: a coding 
 
 ```ts
 // contracts.ts: a requestable topic (it has a `reply`) with a tool description
+import { topic } from '@isoloop/bus';
+import * as s from './schemas';
+
 export const quoteTool = topic('markets.quote.v1', {
   schema: s.quoteRequest,
   reply: s.quoteReply,
@@ -17,6 +20,8 @@ export const quoteTool = topic('markets.quote.v1', {
 });
 
 // main.ts: the kernel lists which topics agents may call
+import { createKernel } from '@isoloop/host';
+
 const kernel = createKernel({ contracts, workers, agents: { expose: ['markets.quote.v1'] } });
 ```
 
@@ -39,8 +44,11 @@ The `tool` field stays on the host: it isn't part of the topic config the bus se
 ## Exposing tools: `agents.expose`
 
 ```ts
+import { createKernel } from '@isoloop/host';
+
 createKernel({
   contracts,
+  workers,
   agents: { expose: ['markets.quote.v1', 'markets.alerts.*'], timeoutMs: 10_000 },
 });
 ```
@@ -56,6 +64,10 @@ createKernel({
 An isolate answers a tool call the way it answers any request: it subscribes to the topic and replies to records that carry `req`. Markets' alerts isolate:
 
 ```ts
+import { defineIsolate } from '@isoloop/runtime';
+import { busSource, runAlerts } from './alerts';
+import { createAlertTool } from './contracts';
+
 export default defineIsolate({
   start(ctx) {
     const svc = runAlerts(busSource(ctx.bus));
@@ -77,7 +89,7 @@ The isolate needs a subscribe grant for the topic, as for any request. The first
 
 Delivery is at least once, as for every handler on the bus. A crash after the handler's side effect but before its reply delivers the request again, so a tool that changes something would do it twice. Its handler has to recognise a request it has already handled by `req.id`. Markets derives the rule's id from the request's id (`agent-${req.id}`) and publishes the rule under that key, so a request delivered again adds nothing new:
 
-```ts
+```ts nocheck
 create(requestId, rule) {
   const id = `agent-${requestId}`;
   const created = !engine.has(id);
@@ -94,10 +106,11 @@ The bus doesn't de-duplicate request records itself.
 Transports call tools through `kernel.request`. It works on any requestable topic, exposed to agents or not.
 
 ```ts
+const controller = new AbortController();
 const tool = kernel.tools().find((t) => t.name === 'markets.quote.v1')!;
 const reply = await kernel.request(tool.topic, { symbol: 'BTC-USD' }, {
   timeoutMs: tool.timeoutMs,
-  signal,                 // aborting rejects with `aborted`
+  signal: controller.signal, // controller.abort() rejects with `aborted`
   via: 'webmcp',          // set on the record as `req.via`
 });
 ```

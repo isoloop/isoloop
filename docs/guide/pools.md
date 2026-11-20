@@ -3,11 +3,19 @@
 By default every isolate gets its own worker ([ADR 0001](../adr/0001-one-worker-per-isolate.md)): its own thread, heap and copy of the runtime, so one isolate that blocks or crashes affects only itself. A **pool** puts several isolates in one worker instead, headless ones, visual ones (widgets) or both. It saves memory and start-up time, and gives up isolation between the members.
 
 ```ts
+import feedUrl from './feed?isolate';
+import statsUrl from './stats?isolate';
+import trendUrl from './trend?isolate';
+import gaugesUrl from './gauges?isolate';
+import loginUrl from './login?isolate';
+
+const el = (id: string) => document.getElementById(id)!;
+
 kernel.spawn({ id: 'feed-t1', src: feedUrl, pool: 'machine-t1' });
 kernel.spawn({ id: 'stats-t1', src: statsUrl, pool: 'machine-t1' });
-kernel.spawn({ id: 'trend-t1', src: trendUrl, surface: trendEl, pool: 'widgets-t1' });
-kernel.spawn({ id: 'gauges-t1', src: gaugesUrl, surface: gaugesEl, pool: 'widgets-t1' });
-kernel.spawn({ id: 'login', src: loginUrl, surface: loginEl }); // its own worker
+kernel.spawn({ id: 'trend-t1', src: trendUrl, surface: el('trend'), pool: 'widgets-t1' });
+kernel.spawn({ id: 'gauges-t1', src: gaugesUrl, surface: el('gauges'), pool: 'widgets-t1' });
+kernel.spawn({ id: 'login', src: loginUrl, surface: el('login') }); // its own worker
 ```
 
 Placement belongs to the host: the isolate's code is the same either way, and an isolate can't ask for a pool or refuse one. The pool's worker starts with its first member and goes away after its last. To have the host place isolates by measured load instead of by name, use the opt-in [balancer](balancer.md); pool names starting with `balancer-` are reserved for it, and `kernel.spawn` rejects them with `reserved_pool`.

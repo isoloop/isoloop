@@ -7,15 +7,21 @@
 //   for the PR hook.
 // - Item 6 (coverage) reads the built `dist/*.d.ts` through `readApi`, so it
 //   needs `pnpm build` first.
-// - Items 2 and 5 (fences that type-check, guides naming removed exports) come
-//   with M4c task 4, as more entries in GUIDE_CHECKS and API_CHECKS.
+// - Item 2 (fences that type-check, scripts/docs/fences.ts) runs `tsc` over
+//   the guides' `ts` and `tsx` fences; `--guides` runs it too.
+// - Item 5 (a guide naming a removed export) needs the PR's base built, so the
+//   API check runs it (scripts/ci/api-check.ts), with checkRemovedNames from
+//   ./markdown.ts.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkFences } from './fences.ts';
 import { isTypeKind, readApi, type ApiModel, type EntryFile, type ExportKind } from './read-api.ts';
 
-export type Problem = { file: string; message: string };
+export type { Problem } from './markdown.ts';
+export { checkRemovedNames, withoutFences } from './markdown.ts';
+import { type Problem, withoutFences } from './markdown.ts';
 
 /**
  * Guides that predate the skeleton and the lead rule (M4c decisions 9 and 19). Item 1
@@ -78,23 +84,6 @@ export function parseWritingRules(md: string): WritingRules {
 }
 
 // --- Markdown helpers --------------------------------------------------------
-
-/** The Markdown with fenced blocks blanked (line count kept), for prose-only checks. */
-export function withoutFences(md: string): string {
-  const out: string[] = [];
-  let fence: string | undefined;
-  for (const line of md.split('\n')) {
-    const m = /^\s*(`{3,}|~{3,})/.exec(line);
-    if (fence) {
-      if (m && (m[1] ?? '').startsWith(fence)) fence = undefined;
-      out.push('');
-    } else if (m) {
-      fence = (m[1] ?? '').slice(0, 3);
-      out.push('');
-    } else out.push(line);
-  }
-  return out.join('\n');
-}
 
 /** Prose as a reader sees it: inline code removed, links reduced to their text. */
 const prose = (line: string): string =>
@@ -431,6 +420,15 @@ function main(): void {
       ...checkWords(file, md, rules),
     );
   }
+  problems.push(
+    ...checkFences(
+      root,
+      guides.map((name) => {
+        const file = relative(root, join(guideDir, name));
+        return { file, md: readFileSync(join(root, file), 'utf8') };
+      }),
+    ),
+  );
 
   if (!guidesOnly) {
     const map = parseMap(readFileSync(join(root, MAP), 'utf8'));

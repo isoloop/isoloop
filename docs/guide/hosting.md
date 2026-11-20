@@ -24,6 +24,7 @@ With Vite, `@isoloop/vite` provides both URLs as `virtual:isoloop/workers`, as i
 import workers from 'virtual:isoloop/workers'; // types: /// <reference types="@isoloop/vite/client" />
 import list from './contracts';
 import contractsUrl from './contracts?isolate';
+import { createKernel } from '@isoloop/host';
 
 const kernel = createKernel({
   contracts: { url: contractsUrl, list },

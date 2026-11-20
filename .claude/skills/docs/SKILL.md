@@ -62,7 +62,10 @@ There are no redirects before 1.0: a removed page's URL returns the 404 page.
 
 ## 5. Check
 
-Run `pnpm build`, then `pnpm docs:check` and `pnpm format:check`. `docs:check` checks the rules `docs/writing.md` marks **(checked)**: the skeleton and lead sentence, the links, the banned phrases and em dashes, and the map's coverage. The PR hook runs `pnpm docs:check --guides`, the Markdown part, and CI runs all of it. Two checks arrive with M4c task 4, the type-checked fences and guides naming a removed export; until then, check those by hand.
+Run `pnpm build`, then `pnpm docs:check` and `pnpm format:check`. `docs:check` checks the rules `docs/writing.md` marks **(checked)**: the skeleton and lead sentence, the links, the banned phrases and em dashes, the type-checked fences, and the map's coverage. The PR hook runs `pnpm docs:check --guides` (everything but coverage), and CI runs all of it.
+
+- **Fences** compile next to a small example app, `scripts/docs/fence-app/`. A fence may use `kernel`, `contracts` and `workers` without declaring them, and import `./contracts`, `./schemas` and `./alerts`. Everything else it imports. `virtual:isoloop/*`, `*?isolate` and `import.meta.env` have their types. Add to the fence app only what several guides build on.
+- **A guide naming a removed export** fails the API check job, which builds the PR's base: rename or remove the mention.
 
 The steward reviews the rest on the PR: whether each claim matches the code, the voice, and whether a guide the map flagged needed a change.
 
