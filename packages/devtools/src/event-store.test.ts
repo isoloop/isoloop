@@ -1,6 +1,6 @@
 import type { InspectEvent } from '@isoloop/protocol';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createRecorder, KEEP_SESSIONS } from './event-store';
+import { createRecorder, KEEP_SESSIONS, PER_SESSION } from './event-store';
 
 const ev = (
   at: number,
@@ -91,6 +91,21 @@ describe('the events kept for the whole session', () => {
     expect(kept).not.toContain(made[0]?.session);
   });
 
+  it('keeps no more than PER_SESSION events of a session, the oldest going first', async () => {
+    const r = createRecorder();
+    const total = PER_SESSION + 120;
+    const many = Array.from({ length: total }, (_, i) => ev(i, 'isolate:ready', { id: `i${i}` }));
+    r.add(many);
+    r.add([ev(total, 'isolate:failed', { id: 'last', reason: 'error', message: 'x' })]);
+    expect(r.events()).toHaveLength(PER_SESSION);
+    await stored(r, PER_SESSION);
+    const rows = await createRecorder().load(r.session);
+    expect(rows).toHaveLength(PER_SESSION);
+    // The oldest were dropped and the newest kept.
+    expect(rows[0]?.at).toBeGreaterThan(0);
+    expect(rows.at(-1)?.at).toBe(total);
+  });
+
   it('forgets everything on clear, keeping this session going', async () => {
     const r = createRecorder();
     r.add([ev(1, 'isolate:failed', { id: 'a', reason: 'error', message: 'x' })]);
@@ -100,5 +115,24 @@ describe('the events kept for the whole session', () => {
     const after = await r.sessions();
     expect(after.map((s) => s.id)).toEqual([r.session]);
     expect(after[0]?.count).toBe(0);
+  });
+
+  it('lets the database be deleted while it is open, and opens it again after', async () => {
+    const r = createRecorder();
+    r.add([ev(1, 'isolate:failed', { id: 'a', reason: 'error', message: 'x' })]);
+    await stored(r, 1);
+    // Another tab (or another test file) deleting it must not wait on this connection.
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.deleteDatabase('isoloop-devtools');
+      req.addEventListener('success', () => {
+        resolve();
+      });
+      req.addEventListener('error', () => {
+        reject(req.error ?? new Error('delete failed'));
+      });
+    });
+    const again = createRecorder();
+    again.add([ev(2, 'isolate:failed', { id: 'b', reason: 'error', message: 'y' })]);
+    await stored(again, 1);
   });
 });

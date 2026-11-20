@@ -81,8 +81,17 @@ function openDb(): Promise<IDBDatabase> {
       d.createObjectStore(SESSIONS_STORE, { keyPath: 'id' });
     }
   });
+  const opened = settle(req).then((d) => {
+    // Another tab upgrading or deleting the database waits for this connection
+    // to close. Let it go, and open again the next time storage is used.
+    d.addEventListener('versionchange', () => {
+      d.close();
+      db = undefined;
+    });
+    return d;
+  });
   return Promise.race([
-    settle(req),
+    opened,
     new Promise<never>((_resolve, reject) => {
       req.addEventListener('blocked', () => {
         reject(new Error('indexedDB.open blocked'));
@@ -91,6 +100,7 @@ function openDb(): Promise<IDBDatabase> {
   ]);
 }
 
+/** The open connection, shared; reset when the database is closed from under it. */
 let db: Promise<IDBDatabase> | undefined;
 export const database = (): Promise<IDBDatabase> => {
   db ??= openDb();

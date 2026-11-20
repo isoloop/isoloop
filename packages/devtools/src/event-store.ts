@@ -142,8 +142,8 @@ export function createRecorder(): Recorder {
       const store = tx.objectStore(EVENTS_STORE);
       for (const e of batch) store.add({ ...e, session } satisfies Row);
       written += batch.length;
-      if (written > PER_SESSION + 500) {
-        // Past the cap: the oldest of this session go.
+      if (written > PER_SESSION) {
+        // Past the cap: the oldest of this session go, so no more than `PER_SESSION` stay.
         let drop = written - PER_SESSION;
         written = PER_SESSION;
         const cursor = store.index('session').openKeyCursor(IDBKeyRange.only(session));
