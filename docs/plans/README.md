@@ -67,6 +67,14 @@ Agent work after 0.1, from the 2026-11-17 grilling ([investigation](../investiga
 - **The Isoloop Builder as a third tool user** (`via: 'builder'`), plus its Claude Desktop bridge on the dev MCP's transport code ([builder.md](builder.md)).
 - **Re-check later:** MCP Apps (needs a server, outside the tab boundary) and Chrome's Prompt API (not available in workers as of 2026-11-17).
 
+## After 0.1: a tied-down benchmark gate
+
+Added 2026-11-20 as a note; not planned yet. It gets a milestone id, a grilling and a plan when it starts.
+
+- **Why:** results recorded on phones don't hold over time. A phone that's mid-range today is low-end in a year, so those figures can't be compared from one release to the next, and they can't gate one.
+- **What:** contained tests on a benchmark gate whose machine doesn't change: the bench server with its cores pinned at a fixed clock, browser builds fixed in a container image, and device classes reproduced there by the specs that matter (cores, CPU throttling, memory) rather than by real phones. A result from one year then compares with the next, and a regression fails the gate.
+- **Phones** become spot checks, described by class and platform ([`docs/writing.md`](../writing.md)), never the basis of a claim that has to last.
+
 ## Conventions
 
 - **Initiatives and epics:** a large milestone can be an *initiative* that groups *epics* under one goal (M3: M3a and M3b). The initiative's plan holds the goal, the overall done-when and the risks shared by its epics; each epic has its own plan, done-when, demo and write-up.
