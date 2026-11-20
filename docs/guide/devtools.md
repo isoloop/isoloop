@@ -80,7 +80,7 @@ The panel reads the feed on a port of its own, not through the bus, so none of t
 
 ## Events view
 
-The Events tab is the kernel's own history, newest first: isolates changing state, crashing or failing, the bus restarting, storage warnings. It says why the ring changed colour. Each row has the time since the page started, the event, the isolate (or `bus`), and one line of what happened; click a row to see its data, with a Copy button. Rows are coloured like the ring: green for ready and running, amber for a crash, a stall or a warning, red for a failure.
+The Events tab is the kernel's own history, newest first: isolates changing state, crashing or failing, the bus restarting, and warnings about the bus's storage quota and durability and about the worker budget. It says why the ring changed colour. Each row has the time since the page started, the event, the isolate (or `bus`), and one line of what happened; click a row to see its data, with a Copy button. Rows are coloured like the ring: green for ready and running, amber for a crash, a stall or a warning, red for a failure.
 
 - **The whole session:** the feed itself keeps only its last 200 events, which start-up alone can use. The panel's worker records every event from the moment it connects, even with the panel closed, so the tab lists them all (up to 6,000 a session, the oldest going first), newest 500 at first with a Load older button.
 - **Earlier sessions:** the last 3 sessions are kept in IndexedDB (about 5 MB in all), so a crash that ended in a reload can be read back from the session selector. Clear forgets all of them. Without storage the tab still lists this session, from memory.
