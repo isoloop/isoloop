@@ -46,6 +46,8 @@ function rowsOf(events: readonly StoredEvent[]): Row[] {
   return rows;
 }
 
+const isProblem = (l: EventLevel): boolean => l === 'bad' || l === 'warn';
+
 const MARK: Record<EventLevel, string> = { bad: '●', warn: '●', good: '●', info: '○' };
 
 const PAGE = 500;
@@ -53,7 +55,7 @@ const PAGE = 500;
 const when = (ms: number): string =>
   new Date(ms).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'medium' });
 
-export function EventsView(props: { recorder: Recorder }): JSX.Element {
+export function EventsView(props: { recorder: Recorder; onAck: () => void }): JSX.Element {
   const { recorder } = props;
   const [filter, setFilter] = useState('');
   const [problems, setProblems] = useState(false);
@@ -93,6 +95,7 @@ export function EventsView(props: { recorder: Recorder }): JSX.Element {
   );
   const rows = matching.slice(0, limit);
   const others = sessions.filter((s) => s.id !== recorder.session);
+  const unseen = recorder.unacknowledged();
   return (
     <div class="dt-view dt-log" data-view="events">
       <form
@@ -144,13 +147,26 @@ export function EventsView(props: { recorder: Recorder }): JSX.Element {
         ) : null}
         <button
           type="button"
+          data-events-ack=""
+          disabled={unseen === 0}
+          title="Mark the problems listed as seen, which clears the count on the tab"
+          onClick={() => {
+            recorder.acknowledge();
+            props.onAck();
+          }}
+        >
+          Acknowledge{unseen > 0 ? ` (${unseen})` : ''}
+        </button>
+        <button
+          type="button"
           data-events-clear=""
-          title="Forget the stored events of every session"
+          title={`Forget the stored events of every session. Kept in this browser (IndexedDB): the last ${KEEP_SESSIONS} sessions, up to ${PER_SESSION} events each.`}
           onClick={() => {
             void recorder.clear().then(() => {
               setSession(recorder.session);
               setOpen(new Set());
               refreshSessions();
+              props.onAck();
             });
           }}
         >
@@ -199,7 +215,7 @@ export function EventsView(props: { recorder: Recorder }): JSX.Element {
                   return (
                     <Fragment key={r.key}>
                       <tr
-                        class={`dt-log-row dt-ev-${r.level}`}
+                        class={`dt-log-row dt-ev-${r.level}${current && isProblem(r.level) && recorder.isNew(r.e) ? ' dt-ev-new' : ''}`}
                         data-event={r.e.event}
                         data-level={r.level}
                         aria-expanded={isOpen ? 'true' : 'false'}
@@ -290,10 +306,6 @@ export function EventsView(props: { recorder: Recorder }): JSX.Element {
           </>
         )}
       </div>
-      <p class="dt-muted" style="margin:4px 0 0;font-size:11px;">
-        Kept in this browser (IndexedDB): the last {KEEP_SESSIONS} sessions, up to {PER_SESSION}{' '}
-        events each.
-      </p>
     </div>
   );
 }

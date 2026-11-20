@@ -21,8 +21,12 @@ export const PER_SESSION = 6_000;
 /** How long events wait to be written together. Problems are written at once. */
 const FLUSH_MS = 250;
 
-/** An event as stored: `wall` is the wall-clock time it was recorded. */
-export type StoredEvent = InspectEvent & { wall: number };
+/**
+ * An event as stored: `wall` is the wall-clock time it was recorded; `n` counts
+ * the events of its session in the order they were recorded (what
+ * acknowledging marks).
+ */
+export type StoredEvent = InspectEvent & { wall: number; n?: number };
 
 export type SessionInfo = { id: string; started: number; count: number };
 
@@ -42,6 +46,7 @@ const isRow = (v: unknown): v is Row =>
   typeof Reflect.get(v, 'at') === 'number' &&
   typeof Reflect.get(v, 'event') === 'string' &&
   typeof Reflect.get(v, 'wall') === 'number' &&
+  ['number', 'undefined'].includes(typeof Reflect.get(v, 'n')) &&
   typeof Reflect.get(v, 'data') === 'object';
 
 /** The recorder: see `createRecorder`. */
@@ -51,6 +56,12 @@ export type Recorder = {
   add(events: readonly InspectEvent[], wall?: number): void;
   /** This session's events, oldest first. */
   events(): readonly StoredEvent[];
+  /** Problem events not yet acknowledged. */
+  unacknowledged(): number;
+  /** Whether this event came after the last acknowledgement. */
+  isNew(e: StoredEvent): boolean;
+  /** Marks every event so far as seen. */
+  acknowledge(): void;
   /**
    * Starts recording from `inspector`: every event as it comes, and the ring it
    * already holds (what happened before the panel connected). Returns a stop.
@@ -84,6 +95,8 @@ export function createRecorder(): Recorder {
   let pending: StoredEvent[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
   let written = 0;
+  let seq = 0;
+  let acked = 0;
   let ready: Promise<boolean> | undefined;
 
   /** Opens storage, notes this session and drops the sessions beyond the last few. */
@@ -161,7 +174,7 @@ export function createRecorder(): Recorder {
       const k = keyOf(e);
       if (seen.has(k)) continue;
       seen.add(k);
-      const stored: StoredEvent = { ...e, wall };
+      const stored: StoredEvent = { ...e, wall, n: ++seq };
       mem.push(stored);
       pending.push(stored);
       changed = true;
@@ -181,6 +194,15 @@ export function createRecorder(): Recorder {
     add,
     /** This session's events, oldest first. */
     events: (): readonly StoredEvent[] => mem,
+    isNew: (e) => (e.n ?? 0) > acked,
+    unacknowledged: () =>
+      mem.filter((e) => {
+        const l = levelOfEvent(e);
+        return (l === 'bad' || l === 'warn') && (e.n ?? 0) > acked;
+      }).length,
+    acknowledge() {
+      acked = seq;
+    },
     /**
      * Starts recording from `inspector`: every event as it comes, and the ring
      * it already holds (what happened before the panel connected).
@@ -242,6 +264,7 @@ export function createRecorder(): Recorder {
       pending = [];
       seen.clear();
       written = 0;
+      acked = seq;
       try {
         const d = await database();
         const tx = d.transaction([SESSIONS_STORE, EVENTS_STORE], 'readwrite');

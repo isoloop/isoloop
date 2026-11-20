@@ -40,6 +40,22 @@ describe('the events kept for the whole session', () => {
     expect(r.events()).toHaveLength(3);
   });
 
+  it('counts the problems not acknowledged yet, and only the newer ones after an acknowledgement', () => {
+    const r = createRecorder();
+    r.add([ev(1), ev(2, 'isolate:crash', { id: 'a', reason: 'error', message: 'x' })]);
+    r.add([ev(3, 'isolate:state', { id: 'a', state: 'blocked', prev: 'running' })]);
+    expect(r.unacknowledged()).toBe(2);
+    const seen = r.events().filter((e) => e.event === 'isolate:crash');
+    expect(seen.every((e) => r.isNew(e))).toBe(true);
+
+    r.acknowledge();
+    expect(r.unacknowledged()).toBe(0);
+    expect(seen.some((e) => r.isNew(e))).toBe(false);
+
+    r.add([ev(4, 'isolate:failed', { id: 'a', reason: 'error', message: 'y' }), ev(5)]);
+    expect(r.unacknowledged()).toBe(1);
+  });
+
   it('stores them, and a later session can read them back', async () => {
     const first = createRecorder();
     first.add([ev(1), ev(2, 'isolate:state', { id: 'a', state: 'running', prev: 'loading' })]);

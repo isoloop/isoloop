@@ -14,7 +14,6 @@ import type { IsolateInspector } from '@isoloop/runtime';
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { BusView, type BusSub } from './bus-view';
-import { problemCount } from './event-level';
 import type { Recorder } from './event-store';
 import { EventsView } from './events-view';
 import { MessagesView } from './messages-view';
@@ -80,10 +79,10 @@ const CSS = `
 .dt-log-rows { flex: 1; min-height: 0; overflow: auto; container-type: inline-size; }
 /* The detail keeps the width you can see, so a wide table doesn't push its panels out of view. */
 .dt-detail { position: sticky; left: 0; width: calc(100cqw - 16px); box-sizing: border-box; }
-.dt-log-bar { display: flex; align-items: stretch; gap: 4px; }
-.dt-log-bar input { flex: 1; min-width: 0; box-sizing: border-box; background: #0b1220; color: #e5e7eb;
+.dt-log-bar { display: flex; flex-wrap: wrap; align-items: stretch; gap: 4px; }
+.dt-log-bar input { flex: 1 1 9em; min-width: 9em; box-sizing: border-box; background: #0b1220; color: #e5e7eb;
   border: 1px solid #374151; border-radius: 4px; font: inherit; padding: 2px 6px; }
-.dt-log-bar button { box-sizing: border-box; background: #1f2937; color: #e5e7eb; border: 1px solid #374151;
+.dt-log-bar button { white-space: nowrap; box-sizing: border-box; background: #1f2937; color: #e5e7eb; border: 1px solid #374151;
   border-radius: 4px; font: inherit; font-size: 11px; padding: 1px 8px; cursor: pointer; }
 .dt-log-bar select { box-sizing: border-box; background: #1f2937; color: #e5e7eb; border: 1px solid #374151;
   border-radius: 4px; font: inherit; font-size: 11px; padding: 1px 4px; max-width: 14em; }
@@ -105,6 +104,8 @@ const CSS = `
 .dt-sr { position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; }
 .dt-log-row { cursor: pointer; }
+.dt-ev-new td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
+.dt-log-bar button:disabled { opacity: 0.45; cursor: default; }
 .dt-ev-bad .dt-ev-dot { color: #ef4444; }
 .dt-ev-warn .dt-ev-dot { color: #f59e0b; }
 .dt-ev-good .dt-ev-dot { color: #22c55e; }
@@ -414,7 +415,9 @@ export function Body(props: {
   }, []);
   const { snap } = props;
   // Every problem event of this page session, not only of the feed's last 200.
-  const eventProblems = problemCount(props.recorder.events());
+  // The Events tab's badge: problems not yet acknowledged.
+  const [, setAcks] = useState(0);
+  const eventProblems = props.recorder.unacknowledged();
   // Arrow keys move between tabs and focus the new one (the WAI-ARIA tabs
   // pattern); focus is a host call, since the DOM lives on the page.
   const buttons = useRef<Partial<Record<Tab, unknown>>>({});
@@ -457,7 +460,15 @@ export function Body(props: {
       );
     }
     view = <BusView bus={snap.bus} sub={busSub} />;
-  } else if (tab === 'events') view = <EventsView recorder={props.recorder} />;
+  } else if (tab === 'events')
+    view = (
+      <EventsView
+        recorder={props.recorder}
+        onAck={() => {
+          setAcks((n) => n + 1);
+        }}
+      />
+    );
   else if (tab === 'messages') view = <MessagesView />;
   else {
     // No pools, no Pools tab; a selected Pools tab falls back to the isolates.
@@ -506,7 +517,10 @@ export function Body(props: {
             >
               {t.label}
               {t.id === 'events' && eventProblems > 0 ? (
-                <span class="dt-badge dt-badge-warn" title="Problem events this session">
+                <span
+                  class="dt-badge dt-badge-warn"
+                  title="Problem events you haven't acknowledged"
+                >
                   {eventProblems > 99 ? '99+' : eventProblems}
                 </span>
               ) : null}
