@@ -60,6 +60,8 @@ const CSS = `
 .dt-pool-note { margin-top: 3px; font-size: 11px; }
 .dt-badge { display: inline-block; margin-left: 4px; padding: 0 4px; border-radius: 3px;
   background: #1e3a8a; color: #bfdbfe; font-size: 10px; }
+/* The Events tab's count of problems: amber, like the ring's arcs. */
+.dt-badge-warn { background: #f59e0b; color: #111827; font-weight: 600; }
 .dt-pool { display: block; color: #9ca3af; font-size: 11px; }
 .dt-state-running { color: #86efac; }
 .dt-state-blocked, .dt-state-crashed, .dt-state-restarting { color: #fcd34d; }
@@ -411,7 +413,8 @@ export function Body(props: {
     ctx.styles(CSS);
   }, []);
   const { snap } = props;
-  const eventProblems = snap ? problemCount(snap.events) : 0;
+  // Every problem event of this page session, not only of the feed's last 200.
+  const eventProblems = problemCount(props.recorder.events());
   // Arrow keys move between tabs and focus the new one (the WAI-ARIA tabs
   // pattern); focus is a host call, since the DOM lives on the page.
   const buttons = useRef<Partial<Record<Tab, unknown>>>({});
@@ -503,8 +506,8 @@ export function Body(props: {
             >
               {t.label}
               {t.id === 'events' && eventProblems > 0 ? (
-                <span class="dt-badge" title="Problems among the recent events">
-                  {eventProblems}
+                <span class="dt-badge dt-badge-warn" title="Problem events this session">
+                  {eventProblems > 99 ? '99+' : eventProblems}
                 </span>
               ) : null}
             </button>
