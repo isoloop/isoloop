@@ -9,8 +9,10 @@
  */
 import { useIsolate } from '@isoloop/preact';
 import type { InspectRecord } from '@isoloop/protocol';
-import type { JSX } from 'preact';
+import { Fragment, type JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
+import { highlight, type Part } from './format';
+import { RecordDetail } from './record-detail';
 
 /** The tap's rate cap: the bus's default. */
 export const MAX_PER_SEC = 50;
@@ -34,7 +36,10 @@ const time = (ts: number): string => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
 };
 
-type Entry = InspectRecord & { n: number };
+/** The row's one-line value is coloured once, from its first characters (the cell clips the rest). */
+const GLANCE = 240;
+
+type Entry = InspectRecord & { n: number; glance: Part[] };
 
 export function LogView(): JSX.Element {
   const ctx = useIsolate();
@@ -45,6 +50,8 @@ export function LogView(): JSX.Element {
   const [entries, setEntries] = useState<Entry[]>([]);
   // Records the bus left out over the cap, since the log was opened.
   const [skipped, setSkipped] = useState(0);
+  // The records opened to read their value.
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     if (!inspector || paused) return undefined;
@@ -54,14 +61,14 @@ export function LogView(): JSX.Element {
     };
     const off = inspector.tap({ topics: applied, maxPerSec: MAX_PER_SEC, onSkipped }, (r) => {
       n += 1;
-      const entry: Entry = { ...r, n };
+      const entry: Entry = { ...r, n, glance: highlight(r.preview.slice(0, GLANCE)) };
       setEntries((prev) => [entry, ...prev].slice(0, LOG_SIZE));
     });
     return off;
   }, [inspector, applied, paused]);
 
   return (
-    <div class="dt-view" data-view="log">
+    <div class="dt-view dt-log" data-view="log">
       <form
         class="dt-log-bar"
         onSubmit={(e) => {
@@ -108,47 +115,87 @@ export function LogView(): JSX.Element {
           {MAX_PER_SEC}/s cap · {skipped} skipped
         </span>
       </p>
-      {entries.length === 0 ? (
-        <p class="dt-muted">No records yet.</p>
-      ) : (
-        <table class="dt-table" data-log-table="">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Topic</th>
-              <th class="dt-num">Offset</th>
-              <th>Key</th>
-              <th>Producer</th>
-              <th class="dt-num">Size</th>
-              <th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((r) => (
-              <tr
-                key={`${r.topic} ${r.offset} ${r.n}`}
-                data-log-topic={r.topic}
-                data-offset={r.offset}
-              >
-                <td>{time(r.ts)}</td>
-                <td>
-                  <code>{r.topic}</code>
-                </td>
-                <td class="dt-num">{r.offset}</td>
-                <td>{r.key ?? ''}</td>
-                <td>{r.producer}</td>
-                <td class="dt-num">{r.bytes} B</td>
-                <td class="dt-value" title={r.truncated ? 'Cut to a 2 KB preview' : ''}>
-                  <code>
-                    {r.preview}
-                    {r.truncated ? '…' : ''}
-                  </code>
-                </td>
+      <div class="dt-log-rows">
+        {entries.length === 0 ? (
+          <p class="dt-muted">No records yet.</p>
+        ) : (
+          <table class="dt-table" data-log-table="">
+            <thead>
+              <tr>
+                <th class="dt-c-chev">
+                  <span class="dt-sr">Details</span>
+                </th>
+                <th class="dt-c-time">Time</th>
+                <th>Topic</th>
+                <th class="dt-num dt-c-offset">Offset</th>
+                <th class="dt-c-key">Key</th>
+                <th>Producer</th>
+                <th class="dt-num dt-c-size">Size</th>
+                <th>Value</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {entries.map((r) => {
+                const id = `${r.topic} ${r.offset} ${r.n}`;
+                const isOpen = open.has(id);
+                return (
+                  <Fragment key={id}>
+                    <tr
+                      class="dt-log-row"
+                      data-log-topic={r.topic}
+                      data-offset={r.offset}
+                      aria-expanded={isOpen ? 'true' : 'false'}
+                      onClick={() => {
+                        const next = new Set(open);
+                        if (isOpen) next.delete(id);
+                        else next.add(id);
+                        setOpen(next);
+                      }}
+                    >
+                      <td class="dt-c-chev">
+                        <button
+                          type="button"
+                          class="dt-chev"
+                          aria-expanded={isOpen ? 'true' : 'false'}
+                          aria-label={isOpen ? 'Hide the record' : 'Show the record'}
+                        >
+                          {isOpen ? '▾' : '▸'}
+                        </button>
+                      </td>
+                      <td class="dt-c-time">{time(r.ts)}</td>
+                      <td class="dt-col-topic">
+                        <code>{r.topic}</code>
+                      </td>
+                      <td class="dt-num dt-c-offset dt-col-num">{r.offset}</td>
+                      <td class="dt-c-key dt-col-str" title={r.key ?? ''}>
+                        {r.key ?? ''}
+                      </td>
+                      <td>{r.producer}</td>
+                      <td class="dt-num dt-c-size">{r.bytes} B</td>
+                      <td class="dt-vclip">
+                        <code>
+                          {r.glance.map((part, i) => (
+                            <span key={i} class={part.kind ? `dt-j-${part.kind}` : undefined}>
+                              {part.text}
+                            </span>
+                          ))}
+                        </code>
+                      </td>
+                    </tr>
+                    {isOpen ? (
+                      <tr class="dt-log-detail" data-log-detail="">
+                        <td colSpan={8}>
+                          <RecordDetail r={r} />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

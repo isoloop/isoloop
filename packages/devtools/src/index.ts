@@ -33,9 +33,23 @@ export type DevtoolsOptions = {
 /** The attribute the panel puts on its open and close buttons. */
 const TOGGLE = '[data-isoloop-devtools-toggle]';
 
+/** The attribute a panel button puts its text on, for the page to copy. */
+const COPY = 'data-isoloop-copy';
+
 /** Alt+Shift+D (Option+Shift+D on a Mac) opens and closes the panel. */
 const isShortcut = (e: KeyboardEvent): boolean =>
   e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyD';
+
+/**
+ * A page-side clipboard write for the panel's Copy buttons: the panel runs in a
+ * worker, which has none. The button carries its text; the click is the user's
+ * own, so the browser allows the write.
+ */
+const onCopy = (e: MouseEvent): void => {
+  const button = e.composedPath().find((n) => n instanceof Element && n.hasAttribute(COPY));
+  const text = button instanceof Element ? button.getAttribute(COPY) : null;
+  if (text !== null) void navigator.clipboard.writeText(text).catch(() => undefined);
+};
 
 const panelUrl = (): string => new URL('./panel.js', import.meta.url).href;
 
@@ -106,6 +120,7 @@ export function connectDevtools(kernel: Kernel, o: DevtoolsOptions = {}): () => 
     const button = surface.querySelector('iso-surface')?.shadowRoot?.querySelector(TOGGLE);
     if (button instanceof HTMLElement) button.click();
   };
+  surface.addEventListener('click', onCopy);
   const onKey = (e: KeyboardEvent): void => {
     if (!isShortcut(e)) return;
     e.preventDefault();
@@ -117,6 +132,7 @@ export function connectDevtools(kernel: Kernel, o: DevtoolsOptions = {}): () => 
   return () => {
     gone ??= (async () => {
       window.removeEventListener('keydown', onKey);
+      surface.removeEventListener('click', onCopy);
       await kernel.stop(id);
       surface.remove();
     })();

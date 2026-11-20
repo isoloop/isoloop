@@ -14,7 +14,13 @@ export type UiState = {
   width: number;
   height: number;
   position: DevtoolsPosition;
+  /** `wide` stretches the panel across the viewport's width; `max` fills the viewport. */
+  mode: PanelMode;
 };
+
+export type PanelMode = 'normal' | 'wide' | 'max';
+
+const isMode = (v: unknown): v is PanelMode => v === 'normal' || v === 'wide' || v === 'max';
 
 const DB = 'isoloop-devtools';
 const STORE = 'settings';
@@ -41,6 +47,8 @@ export function parseUi(v: unknown): Partial<UiState> {
   if (typeof width === 'number' && Number.isFinite(width)) out.width = width;
   if (typeof height === 'number' && Number.isFinite(height)) out.height = height;
   if (isPosition(position)) out.position = position;
+  const mode: unknown = Reflect.get(v, 'mode');
+  if (isMode(mode)) out.mode = mode;
   return out;
 }
 
