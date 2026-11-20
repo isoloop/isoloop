@@ -2,7 +2,7 @@
 
 **Goal:** the docs on isoloop.dev, readable by people and by agents, and a pipeline that keeps them matching the code as features are added, changed and removed.
 
-**Status:** grilled 2026-11-20 (Q1–Q31, yes to all). Phase A (tasks 1–20) doesn't wait for the API freeze. Phase B (tasks 21–27) starts after the freeze ([M4d](m4d-release.md) task 1), which starts on the maintainer's word.
+**Status:** grilled 2026-11-20 (Q1–Q31, yes to all), and the API coverage the same day (Q32–Q42, decisions 32–42). Tasks 1, 2, 7 and 8 done 2026-11-20 (isoloop#307, web#207–#209). Phase A (tasks 1–20 and 28) doesn't wait for the API freeze. Phase B (tasks 21–27) starts after the freeze ([M4d](m4d-release.md) task 1), which starts on the maintainer's word.
 
 **Done when:**
 
@@ -10,6 +10,7 @@
 - `llms.txt`, `llms-full.txt` and a Markdown copy of each docs page are served next to them.
 - `pnpm docs:check` runs in the library's CI and its PR hook, the `docs` skill and `docs/writing.md` are merged, and the steward reviews docs against them.
 - Every public export has TSDoc at decision 30's bar.
+- `docs/guide/map.json` has no `pending`: every public export is in a guide, in `referenceOnly`, or reached from a covered export (decisions 37–41).
 
 **Depends on:** [M4a](m4a-agents.md) and [M4b](m4b-devtools.md)'s public API (merged). The API reference waits for M4d's freeze. The skill link in `llms.txt` waits for M4a task 12.
 
@@ -100,7 +101,7 @@
 
 ### The API reference (phase B)
 
-27. **Our own generator** reads each package's published `.d.ts` rollup with the TypeScript compiler API (tsdown keeps the TSDoc), so it documents exactly what ships. It writes `docs/api/<package>.md` here, committed, and CI fails on drift, as the diagrams' test does. The site renders those pages like any guide, at `/docs/api/<package>/`, and `llms-full.txt` takes them as they are. TypeDoc was the alternative: many dependencies and a theme to fight.
+27. **Our own generator** reads each package's published `.d.ts` rollup through `readApi` (decision 32; *amended 2026-11-20:* first planned on the TypeScript compiler API, which TypeScript 7 doesn't ship as before), so it documents exactly what ships. tsdown keeps the TSDoc. It writes `docs/api/<package>.md` here, committed, and CI fails on drift, as the diagrams' test does. The site renders those pages like any guide, at `/docs/api/<package>/`, and `llms-full.txt` takes them as they are. TypeDoc was the alternative: many dependencies and a theme to fight.
 28. **The user-facing packages get a page each,** with a section per entry point: host (with `./dev-mcp`), runtime, bus, dom, react, preact, vite, balancer, devtools and webmcp. protocol and codec are left out; the protocol types host re-exports are documented under host.
 29. **Reference details:**
     - Symbols tagged `@experimental` get the site's Experimental pill (`isoloop/web` ADR 0005).
@@ -115,6 +116,22 @@
     The check enforces 1 and 2 everywhere, and 3 on the listed entry points. As of `0.1.0-next.7`, `createKernel`, `Kernel`, `KernelConfig`, `IsolateHandle`, `defineIsolate`, `isoloop()` and `createTestContext` have no top-level TSDoc, and nothing has `@example`.
 31. **Search is our own,** with no dependency. A build plugin writes `/docs/search.json` (titles, headings, section text, API symbols, about 40–90 KB gzip), loaded only when the search box gets focus. A module of about 200 lines ranks title over heading over body, with the keyboard and a `/` shortcut. Without JS the box is hidden. Pagefind was ruled out: its WebAssembly needs `'wasm-unsafe-eval'`, which `default-src 'self'` doesn't allow.
 
+### Coverage of the API (2026-11-20, Q32–Q42)
+
+Counted on the published `0.1.0-next.6` rollups (the `.d.ts` installed in `isoloop/web` when this was grilled), the user-facing packages have 242 exports that aren't `@internal`, across 18 entry points (a re-export counted once per entry point), and the first `map.json` maps 28 of them.
+
+32. **`readApi` on tsrs.** The library is on TypeScript 7.0.2, whose npm package has only `typescript/unstable/sync` and no classic compiler API. `readApi(dts) → ApiModel` (exports, their kinds, tags and docs, and the types they refer to) is our own seam over `tsrs/sync` from `tsrs@7.1.0-beta.tsrs3`, which task 3 adds as a dev dependency, pinned exactly and used only by the docs scripts. tsrs's API files are copied unchanged from `microsoft/TypeScript` (its `UPSTREAM.json`), and TypeScript 7.1 ships the same API at `typescript/sync`, so moving off tsrs changes one import. A conformance suite runs on fixture `.d.ts` files. `readApi` is built in task 3, for the coverage check, and task 22 adds the rendering. Switching the type checker itself to tsrs stays in [would-like](../would-like.md).
+33. **One export is one declaration,** at its home entry point. Re-exports (`BusError` and `HostApi` in runtime, react and preact; the DOM record types in `dom/worker` and `dom/host`) inherit its coverage, and the reference lists them as "re-exported from …".
+34. **A testing guide:** "Testing isolates and contracts", in the Build section (task 28), for `@isoloop/runtime/testing` (`createTestContext`) and `@isoloop/bus/testing` (`testContracts`).
+35. **The DOM conformance kit** (`@isoloop/dom/testing` and `dom/testing/worker`) is reference only, with a one-line note on its API page: for adapter authors.
+36. **A `freeze` group in `pending`** holds the exports that look internal: the bus's engine and storage pieces (`Broker`, `LogEngine`, `LogStorage`, `MemoryStorage`, `BusPort`, the engine options) and a few of host's (`claimPools`, `HostRenderBridge`). The freeze (task 21) decides each one: `@internal` or reference only.
+37. **`pending` is grouped by the task that will cover each export:** `"pending": { "13": { "@isoloop/host": ["createKernel", …] }, "freeze": { … } }`. Each guide task's PR moves its group's names into its guide's `exports` (or `referenceOnly`) and deletes the group. A name that's both pending and mapped fails the check.
+38. **`pending` only shrinks.** CI fails when a PR's `pending` has a name that `main`'s doesn't, so a new export goes straight into a guide or `referenceOnly`.
+39. **Stale names fail.** A name in `exports`, `referenceOnly` or `pending` that's no longer exported fails the check, which is how a removal (decision 23) reaches the map.
+40. **When it's empty:** the `freeze` group when task 21 merges, and all of `pending`, the key included, by the done-when.
+41. **Types reached from a covered export are covered.** A type (interface or type alias) counts as covered when it's reachable from a covered export's signature through parameters, return types or fields, followed recursively within the user-facing packages, using `readApi`'s type graph. Functions, consts and classes are named in a guide or in `referenceOnly`. The reference still documents every type.
+42. **Task 3 writes the first `pending`** from the gaps, with a proposed task for each export, and its PR goes to the maintainer for that assignment.
+
 ## Tasks
 
 About one evening each ([conventions](README.md#conventions)). One PR per task. Forks merge code PRs on green CI. Tasks marked "maintainer" go to the maintainer and aren't merged by the fork. `isoloop/web` tasks 7–12 can be drafted before ADR 0006 is accepted, but merge only after it is.
@@ -125,7 +142,7 @@ About one evening each ([conventions](README.md#conventions)). One PR per task. 
 | --- | --- | --- | --- | --- | --- |
 | 1 | ADR 0006 "Docs" (decisions 2–26 for the site and the pipeline) | web | `docs/adr/0006-docs.md`, `docs/adr/README.md` | — (maintainer) | — |
 | 2 | `docs/writing.md`, the `docs` skill, `docs/guide/map.json`, the `AGENTS.md` and `CONTRIBUTING.md` lines | library | `docs/writing.md`, `.claude/skills/docs/SKILL.md`, `docs/guide/map.json`, `AGENTS.md`, `CONTRIBUTING.md` | — (maintainer) | — |
-| 3 | `docs:check` items 1, 3, 4 and 6 (skeleton and lead, links, banned phrases, map coverage) and the map notice, in CI and the PR hook | library | `scripts/docs/check.ts`, `package.json`, `.github/workflows/ci.yml`, `.claude/settings.json` | unit: a fixture guide failing each item; the notice on a mapped path | 2 |
+| 3 | `docs:check` items 1, 3, 4 and 6 (skeleton and lead, links, banned phrases, map coverage under decisions 33 and 37–41) and the map notice, in CI and the PR hook; `readApi` on tsrs (decision 32); the first `pending` (decision 42) | library | `scripts/docs/check.ts`, `scripts/docs/read-api.ts`, `docs/guide/map.json`, `package.json`, `pnpm-workspace.yaml`, `.github/workflows/ci.yml`, `.claude/settings.json` | unit: a fixture guide failing each item; the notice on a mapped path; `readApi`'s conformance suite; `pending` growing, a stale name and a pending-and-mapped name each fail; a type reached from a covered export passes | 2 (maintainer, for `pending`) |
 | 4 | `docs:check` items 2 and 5: fences type-checked, removed exports named in guides | library | `scripts/docs/fences.ts`, `scripts/ci/api-check.ts` (shared diff) | unit: a fence that fails, `nocheck`, a removed name in a guide | 3 |
 | 5 | The six drafted guides brought to the skeleton | library | `docs/guide/{agents,balancer,devtools,hosting,inspection,pools}.md` | `docs:check` | 3 (maintainer) |
 | 6 | The docs page mock | web | an artifact | — (maintainer) | — |
@@ -142,14 +159,15 @@ About one evening each ([conventions](README.md#conventions)). One PR per task. 
 | 17 | Guide: The bus (semantics, durability, retention, groups, request and reply, idempotent handlers) | library | `docs/guide/bus.md` | `docs:check` | 4 (maintainer) |
 | 18 | Guide: Supervision and restarts | library | `docs/guide/supervision.md` | `docs:check` | 4 (maintainer) |
 | 19 | Guide: Build a dev tool as an isolate | library | `docs/guide/dev-tools.md` | `docs:check` | 5 (maintainer) |
+| 28 | Guide: Testing isolates and contracts | library | `docs/guide/testing.md` | `docs:check` | 4 (maintainer) |
 | 20 | The steward reads `docs/writing.md` and the `docs` skill; the weekly docs drift pass | web | `.claude/agents/steward.md`, the weekly routine | — (maintainer) | 2 |
 
 ### Phase B (after the freeze)
 
 | # | Task | Repo | Files | Tests | Needs |
 | --- | --- | --- | --- | --- | --- |
-| 21 | The TSDoc pass at decision 30's bar and `docs:check` item 7, inside M4d task 1 | library | `packages/*/src`, `scripts/docs/tsdoc.ts` | unit: an export without a comment fails, an `@example` that doesn't type-check fails | the freeze (maintainer) |
-| 22 | The API generator: `docs/api/<package>.md` from the published `.d.ts`, with the drift test | library | `scripts/docs/api.ts`, `docs/api/` | unit: a fixture `.d.ts`; CI: drift fails | 21 |
+| 21 | The TSDoc pass at decision 30's bar and `docs:check` item 7, inside M4d task 1; the `freeze` group in `pending` decided and emptied (decision 36) | library | `packages/*/src`, `scripts/docs/tsdoc.ts` | unit: an export without a comment fails, an `@example` that doesn't type-check fails | the freeze (maintainer) |
+| 22 | The API generator: `docs/api/<package>.md` from the published `.d.ts` through `readApi`, with the drift test | library | `scripts/docs/api.ts`, `docs/api/` | unit: a fixture `.d.ts`; CI: drift fails | 21 |
 | 23 | The CLI page from `args.ts`; each symbol's links to its guides from `map.json` | library | `scripts/docs/api.ts`, `docs/api/cli.md` | unit: every command and flag listed; a symbol's guide links | 22 |
 | 24 | The API pages on the site, Experimental pills, the API in `llms-full.txt` | web | `apps/site/build/docs/`, `apps/site/content/docs.json` | unit: an `@experimental` symbol gets the pill; smoke and axe on the API pages | 11, 12, 23 |
 | 25 | Search: the index plugin and the search box | web | `apps/site/build/docs/search.ts`, `apps/site/src/search.ts` | unit: ranking; E2E: type, pick a result, land on it; axe; no-JS hides the box | 24 |
