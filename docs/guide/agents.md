@@ -62,7 +62,7 @@ createKernel({
 });
 ```
 
-- **`expose`** takes grant matchers: `*` for one segment, `>` for the rest.
+- **`expose`** takes grant patterns: without `*` a pattern names one topic; `*` matches one or more characters, dots included, so `markets.*` covers `markets.alerts.create.v1`.
 - **Every topic it matches** needs a `reply`, a `tool` with a non-empty `description` and a boolean `readOnly`, and schemas that make JSON Schema (Standard JSON Schema, draft 2020-12). Otherwise `createKernel` throws `KernelError('not_exposable')`, naming the topic. A schema built with `unchecked()` can't make JSON Schema, so its topic can't be a tool.
 - **A pattern that matches nothing** isn't an error. It's reported once, through the `agents:unmatched` event: `kernel.on('agents:unmatched', ({ patterns }) => …)`.
 - **`timeoutMs`** is how long transports wait for a tool's reply. Default 10 s.
