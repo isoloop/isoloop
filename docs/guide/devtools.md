@@ -1,6 +1,15 @@
 # Devtools panel
 
-`@isoloop/devtools` (`@experimental`) adds a panel to the page that reads the inspection feed ([ADR 0020](../adr/0020-inspection-feed.md)). The panel is a visual isolate in its own worker, so a crash or hang in the panel doesn't reach the app, and the supervisor restarts it like any other isolate. It is never pooled. It gets the feed through the `inspect` grant, on a port of its own, not through bus topics.
+`@isoloop/devtools` (`@experimental`) adds a panel to the page that shows its isolates, the bus and a live log of records, read from the inspection feed.
+
+## When to use it
+
+Use the panel to watch a page while you develop it, and to restart, kill or block an isolate by hand. It reads the inspection feed ([ADR 0020](../adr/0020-inspection-feed.md)). The panel is a visual isolate in its own worker, so a crash or hang in the panel doesn't reach the app, and the supervisor restarts it like any other isolate. It is never pooled. It gets the feed through the `inspect` grant, on a port of its own, not through bus topics.
+
+- **To build a tool of your own** on the same feed, read [the inspection guide](inspection.md).
+- **To let a coding agent read the page,** use the dev MCP ([agents guide](agents.md#in-development-the-dev-mcp)).
+
+## Adding it
 
 ```ts
 import { connectDevtools } from '@isoloop/devtools';
@@ -9,7 +18,7 @@ const disconnect = connectDevtools(kernel, { position: 'bottom-right' });
 // later: await disconnect();
 ```
 
-- **Opting in:** the app opts in by importing and connecting it. Nothing stops a production build from including it.
+- **Opting in:** the app opts in by importing and connecting it.
 - **`src`:** the panel isolate's module URL. Without it, `connectDevtools` uses the `panel.js` next to the package's entry (`new URL('./panel.js', import.meta.url)`). That file is self-contained, with Preact 11 bundled, so the app's own framework and version don't matter.
   - **With `@isoloop/vite`, leave `src` out.** In dev, the plugin keeps `@isoloop/devtools` out of Vite's dependency pre-bundling, so the server serves `panel.js` next to the entry. In a build, Vite emits `panel.js` as an asset and rewrites the URL.
   - **With another bundler,** pass `src` yourself: the URL your build serves `@isoloop/devtools/panel` (the package's `dist/panel.js`) at, copied as a file. Under `@isoloop/vite`, `import panel from '@isoloop/devtools/panel?isolate'` gives that URL as well.
@@ -25,6 +34,7 @@ const disconnect = connectDevtools(kernel, { position: 'bottom-right' });
 - **Resizing:** drag the panel's inner corner to resize it. The header's ⤢ button moves it to the next corner.
 - **Persistence:** the open state, size and corner are kept across reloads in IndexedDB, on the page's origin. The panel runs in a worker, and workers have no `localStorage`. Without storage (a private window, blocked site data), the panel starts from its defaults.
 - **While it restarts:** the panel briefly disappears. If it gives up, a small box with a Retry button takes its place in the corner.
+- **Clicks:** the panel's surface covers the viewport, but it doesn't take pointer events, so only the panel's own boxes catch clicks.
 
 ## Isolates view
 
@@ -71,4 +81,17 @@ The records come from a tap ([ADR 0020](../adr/0020-inspection-feed.md), decisio
 - **Only while open:** the tap runs only while the Log tab is open. Leaving the tab, or closing the panel, ends it and clears the list. Pause stops it, and Clear empties the list.
 - **Bus restarts:** the host reopens the tap after a bus restart, so the log carries on. Memory topics start empty again, so their offsets start from 0. The panel doesn't publish to the bus ([M4b plan](../plans/m4b-devtools.md), devtools decision 7).
 
-The panel's surface covers the viewport, but it doesn't take pointer events, so only the panel's own boxes catch clicks.
+## Limits
+
+- **It's `@experimental` in 0.1.**
+- **Nothing stops a production build from including it.** Keep `connectDevtools` out of production code yourself.
+- **Memory is measured only in Chromium, on a cross-origin isolated page** ([Isolates view](#isolates-view)).
+- **The log is a sample:** at most 50 records a second reach it, and it keeps the last 200 ([Log view](#log-view)).
+- **Its settings need storage:** without IndexedDB (a private window, blocked site data), the panel starts from its defaults each time.
+
+## See also
+
+- [ADR 0020: the inspection feed](../adr/0020-inspection-feed.md), the decisions behind the panel.
+- [The inspection feed](inspection.md), the API the panel reads.
+- [Tools for agents](agents.md), whose dev MCP reads the same feed.
+- [The M4b plan](../plans/m4b-devtools.md), where the panel was built.

@@ -1,6 +1,21 @@
 # Worker pools
 
-By default every isolate gets its own worker ([ADR 0001](../adr/0001-one-worker-per-isolate.md)): its own thread, heap and copy of the runtime, so one isolate that blocks or crashes affects only itself. A **pool** puts several isolates in one worker instead, headless ones, visual ones (widgets) or both. It saves memory and start-up time, and gives up isolation between the members.
+A **pool** puts several isolates, headless or visual, in one worker, which saves memory and start-up time and gives up isolation between its members.
+
+## When to use it
+
+By default every isolate gets its own worker ([ADR 0001](../adr/0001-one-worker-per-isolate.md)): its own thread, heap and copy of the runtime, so one isolate that blocks or crashes affects only itself. A pool trades some of that isolation for memory and start-up time.
+
+| Pool | Keep in its own worker |
+|---|---|
+| Small headless isolates: feeds, adapters, light transforms, state managers | Heavy computation (it holds up the whole pool) |
+| Widgets that belong together: one machine's panel, one feature's views | Widgets that handle secrets (members can read each other's DOM and input) |
+| Isolates that belong together and can fail together (one machine's feeds, one feature) | Code you trust less than its neighbours, or from another team |
+| Many isolates that each do little, where the worker count adds up | Isolates whose crash must not take others down |
+
+Group by what fails together: a pool is a unit of failure. When you can't know an isolate's cost in advance (user-added widgets, jobs of varying size), the [balancer](balancer.md) can place it by measured load and move it out when its pool lags or fills up.
+
+## Spawning into a pool
 
 ```ts
 import feedUrl from './feed?isolate';
@@ -67,17 +82,6 @@ function Confirm({ onYes }: { onYes: () => void }) {
 
 Most overlay libraries take a container option for the same purpose. The portal container is made on first use and lives inside the widget's surface, so the overlay is clipped to the widget. An overlay that must cover the whole page belongs to the host page, not to an isolate.
 
-## When to pool
-
-| Pool | Keep in its own worker |
-|---|---|
-| Small headless isolates: feeds, adapters, light transforms, state managers | Heavy computation (it holds up the whole pool) |
-| Widgets that belong together: one machine's panel, one feature's views | Widgets that handle secrets (members can read each other's DOM and input) |
-| Isolates that belong together and can fail together (one machine's feeds, one feature) | Code you trust less than its neighbours, or from another team |
-| Many isolates that each do little, where the worker count adds up | Isolates whose crash must not take others down |
-
-Group by what fails together: a pool is a unit of failure. When you can't know an isolate's cost in advance (user-added widgets, jobs of varying size), the [balancer](balancer.md) can place it by measured load and move it out when its pool lags or fills up.
-
 ## When to pool, and when not to: the plant dashboard's figures
 
 The [plant dashboard](https://github.com/isoloop/web/tree/main/apps/dashboards/plant) (72 widgets, 8 machines) runs the same code in several placements, so it shows what each choice costs and contains. Unless a row says otherwise, figures are from its latest matched comparison on a dedicated machine ([`comparison/matched-v2/`](https://github.com/isoloop/web/tree/main/apps/dashboards/plant/comparison/matched-v2), `@isoloop/*@0.0.0-next.d028bc1`): Chromium, 4 physical cores fixed at 2.0 GHz, 1 kHz, medians of 5 rounds. Memory is after GC, 16 s after load. The per-pool costs come from the [plant memory investigation](../investigations/plant-memory.md).
@@ -137,3 +141,17 @@ That's why the plant's default is `matched`: on this phone `split` was the slowe
 - `kernel.on('isolate:beat', fn)`: every heartbeat as it arrives, `{ id, pool?, lagMs, busyMs?, at }`, once per member. The kernel emits it only while something listens. What `busyMs` covers and its limits are in the [balancer guide](balancer.md#busyms-whats-measured).
 - `kernel.pools()`: each pool's members, whether its worker runs, its effective grants, and whether its members share a document (`sharesDocument`, with a `warning`).
 - A pool counts as one worker against `workers.budget`.
+
+## Limits
+
+- **Members share an event loop, fate and globals,** and visual members share one document, so they can read each other's DOM and input ([What members share](#what-members-share), [Visual pools](#visual-pools)).
+- **A stopped member's leftovers aren't all cleared:** work started outside its code and promise continuations still run ([What members share](#what-members-share)).
+- **The saving depends on sharing a framework.** Widgets built apart bring their own copy and save less.
+- **The figures are one dashboard's** on the machines named with them; measure your own page before choosing a placement.
+
+## See also
+
+- [ADR 0001](../adr/0001-one-worker-per-isolate.md), one worker per isolate by default.
+- [ADR 0015](../adr/0015-visual-pools.md), visual pools, and [ADR 0012](../adr/0012-isolates-built-apart.md), isolates built apart.
+- [The balancer](balancer.md), for placing by measured load.
+- [The plant memory investigation](../investigations/plant-memory.md), where the per-pool costs come from.

@@ -1,6 +1,15 @@
 # The inspection feed
 
-`kernel.inspect()` (`@experimental`) gives a live view of a running page: its isolates, pools and bus, the kernel's events, and records copied from the bus as they're appended. The devtools panel ([devtools guide](devtools.md)) and the dev MCP's `isoloop_*` tools ([agents guide](agents.md#in-development-the-dev-mcp)) both read it, and an app can read it too. The decisions are in [ADR 0020](../adr/0020-inspection-feed.md).
+`kernel.inspect()` (`@experimental`) gives a live view of a running page: its isolates, pools and bus, the kernel's events, and records copied from the bus as they're appended.
+
+## When to use it
+
+Use it to build a tool that watches or controls a running page. The devtools panel ([devtools guide](devtools.md)) and the dev MCP's `isoloop_*` tools ([agents guide](agents.md#in-development-the-dev-mcp)) both read it, and an app can read it too. The decisions are in [ADR 0020](../adr/0020-inspection-feed.md).
+
+- **To watch a page by hand,** add the devtools panel instead.
+- **A tool that reads only the app's own topics** doesn't need the feed: it subscribes like any isolate ([below](#the-inspect-grant-and-ctxinspector)).
+
+## The Inspector
 
 ```ts
 const inspector = kernel.inspect();
@@ -18,8 +27,6 @@ untap(); stop(); inspector.close();
 ```
 
 Every message is plain, structured-cloneable data, the same for the host's `Inspector`, an isolate's `ctx.inspector` and the dev MCP's WebSocket.
-
-## The Inspector
 
 | Call | What it does |
 | --- | --- |
@@ -104,3 +111,17 @@ Where the page is cross-origin isolated (COOP `same-origin` and COEP `require-co
 - **Elsewhere,** there's no `memory` field: Firefox, WebKit, and any page that isn't cross-origin isolated.
 
 `@isoloop/vite`'s `crossOriginIsolated: true` sends the two headers from the dev and preview servers. In production, the host has to send them; the [hosting guide](hosting.md) lists them.
+
+## Limits
+
+- **It's `@experimental` in 0.1.**
+- **A tap is a sample,** capped per second in fixed windows, and records appended while no bus runs aren't seen ([The Inspector](#the-inspector)).
+- **The controls have no production gate.** Whoever holds an `Inspector`, or an isolate with `inspect`, can restart, kill and block ([Controls](#controls)).
+- **Memory per isolate is Chromium-only,** on cross-origin isolated pages, and the figures are coarse and seconds old ([Memory per isolate](#memory-per-isolate)).
+
+## See also
+
+- [ADR 0020: the inspection feed](../adr/0020-inspection-feed.md), the decisions behind this page.
+- [The devtools panel](devtools.md) and [tools for agents](agents.md), which read the feed.
+- [What the feed costs](../investigations/inspect-feed-cost.md), the measurement above.
+- [Hosting](hosting.md), for the headers memory per isolate needs.

@@ -41,7 +41,7 @@
         "packages/runtime/src/bootstrap.ts"
       ],
       "exports": {
-        "@isoloop/vite": ["IsoloopOptions", "isoloop"]
+        "@isoloop/vite": ["IsoloopOptions", "devCsp", "headersFor", "isoloop"]
       }
     },
     "inspection": {
@@ -121,9 +121,6 @@
     ]
   },
   "pending": {
-    "5": {
-      "@isoloop/vite": ["devCsp", "headersFor"]
-    },
     "13": {
       "@isoloop/host": [
         "HostComponent",

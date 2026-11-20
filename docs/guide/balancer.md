@@ -1,6 +1,22 @@
 # Automatic placement: the balancer
 
-`@isoloop/balancer` (**experimental**) decides where isolates run so you don't have to. You spawn through it instead of naming a pool. It places each isolate in a pool with room, moves one out when its pool can't keep up, and keeps an isolate that blocks or crashes in a quarantine pool until it has been quiet for a while. The decisions are in [ADR 0017](../adr/0017-opt-in-balancer.md).
+`@isoloop/balancer` (**experimental**) decides where isolates run: you spawn through it instead of naming a pool.
+
+## When to use it
+
+The balancer places each isolate in a pool with room, moves one out when its pool can't keep up, and keeps an isolate that blocks or crashes in a quarantine pool until it has been quiet for a while. The decisions are in [ADR 0017](../adr/0017-opt-in-balancer.md).
+
+The kernel doesn't place anything on its own ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). Without the balancer nothing changes; with it, only the isolates you spawn through it are ever moved.
+
+| Use the balancer | Place by hand ([pools guide](pools.md)) |
+| --- | --- |
+| Isolates whose cost you can't know in advance: user-added widgets, plug-ins, jobs of varying size | Isolates whose cost and failure domains you know |
+| Pages where a heavy or misbehaving isolate must not slow its neighbours for long | Groups that must fail together, or stay apart, for reasons other than load (a machine's feed with its widgets; widgets that handle secrets, which belong on their own worker) |
+| Workloads that change while the page runs | Pages measured placement by placement, where moves would blur the figures |
+
+It doesn't replace thinking about failure domains: it groups by load, not by what belongs together. A move also restarts the isolate (see [Moves](#moves)), so isolates that can't afford a restart are better placed by hand.
+
+## The API
 
 ```ts
 import { createKernel } from '@isoloop/host';
@@ -17,21 +33,7 @@ balancer.spawn({ id: 'chart-1', src: chartUrl, surface: document.getElementById(
 balancer.on('move', (e) => console.log(`${e.id}: ${e.from} → ${e.to} (${e.reason})`));
 ```
 
-The kernel doesn't place anything on its own ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). Without the balancer nothing changes; with it, only the isolates you spawn through it are ever moved.
-
 To see it work, the processor example's **Playground** ([isoloop/web `apps/processor`](https://github.com/isoloop/web/tree/main/apps/processor)) spawns tasks with a CPU slider each, Block and Crash buttons, and one column per pool, so every move shows up with its reason.
-
-## When to use it
-
-| Use the balancer | Place by hand ([pools guide](pools.md)) |
-| --- | --- |
-| Isolates whose cost you can't know in advance: user-added widgets, plug-ins, jobs of varying size | Isolates whose cost and failure domains you know |
-| Pages where a heavy or misbehaving isolate must not slow its neighbours for long | Groups that must fail together, or stay apart, for reasons other than load (a machine's feed with its widgets; widgets that handle secrets, which belong on their own worker) |
-| Workloads that change while the page runs | Pages measured placement by placement, where moves would blur the figures |
-
-It doesn't replace thinking about failure domains: it groups by load, not by what belongs together. A move also restarts the isolate (see [Moves](#moves)), so isolates that can't afford a restart are better placed by hand.
-
-## The API
 
 ```ts nocheck
 const balancer = createBalancer(kernel, options?);
@@ -171,3 +173,18 @@ M3h measured these on the processor example's File processor, on 4 cores at 2.0 
 - `balancer.on('arrived')`, `on('spike')`, `on('behind')` and `on('failed')`: each move's cost, every spike and what it did, isolates with nowhere to go, and isolates the kernel gave up on.
 - `kernel.pools()`: the `balancer-` pools and their members, like any pool.
 - `kernel.on('isolate:beat')`: the raw feed the balancer reads.
+
+## Limits
+
+- **It's `@experimental` in 0.1.**
+- **It groups by load, not by what belongs together,** and every move restarts the isolate ([When to use it](#when-to-use-it), [Moves](#moves)).
+- **`busyMs` misses some work:** promise continuations, other libraries' schedulers and work the whole worker shares. Report your own busy time for work it misses ([`busyMs`](#busyms-whats-measured)).
+- **`navigator.hardwareConcurrency` can overstate the cores** in a container or VM, and with it the default `maxWorkers` ([What it costs](#what-it-costs)).
+- **One balancer per kernel at a time** ([Pool names](#pool-names-and-one-balancer-per-kernel-at-a-time)).
+
+## See also
+
+- [ADR 0017: an opt-in balancer](../adr/0017-opt-in-balancer.md), the decisions behind this page.
+- [Worker pools](pools.md), for placing by hand.
+- [ADR 0001](../adr/0001-one-worker-per-isolate.md) and [ADR 0015](../adr/0015-visual-pools.md), on placement and on pool members' timers.
+- [The inspection feed](inspection.md), for reading pools and isolates from a tool.
