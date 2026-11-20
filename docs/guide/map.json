@@ -34,6 +34,24 @@
         "@isoloop/devtools": ["DevtoolsOptions", "DevtoolsPosition", "connectDevtools"]
       }
     },
+    "getting-started": {
+      "paths": [
+        "packages/host/src/kernel.ts",
+        "packages/host/src/render/registry.ts",
+        "packages/vite/src/index.ts",
+        "packages/vite/src/build.ts",
+        "packages/vite/client.d.ts"
+      ],
+      "exports": {
+        "@isoloop/host": [
+          "HostComponent",
+          "KernelConfig",
+          "KernelError",
+          "KernelErrorCode",
+          "createKernel"
+        ]
+      }
+    },
     "hosting": {
       "paths": [
         "packages/host/src/loader.ts",
@@ -121,17 +139,7 @@
     ]
   },
   "pending": {
-    "13": {
-      "@isoloop/host": [
-        "HostComponent",
-        "KernelConfig",
-        "KernelError",
-        "KernelErrorCode",
-        "createKernel"
-      ]
-    },
     "15": {
-      "@isoloop/host": ["NavigateRequest", "OnNavigate"],
       "@isoloop/runtime": [
         "BusClient",
         "IsolateContext",
@@ -203,9 +211,6 @@
         "KERNEL_PRODUCER",
         "Retention"
       ]
-    },
-    "18": {
-      "@isoloop/host": ["Backoff"]
     },
     "28": {
       "@isoloop/runtime/testing": ["TestContext", "TestContextOptions", "createTestContext"],
