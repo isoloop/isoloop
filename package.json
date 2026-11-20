@@ -28,7 +28,8 @@
     "bench:visual-pools": "playwright test --config bench/visual-pools/playwright.config.ts",
     "changeset": "changeset",
     "release:version": "changeset version",
-    "release:status": "changeset status"
+    "release:status": "changeset status",
+    "docs:check": "node scripts/docs/check.ts"
   },
   "devDependencies": {
     "@changesets/cli": "catalog:",
@@ -41,6 +42,7 @@
     "oxlint-tsgolint": "catalog:",
     "playwright": "catalog:",
     "tsdown": "catalog:",
+    "tsrs": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

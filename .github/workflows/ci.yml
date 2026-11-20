@@ -33,6 +33,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # HEAD^1 is the base for docs:check: main's tip on a PR (HEAD is the
+          # merge commit), the previous commit on a push.
+          fetch-depth: 2
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -45,6 +49,10 @@ jobs:
       - run: pnpm test:node
       - run: pnpm build
       - run: node scripts/check-exports.ts
+      # The docs rules and the map's coverage of the built .d.ts (M4c decision 22).
+      - run: pnpm docs:check
+        env:
+          DOCS_CHECK_BASE: HEAD^1
 
   browser:
     needs: check

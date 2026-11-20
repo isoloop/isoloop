@@ -3,7 +3,9 @@
 // (isoloop/web ADR 0004, decision 4):
 // - the description ends with a valid "Site impact:" line;
 // - a change under packages/ or apps/ comes with a changeset, unless the
-//   title, description or labels say it's internal-only (`no-changeset`).
+//   title, description or labels say it's internal-only (`no-changeset`);
+// - the guides pass `pnpm docs:check --guides` (M4c decision 22). The map's
+//   coverage needs a fresh `pnpm build`, so it's left to CI.
 // Exit 2 blocks the call and shows stderr to the agent; exit 0 lets it run.
 // Anything this script can't work out lets the call run: CI still checks.
 import { execFileSync } from 'node:child_process';
@@ -129,6 +131,33 @@ export function changesetProblem(dir: string, text: string): string | undefined 
   return 'This branch changes packages/ or apps/ but adds no changeset. Run `pnpm changeset` and commit it, or, for an internal-only change, add the `no-changeset` label (`--label no-changeset`).';
 }
 
+/** What `docs:check --guides` reports, or undefined when it passes (or isn't in this repo). */
+export function docsProblem(
+  dir: string,
+  run: (root: string) => { ok: boolean; out: string } = runGuidesCheck,
+): string | undefined {
+  const root = git(dir, ['rev-parse', '--show-toplevel']);
+  if (!root || !existsSync(join(root, 'scripts/docs/check.ts'))) return undefined;
+  const { ok, out } = run(root);
+  return ok
+    ? undefined
+    : `\`pnpm docs:check --guides\` fails; fix the guides first:\n${out.trim()}`;
+}
+
+function runGuidesCheck(root: string): { ok: boolean; out: string } {
+  try {
+    execFileSync('node', ['scripts/docs/check.ts', '--guides'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: 'pipe',
+    });
+    return { ok: true, out: '' };
+  } catch (e) {
+    const out = field(e, 'stdout');
+    return { ok: false, out: typeof out === 'string' ? out : String(e) };
+  }
+}
+
 const field = (o: unknown, k: string): unknown =>
   typeof o === 'object' && o !== null ? Reflect.get(o, k) : undefined;
 
@@ -170,6 +199,8 @@ function main(): void {
     `${title(found.cmd)}\n${description ?? ''}\n${found.cmd}`,
   );
   if (changeset) problems.push(changeset);
+  const docs = docsProblem(found.dir);
+  if (docs) problems.push(docs);
   if (problems.length > 0) {
     process.stderr.write(
       `PR gate (AGENTS.md, definition of done) blocked \`gh pr create\`:\n${problems.map((p) => `- ${p}`).join('\n')}\n`,
