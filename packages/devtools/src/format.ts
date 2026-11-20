@@ -1,5 +1,5 @@
 /*
- * Record values in the log: a value arrives as JSON-like text, at most 2 KB.
+ * Record values in the messages: a value arrives as JSON-like text, at most 2 KB.
  * `pretty` indents it when it is whole JSON (a preview cut at 2 KB isn't, and
  * stays as it came); `highlight` splits the text into plain and coloured parts.
  */

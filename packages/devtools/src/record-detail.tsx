@@ -1,5 +1,5 @@
 /*
- * What opens under a record in the log: its value (indented, coloured) and the
+ * What opens under a record in the messages: its value (indented, coloured) and the
  * record itself (time, topic, offset, key, producer, size, who asked). Each has
  * a Copy button; the page does the copying (see `connectDevtools`).
  */

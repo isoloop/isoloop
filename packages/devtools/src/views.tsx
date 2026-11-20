@@ -5,8 +5,9 @@
  * then the pools and their members. The panel lists itself, marked as
  * devtools (decision 6). The bus view: its state and restarts, each topic's
  * rates, head and retained count, each subscription's lag and credit, and
- * the publishes it rejected. The log view: records from a tap, live, while
- * its tab is open.
+ * the publishes it rejected. The events view: the kernel's own history. The
+ * messages view: the records your app publishes, from a tap, live, while its
+ * tab is open.
  */
 import { useIsolate } from '@isoloop/preact';
 import type { InspectIsolate, InspectMemory, InspectSnapshot } from '@isoloop/protocol';

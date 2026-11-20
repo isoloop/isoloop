@@ -2,9 +2,9 @@
  * The messages tab: the live record log (M4b plan, item 2; ADR 0020, decision 3): records
  * appended to the bus, copied from a tap while the Messages tab is open, newest
  * first. A tap isn't a consumer, so it isn't in the bus figures, and the
- * host reopens it after a bus restart, so the log carries on. The tap sends
+ * host reopens it after a bus restart, so the messages carry on. The tap sends
  * at most `MAX_PER_SEC` records a second; the header counts the records it
- * left out since the log was opened (ADR 0020, decision 6, amended
+ * left out since the tab was opened (ADR 0020, decision 6, amended
  * 2026-11-19). Values arrive as 2 KB previews with their full size.
  */
 import { useIsolate } from '@isoloop/preact';
@@ -17,7 +17,7 @@ import { RecordDetail } from './record-detail';
 /** The tap's rate cap: the bus's default. */
 export const MAX_PER_SEC = 50;
 
-/** How many records the log keeps. */
+/** How many records the tab keeps. */
 export const LOG_SIZE = 200;
 
 /** Splits the filter into tap patterns: `*` (every topic) when empty. */
@@ -48,7 +48,7 @@ export function MessagesView(): JSX.Element {
   const [applied, setApplied] = useState<string[]>(['*']);
   const [paused, setPaused] = useState(false);
   const [entries, setEntries] = useState<Entry[]>([]);
-  // Records the bus left out over the cap, since the log was opened.
+  // Records the bus left out over the cap, since the tab was opened.
   const [skipped, setSkipped] = useState(0);
   // The records opened to read their value.
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
