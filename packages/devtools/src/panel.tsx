@@ -148,9 +148,18 @@ export const stepPosition = (
 
 const ARROW = 24;
 const ARROW_GAP = 4;
+/** Chevron paths on the 14 px icon grid. */
+const CHEVRON = {
+  left: 'M8.5 3 4.5 7l4 4',
+  right: 'M5.5 3l4 4-4 4',
+  up: 'M3 8.5l4-4 4 4',
+  down: 'M3 5.5l4 4 4-4',
+};
+
 const arrowStyle =
   `position:absolute;width:${ARROW}px;height:${ARROW}px;padding:0;border-radius:${ARROW / 2}px;` +
-  'border:1px solid #374151;background:#111827;color:#e5e7eb;cursor:pointer;font-size:13px;line-height:1;' +
+  'display:flex;align-items:center;justify-content:center;' +
+  'border:1px solid #374151;background:#111827;color:#e5e7eb;cursor:pointer;' +
   'box-shadow:0 2px 6px rgb(0 0 0 / 0.5);';
 
 function Fab(props: {
@@ -167,8 +176,9 @@ function Fab(props: {
   // The arrows point to the free sides: from the bottom-left corner, right and up.
   const toH = stepPosition(props.position, 'horizontal');
   const toV = stepPosition(props.position, 'vertical');
-  const arrowH = h === 'left' ? '→' : '←';
-  const arrowV = v === 'top' ? '↓' : '↑';
+  // Chevrons pointing the way the button would go.
+  const chevH = h === 'left' ? CHEVRON.right : CHEVRON.left;
+  const chevV = v === 'top' ? CHEVRON.down : CHEVRON.up;
   // Each arrow sits beside the button with a transparent bridge over the gap,
   // so the pointer crossing to it never leaves the hover area.
   const mid = (FAB_SIZE - ARROW) / 2;
@@ -293,7 +303,7 @@ function Fab(props: {
               }}
               style={`${arrowStyle}top:${mid}px;left:${offH}px;`}
             >
-              {arrowH}
+              <Icon d={chevH} />
             </button>
             <button
               type="button"
@@ -305,7 +315,7 @@ function Fab(props: {
               }}
               style={`${arrowStyle}top:${offV}px;left:${mid}px;`}
             >
-              {arrowV}
+              <Icon d={chevV} />
             </button>
           </>
         ) : null}
