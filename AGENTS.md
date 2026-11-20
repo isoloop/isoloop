@@ -8,7 +8,7 @@ A change is done when all five hold:
 
 1. **Tests** cover it, and `pnpm check` plus CI are green.
 2. **A changeset** describes it for the package changelogs (`pnpm changeset`), as it is at this commit. It never says what comes later ("in a later task", "nothing uses it yet"): changesets ship together at the next version, so the follow-up may land first and the sentence is then false. An internal-only change (tests, CI, benches, refactors that leave the published `.d.ts` alone) takes the `no-changeset` label instead.
-3. **Docs** match it: TSDoc for every public export it touches, and `docs/guide` when behaviour users rely on changes. The API check fails a PR whose published types changed without docs.
+3. **Docs** match it, written with the `docs` skill: TSDoc for every public export it touches, and `docs/guide` when behaviour users rely on changes. The API check fails a PR whose published types changed without docs.
 4. **Site impact** closes the PR description: `none`, `update needed`, or `done in web#N`. Site-worthy means a new capability or a behaviour change users see, new or changed measurements, site copy the change makes wrong, or a newly found limitation.
 5. **When Site impact is `update needed`,** open the follow-up in `isoloop/web` in the same session, using its `publish` skill, while the context is fresh.
 
