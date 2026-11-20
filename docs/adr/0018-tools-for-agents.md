@@ -1,6 +1,6 @@
 # ADR 0018: Tools for agents
 
-- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all). What its implementation (isoloop#242) added was grilled on 2026-11-18 (Q1–Q5, yes to all) and is recorded in decisions 1–4 and 8. Amended on 2026-11-19 for Firefox's WebMCP and three details of Chromium's (decision 8, *Browsers that differ*); the amendment was grilled the same day (Q1–Q6, yes to all). Its code, and the `firefox-webmcp` Playwright project, landed in isoloop#267.
+- **Status:** Accepted (2026-11-17), after grilling. Its differences from the M4a grilling were grilled the same day (Q1–Q10, yes to all). What its implementation (isoloop#242) added was grilled on 2026-11-18 (Q1–Q5, yes to all) and is recorded in decisions 1–4 and 8. Amended on 2026-11-19 for Firefox's WebMCP and three details of Chromium's (decision 8, *Browsers that differ*); the amendment was grilled the same day (Q1–Q6, yes to all). Its code, and the `firefox-webmcp` Playwright project, landed in isoloop#267. Amended on 2026-11-20 for requests that retention removes before any responder gets them (decision 5, *A request retention drops*, from isoloop#288); grilled the same day (Q1–Q4, yes to all). Its code follows this amendment's acceptance.
 - **Date:** 2026-11-17
 - **Amends:** [ADR 0003](0003-schema-format-standard-schema.md). A contract may describe a tool, and the host makes JSON Schema at run time through the same vendored interface that decision 21 uses for `isoloop contracts export`, not only at export.
 - **Plan:** [M4a](../plans/m4a-agents.md), grilled 2026-11-17 (decisions 1–8, 10, 11 and 14 there). Background: the [AI-enablers investigation](../investigations/ai-enablers.md).
@@ -101,7 +101,8 @@ kernel.request(topic, value, { key?, timeoutMs?, signal?, via? }): Promise<ROut>
 - **It rejects with a `BusError`:**
   - `not_requestable`, `invalid`, `reply_invalid`, `timeout` and `bus_unavailable`, as `bus.request` does;
   - `aborted`, new, when `signal` aborts (the broker forgets the request, as after a timeout). It's a `BusError` like every other failure, not the platform's `AbortError`, so callers handle one shape;
-  - `no_responder`, new (decision 6).
+  - `no_responder`, new (decision 6);
+  - `dropped`, new (decision 5, amended 2026-11-20).
 - **`timeoutMs` defaults to the bus's 30 s.** Transports pass the tool's `timeoutMs` from `kernel.tools()`, which is `agents.timeoutMs`.
 - **The record carries `req: { from: 'host', id, via? }`.** `from` is the bus's existing host producer id (`HOST_PRODUCER`), the same as for `kernel.publish`, so one id means the main thread; the M4a grilling first said `'kernel'`. `via` is a short string the caller sets: `'mcp'` and `'webmcp'` for the two transports here, `'builder'` later. A handler can refuse agent calls or log them. An isolate's own `bus.request` never sets `via`. `via` is self-declared: a label for logging and policy between cooperating code on one page, never something to authorize with (see Consequences). The values are a closed list, `RequestVia`. Any other value rejects with `invalid`, so a typo can't slip through, and a new transport first adds its value to the protocol.
 - **Protocol:** a new `HostToBus` `request` envelope (its answer comes as `result`, like the host's `publish`), and the optional `via` on `BusRecord.req`. Nothing else in the protocol changes. Both are additions, so isolates built against an older protocol keep working ([ADR 0012](0012-isolates-built-apart.md)'s floor is unchanged).
@@ -109,6 +110,15 @@ kernel.request(topic, value, { key?, timeoutMs?, signal?, via? }): Promise<ROut>
 ### 5. A call waits for a restart, up to the timeout
 
 The request record is in the topic's log, so an isolate that restarts within the timeout gets the call when it resubscribes, and replies. Agent calls time out after `agents.timeoutMs` (10 s by default): long enough for a restart and catch-up, short enough not to look broken.
+
+**A request retention drops (amended 2026-11-20).** A request is a record in its topic's log, so the topic's retention applies to it. When a burst pushes a requestable topic past its retention before the bus has handed the older requests to a subscriber, those requests leave the log and nobody can answer them. Until this amendment each such caller waited out its whole timeout. isoloop#288 reproduces it at the broker (`packages/bus/src/requests.test.ts`): on a topic keeping 100 records, 100 of 1,000 calls sent at once are answered.
+
+- **The bus answers such a caller at once with `BusError('dropped')`,** with the message "the request was dropped: the topic's retention was full; retry or raise retention". It applies to a request record that leaves the log before the bus delivered it to any subscriber. A request already delivered to one is that responder's to answer, as before.
+- **It's the broker's rule,** so an isolate's own `bus.request` gets it too, not only `kernel.request` (unlike `no_responder`, decision 6, which is the host's check). The broker already tracks each open request until its timeout (`#openRequest` in `packages/bus/src/broker.ts`); that's where it learns which ones were never delivered.
+- **Retention keeps its meaning.** A requestable topic keeps what its `retention` says, and no more.
+- **`dropped` joins `ERROR_CODES`** in `packages/protocol/src/errors.ts`, beside `aborted` and `no_responder`.
+- **Both transports pass it on as they pass every `BusError`.** The dev MCP answers the tool call with `isError` and the text `dropped: <message>` (`#settle` in `packages/cli/src/mcp/server.ts`). `@isoloop/webmcp` rejects `execute` with the `BusError`, so a Firefox agent sees the message and a Chromium agent sees "Tool execution failed", as in decision 8's table.
+- **The Agents guide says to size a tool's topic's retention for its largest burst** of calls, since retention caps how many calls can wait at once.
 
 ### 6. `no_responder` at once
 
@@ -164,10 +174,10 @@ Firefox's WebMCP is behind prefs and not shipped, so this follows it the way the
 
 - **One tool surface, several transports.** The dev MCP and WebMCP ship in 0.1. The Builder's agent (`via: 'builder'`) and a later browser extension can reuse it without changing the kernel.
 - **Apps get `kernel.request`** for their own use, not only for agents.
-- **Agent calls get the containment the rest of the page has.** A blocked isolate fails one call after 10 s, a crashed one answers after its restart, and a call nobody can answer fails at once.
+- **Agent calls get the containment the rest of the page has.** A blocked isolate fails one call after 10 s, a crashed one answers after its restart, and a call nobody can answer, or one that retention drops before any responder gets it, fails at once.
 - **Handlers can tell agent calls apart** by `req.via`.
 - **The cost of a tool call is a bus request from the main thread.** M4a measures it (main-thread time and round trip, idle and on plant at `?rate=5`) and reports it whatever it shows.
-- **Two new `BusError` codes (`aborted`, `no_responder`), one `KernelError` code (`not_exposable`), one kernel event (`agents:unmatched`), one host-to-bus envelope and one optional field on request records.** All additions.
+- **Three new `BusError` codes (`aborted`, `no_responder`, and `dropped` from the 2026-11-20 amendment), one `KernelError` code (`not_exposable`), one kernel event (`agents:unmatched`), one host-to-bus envelope and one optional field on request records.** All additions.
 - **A consequential tool runs on agent input.** The annotations tell the agent; asking the user first is the agent's job (WebMCP leaves it to the agent too). The docs say both, plainly.
 - **`@isoloop/webmcp` follows a moving draft.** [M7](../plans/m7-webmcp-stable.md) follows it to its ship and amends this ADR when it drops `@experimental`.
 - **No mainstream agent may call WebMCP tools by 0.1,** so the in-browser path may only be proven under Playwright: Chromium with `--enable-features=WebMCP`, and, from isoloop#267, Firefox with `dom.modelcontext.enabled`.
@@ -184,6 +194,8 @@ Firefox's WebMCP is behind prefs and not shipped, so this follows it the way the
 - **`tool` in the topic config the bus sees,** so the contracts-mismatch check covers it. Rejected: the bus never acts on it, and a differing `tool` doesn't break delivery. It can be added if the bus ever needs it.
 - **Enforcing `via`,** for example letting only transport entries set it. Rejected: on one page that needs a token scheme, and the page is one trust domain anyway.
 - **Always waiting out the timeout.** Rejected: 10 s of silence when every responder has given up looks like a hang, and the host already knows the answer.
+- **Keeping unread requests past retention** (amendment of 2026-11-20). Rejected: no call would be lost, but a requestable topic's memory would then be bounded by its timeout and call rate instead of by its retention, so `retention` would stop meaning what it says on those topics.
+- **Only documenting the limit** (amendment of 2026-11-20). Rejected on its own: callers would still wait out the timeout in silence. The Agents guide says it as well, alongside `dropped`.
 - **Bus-side de-duplication of request records.** Deferred to would-like: idempotent handlers are already the bus's rule, and it's only worth it if consequential tools need it.
 - **The dev MCP as a kernel option** (`createKernel({ dev: { mcp } })`). Rejected: the WebSocket client would ship in every production bundle, and the kernel can't tell a dev build from a production one.
 - **The official `@modelcontextprotocol/sdk` in the CLI.** Rejected for now: the surface we need (`initialize`, `tools/list`, `tools/call`, `notifications/tools/list_changed`) is about 300 lines, and the SDK's client stays a dev dependency for conformance tests. Reconsider if the CLI needs resources or prompts.
