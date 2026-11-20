@@ -2,7 +2,7 @@
 
 **Goal:** the docs on isoloop.dev, readable by people and by agents, and a pipeline that keeps them matching the code as features are added, changed and removed.
 
-**Status:** grilled 2026-11-20 (Q1–Q31, yes to all), and the API coverage the same day (Q32–Q42, decisions 32–42). Tasks 1, 2, 7 and 8 done 2026-11-20 (isoloop#307, web#207–#209). Phase A (tasks 1–20 and 28) doesn't wait for the API freeze. Phase B (tasks 21–27) starts after the freeze ([M4d](m4d-release.md) task 1), which starts on the maintainer's word. *2026-11-20:* phase A is done, and the freeze started on the maintainer's word. Tasks 21–24 run as [M4d](m4d-release.md) tasks 7–10, after the API review's decisions (M4d tasks 2–6), and the docs go live with the API reference (M4d task 11). Task 25 (search) can follow after launch.
+**Status:** grilled 2026-11-20 (Q1–Q31, yes to all), and the API coverage the same day (Q32–Q42, decisions 32–42). Tasks 1, 2, 7 and 8 done 2026-11-20 (isoloop#307, web#207–#209). Phase A (tasks 1–20 and 28) doesn't wait for the API freeze. Phase B (tasks 21–27) starts after the freeze ([M4d](m4d-release.md) task 1), which starts on the maintainer's word. *2026-11-20:* the freeze started on the maintainer's word. Tasks 21–24 run as [M4d](m4d-release.md) tasks 7–10, after the API review's decisions (M4d tasks 2–6), and the docs go live with the API reference (M4d task 11). Task 25 (search) can start once task 24 is merged, and needn't land before the docs go live.
 
 **Done when:**
 

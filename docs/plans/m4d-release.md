@@ -47,7 +47,7 @@ The public docs say how Isoloop works and how to use it, not why it was decided 
 
 | # | Task | When | Repo | Files | Tests | Depends on |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | The API review's decisions recorded (this plan), M4c tasks 21–24 cross-referenced, F1 in the steward's rules | now | library + web | `docs/plans/m4d-release.md`, `docs/plans/m4c-docs.md`, web `.claude/agents/steward.md` | — (maintainer) | the review |
+| 1 | The API review's decisions recorded (this plan), M4c tasks 21–24 cross-referenced, F1 in the steward's rules (an `isoloop/web` PR; the task is done when both have merged) | now | library + web | `docs/plans/m4d-release.md`, `docs/plans/m4c-docs.md`, web `.claude/agents/steward.md` | — (maintainer) | the review |
 | 2 | N1: snake_case codes, reasons and the event, with the web follow-up for the dashboards' alerts and site copy | now | library, web | `packages/protocol/src`, host, runtime, bus, `docs/guide/*` | existing unit and e2e tests, renamed literals | 1 |
 | 3 | N3, D1 and D2: `@internal` on the freeze group and on `dom/worker` and `dom/host`; the reference's user-facing list and `map.json` updated, `pending` emptied; the protocol and codec READMEs | now | library | `packages/{host,runtime,bus,dom,vite}/src`, `scripts/docs/check.ts`, `docs/guide/map.json`, protocol and codec READMEs | `docs:check` coverage passes with `pending` gone | 1 |
 | 4 | N2, N4 and N5: `BuildManifest`, the balancer on `Kernel`, one `RequestOptions` | now | library | `packages/{vite,balancer,runtime,react,preact,host}/src`, the agents and isolates guides | unit and types | 1 |
@@ -62,7 +62,7 @@ The public docs say how Isoloop works and how to use it, not why it was decided 
 | 13 | The launch post, with "Isoloop for agents" (main work item 4) | after the maintainer's landing-page pass | library or social | `docs/posts/` | — (maintainer) | 11 |
 | 14 | `0.1.0`: `changeset pre exit`, the version PR, the tag | after the maintainer's landing-page pass | library | `.changeset/` | full CI | 12, 13 |
 
-M4c task 25 (search) can run in parallel once task 10 is merged. M4c task 26 (the skill link in `llms.txt`) waits for M4a task 12, and task 27 (the M4c write-up) comes after task 11.
+M4c task 25 (search) can start once task 10 is merged, and needn't land before the docs go live. M4c task 26 (the skill link in `llms.txt`) waits for M4a task 12, and task 27 (the M4c write-up) comes after task 11.
 
 ## Main work items
 
