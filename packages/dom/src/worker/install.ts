@@ -16,7 +16,11 @@ import {
   type WorkerDom,
 } from './dom';
 
-/** The DOM globals the subset provides (ADR 0010 point 2), by their DOM names. */
+/**
+ * The DOM globals the subset provides (ADR 0010 point 2), by their DOM names.
+ *
+ * @internal
+ */
 export const DOM_GLOBALS: Readonly<Record<string, unknown>> = {
   Node: WNode,
   Element: WElement,
@@ -37,6 +41,8 @@ export const DOM_GLOBALS: Readonly<Record<string, unknown>> = {
  * Exposes `dom` as the worker's `document`, `window` and DOM classes, so
  * frameworks find them where they look. Only for isolates with a surface; a
  * headless isolate never calls this.
+ *
+ * @internal
  */
 export function install(dom: WorkerDom, scope: object): void {
   const define = (name: string, value: unknown) => {

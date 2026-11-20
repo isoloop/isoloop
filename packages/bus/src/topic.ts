@@ -94,7 +94,11 @@ export function unchecked<T>(): StandardSchemaV1<T, T> {
   };
 }
 
-/** True if the schema came from `unchecked()`. */
+/**
+ * True if the schema came from `unchecked()`.
+ *
+ * @internal
+ */
 export function isUnchecked(schema: StandardSchemaV1): boolean {
   return schema['~standard'].vendor === UNCHECKED_VENDOR;
 }
@@ -245,12 +249,20 @@ function seedCycle(byName: Map<string, AnyTopicDef>): string[] | undefined {
   return undefined;
 }
 
-/** True for a value built by `contracts()`, from any copy of this package. */
+/**
+ * True for a value built by `contracts()`, from any copy of this package.
+ *
+ * @internal
+ */
 export function isContracts(x: unknown): x is Contracts {
   return isRecord(x) && x['~isoloop'] === 'contracts';
 }
 
-/** The structured-cloneable part of a topic, sent at `boot` for the contracts check (ADR 0003, decision 5). */
+/**
+ * The structured-cloneable part of a topic, sent at `boot` for the contracts check (ADR 0003, decision 5).
+ *
+ * @internal
+ */
 export function topicConfig(t: AnyTopicDef): TopicConfig {
   return topicConfigOf(t);
 }

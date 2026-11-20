@@ -273,48 +273,7 @@
   },
   "pending": {
     "freeze": {
-      "@isoloop/host": ["HostRenderBridge"],
-      "@isoloop/runtime": ["REQUIRES"],
-      "@isoloop/bus": [
-        "Broker",
-        "BrokerOptions",
-        "BrokerStats",
-        "BusPort",
-        "EngineOptions",
-        "LogEngine",
-        "LogStorage",
-        "MemoryStorage",
-        "NewRecord",
-        "Publisher",
-        "StoredState",
-        "TapSink",
-        "Timers",
-        "TsEngine",
-        "TsEngineOptions",
-        "effectiveDurability",
-        "estimateSize",
-        "isContracts",
-        "isUnchecked",
-        "publishId",
-        "toIssues",
-        "topicConfig"
-      ],
-      "@isoloop/dom/worker": [
-        "DOM_GLOBALS",
-        "ISOLOOP_DOM_FMT",
-        "ROOT_ID",
-        "WComment",
-        "WDocument",
-        "WDocumentFragment",
-        "WElement",
-        "WNode",
-        "WText",
-        "WorkerDomOptions",
-        "createDom",
-        "install"
-      ],
-      "@isoloop/dom/host": ["Applier", "SanitisePolicy", "createApplier", "isDomBatch"],
-      "@isoloop/vite": ["ISOLATES_ID", "IsolateManifest", "MANIFEST", "WORKERS_ID"]
+      "@isoloop/vite": ["IsolateManifest"]
     }
   }
 }

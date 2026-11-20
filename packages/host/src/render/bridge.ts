@@ -4,6 +4,8 @@ import type { SerializedEvent } from '@isoloop/protocol';
  * Host side of a render format (design §4.5). The compositor is the only
  * caller of `apply`. Bridges wire their own delegated events for now; task 8
  * moves that, with default actions, to an EventBridge using `idFor`.
+ *
+ * @internal
  */
 export interface HostRenderBridge {
   /** `ready.renderFmt` this bridge reads, e.g. `isoloop-dom@1`. */

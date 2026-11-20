@@ -46,6 +46,13 @@ export const USER_FACING = [
   'webmcp',
 ] as const;
 
+/**
+ * Entry points of those packages that are internal to Isoloop: the coverage
+ * check and the reference skip them (API freeze, D1). `@isoloop/protocol` and
+ * `@isoloop/codec` are internal packages, so they aren't in USER_FACING at all.
+ */
+export const INTERNAL_ENTRIES: readonly string[] = ['@isoloop/dom/worker', '@isoloop/dom/host'];
+
 export const MAX_LEAD = 200;
 
 // --- The rules, read from docs/writing.md -----------------------------------
@@ -402,8 +409,9 @@ export function entryFiles(root: string): EntryFile[] {
       throw new Error(`${dir}: no name or exports`);
     return Object.entries(exports).flatMap(([sub, v]) => {
       const types = field(v, 'types');
-      return typeof types === 'string'
-        ? [{ entry: sub === '.' ? name : `${name}${sub.slice(1)}`, file: resolve(dir, types) }]
+      const entry = sub === '.' ? name : `${name}${sub.slice(1)}`;
+      return typeof types === 'string' && !INTERNAL_ENTRIES.includes(entry)
+        ? [{ entry, file: resolve(dir, types) }]
         : [];
     });
   });

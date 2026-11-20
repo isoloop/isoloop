@@ -1,7 +1,11 @@
 import type { TopicConfig } from '@isoloop/protocol';
 import type { LogStorage, StoredState } from './types';
 
-/** Storage that keeps nothing. Every topic behaves as `memory`. */
+/**
+ * Storage that keeps nothing. Every topic behaves as `memory`.
+ *
+ * @internal
+ */
 export class MemoryStorage implements LogStorage {
   readonly kind = 'memory' as const;
 
@@ -48,6 +52,8 @@ export class MemoryStorage implements LogStorage {
  * A `persistent` topic on storage that keeps nothing (no OPFS, or another tab
  * holds it) behaves as `memory`; the kernel reports that as
  * `bus:durability_degraded` (ADR 0007, decision 6).
+ *
+ * @internal
  */
 export function effectiveDurability(
   cfg: TopicConfig,

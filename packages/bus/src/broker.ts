@@ -33,6 +33,8 @@ import { DEFAULT_MAX_RECORD_BYTES, topicConfig, type AnyTopicDef, type Contracts
 /**
  * One isolate's bus connection, as the broker sees it. The bus worker wraps a
  * `MessagePort`; tests use in-memory ports.
+ *
+ * @internal
  */
 export interface BusPort {
   post(msg: BusToIsolate): void;
@@ -41,11 +43,16 @@ export interface BusPort {
   close(): void;
 }
 
-/** Timer functions, injectable for tests. */
+/**
+ * Timer functions, injectable for tests.
+ *
+ * @internal
+ */
 export type Timers = {
   set(fn: () => void, ms: number): void;
 };
 
+/** @internal */
 export type BrokerOptions = {
   contracts: Contracts;
   engine: LogEngine;
@@ -85,10 +92,16 @@ export type BrokerOptions = {
 /**
  * Gets each record appended to a tapped topic (ADR 0020, decision 3), with
  * its estimated size. A tap is not a consumer: it has no cursor or credit.
+ *
+ * @internal
  */
 export type TapSink = (topic: string, rec: BusRecord, bytes: number) => void;
 
-/** Who is publishing: an isolate (grants apply), the host (`kernel.publish`), or the kernel itself (system topics). */
+/**
+ * Who is publishing: an isolate (grants apply), the host (`kernel.publish`), or the kernel itself (system topics).
+ *
+ * @internal
+ */
 export type Publisher =
   | { kind: 'isolate'; isolateId: string }
   | { kind: 'host' }
@@ -108,7 +121,11 @@ type Topic = {
   bytes: number;
 };
 
-/** Cumulative counters for metrics (design §6.3); the bus worker turns them into rates. */
+/**
+ * Cumulative counters for metrics (design §6.3); the bus worker turns them into rates.
+ *
+ * @internal
+ */
 export type BrokerStats = {
   /** `head` and `retained` are the engine's, at the time of the sample (ADR 0020, decision 2). */
   topics: { topic: string; records: number; bytes: number; head: number; retained: number }[];
@@ -244,7 +261,11 @@ function hash(s: string): number {
 
 const reqKey = (topic: string, offset: number): string => `${topic}\u0000${offset}`;
 
-/** A message's `(epoch, seq)`, when it carries both as numbers. */
+/**
+ * A message's `(epoch, seq)`, when it carries both as numbers.
+ *
+ * @internal
+ */
 export function publishId(p: { epoch?: unknown; seq?: unknown }): AppendId | undefined {
   const { epoch, seq } = p;
   return typeof epoch === 'number' && typeof seq === 'number' ? { epoch, seq } : undefined;
@@ -262,6 +283,8 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
  * and consumer groups, delivers from the log under credit, and routes
  * request replies. Knows nothing about workers; the bus worker entry wires
  * ports to it.
+ *
+ * @internal
  */
 export class Broker {
   readonly #engine: LogEngine;

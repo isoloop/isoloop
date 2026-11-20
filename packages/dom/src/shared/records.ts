@@ -5,10 +5,12 @@
  * the fmt to isoloop-dom@2.
  */
 
+/** @internal */
 export const ISOLOOP_DOM_FMT = 'isoloop-dom@1';
 
 /** A node id. The worker assigns them at creation; the root is always 0. */
 export type NodeId = number;
+/** @internal */
 export const ROOT_ID: NodeId = 0;
 
 export type Namespace = 'html' | 'svg';
@@ -152,7 +154,11 @@ function isRecord(x: unknown): x is DomRecord {
   }
 }
 
-/** The batch comes from an isolate, so its shape is checked before anything touches the DOM. */
+/**
+ * The batch comes from an isolate, so its shape is checked before anything touches the DOM.
+ *
+ * @internal
+ */
 export function isDomBatch(x: unknown): x is DomBatch {
   return Array.isArray(x) && x.every(isRecord);
 }

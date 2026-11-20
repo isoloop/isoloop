@@ -57,6 +57,8 @@ const segmentKey = (s: PropertyKey | StandardSchemaV1.PathSegment): PropertyKey 
 /**
  * Maps schema issues to the cloneable `{ message, path }[]` sent with `invalid`
  * (ADR 0003, decision 10). Symbol keys become their description.
+ *
+ * @internal
  */
 export function toIssues(issues: ReadonlyArray<StandardSchemaV1.Issue>): WireIssue[] {
   return issues.map((i) => ({
