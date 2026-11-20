@@ -93,7 +93,7 @@ A tool that reads only the app's own topics needs no grant: it subscribes like a
 | Control | What it does |
 | --- | --- |
 | `restart(id)` | Restarts the isolate, as `kernel.restart(id)` does. |
-| `kill(id)` | Ends the isolate's worker as a crash (`worker-error`), so the supervisor restarts it like any other. Resolves once the kill is sent, not when the isolate is back. |
+| `kill(id)` | Ends the isolate's worker as a crash (`worker_error`), so the supervisor restarts it like any other. Resolves once the kill is sent, not when the isolate is back. |
 | `block(id, ms)` | Busy-loops the isolate's worker for `ms`, at most 10 s, so you can watch containment work: its beat goes late, it shows as `blocked`, and past the kernel's limit it's restarted. |
 
 - **Pools:** for a pooled isolate, `kill` and `block` act on the pool's worker. A kill crashes and restarts every member, and the feed shows each one.

@@ -39,12 +39,12 @@ The main thread shows everything isolates render ([engine constraints](investiga
 
 ## Storage
 
-- **IndexedDB storage when OPFS sync access is missing.** Today such a tab falls back to memory topics with `bus:durability-degraded` (`no-sync-access`). A second storage engine is worth it only if a major browser lacks sync access in normal browsing. ([ADR 0007](adr/0007-bus-worker-supervision.md), M2b task 15)
+- **IndexedDB storage when OPFS sync access is missing.** Today such a tab falls back to memory topics with `bus:durability_degraded` (`no_sync_access`). A second storage engine is worth it only if a major browser lacks sync access in normal browsing. ([ADR 0007](adr/0007-bus-worker-supervision.md), M2b task 15)
 - **A single-thread kernel (`@isoloop/local`),** for testing isolates without workers or as a fallback where workers aren't available. Drafted as ADR 0013 for the M3b comparison and withdrawn on 2026-11-07, since the comparison uses a native build; it would need its own ADR and semver promise if users ask.
 
 ## Multiple tabs
 
-- **Share the bus across tabs.** Today a second tab falls back to memory topics with `bus:durability-degraded` and runs its own isolates, so a backend-less app opened in two tabs fetches everything twice (two sets of exchange WebSockets in the markets dashboard). Options: the bus in a `SharedWorker`, or a leader tab elected through Web Locks that runs the feeds and relays records over `BroadcastChannel`. Out of v1 by [ADR 0005](adr/0005-bus-topology-message-channels.md) and [ADR 0007](adr/0007-bus-worker-supervision.md). Backend-less apps are the use case that would justify it.
+- **Share the bus across tabs.** Today a second tab falls back to memory topics with `bus:durability_degraded` and runs its own isolates, so a backend-less app opened in two tabs fetches everything twice (two sets of exchange WebSockets in the markets dashboard). Options: the bus in a `SharedWorker`, or a leader tab elected through Web Locks that runs the feeds and relays records over `BroadcastChannel`. Out of v1 by [ADR 0005](adr/0005-bus-topology-message-channels.md) and [ADR 0007](adr/0007-bus-worker-supervision.md). Backend-less apps are the use case that would justify it.
 
 ## Routing
 

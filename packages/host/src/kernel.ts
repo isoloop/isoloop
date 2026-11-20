@@ -290,11 +290,11 @@ export type KernelEvents = {
   'bus:recovered': { quarantined: string[] };
   /**
    * Persistent topics run in memory on this bus, so they won't survive a
-   * reload (ADR 0007, decision 6). `another-tab`: another tab's bus holds the
-   * origin's files; `no-sync-access`: OPFS sync access handles are missing;
-   * `open-failed`: the files couldn't be opened.
+   * reload (ADR 0007, decision 6). `another_tab`: another tab's bus holds the
+   * origin's files; `no_sync_access`: OPFS sync access handles are missing;
+   * `open_failed`: the files couldn't be opened.
    */
-  'bus:durability-degraded': { reason: DurabilityDegraded };
+  'bus:durability_degraded': { reason: DurabilityDegraded };
   /**
    * The origin's storage is 80 % used, once per crossing (M2b task 14). At
    * 100 % persistent publishes reject with `quota_exceeded`; memory topics
@@ -648,7 +648,7 @@ export function createKernel(config: KernelConfig): Kernel {
     'bus:ready': new Set(),
     'bus:crash': new Set(),
     'bus:recovered': new Set(),
-    'bus:durability-degraded': new Set(),
+    'bus:durability_degraded': new Set(),
     'bus:quota': new Set(),
     'bus:seed_rejected': new Set(),
     'bus:seeded': new Set(),
@@ -892,7 +892,7 @@ export function createKernel(config: KernelConfig): Kernel {
     for (const fx of effects) {
       if (fx.k !== 'emit' || fx.event !== 'isolate:crash') continue;
       const { reason, message } = fx.data;
-      if (reason !== 'unresponsive' && reason !== 'worker-error') return;
+      if (reason !== 'unresponsive' && reason !== 'worker_error') return;
       const at = performance.now();
       const why = `pool "${loaded.pool}" restarted: "${slot.manifest.id}" ${reason === 'unresponsive' ? 'stopped responding' : 'took the worker down'} (${message})`;
       for (const other of slots.values())
@@ -1265,7 +1265,7 @@ export function createKernel(config: KernelConfig): Kernel {
             },
             crash: (reason, message) => emit('bus:crash', { reason, message }),
             recovered: (quarantined) => emit('bus:recovered', { quarantined }),
-            degraded: (reason) => emit('bus:durability-degraded', { reason }),
+            degraded: (reason) => emit('bus:durability_degraded', { reason }),
             orphaned: (names, bytes) => emit('bus:orphaned_topics', { names, bytes }),
             seed: (e) => {
               if (e.kind === 'seeded') {

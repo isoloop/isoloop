@@ -14,18 +14,18 @@ describe('[FLOOR, VERSION] (ADR 0012)', () => {
     }
   });
 
-  it('refuses a newer stamp as runtime-too-old and an older one as isolate-too-old', () => {
+  it('refuses a newer stamp as runtime_too_old and an older one as isolate_too_old', () => {
     expect(checkRequires('0.7', range)).toEqual({
       ok: false,
-      reason: 'runtime-too-old',
+      reason: 'runtime_too_old',
       message: 'built for 0.7, this host runs 0.3 to 0.6',
     });
     expect(checkRequires('0.2', range)).toEqual({
       ok: false,
-      reason: 'isolate-too-old',
+      reason: 'isolate_too_old',
       message: 'built for 0.2, this host runs 0.3 to 0.6',
     });
-    expect(checkRequires('0.10', range)).toMatchObject({ reason: 'runtime-too-old' });
+    expect(checkRequires('0.10', range)).toMatchObject({ reason: 'runtime_too_old' });
   });
 
   it('defaults to this host: VERSION is major.minor and the floor is at or below it', () => {

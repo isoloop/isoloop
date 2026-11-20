@@ -47,7 +47,7 @@ export class MemoryStorage implements LogStorage {
  * Engines call this from `createTopic`: the durability a topic actually gets.
  * A `persistent` topic on storage that keeps nothing (no OPFS, or another tab
  * holds it) behaves as `memory`; the kernel reports that as
- * `bus:durability-degraded` (ADR 0007, decision 6).
+ * `bus:durability_degraded` (ADR 0007, decision 6).
  */
 export function effectiveDurability(
   cfg: TopicConfig,

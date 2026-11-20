@@ -132,10 +132,10 @@ describe('isoloop-dom in the kernel', () => {
     await waitFor(() => q('size') === '60x30');
   });
 
-  it('an isolate reporting another renderFmt fails with render-fmt-mismatch and is not restarted', async () => {
+  it('an isolate reporting another renderFmt fails with render_format_mismatch and is not restarted', async () => {
     const { handle, log } = spawn(worker('../__fixtures__/bogus-fmt-bootstrap.ts'), 'unused');
     await waitFor(() => handle.snapshot().state === 'failed');
-    expect(log.failed).toMatchObject([{ id: 'A', reason: 'render-fmt-mismatch' }]);
+    expect(log.failed).toMatchObject([{ id: 'A', reason: 'render_format_mismatch' }]);
     expect(log.failed[0]?.message).toContain('bogus@9');
     // Give a restart time to happen if it were going to.
     await new Promise((r) => setTimeout(r, 400));

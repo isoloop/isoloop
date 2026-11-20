@@ -23,7 +23,7 @@ type HarnessKernel = {
   ): () => void;
   on(event: 'isolate:failed', fn: (e: { id: string }) => void): () => void;
   on(event: 'bus:ready', fn: (e: { first: boolean }) => void): () => void;
-  on(event: 'bus:durability-degraded', fn: (e: { reason: string }) => void): () => void;
+  on(event: 'bus:durability_degraded', fn: (e: { reason: string }) => void): () => void;
   on(
     event: 'route:navigate_error',
     fn: (e: { from: string; href: string; error: string }) => void,

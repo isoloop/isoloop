@@ -83,7 +83,7 @@ describe('placement rules (ADR 0001)', () => {
 });
 
 describe('spawn failures', () => {
-  it('a worker that cannot be created crashes with spawn-failed, then fails at the limit', async () => {
+  it('a worker that cannot be created crashes with spawn_failed, then fails at the limit', async () => {
     const k = kernel({
       workers: { isolateBootstrap: 'http://[' },
       supervisor: { maxRestarts: 2, backoff: { initialMs: 5 } },
@@ -92,7 +92,7 @@ describe('spawn failures', () => {
     k.on('isolate:crash', (e) => crashes.push(e));
     const a = k.spawn({ id: 'A', src: counter });
     await waitFor(() => a.snapshot().state === 'failed');
-    expect(crashes.map((c) => c.reason)).toEqual(['spawn-failed', 'spawn-failed', 'spawn-failed']);
+    expect(crashes.map((c) => c.reason)).toEqual(['spawn_failed', 'spawn_failed', 'spawn_failed']);
   });
 });
 

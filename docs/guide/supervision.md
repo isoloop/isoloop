@@ -35,13 +35,13 @@ A crash also comes from the other causes in `CrashReason`:
 | Reason | Cause | Restarted? |
 | --- | --- | --- |
 | `error` | A fatal error from the isolate: `start()` threw, the module failed to import, or `ctx.reportError(e)` (fatal unless you pass `{ fatal: false }`). | Yes |
-| `worker-error` | The worker's own `error` or `messageerror` event. | Yes |
-| `ready-timeout` | No `ready` within `heartbeat.readyTimeoutMs` (10 000 ms) of the spawn. | Yes |
+| `worker_error` | The worker's own `error` or `messageerror` event. | Yes |
+| `ready_timeout` | No `ready` within `heartbeat.readyTimeoutMs` (10 000 ms) of the spawn. | Yes |
 | `unresponsive` | No beat for `killAfterMs`. | Yes |
-| `spawn-failed` | `new Worker` threw. Before each retry the kernel suspends every idle isolate that opted in, to free memory. | Yes |
-| `render-fmt-mismatch` | The isolate speaks a render format the host doesn't ([ADR 0011](../adr/0011-dom-package.md)). | No |
-| `runtime-too-old`, `isolate-too-old` | The isolate's required runtime version is outside what this host supports ([ADR 0012](../adr/0012-isolates-built-apart.md)). | No |
-| `bus-failed` | The contracts module couldn't load, so no isolate can run ([ADR 0003](../adr/0003-schema-format-standard-schema.md)). | No |
+| `spawn_failed` | `new Worker` threw. Before each retry the kernel suspends every idle isolate that opted in, to free memory. | Yes |
+| `render_format_mismatch` | The isolate speaks a render format the host doesn't ([ADR 0011](../adr/0011-dom-package.md)). | No |
+| `runtime_too_old`, `isolate_too_old` | The isolate's required runtime version is outside what this host supports ([ADR 0012](../adr/0012-isolates-built-apart.md)). | No |
+| `bus_failed` | The contracts module couldn't load, so no isolate can run ([ADR 0003](../adr/0003-schema-format-standard-schema.md)). | No |
 
 A restart can't fix the last four, so they fail the isolate on the first crash.
 
@@ -65,7 +65,7 @@ Other isolates are untouched. A restart starts a new worker, so the isolate's in
 
 The heartbeat belongs to the worker, so a pool's members block and are killed together ([pools guide](pools.md#what-members-share)).
 
-- **The worker fails:** when a member crashes with `unresponsive` or `worker-error`, every other member on that worker crashes with the same reason. The worker is terminated, and every member restarts in a new one. Each member's `isolate:crash` carries the `pool`, and the message names the member that caused it.
+- **The worker fails:** when a member crashes with `unresponsive` or `worker_error`, every other member on that worker crashes with the same reason. The worker is terminated, and every member restarts in a new one. Each member's `isolate:crash` carries the `pool`, and the message names the member that caused it.
 - **A member's own failure:** a fatal error, a ready timeout or a version mismatch crashes only that member. It restarts alone and rejoins the running worker.
 - **Limits are per isolate.** Each member counts the shared crash in its own window, so a pool that keeps failing usually reaches `failed` for all its members together.
 

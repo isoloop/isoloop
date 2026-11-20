@@ -54,8 +54,8 @@ describe('the [FLOOR, VERSION] check (ADR 0012)', () => {
   });
 
   it.each([
-    ['stamped-0-6', 'runtime-too-old', 'built for 0.6, this host runs 0.3 to 0.5'],
-    ['stamped-0-2', 'isolate-too-old', 'built for 0.2, this host runs 0.3 to 0.5'],
+    ['stamped-0-6', 'runtime_too_old', 'built for 0.6, this host runs 0.3 to 0.5'],
+    ['stamped-0-2', 'isolate_too_old', 'built for 0.2, this host runs 0.3 to 0.5'],
   ])('%s fails with %s, final', async (name, reason, message) => {
     const { handle, failed, states } = spawn(fixture(name));
     await waitFor(() => handle.snapshot().state === 'failed');

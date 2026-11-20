@@ -182,7 +182,7 @@ test('a widget that hangs restarts its pool, whose surfaces redraw; nothing else
 test('a widget that takes its worker down restarts its pool', async ({ page }) => {
   const out = await run(page, 'P1', 'kill');
   restartedTogether(out, ['P2', 'P3'], 'p');
-  expect(out.crashes.find((c) => c.id === 'P2')?.reason).toBe('worker-error');
+  expect(out.crashes.find((c) => c.id === 'P2')?.reason).toBe('worker_error');
   untouched(out, ELSEWHERE);
 });
 

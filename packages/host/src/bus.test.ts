@@ -122,7 +122,7 @@ describe('bus controller', () => {
 
     kernel.debug.crashBus();
     await vi.waitUntil(() => ready.length === 2, { timeout: 3000 });
-    expect(crash).toMatchObject([{ reason: 'worker-error' }]);
+    expect(crash).toMatchObject([{ reason: 'worker_error' }]);
     expect(restart).toEqual([{ restarts: 1 }]);
     expect(ready[1]).toEqual({ first: false });
 
@@ -256,18 +256,18 @@ describe('bus controller', () => {
     expect(got.map((r) => [r.offset, r.value])).toEqual([[4, 9]]);
   });
 
-  it('one bus owns the files: a second runs in memory with bus:durability-degraded (M2b)', async () => {
+  it('one bus owns the files: a second runs in memory with bus:durability_degraded (M2b)', async () => {
     const a = setup();
-    const aDegraded = a.log('bus:durability-degraded');
+    const aDegraded = a.log('bus:durability_degraded');
     const aReady = a.log('bus:ready');
     await vi.waitUntil(() => aReady.length === 1);
     await a.kernel.publish(saved, { value: 1 });
 
     const b = setup();
-    const bDegraded = b.log('bus:durability-degraded');
+    const bDegraded = b.log('bus:durability_degraded');
     const bReady = b.log('bus:ready');
     await vi.waitUntil(() => bReady.length === 1);
-    expect(bDegraded).toEqual([{ reason: 'another-tab' }]);
+    expect(bDegraded).toEqual([{ reason: 'another_tab' }]);
     expect(aDegraded).toEqual([]);
     // It works, in memory.
     await b.kernel.publish(saved, { value: 2 });
@@ -335,7 +335,7 @@ describe('bus controller', () => {
     // The destroyed kernel's bus may hold the files a moment longer.
     let second = next();
     let orphaned = second.log('bus:orphaned_topics');
-    let degraded = second.log('bus:durability-degraded');
+    let degraded = second.log('bus:durability_degraded');
     let up = second.log('bus:ready');
     await vi.waitUntil(() => up.length === 1);
     while (degraded.length > 0) {
@@ -343,7 +343,7 @@ describe('bus controller', () => {
       await second.kernel.destroy();
       second = next();
       orphaned = second.log('bus:orphaned_topics');
-      degraded = second.log('bus:durability-degraded');
+      degraded = second.log('bus:durability_degraded');
       up = second.log('bus:ready');
       // oxlint-disable-next-line no-await-in-loop -- retry until the files are free
       await vi.waitUntil(() => up.length === 1);
@@ -374,7 +374,7 @@ describe('bus controller', () => {
     expect(failed[0]).toMatchObject({ code: 'contracts_mismatch' });
     expect(failed[0]?.message).toContain('notes.v1');
     await vi.waitUntil(() => isoFailed.length === 1);
-    expect(isoFailed[0]).toMatchObject({ id: 'X', reason: 'bus-failed' });
+    expect(isoFailed[0]).toMatchObject({ id: 'X', reason: 'bus_failed' });
     expect(() => kernel.spawn({ id: 'Z', src })).toThrow(
       expect.objectContaining({ code: 'bus_failed' }),
     );
@@ -395,7 +395,7 @@ describe('bus controller', () => {
     await vi.waitUntil(() => ready.length === 2, { timeout: 3000 });
     kernel.debug.crashBus();
     await vi.waitUntil(() => failed.length === 1);
-    expect(failed[0]).toMatchObject({ reason: 'worker-error' });
+    expect(failed[0]).toMatchObject({ reason: 'worker_error' });
     await expect(kernel.publish(count, { value: 1 })).rejects.toMatchObject({
       code: 'bus_unavailable',
     });

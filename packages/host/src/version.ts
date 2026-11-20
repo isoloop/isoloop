@@ -16,7 +16,7 @@ export const FLOOR = '0.0';
 
 export type VersionVerdict =
   | { ok: true }
-  | { ok: false; reason: 'runtime-too-old' | 'isolate-too-old'; message: string };
+  | { ok: false; reason: 'runtime_too_old' | 'isolate_too_old'; message: string };
 
 /**
  * Whether an isolate stamped `requires` runs on a host in `[floor, version]`.
@@ -30,10 +30,10 @@ export function checkRequires(
   const runs = range.floor === range.version ? range.version : `${range.floor} to ${range.version}`;
   const message = `built for ${majorMinor(requires)}, this host runs ${runs}`;
   if (compareVersions(requires, range.version) > 0) {
-    return { ok: false, reason: 'runtime-too-old', message };
+    return { ok: false, reason: 'runtime_too_old', message };
   }
   if (compareVersions(requires, range.floor) < 0) {
-    return { ok: false, reason: 'isolate-too-old', message };
+    return { ok: false, reason: 'isolate_too_old', message };
   }
   return { ok: true };
 }

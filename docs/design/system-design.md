@@ -234,7 +234,7 @@ interface Kernel {
   resume(id: string): Promise<void>;                   // wake a suspended isolate (ADR 0001); no-op unless suspended
   publish<In>(topic: TopicRef<In>, rec: { key?: string; value: In }): Promise<void>;   // rejects with a BusError
   subscribe<Out>(topic: TopicRef<unknown, Out>, fn: (r: TypedRecord<Out>) => void, opts?: { from?: StartPosition }): () => void;   // from 'latest' by default
-  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, isolate:beat (ADR 0017: { id, pool?, lagMs, busyMs?, at } per member per beat, only while listened to), workers:budget, bus:ready, bus:crash, bus:recovered, bus:durability-degraded, bus:quota, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
+  on(event: KernelEvent, fn: (e: any) => void): () => void;   // isolate:state, isolate:ready, isolate:crash, isolate:failed, isolate:error, isolate:beat (ADR 0017: { id, pool?, lagMs, busyMs?, at } per member per beat, only while listened to), workers:budget, bus:ready, bus:crash, bus:recovered, bus:durability_degraded, bus:quota, bus:restart, bus:failed, bus:metrics, route:state_dropped, route:navigate_error; M2b adds bus:seeded, bus:seed_rejected, bus:orphaned_topics
   isolates(): IsolateSnapshot[];                                      // used by devtools; `pool` for pool members (M2c); `lagMs`, and `busyMs` from the last beat (ADR 0017)
   pools(): PoolSnapshot[];                                            // M2c: members, worker running, effective grants (union); ADR 0015: sharesDocument, warning
   syncRoute(): void;                                   // host router changed the URL; republish isoloop.route.v1 if href/state differ (ADR 0002)
@@ -250,7 +250,7 @@ Defaults: heartbeat `100 / 400 / 10_000` ms, ready timeout `10_000` ms, frame bu
 
 `contracts` and `workers.bus` come together: giving only one throws `invalid_config`. Without both there is no bus worker: isolates get an unconnected bus port and `kernel.publish` rejects with `bus_unavailable`.
 
-`createKernel` stays synchronous, so isolates start while the bus loads its contracts. If loading fails, every isolate fails with reason `bus-failed` (no restart) and `bus:failed { code }` is emitted ([ADR 0003](../adr/0003-schema-format-standard-schema.md), decision 7). `spawn` throws a `KernelError` with a `code`: `invalid_manifest` (also for ids starting with `isoloop:`, which name the kernel's own bus connections), or `bus_failed` once the bus couldn't load its contracts. `kernel.publish` rejects with a `BusError` carrying the broker's code. A host publish the bus never answered before it crashed is sent again to the new bus, as isolates re-send theirs, and each carries `(epoch, seq)` so a persistent topic answers a record it already wrote with its original offset (§5, [ADR 0007](../adr/0007-bus-worker-supervision.md) steps 5 and 6); host publishes made while the bus restarts are queued. Once the bus has failed for good, isolates get a port that answers every call with `bus_unavailable`.
+`createKernel` stays synchronous, so isolates start while the bus loads its contracts. If loading fails, every isolate fails with reason `bus_failed` (no restart) and `bus:failed { code }` is emitted ([ADR 0003](../adr/0003-schema-format-standard-schema.md), decision 7). `spawn` throws a `KernelError` with a `code`: `invalid_manifest` (also for ids starting with `isoloop:`, which name the kernel's own bus connections), or `bus_failed` once the bus couldn't load its contracts. `kernel.publish` rejects with a `BusError` carrying the broker's code. A host publish the bus never answered before it crashed is sent again to the new bus, as isolates re-send theirs, and each carries `(epoch, seq)` so a persistent topic answers a record it already wrote with its original offset (§5, [ADR 0007](../adr/0007-bus-worker-supervision.md) steps 5 and 6); host publishes made while the bus restarts are queued. Once the bus has failed for good, isolates get a port that answers every call with `bus_unavailable`.
 
 With `suspend` set, an isolate subscribed to a `last-n` or `time` topic gets a console warning, since records may expire while it sleeps. It comes from the bus metrics, so about a second after the subscribe. The manifest's `bus: { onReset: 'restart' }` opts an isolate into a restart instead of `reset` after a bus restart ([ADR 0007](../adr/0007-bus-worker-supervision.md)). Hosting requirements (CSP, CORS) are in [the hosting guide](../guide/hosting.md).
 
@@ -280,7 +280,7 @@ type SupervisorInput =
   | { k: 'spawned'; at: number } | { k: 'ready' } | { k: 'beat'; at: number; lagMs: number } | { k: 'tick'; at: number }
   | { k: 'error'; at: number; fatal: boolean; message: string } | { k: 'workerError'; at: number; message: string }
   | { k: 'spawnFailed' | 'renderFmtMismatch' | 'busFailed'; at: number; message: string }
-  | { k: 'versionMismatch'; at: number; reason: 'runtime-too-old' | 'isolate-too-old'; message: string }
+  | { k: 'versionMismatch'; at: number; reason: 'runtime_too_old' | 'isolate_too_old'; message: string }
   | { k: 'poolCrash'; at: number; reason: CrashReason; message: string }   // another member took the shared worker down (M2c)
   | { k: 'stop' } | { k: 'respawn' } | { k: 'suspend' } | { k: 'wake' } | { k: 'hidden' } | { k: 'visible'; at: number };
 type SupervisorEffect =
@@ -299,29 +299,29 @@ Transitions (matching the RFC lifecycle diagram):
 | From | Input | To | Effects |
 | --- | --- | --- | --- |
 | loading | `ready` | running | emit `isolate:ready` |
-| loading | `ready` with a `renderFmt` the host doesn't speak | failed | reason `render-fmt-mismatch`, no restart ([ADR 0011](../adr/0011-dom-package.md)); showFallback, emit `isolate:failed` |
-| loading | `ready` with a `requires` outside `[FLOOR, VERSION]` | failed | reason `runtime-too-old` (newer than `VERSION`) or `isolate-too-old` (older than `FLOOR`), no restart ([ADR 0012](../adr/0012-isolates-built-apart.md)); showFallback, emit `isolate:failed` |
+| loading | `ready` with a `renderFmt` the host doesn't speak | failed | reason `render_format_mismatch`, no restart ([ADR 0011](../adr/0011-dom-package.md)); showFallback, emit `isolate:failed` |
+| loading | `ready` with a `requires` outside `[FLOOR, VERSION]` | failed | reason `runtime_too_old` (newer than `VERSION`) or `isolate_too_old` (older than `FLOOR`), no restart ([ADR 0012](../adr/0012-isolates-built-apart.md)); showFallback, emit `isolate:failed` |
 | loading | tick past `readyTimeoutMs` | crashed | terminate |
 | running | tick, no beat for `blockedAfterMs` | blocked | showBusy |
 | blocked | `beat` | running | hideBusy |
 | blocked | tick, no beat for `killAfterMs` | crashed | terminate |
 | running / blocked | `workerError` or fatal `error` | crashed | terminate, emit `isolate:crash` |
-| loading / running / blocked | `poolCrash`: another member of its pool crashed with `unresponsive` or `worker-error` | crashed | with that member's reason; every member restarts, in a new worker |
+| loading / running / blocked | `poolCrash`: another member of its pool crashed with `unresponsive` or `worker_error` | crashed | with that member's reason; every member restarts, in a new worker |
 | crashed | restarts in window < max | restarting | spawn after backoff |
 | crashed | restarts in window ≥ max, or strategy `never` | failed | showFallback, emit `isolate:failed` |
 | restarting | `spawned` | loading | – |
 | any but failed | `stop` | stopped | `shutdown` with grace, then terminate |
 | failed / stopped | `respawn` | restarting, then `spawned` → loading | resets restart window |
-| any but failed | `busFailed` (contracts couldn't load) | failed | reason `bus-failed`, no restart; showFallback, emit `isolate:failed` |
+| any but failed | `busFailed` (contracts couldn't load) | failed | reason `bus_failed`, no restart; showFallback, emit `isolate:failed` |
 | running | `suspend` set, idle for `afterMs` (no visible surface, no deliveries, no `keepAwake` hold, nothing in flight; ADR 0001) | suspended | `shutdown` with grace, `detach { keepOffsets: true, wake: true }` (leaves consumer groups), terminate, keep surface snapshot |
 | suspended | surface visible (visual), bus `wake` (headless), `resume`, or a bus restart (every suspended headless isolate, since the new bus has lost their wake subscriptions; [ADR 0001](../adr/0001-one-worker-per-isolate.md), Suspension) | loading | queued: at most `suspend.maxConcurrentWakes` (4) spawns at once, visible first; `latest` subscriptions start from `committed` (`init.wake`); restart window untouched |
-| any | `spawn-failed` | crashed | reason `spawn-failed`; before the retry, suspend every idle suspendable isolate |
+| any | `spawn_failed` | crashed | reason `spawn_failed`; before the retry, suspend every idle suspendable isolate |
 | any | document hidden | (same) | pause hang judgement (no showBusy, no kill) |
 | any | document visible, or Page Lifecycle `resume` | (same) | reset every heartbeat clock (isolates and bus) |
 
 Non-fatal `error` messages (a caught exception in a handler) are only reported (`isolate:error`). They don't change state.
 
-**Pools** (M2c, M2d). The heartbeat is the worker's, so the members of a pool block and are killed together. A crash that is the worker's (`unresponsive`, `worker-error`) crashes every other member with the same reason (`poolCrash`): the worker is terminated with its last member and they all restart in a new one, each replaying from its own committed offsets. A member's own fatal error, ready timeout or version mismatch stays its own: it restarts alone, back into the running worker. Any member's wake condition wakes the whole pool, and a pool suspends only as a whole ([ADR 0001](../adr/0001-one-worker-per-isolate.md)).
+**Pools** (M2c, M2d). The heartbeat is the worker's, so the members of a pool block and are killed together. A crash that is the worker's (`unresponsive`, `worker_error`) crashes every other member with the same reason (`poolCrash`): the worker is terminated with its last member and they all restart in a new one, each replaying from its own committed offsets. A member's own fatal error, ready timeout or version mismatch stays its own: it restarts alone, back into the running worker. Any member's wake condition wakes the whole pool, and a pool suspends only as a whole ([ADR 0001](../adr/0001-one-worker-per-isolate.md)).
 
 The supervisor also tracks the bus worker. A bus crash doesn't restart isolates: they get a new bus port (`reattach`) and keep running ([ADR 0007](../adr/0007-bus-worker-supervision.md), §7.7).
 
@@ -445,7 +445,7 @@ function contracts(...topics: TopicDef<any, any, any, any>[]): Contracts;   // d
 function unchecked<T>(): StandardSchemaV1<T, T>;
 ```
 
-`TopicDef` objects are what host, isolates and the bus worker share through the contracts package ([ADR 0003](../adr/0003-schema-format-standard-schema.md)). On the wire only the name travels. The bus worker builds its topics only from the module at `contracts.url`; at `boot` it compares them with the host's `list` and fails with `contracts_mismatch` if they differ. `contracts_failed`, `contracts_invalid`, `contracts_mismatch` and `reserved_topic` (a contracts module exporting `isoloop.*`) are fatal and not retried: every isolate fails with `bus-failed` and the kernel emits `bus:failed` (§4.1; ADR 0003, decision 7). While the module loads, the bus accepts `attach`/`subscribe` and buffers publishes per port inside the bus worker, validated in order once the broker exists; past 1,000 they reject with `bus_unavailable` (ADR 0003, decision 8; the buffer across a bus restart is a separate one, on the isolate side). System topics are defined in `@isoloop/protocol` with hand-written validators.
+`TopicDef` objects are what host, isolates and the bus worker share through the contracts package ([ADR 0003](../adr/0003-schema-format-standard-schema.md)). On the wire only the name travels. The bus worker builds its topics only from the module at `contracts.url`; at `boot` it compares them with the host's `list` and fails with `contracts_mismatch` if they differ. `contracts_failed`, `contracts_invalid`, `contracts_mismatch` and `reserved_topic` (a contracts module exporting `isoloop.*`) are fatal and not retried: every isolate fails with `bus_failed` and the kernel emits `bus:failed` (§4.1; ADR 0003, decision 7). While the module loads, the bus accepts `attach`/`subscribe` and buffers publishes per port inside the bus worker, validated in order once the broker exists; past 1,000 they reject with `bus_unavailable` (ADR 0003, decision 8; the buffer across a bus restart is a separate one, on the isolate side). System topics are defined in `@isoloop/protocol` with hand-written validators.
 
 **Seeding (M2b).** A topic with `seed` starts in a *seeding* state on a device where `seed.from` has data: its publishes are buffered and its subscribers get nothing until every `from` record has been mapped, validated against the new schema and appended (original `ts`/`producer` kept, progress stored atomically with the appends, so exactly once and resumable). Rejected records are skipped and reported (`bus:seed_rejected`), their offsets kept in the seed metadata; `bus:seeded { topic, copied, rejected }` marks the end. `map` must be synchronous (`seed_async` otherwise). `follow: true` keeps forwarding new `from` records while both topics are listed. Persistent topics no longer listed are reported as `bus:orphaned_topics` and kept until `kernel.dropTopic`, which rejects with `seed_pending` while a pending seed needs the topic and needs `{ force: true }` if rejected seed records from it are recorded.
 
@@ -489,7 +489,7 @@ interface LogStorage {
 }
 ```
 
-`MemoryStorage` (M2) is a no-op. `OpfsStorage` (M2b) keeps one directory per topic, segment files of up to 4 MiB, and an offsets file, all accessed through sync access handles inside the bus worker, under the Web Lock `isoloop-bus` so only one tab writes. A bus that doesn't get the lock runs every topic in memory and reports `ready.degraded: 'another-tab'`, and the kernel emits `bus:durability-degraded { reason }`; a restarting bus waits up to 2 s for the one it replaces to let go. Records are encoded by a shared binary codec (`@isoloop/codec`, also used by M5).
+`MemoryStorage` (M2) is a no-op. `OpfsStorage` (M2b) keeps one directory per topic, segment files of up to 4 MiB, and an offsets file, all accessed through sync access handles inside the bus worker, under the Web Lock `isoloop-bus` so only one tab writes. A bus that doesn't get the lock runs every topic in memory and reports `ready.degraded: 'another_tab'`, and the kernel emits `bus:durability_degraded { reason }`; a restarting bus waits up to 2 s for the one it replaces to let go. Records are encoded by a shared binary codec (`@isoloop/codec`, also used by M5).
 
 ### 6.3 Broker
 

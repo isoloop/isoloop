@@ -102,9 +102,9 @@ describe('kernel', () => {
     await waitFor(() => a.text() === '1');
     a.click('crash');
     await waitFor(() => a.handle.snapshot().state === 'restarting');
-    expect(a.handle.snapshot()).toMatchObject({ reason: 'worker-error', restarts: 1 });
+    expect(a.handle.snapshot()).toMatchObject({ reason: 'worker_error', restarts: 1 });
     expect(a.handle.snapshot().error).toContain('fixture crash');
-    expect(events['isolate:crash']).toMatchObject([{ id: 'A', reason: 'worker-error' }]);
+    expect(events['isolate:crash']).toMatchObject([{ id: 'A', reason: 'worker_error' }]);
     await waitFor(() => a.handle.snapshot().state === 'running');
     // Fresh state after the restart, same surface.
     await waitFor(() => a.text() === '0');

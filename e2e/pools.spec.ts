@@ -165,7 +165,7 @@ test('a member that takes the worker down (an uncaught error) restarts its pool'
     expect(
       out.crashes.find((c) => c.id === id),
       id,
-    ).toMatchObject({ reason: 'worker-error', pool: 'p' });
+    ).toMatchObject({ reason: 'worker_error', pool: 'p' });
   for (const id of ['B', 'C']) {
     expect(out.instances[id]?.length, id).toBeGreaterThanOrEqual(2);
     replayedFromCommitted(out.latest[id] ?? [], id);

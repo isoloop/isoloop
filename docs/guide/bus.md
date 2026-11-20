@@ -191,11 +191,11 @@ On disk, retention and compaction apply as in memory. A persistent topic keeps i
 
 What survives a reload: a persistent topic's records, and the committed offsets of every consumer of it, so a subscription with `from: 'committed'`, or a group that has committed, picks up where it left off. Isolates themselves are new instances, and memory topics start empty.
 
-Persistent topics can run as memory topics. The kernel then emits `bus:durability-degraded` with a `reason`:
+Persistent topics can run as memory topics. The kernel then emits `bus:durability_degraded` with a `reason`:
 
-- **`another-tab`:** only one tab's bus holds the files, through the Web Lock `isoloop-bus`. Other tabs on the origin keep every topic in memory.
-- **`no-sync-access`:** the browser has no OPFS sync access handles.
-- **`open-failed`:** the files couldn't be opened, as in some private windows.
+- **`another_tab`:** only one tab's bus holds the files, through the Web Lock `isoloop-bus`. Other tabs on the origin keep every topic in memory.
+- **`no_sync_access`:** the browser has no OPFS sync access handles.
+- **`open_failed`:** the files couldn't be opened, as in some private windows.
 
 Storage is limited by the origin's quota. The kernel emits `bus:quota` once use reaches 80 %. At 100 %, publishes to persistent topics reject with `quota_exceeded`, and memory topics carry on.
 

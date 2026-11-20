@@ -83,7 +83,7 @@ const PACK_EVERY_MS = 60_000;
 const QUIET_CAP_MS = 120_000;
 
 /** Worker crash reasons whose culprit the kernel can't name: every member of the pool crashes. */
-const POOL_KILL = new Set(['unresponsive', 'worker-error']);
+const POOL_KILL = new Set(['unresponsive', 'worker_error']);
 
 type Beat = { at: number; busy: number; dur: number };
 type Lag = { at: number; lagMs: number };

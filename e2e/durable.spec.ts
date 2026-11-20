@@ -9,14 +9,14 @@ import { HARNESS, ISOLATES_CORS } from './servers';
 const CONTRACTS = new URL('contracts.js', ISOLATES_CORS).href;
 const saved = { name: 'saved.v1' };
 
-/** Loads the harness and starts a kernel with a bus; resolves with what `bus:durability-degraded` said by `ready`. */
+/** Loads the harness and starts a kernel with a bus; resolves with what `bus:durability_degraded` said by `ready`. */
 async function boot(page: Page): Promise<string[]> {
   await page.goto(HARNESS);
   await expect(page.locator('body[data-ready]')).toBeAttached();
   return page.evaluate(async (contracts) => {
     const kernel = await window.harness.createBusKernel(contracts);
     const degraded: string[] = [];
-    kernel.on('bus:durability-degraded', ({ reason }) => degraded.push(reason));
+    kernel.on('bus:durability_degraded', ({ reason }) => degraded.push(reason));
     window.durable = { kernel, degraded };
     await new Promise<void>((resolve) => kernel.on('bus:ready', () => resolve()));
     // The degraded event follows `ready` in the same message.
@@ -96,7 +96,7 @@ test('I12: a persistent topic loses no acknowledged record when the bus worker i
   page,
 }) => {
   const first = await boot(page);
-  test.skip(first.includes('open-failed'), 'no OPFS in this browser build');
+  test.skip(first.includes('open_failed'), 'no OPFS in this browser build');
   const n = 1000;
   const { acked, rejected } = await streamThroughCrash(page, n, 300);
   expect(rejected).toEqual([]);
@@ -110,7 +110,7 @@ test('I12: a persistent topic loses no acknowledged record when the page is relo
   page,
 }) => {
   const first = await boot(page);
-  test.skip(first.includes('open-failed'), 'no OPFS in this browser build');
+  test.skip(first.includes('open_failed'), 'no OPFS in this browser build');
   await page.evaluate(async (topic) => {
     const kernel = window.durable?.kernel;
     if (!kernel) throw new Error('no kernel');
@@ -125,18 +125,18 @@ test('I12: a persistent topic loses no acknowledged record when the page is relo
   expect(await publishAndRead(page, 500)).toEqual(Array.from({ length: 501 }, (_, i) => i));
 });
 
-test('a second tab runs in memory with bus:durability-degraded; after the first closes, a reload takes the files', async ({
+test('a second tab runs in memory with bus:durability_degraded; after the first closes, a reload takes the files', async ({
   context,
   page,
 }) => {
   const first = await boot(page);
   // Playwright's WebKit has no OPFS, so no tab gets the files there (M2b task 15).
-  test.skip(first.includes('open-failed'), 'no OPFS in this browser build');
+  test.skip(first.includes('open_failed'), 'no OPFS in this browser build');
   expect(first).toEqual([]);
   expect(await publishAndRead(page, 1)).toEqual([1]);
 
   const second = await context.newPage();
-  expect(await boot(second)).toEqual(['another-tab']);
+  expect(await boot(second)).toEqual(['another_tab']);
   // It works, in memory: it doesn't see the first tab's record.
   expect(await publishAndRead(second, 2)).toEqual([2]);
 
@@ -153,7 +153,7 @@ test('a record published just before the page freezes and is discarded is on dis
   page,
 }) => {
   const first = await boot(page);
-  test.skip(first.includes('open-failed'), 'no OPFS in this browser build');
+  test.skip(first.includes('open_failed'), 'no OPFS in this browser build');
   await page.evaluate((topic) => {
     const kernel = window.durable?.kernel;
     if (!kernel) throw new Error('no kernel');

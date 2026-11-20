@@ -19,7 +19,7 @@ export function levelOfEvent(e: InspectEvent): EventLevel {
     case 'bus:crash':
     case 'bus:recovered':
     case 'bus:quota':
-    case 'bus:durability-degraded':
+    case 'bus:durability_degraded':
     case 'workers:budget':
     case 'agents:unmatched':
       return 'warn';
