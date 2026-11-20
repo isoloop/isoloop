@@ -186,6 +186,15 @@ export function checkLinks(file: string, md: string, exists: (path: string) => b
 /** A link into the ADRs or the plans, relative or absolute. */
 const HISTORY_LINK = /(?:^|\/)docs\/(?:adr|plans)\/|^(?:\.\.\/)+(?:adr|plans)\/|^(?:adr|plans)\//;
 
+/**
+ * The API reference (docs/api, generated from the TSDoc) is public docs too:
+ * no ADR or plan references there either. Its fix is in the TSDoc behind the
+ * page, then `pnpm docs:api`.
+ */
+export function checkApiPages(pages: readonly { file: string; md: string }[]): Problem[] {
+  return pages.flatMap((p) => checkHistory(p.file, p.md));
+}
+
 export function checkHistory(file: string, md: string): Problem[] {
   const problems: Problem[] = [];
   withoutFences(md)
@@ -197,13 +206,13 @@ export function checkHistory(file: string, md: string): Problem[] {
         if (HISTORY_LINK.test(target.replace(/^\.\//, '')))
           problems.push({
             file,
-            message: `line ${n + 1}: a guide doesn't link ADRs or plans ("${target}"); say how it works, not why it was decided`,
+            message: `line ${n + 1}: public docs don't link ADRs or plans ("${target}"); say how it works, not why it was decided`,
           });
       }
       if (/\bADRs?[\s-]*\d{1,4}\b/.test(prose(l)))
         problems.push({
           file,
-          message: `line ${n + 1}: a guide doesn't name ADRs; say how it works, not why it was decided`,
+          message: `line ${n + 1}: public docs don't name ADRs; say how it works, not why it was decided`,
         });
     });
   return problems;
@@ -450,6 +459,19 @@ function main(): void {
       ...checkLinks(file, md, (p) => existsSync(join(root, p))),
       ...checkHistory(file, md),
       ...checkWords(file, md, rules),
+    );
+  }
+  const apiDir = join(root, 'docs/api');
+  if (existsSync(apiDir)) {
+    const pages = readdirSync(apiDir).filter((f) => f.endsWith('.md'));
+    pages.sort();
+    problems.push(
+      ...checkApiPages(
+        pages.map((f) => {
+          const file = relative(root, join(apiDir, f));
+          return { file, md: readFileSync(join(root, file), 'utf8') };
+        }),
+      ),
     );
   }
   problems.push(

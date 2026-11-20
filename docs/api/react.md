@@ -6,47 +6,94 @@ The React adapter: `defineIsolate` for a component, and hooks for the bus and th
 
 ### `defineIsolate`
 
+Makes `Component` an isolate: the module's default export, which renders it into the
+isolate's surface (with `createRoot`) and unmounts the root on shutdown, so effects clean up and
+subscriptions end. Every hook in this package works inside it.
+
+A render error is caught at the root and reported as this isolate's own crash, so in
+a pool it fails only this member. The isolate needs a surface: started headless, it
+throws an `Error` at start.
+
 ```ts nocheck
 function defineIsolate(Component: ComponentType<IsolateProps>): IsolateDefinition;
+```
+
+| Parameter | Description |
+| --- | --- |
+| `Component` | The root component. It gets `IsolateProps`. |
+
+**Returns:** The isolate definition, stamped with the runtime version it was built against.
+
+**Example:**
+
+```tsx
+import { defineIsolate, usePublish, useTopic } from '@isoloop/react';
+import { count } from './topics';
+
+function Counter() {
+  const n = useTopic(count, { from: 'earliest' }) ?? 0;
+  const publish = usePublish(count);
+  return <button onClick={() => void publish(n + 1)}>Count: {n}</button>;
+}
+
+export default defineIsolate(Counter);
 ```
 
 **Guides:** [Writing isolates](../guide/isolates.md).
 
 ### `useHost`
 
-`measure`, `focus`, `scrollIntoView` and `navigate`, as `ctx.host` has them.
+The isolate's host calls (`ctx.host`): `measure`, `focus`, `scrollIntoView` and
+`navigate`. Pass them the elements a ref holds; the host acts on what it rendered for
+them, after pending changes are applied.
 
 ```ts nocheck
 function useHost(): HostApi$1;
 ```
 
+**Returns:** The host API.
+
+**Throws:**
+- `Error` outside a component that `defineIsolate` rendered.
+
 **Guides:** [Writing isolates](../guide/isolates.md).
 
 ### `useIsolate`
 
-The isolate context. Throws outside a component that `defineIsolate` rendered.
+The isolate's context, as `start(ctx)` gets it: `ctx.bus`, `ctx.host`, `ctx.config` and
+the rest.
 
 ```ts nocheck
 function useIsolate(): IsolateContext$1;
 ```
 
+**Returns:** The context of the isolate this component runs in.
+
+**Throws:**
+- `Error` outside a component that `defineIsolate` rendered.
+
 **Guides:** [Writing isolates](../guide/isolates.md).
 
 ### `usePortalRoot`
 
-`ctx.portalRoot`: the container inside this isolate's surface for modals,
-tooltips, toasts and menus (ADR 0015), for `createPortal` or a library's
-container option. Throws in a headless isolate.
+The container inside this isolate's surface for modals, tooltips, toasts and menus
+(`ctx.portalRoot`), for `createPortal` or a library's container option. Content
+portalled there stays inside the isolate's surface.
 
 ```ts nocheck
 function usePortalRoot(): Element;
 ```
 
+**Returns:** The portal container.
+
+**Throws:**
+- `Error` in a headless isolate, or outside a component that `defineIsolate` rendered.
+
 **Guides:** [Worker pools](../guide/pools.md).
 
 ### `usePublish`
 
-A function that publishes to `topic`; it resolves once the broker appended the record (`BusClient.publish`).
+A function that publishes to `topic`. The function is stable while `topic` is the same.
 
 ```ts nocheck
 function usePublish<In>(topic: TopicRef<In, any, any, any>): (value: In, opts?: {
@@ -54,41 +101,82 @@ function usePublish<In>(topic: TopicRef<In, any, any, any>): (value: In, opts?: 
 }) => Promise<void>;
 ```
 
+| Parameter | Description |
+| --- | --- |
+| `topic` | The topic to publish to. The isolate needs a publish grant for it. |
+
+**Returns:** `(value, opts?) => Promise<void>`, with `opts.key` for the record's key. The
+promise resolves once the bus has appended the record, and rejects with a `BusError`:
+`forbidden` without a publish grant, `invalid` when the schema rejects the value
+(`issues` says why), `too_large` over the topic's `maxRecordBytes`, `not_encodable`
+for a value the bus can't store, `quota_exceeded` when storage is full,
+`unknown_topic`, or `bus_unavailable`.
+
+**Throws:**
+- `Error` outside a component that `defineIsolate` rendered.
+
 **Guides:** [Writing isolates](../guide/isolates.md).
 
 ### `useRequest`
 
 **Experimental.**
 
-A function that sends a request on `topic` and resolves with the reply.
-It rejects with a `BusError`, `timeout` after `timeoutMs` (default 30 s).
+A function that sends a request on `topic` and resolves with the first valid reply.
+The function is stable while `topic` is the same.
 
 ```ts nocheck
 function useRequest<In, ROut>(topic: TopicRef<In, any, any, ROut>): (value: In, opts?: RequestOptions$1) => Promise<ROut>;
 ```
 
+| Parameter | Description |
+| --- | --- |
+| `topic` | A topic with a `reply` schema. |
+
+**Returns:** `(value, opts?) => Promise<reply>`. `opts` takes `key` and `timeoutMs`
+(default 30 s). The promise rejects with a `BusError`: `timeout` when no reply came
+in time, `dropped` when retention removed the request before any subscriber got it,
+`reply_invalid` when the reply failed the `reply` schema, `not_requestable` on a
+topic without one, and the publish codes (`forbidden`, `invalid`, `too_large`,
+`unknown_topic`, `bus_unavailable`) for the request itself.
+
 **Guides:** [Writing isolates](../guide/isolates.md).
 
 ### `useRoute`
 
-The current route, or `undefined` until the first record arrives (or with routing off).
+The host's current location. The route is read only while a component uses this hook.
 
 ```ts nocheck
 function useRoute(): RouteValue$1 | undefined;
 ```
 
+**Returns:** The current route, or `undefined` until the first one arrives, and always
+with routing off.
+
+**Throws:**
+- `Error` outside a component that `defineIsolate` rendered.
+
 **Guides:** [Writing isolates](../guide/isolates.md).
 
 ### `useTopic`
 
-The latest value on `topic`, or `undefined` until one arrives. A bus
-restart that lost the memory topic (`onReset`, ADR 0007) clears it. The
-bus subscription lives while the component is subscribed to the store:
-StrictMode's extra subscribe and unsubscribe leave one subscription.
+The latest value on `topic`, read through `useSyncExternalStore`, so concurrent renders
+never tear. The subscription lives while the component is mounted; StrictMode's extra
+subscribe and unsubscribe leave one.
 
 ```ts nocheck
 function useTopic<Out>(topic: TopicRef<any, Out, any, any>, opts?: UseTopicOptions): Out | undefined;
 ```
+
+| Parameter | Description |
+| --- | --- |
+| `topic` | The topic to read. The isolate needs a subscribe grant for it. |
+| `opts` | Where reading starts (`UseTopicOptions`). |
+
+**Returns:** The latest value, or `undefined` until one arrives. A bus restart that lost a
+memory topic clears it back to `undefined`.
+
+**Throws:**
+- `Error` outside a component that `defineIsolate` rendered.
 
 **Guides:** [Writing isolates](../guide/isolates.md).
 
@@ -110,13 +198,17 @@ Re-exported from `@isoloop/runtime`: see [`IsolateContext`](runtime.md#isolateco
 
 ### `IsolateProps`
 
-Props every isolate component gets: `manifest.config`, passed through.
+The props `defineIsolate` passes to the isolate's component.
 
 ```ts nocheck
 type IsolateProps = {
   config: unknown;
 };
 ```
+
+| Field | Description |
+| --- | --- |
+| `config` | The `config` the isolate was spawned with (`manifest.config`), passed through unchanged; `undefined` when it has none. |
 
 **Guides:** [Writing isolates](../guide/isolates.md).
 
@@ -126,7 +218,7 @@ Re-exported from `@isoloop/runtime`: see [`RequestOptions`](runtime.md#requestop
 
 ### `RouteValue`
 
-The current location, as the kernel publishes it (ADR 0002).
+The host page's current location, as the kernel publishes it on each navigation.
 
 ```ts nocheck
 type RouteValue = {
@@ -141,13 +233,18 @@ type RouteValue = {
 
 | Field | Description |
 | --- | --- |
-| `href` | Absolute URL. |
+| `href` | The absolute URL. |
+| `pathname` | The URL's path, as `location.pathname` has it. |
 | `path` | `pathname` relative to `basePath`, starting with `/`; `null` outside it. |
+| `search` | The query string, with its `?`, or `''`. |
+| `hash` | The fragment, with its `#`, or `''`. |
 | `state` | `history.state` as is; `null` when it was too large for the bus (`route:state_dropped`). |
 
 **Guides:** [Writing isolates](../guide/isolates.md).
 
 ### `UseTopicOptions`
+
+Options for `useTopic`.
 
 ```ts nocheck
 type UseTopicOptions = {
@@ -157,7 +254,7 @@ type UseTopicOptions = {
 
 | Field | Description |
 | --- | --- |
-| `from?` | Default `latest`. `earliest` replays the topic, so a compacted one gives its current value at once. |
+| `from?` | Where reading starts. Default `'latest'`: only records appended from now. `'earliest'` replays the topic, so a compacted one gives its current value at once. |
 
 **Guides:** [Writing isolates](../guide/isolates.md).
 

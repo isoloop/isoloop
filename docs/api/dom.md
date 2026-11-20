@@ -6,9 +6,25 @@ The render bridge's conformance kit, for authors of a framework adapter.
 
 ### `checkDomUsage`
 
+Runs a usage fixture worker and checks its log. Fails the test if the
+framework reached for members the subset doesn't have (other than
+`TOLERATED_MISSING`), or if the log differs from the committed one. Runs in
+Vitest's browser mode.
+
 ```ts nocheck
 function checkDomUsage(worker: Worker, logPath: string, write: boolean): Promise<UsageLog>;
 ```
+
+| Parameter | Description |
+| --- | --- |
+| `worker` | A worker running a usage fixture (`trackUsage()`, then `reportUsage()`). It's terminated when the log arrives. |
+| `logPath` | The committed log, relative to the repo root, e.g. `packages/dom/usage/preact-10.json`. |
+| `write` | Rewrite the committed log with this run's before comparing. |
+
+**Returns:** The log.
+
+**Throws:**
+- {Error} when the fixture worker throws or fails to load.
 
 ### `createIsoloopDomDriver`
 
@@ -22,33 +38,58 @@ function createIsoloopDomDriver(): IsolateDriver & {
 };
 ```
 
+**Returns:** The driver, with the `WorkerDom` it drives.
+
 ### `mountFixture`
+
+Applies a fixture worker's batches (from `serveFixture()`) under a new
+`<div>` in the document, through the real applier, and sends the
+container's `click`, `input`, `change` and `keydown` events back.
 
 ```ts nocheck
 function mountFixture(worker: Worker): FixtureHost;
 ```
 
+| Parameter | Description |
+| --- | --- |
+| `worker` | A worker that calls `serveFixture()`. |
+
+**Returns:** The container, a way to wait until it settles, and `dispose()`.
+
 ### `mountMembers`
 
 The page side of `servePoolFixture(n)`: one container per member, each
 with its own applier, getting only that member's batches and sending its
-events back for that member (ADR 0015, M2d task 2).
+events back for that member.
 
 ```ts nocheck
 function mountMembers(worker: Worker, n: number): HTMLElement[];
 ```
 
+| Parameter | Description |
+| --- | --- |
+| `worker` | A worker that calls `servePoolFixture(n)`. |
+| `n` | How many members it serves. |
+
+**Returns:** One container per member, in member order.
+
 ### `runBridgeConformance`
 
-The suite every render bridge must pass, with no known gaps for the
-isoloop-dom bridge. Known gaps can be marked per bridge. Batches go through
-`structuredClone`, as they would through `postMessage`.
+Registers the suite every render bridge must pass, as Vitest tests. Known
+gaps can be marked per bridge, and run as expected failures. Batches go
+through `structuredClone`, as they would through `postMessage`.
 
 ```ts nocheck
 function runBridgeConformance(name: string, makePair: MakeBridgePair, opts?: {
   knownGaps?: readonly CaseName[];
 }): void;
 ```
+
+| Parameter | Description |
+| --- | --- |
+| `name` | The bridge's name, used for the `describe` block. |
+| `makePair` | Makes a fresh bridge for each case. |
+| `opts` | `knownGaps`: the cases expected to fail for this bridge. Default none. |
 
 ### `snapshot`
 
@@ -61,6 +102,15 @@ function snapshot(root: Element): {
   select: string;
 };
 ```
+
+| Parameter | Description |
+| --- | --- |
+| `root` | The container the fixture app rendered into. |
+
+**Returns:** Its `innerHTML`, the input's value and the select's value.
+
+**Throws:**
+- {Error} when the app rendered no `<input>` or `<select>`.
 
 ### `CASES`
 
@@ -114,6 +164,8 @@ const TOLERATED_MISSING: Readonly<Record<string, string>>;
 
 ### `BridgePair`
 
+One bridge under test: its host side and its isolate side, freshly made.
+
 ```ts nocheck
 interface BridgePair {
   host: ConformanceHost & Partial<NodeIds>;
@@ -124,9 +176,13 @@ interface BridgePair {
 
 | Field | Description |
 | --- | --- |
+| `host` | The host side, with the node-id lookups if the bridge has them. |
+| `isolate` | The isolate side. |
 | `internalAttr?` | Attributes the bridge writes for its own bookkeeping, left out when trees are compared. |
 
 ### `CaseName`
+
+The name of one case in the suite, a key of `CASES`.
 
 ```ts nocheck
 type CaseName = keyof typeof CASES;
@@ -165,9 +221,13 @@ interface ConformanceHost {
 
 | Member | Description |
 | --- | --- |
-| `apply()` | Applies one batch. Returns false and changes nothing if the batch is malformed. |
+| `mount()` | Starts rendering into `root`. |
+| `apply()` | Applies one batch. |
+| `unmount()` | Stops rendering and removes what was rendered. |
 
 ### `FixtureHost`
+
+The page side of a mounted fixture worker.
 
 ```ts nocheck
 type FixtureHost = {
@@ -244,12 +304,17 @@ interface IsolateDriver {
 | Member | Description |
 | --- | --- |
 | `root` | An element with `class="cf-root"` that the suite builds under. Already inserted. |
+| `el()` | `document.createElement(tag)`. |
+| `text()` | `document.createTextNode(data)`. |
 | `comment()` | `document.createComment(data)`. |
 | `fragment()` | `document.createDocumentFragment()`; `insert` takes it as a parent or a child. |
 | `childCount()` | How many children `parent` has, on the isolate side. |
 | `insert()` | Inserts `child` into `parent` before `before`, or at the end. Moves it if it's already in the tree. |
-| `setAttr()` | `null` removes the attribute. |
+| `remove()` | `child.remove()`. |
+| `setAttr()` | `el.setAttribute(name, value)`; `null` removes the attribute. |
+| `setText()` | Sets a text or comment node's `data`. |
 | `setValue()` | Sets the `value` property, as a framework does on a controlled input; `force` overrides a focused host input. |
+| `listen()` | Adds a listener for `type` on `el`. |
 | `classList()` | `el.classList`: `add`, `remove`, `toggle` (with `force`) or `contains`; returns whether `el` has the token after. |
 | `dataset()` | `el.dataset[key] = value`, or `delete el.dataset[key]` for `null`; returns `el.dataset[key]` after. |
 | `byId()` | `document.getElementById(id)`. |
@@ -260,13 +325,15 @@ interface IsolateDriver {
 
 ### `MakeBridgePair`
 
+Makes a fresh `BridgePair`; the suite calls it once per case.
+
 ```ts nocheck
 type MakeBridgePair = () => BridgePair;
 ```
 
 ### `NodeIds`
 
-Host-side node-id lookups (design §4.5). Optional until every bridge has them.
+Host-side node-id lookups. Optional until every bridge has them.
 
 ```ts nocheck
 interface NodeIds {
@@ -274,6 +341,11 @@ interface NodeIds {
   nodeFor(id: string): Element | undefined;
 }
 ```
+
+| Member | Description |
+| --- | --- |
+| `idFor()` | The id the bridge gave a host node, or `undefined` if it has none. |
+| `nodeFor()` | The host element with this id, or `undefined`. |
 
 ### `UsageLog`
 
@@ -302,26 +374,42 @@ type UsageLog = {
 Drives the usage fixture the way a user would, through host events: the
 fixture renders `<button name="toggle">` (hides and shows a conditional
 child), `<button name="reorder">` (reverses a keyed list), a controlled
-`<input>` and a `<select>`. `settle` waits for the framework to commit.
+`<input>` and a `<select>`.
 
 ```ts nocheck
 function driveUsageFixture(dom: WorkerDom, settle: () => Promise<void>): Promise<void>;
 ```
 
+| Parameter | Description |
+| --- | --- |
+| `dom` | The worker DOM from `serveFixture()`. |
+| `settle` | Resolves once the framework has committed. |
+
+**Throws:**
+- {Error} when the fixture didn't render one of those controls.
+
 ### `reportUsage`
 
-Runs the fixture, lets the framework settle, and posts the log (or the error).
+Runs the fixture, lets the framework settle, and posts the log to the page,
+or the error if `run` throws.
 
 ```ts nocheck
 function reportUsage(tracker: UsageTracker, framework: string, run: () => Promise<void>): Promise<void>;
 ```
+
+| Parameter | Description |
+| --- | --- |
+| `tracker` | From `trackUsage()`. |
+| `framework` | The framework and version to record, e.g. `preact@10.29.8`. |
+| `run` | Renders the fixture and drives it, for example with `driveUsageFixture()`. |
 
 ### `serveFixture`
 
 Installs the subset as this worker's `document`, posts every batch, and
 delivers the page's events. Import it before the framework: React decides
 at load time whether it has a DOM. Uncaught errors are posted with their
-stack, which a worker `error` event doesn't carry.
+stack, which a worker `error` event doesn't carry. Pair with
+`mountFixture()` on the page.
 
 ```ts nocheck
 function serveFixture(): {
@@ -330,24 +418,37 @@ function serveFixture(): {
 };
 ```
 
+**Returns:** The worker DOM, and its root as an `Element` to render into.
+
 ### `servePoolFixture`
 
-A pooled fixture (ADR 0015, M2d): one subset document installed as this
-worker's `document`, with `n` render roots, one per member. Each root's
-batches are posted with its `member` index, and the page's events for a
-member go to its root. Pair with `mountMembers()` on the page.
+A pooled fixture: one subset document installed as this worker's
+`document`, with `n` render roots, one per member. Each root's batches are
+posted with its `member` index, and the page's events for a member go to
+its root. Pair with `mountMembers()` on the page.
 
 ```ts nocheck
 function servePoolFixture(n: number): Element[];
 ```
 
+| Parameter | Description |
+| --- | --- |
+| `n` | How many members, each with a render root. |
+
+**Returns:** The roots, in member order, to render each member into.
+
 ### `trackUsage`
 
-Starts logging. Call before the framework renders; it can't be undone.
+Starts logging which members of the subset a framework uses, and which it
+reaches for that the subset doesn't have. Call it before the framework
+renders; it patches the subset's classes for the whole worker and can't be
+undone.
 
 ```ts nocheck
 function trackUsage(): UsageTracker;
 ```
+
+**Returns:** The tracker, whose `report()` gives the log.
 
 ### `FixtureMessage`
 
@@ -358,6 +459,8 @@ Re-exported from `@isoloop/dom/testing`: see [`FixtureMessage`](#fixturemessage)
 Re-exported from `@isoloop/dom/testing`: see [`UsageLog`](#usagelog).
 
 ### `UsageTracker`
+
+The usage log being kept, from `trackUsage()`.
 
 ```ts nocheck
 type UsageTracker = {

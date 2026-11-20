@@ -40,11 +40,6 @@ MCP (`@isoloop/host/dev-mcp`) covers them. A tool's hints tell the agent
 what it does; asking the user before a consequential call is the agent's
 job.
 
-```ts
-import { connectWebMCP } from '@isoloop/webmcp';
-const disconnect = connectWebMCP(kernel);
-```
-
 ```ts nocheck
 function connectWebMCP(kernel: Pick<Kernel, "tools" | "request">): () => void;
 ```
@@ -57,6 +52,14 @@ function connectWebMCP(kernel: Pick<Kernel, "tools" | "request">): () => void;
 
 **Throws:**
 - {KernelError} `invalid_config` when one of the tools is already registered by an earlier `connectWebMCP` on this page.
+
+**Example:**
+
+```ts
+import { connectWebMCP } from '@isoloop/webmcp';
+
+const disconnect = connectWebMCP(kernel);
+```
 
 **Guides:** [Tools for agents](../guide/agents.md).
 
