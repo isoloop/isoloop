@@ -19,6 +19,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
+import { checkRemovedNames } from '../docs/check.ts';
 import { parseSiteImpact } from './site-impact-parse.ts';
 import { prBody } from './site-impact.ts';
 
@@ -145,6 +146,49 @@ export function statements(src: string): string[] {
     .filter((s) => s !== '' && s !== ';' && s !== 'export{}');
 }
 
+/**
+ * The names a package's normalised statements export: `export{a,b as c}`
+ * lists (the exported side of `as`) and `export` declarations.
+ */
+export function exportedNames(stmts: Iterable<string>): Set<string> {
+  const out = new Set<string>();
+  for (const s of stmts) {
+    const list = /^export(?: type)?\{([^}]*)\}/.exec(s);
+    if (list) {
+      for (const item of (list[1] ?? '').split(',')) {
+        const name = item
+          .trim()
+          .split(/\s+as\s+/)
+          .pop()
+          ?.replace(/^type\s+/, '');
+        if (name && name !== 'default') out.add(name);
+      }
+      continue;
+    }
+    const decl =
+      /^export (?:declare )?(?:abstract )?(?:function|const|let|class|interface|type|enum|namespace)\s*([A-Za-z_$][\w$]*)/.exec(
+        s,
+      );
+    if (decl?.[1]) out.add(decl[1]);
+  }
+  return out;
+}
+
+function allNames(m: Map<string, Set<string>>): Set<string> {
+  const out = new Set<string>();
+  for (const stmts of m.values()) for (const n of exportedNames(stmts)) out.add(n);
+  return out;
+}
+
+/** Names some package exported before and no package exports now. */
+export function removedNames(
+  before: Map<string, Set<string>>,
+  now: Map<string, Set<string>>,
+): Set<string> {
+  const still = allNames(now);
+  return new Set([...allNames(before)].filter((n) => !still.has(n)));
+}
+
 /** The `name` and `private` fields of a package.json. */
 function readPackage(file: string): { name: string; private: boolean } {
   const pkg: unknown = JSON.parse(readFileSync(file, 'utf8'));
@@ -155,6 +199,15 @@ function readPackage(file: string): { name: string; private: boolean } {
 }
 
 const mark = (ok: boolean): string => (ok ? '✅' : '❌');
+
+/** Every guide's mentions of `names`, as docs:check item 5 problems. */
+function guidesNaming(root: string, gone: Set<string>): { file: string; message: string }[] {
+  if (gone.size === 0) return [];
+  const dir = join(root, 'docs/guide');
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.md'))
+    .flatMap((f) => checkRemovedNames(`docs/guide/${f}`, readFileSync(join(dir, f), 'utf8'), gone));
+}
 
 function dtsFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -265,6 +318,10 @@ function main(): void {
       return;
     }
 
+    // docs:check item 5 (M4c, decision 22): a guide naming a removed export.
+    const gone = removedNames(before, head);
+    const stale = guidesNaming(root, gone);
+
     const impact = parseSiteImpact(prBody());
     const bumped = bumps(root, base);
     let failed = false;
@@ -287,6 +344,14 @@ function main(): void {
       for (const s of c.removed) say(`- ${s}`);
       for (const s of c.added) say(`+ ${s}`);
       say('```');
+    }
+    if (stale.length > 0) {
+      failed = true;
+      say('\n### Guides that name a removed export\n');
+      for (const p of stale) {
+        say(`- ❌ \`${p.file}\`: ${p.message}`);
+        console.error(`::error file=${p.file.replace(/:\d+$/, '')}::${p.message}`);
+      }
     }
     if (failed) {
       say("\nMark an export `@internal` in its TSDoc if it isn't meant to be public.");

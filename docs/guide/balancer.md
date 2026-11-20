@@ -6,11 +6,14 @@
 import { createKernel } from '@isoloop/host';
 import { createBalancer } from '@isoloop/balancer';
 
-const kernel = createKernel({ /* … */ });
+import taskUrl from './task?isolate';
+import chartUrl from './chart?isolate';
+
+const kernel = createKernel({ contracts, workers });
 const balancer = createBalancer(kernel);
 
 balancer.spawn({ id: 'task-1', src: taskUrl });          // no `pool`: the balancer picks one
-balancer.spawn({ id: 'chart-1', src: chartUrl, surface: chartEl });
+balancer.spawn({ id: 'chart-1', src: chartUrl, surface: document.getElementById('chart')! });
 balancer.on('move', (e) => console.log(`${e.id}: ${e.from} → ${e.to} (${e.reason})`));
 ```
 
@@ -30,7 +33,7 @@ It doesn't replace thinking about failure domains: it groups by load, not by wha
 
 ## The API
 
-```ts
+```ts nocheck
 const balancer = createBalancer(kernel, options?);
 ```
 

@@ -7,12 +7,15 @@
 //   for the PR hook.
 // - Item 6 (coverage) reads the built `dist/*.d.ts` through `readApi`, so it
 //   needs `pnpm build` first.
-// - Items 2 and 5 (fences that type-check, guides naming removed exports) come
-//   with M4c task 4, as more entries in GUIDE_CHECKS and API_CHECKS.
+// - Item 2 (fences that type-check, scripts/docs/fences.ts) runs `tsc` over
+//   the guides' `ts` and `tsx` fences; `--guides` runs it too.
+// - Item 5 (a guide naming a removed export) needs the PR's base built, so the
+//   API check runs it (scripts/ci/api-check.ts), with checkRemovedNames below.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkFences } from './fences.ts';
 import { isTypeKind, readApi, type ApiModel, type EntryFile, type ExportKind } from './read-api.ts';
 
 export type Problem = { file: string; message: string };
@@ -102,6 +105,38 @@ const prose = (line: string): string =>
     .replace(/`[^`]*`/g, ' ')
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/<[^>]+>/g, ' ');
+
+// --- Item 5: guides naming a removed export -----------------------------------
+
+/**
+ * Each inline code span in the guide's prose that names one of `removed`
+ * (`createKernel`, `kernel.request(…)`, `Kernel`), with its line. Fences are
+ * item 2's: a removed name there fails the type check. The removed names come
+ * from the API check (`scripts/ci/api-check.ts`), the one job that builds the
+ * PR's base, so this item runs there.
+ */
+export function checkRemovedNames(
+  file: string,
+  md: string,
+  removed: ReadonlySet<string>,
+): Problem[] {
+  if (removed.size === 0) return [];
+  const out: Problem[] = [];
+  withoutFences(md)
+    .split('\n')
+    .forEach((line, i) => {
+      for (const span of line.matchAll(/`([^`]+)`/g)) {
+        for (const id of (span[1] ?? '').match(/[A-Za-z_$][\w$]*/g) ?? []) {
+          if (removed.has(id))
+            out.push({
+              file: `${file}:${i + 1}`,
+              message: `names \`${id}\`, which is no longer exported: update the guide`,
+            });
+        }
+      }
+    });
+  return out;
+}
 
 // --- Item 1: the skeleton and the lead ---------------------------------------
 
@@ -431,6 +466,15 @@ function main(): void {
       ...checkWords(file, md, rules),
     );
   }
+  problems.push(
+    ...checkFences(
+      root,
+      guides.map((name) => {
+        const file = relative(root, join(guideDir, name));
+        return { file, md: readFileSync(join(root, file), 'utf8') };
+      }),
+    ),
+  );
 
   if (!guidesOnly) {
     const map = parseMap(readFileSync(join(root, MAP), 'utf8'));

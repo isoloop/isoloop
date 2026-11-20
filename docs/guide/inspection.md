@@ -58,10 +58,14 @@ Medians with their lowest-to-highest spread. That's one page, one load and one m
 An isolate reads the feed through the `inspect` grant:
 
 ```ts
-kernel.spawn({ id: 'my-devtool', src: toolUrl, surface: el, grants: { inspect: true } });
+import toolUrl from './my-devtool?isolate';
+
+kernel.spawn({ id: 'my-devtool', src: toolUrl, surface: document.getElementById('devtool')!, grants: { publish: [], subscribe: [], inspect: true } });
 ```
 
 ```ts
+import { defineIsolate } from '@isoloop/runtime';
+
 export default defineIsolate({
   async start(ctx) {
     const inspector = ctx.inspector!;      // undefined without the grant

@@ -393,6 +393,7 @@
     "**/dist/**",
     "**/coverage/**",
     "docs/diagrams/viewer-*.js",
-    "docs/diagrams/*.mjs"
+    "docs/diagrams/*.mjs",
+    "scripts/docs/fence-app/**"
   ]
 }
