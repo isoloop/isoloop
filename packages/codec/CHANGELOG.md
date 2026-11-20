@@ -1,5 +1,9 @@
 # @isoloop/codec
 
+## 0.1.0-next.10
+
+No changes in this release.
+
 ## 0.1.0-next.9
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @isoloop/dom
 
+## 0.1.0-next.10
+
+### Patch Changes
+
+- 8e03048: The TSDoc of `@isoloop/dom/testing`, `@isoloop/dom/testing/worker` and the types they return (`WorkerDom`, `RenderRoot`, the record and event types) is complete: a lead, `@param`, `@returns` and `@throws` on every function, and a comment on each field. It names no design records.
+
 ## 0.1.0-next.9
 
 ### Minor Changes

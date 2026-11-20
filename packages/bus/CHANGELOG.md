@@ -1,5 +1,15 @@
 # @isoloop/bus
 
+## 0.1.0-next.10
+
+### Patch Changes
+
+- e9b3d2b: The bus's TSDoc is complete for the API reference: `topic` and `contracts` have examples, parameters and return values; `contracts` lists the `ContractsError` codes it throws; every field of a topic's definition and of `Retention` says what it does and its default; `testContracts` and `ContractProblem` are documented. The comments no longer cite design records.
+- Updated dependencies [b303cb3]
+- Updated dependencies [799ca7e]
+  - @isoloop/protocol@0.1.0-next.10
+  - @isoloop/codec@0.1.0-next.10
+
 ## 0.1.0-next.9
 
 ### Minor Changes
