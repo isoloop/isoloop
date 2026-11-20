@@ -42,7 +42,7 @@ const domError = (name: string, message: string): Error => {
 
 /**
  * One render root and where its records go. A worker has one; a pool has one
- * per visual member, all in the same document (ADR 0015).
+ * per visual member, all in the same document.
  */
 type Owner = {
   readonly root: WElement;
@@ -192,7 +192,7 @@ export abstract class WNode extends WEventTarget {
   /**
    * @internal The root this node was rendered under, once it has been. Kept
    * after the node leaves the tree, so it can't move to another member's root
-   * in a pool (ADR 0015, decision 3).
+   * in a pool.
    */
   isoOwner: Owner | null = null;
 
@@ -304,7 +304,7 @@ export class WText extends WCharacterData {
 }
 
 /**
- * A comment node (DOM group 1, ADR 0010): rendered on the host, inert there.
+ * A comment node: rendered on the host, inert there.
  *
  * @internal
  */
@@ -379,7 +379,7 @@ function createStyle(el: WElement): WStyle {
 }
 
 /**
- * `element.classList` (DOM group 1, ADR 0010): a view of the `class`
+ * `element.classList`: a view of the `class`
  * attribute, so every write travels as an `attr` record.
  */
 export class WDOMTokenList {
@@ -453,7 +453,7 @@ const dataKey = (attr: string): string =>
   attr.slice(5).replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
 
 /**
- * `element.dataset` (DOM group 1, ADR 0010): camelCase keys over the
+ * `element.dataset`: camelCase keys over the
  * `data-*` attributes, so every write travels as an `attr` record.
  */
 function createDataset(el: WElement): Record<string, string | undefined> {
@@ -618,7 +618,7 @@ export abstract class WParentNode extends WNode {
 }
 
 /**
- * `DocumentFragment` (DOM group 1, ADR 0010): a detached holder. Inserting
+ * `DocumentFragment`: a detached holder. Inserting
  * it inserts its children, in order, and empties it; it never reaches the
  * host itself.
  *
@@ -644,7 +644,7 @@ export class WElement extends WParentNode {
   /** @internal */ isoStyle: WStyle | null = null;
   /** @internal */ isoClassList: WDOMTokenList | null = null;
   /** @internal */ isoDataset: Record<string, string | undefined> | null = null;
-  /** @internal The offsets the last `scroll` event brought (design §4.6). */
+  /** @internal The offsets the last `scroll` event brought. */
   isoScroll = { top: 0, left: 0 };
 
   constructor(doc: WDocument, id: NodeId, localName: string, ns: Namespace) {
@@ -832,10 +832,9 @@ const MEASURE =
 const ANIMATE = 'animate with CSS transitions or animations, set through classes or `style`';
 
 /**
- * Layout members a worker can't have (ADR 0010, amended 2026-11-16, point 5),
- * by name, with what to use instead. They exist so a read or a call fails
- * with `NotSupportedError` and a hint, never with a fake value or a bare
- * `undefined`. `scrollTop` and `scrollLeft` aren't here: they read the offsets
+ * Layout members a worker can't have, by name, with what to use instead.
+ * They exist so a read or a call fails with `NotSupportedError` and a hint,
+ * never with a fake value or a bare `undefined`. `scrollTop` and `scrollLeft` aren't here: they read the offsets
  * of the last `scroll` event.
  */
 export const LAYOUT_METHODS: Readonly<Record<string, string>> = {
@@ -1046,7 +1045,7 @@ export class WDocument extends WEventTarget {
   readonly body: WHTMLElement;
   /**
    * A detached head: React 19 hoists `<title>`, `<meta>` and `<link>` into
-   * it. The bridge doesn't render it (M3a task 3).
+   * it. The bridge doesn't render it.
    */
   readonly head: WHTMLElement;
 
@@ -1084,7 +1083,7 @@ export class WDocument extends WEventTarget {
   }
 
   /**
-   * The first element in tree order with this `id` (DOM group 1, ADR 0010):
+   * The first element in tree order with this `id`:
    * under the render root, then the detached head. Nodes not yet inserted
    * aren't in the document, so they aren't found.
    */
@@ -1106,8 +1105,7 @@ export class WDocument extends WEventTarget {
 
   /**
    * Type selectors only, alone or as a `head > title` child chain: what React
-   * 19 asks when it hoists a `<title>`. Queries in general are DOM group 2
-   * (ADR 0010), built when a library needs them; anything else throws.
+   * 19 asks when it hoists a `<title>`. Anything else throws.
    */
   querySelector(selector: string): WElement | null {
     const steps = selector.split('>').map((t) => t.trim().toLowerCase());
@@ -1187,51 +1185,93 @@ export type WorkerDomOptions = {
   /**
    * An element was inserted into `document.head` (React 19 hoists `<title>`,
    * `<meta>` and `<link>` there). The bridge doesn't render the head; the
-   * runtime tells the host, which warns in `dev` (M3a task 3).
+   * runtime tells the host, which warns in `dev`.
    */
   onHead?: (tag: string) => void;
 };
 
+/**
+ * The worker-side DOM of one isolate: the subset a framework renders into,
+ * which records every change as batches for the host to apply.
+ */
 export interface WorkerDom {
+  /** The subset's `document`, which `install()` makes the worker's own. */
   readonly document: WDocument;
   /** The isolate's render root; the host maps it to the surface. */
   readonly root: WElement;
   /** Sends pending records now, if any. */
   flush(): void;
-  /** Dispatches an event from the host to the node it names (capture and bubble in the worker). */
+  /**
+   * Dispatches an event from the host to the node it names, with capture and
+   * bubble in the worker.
+   *
+   * @param event The event as the host sent it.
+   */
   deliver(event: DomEvent): void;
-  /** The id of a node, for tests and host calls. */
+  /**
+   * The id of a node, for tests and host calls.
+   *
+   * @param node A node of this document.
+   * @returns Its id in this document, which records and events use.
+   */
   idOf(node: WNode): NodeId;
   /**
    * Sets an input's, textarea's or select's `value`. With `force`, the host
    * applies it even while the user is focused on a host-owned input, and
    * keeps the caret at its end; it's recorded even if the worker already
-   * holds that value, since what the user typed may differ (M3a task 6).
+   * holds that value, since what the user typed may differ.
+   *
+   * @param node An input, textarea or select.
+   * @param value The new value.
+   * @param opts `force`: apply it even to a focused host-owned input. Default `false`.
+   * @throws {TypeError} when `node` isn't an input, textarea or select.
    */
   setValue(node: WNode, value: string, opts?: { force?: boolean }): void;
   /**
    * Adds another render root to this document, with its own batches: one per
-   * visual member of a pool (ADR 0015). Its surface knows it as `ROOT_ID`.
+   * visual member of a pool. Its surface knows it as `ROOT_ID`.
+   *
+   * @param opts Where the new root's batches go.
+   * @returns The new root.
    */
   addRoot(opts: RootOptions): RenderRoot;
 }
 
+/** Options for `WorkerDom.addRoot()`. */
 export type RootOptions = {
-  /** Receives this root's batches, in order. */
+  /** Receives this root's batches, in order. Required. */
   onBatch(batch: DomBatch): void;
-  /** Called once per batch with the flush to run; default `queueMicrotask`. */
+  /** Called once per batch with the flush to run. Default: `queueMicrotask`. */
   schedule?: (flush: () => void) => void;
 };
 
-/** One member's render root in a shared document (ADR 0015). */
+/** One member's render root in a shared document. */
 export interface RenderRoot {
+  /** The root element, which this member's framework renders into. */
   readonly root: WElement;
   /** Sends this root's pending records now, if any. */
   flush(): void;
-  /** Dispatches an event from this root's surface; `ROOT_ID` names the root. */
+  /**
+   * Dispatches an event from this root's surface; `ROOT_ID` names the root.
+   *
+   * @param event The event as the host sent it.
+   */
   deliver(event: DomEvent): void;
-  /** The id this root's surface knows `node` by, or `undefined` if it isn't rendered under this root. */
+  /**
+   * The id this root's surface knows `node` by.
+   *
+   * @param node A node of this document.
+   * @returns Its id, or `undefined` if it isn't rendered under this root.
+   */
   idOf(node: WNode): NodeId | undefined;
+  /**
+   * Sets a control's `value`, as `WorkerDom.setValue()` does, for this root.
+   *
+   * @param node An input, textarea or select under this root.
+   * @param value The new value.
+   * @param opts `force`: apply it even to a focused host-owned input. Default `false`.
+   * @throws {TypeError} when `node` isn't rendered under this root, or isn't an input, textarea or select.
+   */
   setValue(node: WNode, value: string, opts?: { force?: boolean }): void;
   /** Stops sending this root's records and forgets its nodes: the member stopped. */
   dispose(): void;
