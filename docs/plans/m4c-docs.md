@@ -2,7 +2,7 @@
 
 **Goal:** the docs on isoloop.dev, readable by people and by agents, and a pipeline that keeps them matching the code as features are added, changed and removed.
 
-**Status:** grilled 2026-11-20 (Q1–Q31, yes to all), and the API coverage the same day (Q32–Q42, decisions 32–42). Tasks 1, 2, 7 and 8 done 2026-11-20 (isoloop#307, web#207–#209). Phase A (tasks 1–20 and 28) doesn't wait for the API freeze. Phase B (tasks 21–27) starts after the freeze ([M4d](m4d-release.md) task 1), which starts on the maintainer's word.
+**Status:** grilled 2026-11-20 (Q1–Q31, yes to all), and the API coverage the same day (Q32–Q42, decisions 32–42). Tasks 1, 2, 7 and 8 done 2026-11-20 (isoloop#307, web#207–#209). Phase A (tasks 1–20 and 28) doesn't wait for the API freeze. Phase B (tasks 21–27) starts after the freeze ([M4d](m4d-release.md) task 1), which starts on the maintainer's word. *2026-11-20:* phase A is done, and the freeze started on the maintainer's word. Tasks 21–24 run as [M4d](m4d-release.md) tasks 7–10, after the API review's decisions (M4d tasks 2–6), and the docs go live with the API reference (M4d task 11). Task 25 (search) can follow after launch.
 
 **Done when:**
 
@@ -168,10 +168,10 @@ About one evening each ([conventions](README.md#conventions)). One PR per task. 
 
 | # | Task | Repo | Files | Tests | Needs |
 | --- | --- | --- | --- | --- | --- |
-| 21 | The TSDoc pass at decision 30's bar and `docs:check` item 7, inside M4d task 1; the `freeze` group in `pending` decided and emptied (decision 36) | library | `packages/*/src`, `scripts/docs/tsdoc.ts` | unit: an export without a comment fails, an `@example` that doesn't type-check fails | the freeze (maintainer) |
-| 22 | The API generator: `docs/api/<package>.md` from the published `.d.ts` through `readApi`, with the drift test | library | `scripts/docs/api.ts`, `docs/api/` | unit: a fixture `.d.ts`; CI: drift fails | 21 |
-| 23 | The CLI page from `args.ts`; each symbol's links to its guides from `map.json` | library | `scripts/docs/api.ts`, `docs/api/cli.md` | unit: every command and flag listed; a symbol's guide links | 22 |
-| 24 | The API pages on the site, Experimental pills, the API in `llms-full.txt` | web | `apps/site/build/docs/`, `apps/site/content/docs.json` | unit: an `@experimental` symbol gets the pill; smoke and axe on the API pages | 11, 12, 23 |
+| 21 | (M4d task 7) The TSDoc pass at decision 30's bar and `docs:check` item 7, inside M4d task 1; the `freeze` group in `pending` decided and emptied (decision 36) | library | `packages/*/src`, `scripts/docs/tsdoc.ts` | unit: an export without a comment fails, an `@example` that doesn't type-check fails | the freeze (maintainer) |
+| 22 | (M4d task 8) The API generator: `docs/api/<package>.md` from the published `.d.ts` through `readApi`, with the drift test | library | `scripts/docs/api.ts`, `docs/api/` | unit: a fixture `.d.ts`; CI: drift fails | 21 |
+| 23 | (M4d task 9) The CLI page from `args.ts`; each symbol's links to its guides from `map.json` | library | `scripts/docs/api.ts`, `docs/api/cli.md` | unit: every command and flag listed; a symbol's guide links | 22 |
+| 24 | (M4d task 10) The API pages on the site, Experimental pills, the API in `llms-full.txt` | web | `apps/site/build/docs/`, `apps/site/content/docs.json` | unit: an `@experimental` symbol gets the pill; smoke and axe on the API pages | 11, 12, 23 |
 | 25 | Search: the index plugin and the search box | web | `apps/site/build/docs/search.ts`, `apps/site/src/search.ts` | unit: ranking; E2E: type, pick a result, land on it; axe; no-JS hides the box | 24 |
 | 26 | The skill link in `llms.txt` | web | `apps/site/build/docs/llms.ts` | unit | M4a task 12 |
 | 27 | The M4c write-up: what the docs pipeline checks, and what it can't | library | `docs/posts/m4c-docs.md` | — (maintainer) | 25 |
