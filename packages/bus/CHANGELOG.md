@@ -1,5 +1,32 @@
 # @isoloop/bus
 
+## 0.1.0-next.9
+
+### Minor Changes
+
+- e5f3377: The API freeze marks Isoloop's own internals `@internal`, so they leave the public API and its reference: the bus's engine, storage and broker types and its helpers (`Broker`, `TsEngine`, `MemoryStorage`, `LogEngine`, `estimateSize`, `isContracts`, `topicConfig` and the rest), host's `HostRenderBridge`, runtime's `REQUIRES`, vite's `ISOLATES_ID`, `MANIFEST` and `WORKERS_ID`, and the worker DOM and applier in `@isoloop/dom/worker` and `@isoloop/dom/host`. They're still exported for the other `@isoloop/*` packages; app code shouldn't import them. `@isoloop/protocol` and `@isoloop/codec` say they're internal packages in their READMEs.
+- 5793b1a: Names settled for the API freeze:
+  
+  - `@isoloop/vite`: `IsolateManifest`, the type of `isoloop-manifest.json`, is now `BuildManifest`, so it no longer shares a name with host's spawn manifest.
+  - `@isoloop/host`: `kernel.request`'s options type is now `KernelRequestOptions` (`key`, `timeoutMs`, `signal`, `via`).
+  - `@isoloop/runtime`: exports `RequestOptions` (`key`, `timeoutMs`), the type of `bus.request`'s options. `@isoloop/react` and `@isoloop/preact` re-export it for `useRequest`, in place of their own copies.
+  - `@isoloop/balancer`: `createBalancer` takes host's `Kernel`. `KernelLike`, `ManifestLike`, `BeatLike`, `CrashLike`, `FailedLike` and `PoolLike` are no longer exported, and every export is `@experimental`.
+  - Marked `@experimental`: consumer groups (`SubscribeOptions.group`, `autoCommit`, `bus.commit`) and request/reply (`bus.request`, `bus.reply`, a topic's `reply` schema, `useRequest`, `RequestOptions`).
+- 18972a8: Crash reasons, durability reasons and the durability event are snake_case, like the error codes. The strings changed, so code that compares them needs the new spelling:
+  
+  - `CrashReason`: `worker-error` is now `worker_error`, `ready-timeout` is `ready_timeout`, `spawn-failed` is `spawn_failed`, `render-fmt-mismatch` is `render_format_mismatch`, `bus-failed` is `bus_failed`, `runtime-too-old` is `runtime_too_old` and `isolate-too-old` is `isolate_too_old`.
+  - `DurabilityDegraded`: `another-tab` is now `another_tab`, `no-sync-access` is `no_sync_access` and `open-failed` is `open_failed`.
+  - The kernel event `bus:durability-degraded` is now `bus:durability_degraded`.
+  
+  Option values you write in config, such as `'bottom-right'` or `'last-n'`, keep their kebab-case.
+
+### Patch Changes
+
+- Updated dependencies [e5f3377]
+- Updated dependencies [18972a8]
+  - @isoloop/protocol@0.1.0-next.9
+  - @isoloop/codec@0.1.0-next.9
+
 ## 0.1.0-next.8
 
 ### Patch Changes
