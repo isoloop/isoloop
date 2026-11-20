@@ -177,6 +177,25 @@
           "useTopic"
         ]
       }
+    },
+    "supervision": {
+      "paths": [
+        "packages/host/src/supervisor/",
+        "packages/host/src/compositor.ts",
+        "packages/host/src/bus/controller.ts"
+      ],
+      "exports": {
+        "@isoloop/host": [
+          "Backoff",
+          "CrashReason",
+          "FallbackInfo",
+          "FallbackRender",
+          "IsolateSnapshot",
+          "IsolateState",
+          "KernelEvent",
+          "KernelEvents"
+        ]
+      }
     }
   },
   "referenceOnly": {
