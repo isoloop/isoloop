@@ -1,6 +1,6 @@
 # ADR 0001: Own worker by default, named pools later
 
-- **Status:** Accepted
+- **Status:** Accepted. Amended on 2026-11-20 for a warm-up window after `ready` (*Start-up warm-up*, below), from the plant dashboard's restart loop on Firefox; grilled the same day (Q1–Q4, yes to all). Its code follows this amendment's acceptance.
 - **Date:** 2026-11-03
 - **Answers:** RFC 0001 open question "Workers per isolate, or a pool?"
 - **Related:** [ADR 0005](0005-bus-topology-message-channels.md) (per-isolate channels), [ADR 0007](0007-bus-worker-supervision.md) (durable topics), [ADR 0008](0008-isolates-and-surfaces.md) (headless isolates)
@@ -66,6 +66,14 @@ Supporting rules:
 - The `Supervisor` counts live workers (a pool counts as one) and emits a devtools warning when the count passes a configurable soft budget, fixed at 32 by default; devtools shows the device's reported cores and memory next to it. The budget never changes behaviour: it doesn't refuse spawns or trigger suspension. The real ceiling depends on the device, so it is a hint, not a guarantee.
 - If the browser fails to create a worker, that isolate crashes with reason `spawn-failed`: normal backoff and restart limit, ending in `failed` with the fallback UI, while the rest of the app keeps running. Before each retry the supervisor suspends every idle suspendable isolate to free memory.
 
+### Start-up warm-up (amended 2026-11-20)
+
+For `heartbeat.readyTimeoutMs` after an isolate's `ready` (10 s by default), a blocked isolate is killed only once it has gone `readyTimeoutMs` without a beat, not `killAfterMs`. After that window `killAfterMs` applies as before. There's no new option: an app that lowers `killAfterMs` so a short block restarts an isolate keeps that behaviour once the isolate has warmed up. `blockedAfterMs` is unchanged, so the busy overlay and the `blocked` state still show during the window; only the kill waits.
+
+- **Why:** an isolate sends `ready` before its `start()` runs (`startIsolate` in `packages/runtime/src/bootstrap.ts`), so mounting, subscribing and the first replay all happen after the supervisor has moved it to `running`, where the kill check applies (the `blocked` branch of `tick` in `packages/host/src/supervisor/machine.ts`). Nothing protected that start-up work. The plant dashboard sets `killAfterMs` to 2 s so its 3 s stress block restarts a pool (M3d decision 9; `apps/dashboards/plant/src/isoloop/kernel.ts` in isoloop/web). On the 4-vCPU GitHub runner in Firefox, its `widgets` pool (72 members under the default `matched` placement) went more than 2 s without a beat while mounting and replaying, so it was killed at 6–7 s. Each restart mounted and replayed again and was killed again about 3.5 s later. In the last 200 CI runs, that broke 7 of the 69 plant Firefox PR jobs, 4 of them on both attempts. Each failing attempt logged 144–216 crash events; every passing attempt logged none. A slow real device can enter the same loop.
+- **Applies to** own workers and pools alike. The window is the supervisor's, judged per isolate like every other heartbeat rule.
+- **Open question for this review:** heartbeats are per worker, but the window above starts at each member's own `ready`. In a pool, members start one after another in the same event loop, so a member whose window has closed can be killed while a later member's `start()` holds the loop, and the pool's shared fate then restarts everyone. The same happens when one member restarts alone (its own fatal error) inside a running pool. Recommendation: a pool member's window lasts until `readyTimeoutMs` after the latest `ready` on its worker, so the whole pool stays in warm-up while any member is starting. The alternative is to keep the window per member and accept that a pool can still loop if its members start more than `readyTimeoutMs` apart.
+
 ### What the browser still controls
 
 Isoloop's guarantees stop where the browser's tab policy starts. Background tabs throttle main-thread timers (to about once a second, or once a minute after a few minutes in Chrome); Memory Saver and mobile browsers may freeze a tab, pausing its workers; a tab may be discarded, losing memory topics (persistent topics survive). So:
@@ -81,6 +89,7 @@ Isoloop's guarantees stop where the browser's tab policy starts. Background tabs
 - Many small headless isolates are the most likely pressure towards pooling; the worker-count warning makes that pressure visible early.
 - Pools save a heap and a runtime copy per member, start members faster (no new worker), and use fewer threads. In exchange, pool members share an event loop (one can block the others), share fate (a crash or a hang restarts the whole pool, since a worker can only be terminated as a whole), and share `globalThis` and built-in prototypes (browsers offer no per-module realm in a worker yet). That is why pooling is opt-in and meant for trusted isolates. Because members can reach each other's bus ports, a pool effectively holds the union of its members' grants; devtools shows that union.
 - Supervision gains a group case in M2c: heartbeats are per worker, and a pool restart replays every member.
+- An isolate that really is stuck in a loop just after `ready` (or after a restart) is killed after `readyTimeoutMs` rather than `killAfterMs`. With the defaults (10 s each) nothing changes; with plant's 2 s threshold, a kill in the first 10 s after `ready` waits 10 s. A block in that window, such as plant's stress block right after load, shows the busy overlay but doesn't restart the isolate until the window closes (amended 2026-11-20).
 
 ## Alternatives considered
 
@@ -92,4 +101,6 @@ Isoloop's guarantees stop where the browser's tab policy starts. Background tabs
 - **Waking every suspended isolate on any record:** wakes hidden visual isolates for records nobody can see; rejected, since they can catch up from the log when shown.
 - **A device-derived budget (e.g. cores × 4):** browser-reported figures are coarse or hidden, and the warning would differ per machine; rejected for a fixed default.
 - **Suspending isolates as soon as the budget is passed:** turns a warning into behaviour; rejected. Memory is freed only after a real `spawn-failed`.
+- **Raising plant's `killAfterMs` to 2.5–3 s** instead of a library rule (2026-11-20): keeps the stress block restarting a pool, but leaves little margin on the runner, and every app with a short threshold would meet the same loop on a slow device.
+- **A longer threshold only in E2E builds** (2026-11-20): makes CI pass while hiding what a slow device hits; rejected.
 - **Hard worker limit:** fails apps on capable machines and still doesn't protect weak ones, since the real limit depends on the device. Rejected in favour of a warning.
