@@ -245,3 +245,100 @@ describe('host requests (kernel.request, ADR 0018)', () => {
     ]);
   });
 });
+
+// isoloop#288: a burst of requests larger than what the topic keeps.
+describe('a burst of requests past the retention', () => {
+  const wide = topic('price.wide.v1', {
+    schema: z.object({ sku: z.string() }),
+    reply: z.object({ cents: z.number() }),
+    retention: { kind: 'last-n', n: 2_000 },
+  });
+
+  /**
+   * Sends `n` requests at once, then answers each delivered one and commits
+   * them, round after round, like a responder whose commits land after its
+   * replies. `held` records are delivered and left uncommitted first, as a
+   * responder's commit window would leave them. Returns what was delivered,
+   * what the callers got, and the gaps the responder was told about.
+   */
+  async function burst(opts: { n: number; on: typeof price; inboxLimit?: number; held?: number }) {
+    const timers: { fn: () => void; ms: number }[] = [];
+    const broker = new Broker({
+      contracts: contracts(price, plain, wide),
+      engine: new TsEngine(),
+      timers: { set: (fn, ms) => void timers.push({ fn, ms }) },
+      ...(opts.inboxLimit === undefined ? {} : { inboxLimit: opts.inboxLimit }),
+    });
+    const caller = connect(broker, 'C', all);
+    const responder = connect(broker, 'R', all);
+    await responder.call('subscribe', { topic: opts.on.name, from: 'latest' });
+    const send = (i: number) =>
+      caller.send({
+        v: 1,
+        t: 'request',
+        id: `r${i}`,
+        p: { topic: opts.on.name, value: { sku: `s${i}` }, timeoutMs: 10_000 },
+      });
+    let i = 0;
+    for (; i < (opts.held ?? 0); i++) send(i);
+    await flush();
+    for (let j = 0; j < opts.n; j++, i++) send(i);
+    await flush();
+    let answered = 0;
+    for (let round = 0; round < 50; round++) {
+      const recs = responder.records(opts.on.name).slice(answered);
+      if (recs.length === 0) break;
+      // oxlint-disable-next-line no-await-in-loop -- each round reads what the last one freed
+      await Promise.all(
+        recs.map((r) =>
+          responder.call('reply', { topic: opts.on.name, offset: r.offset, value: { cents: 1 } }),
+        ),
+      );
+      answered += recs.length;
+      const last = recs.at(-1)!;
+      // oxlint-disable-next-line no-await-in-loop -- the commit frees credit for the next round
+      await responder.call('commits', {
+        offsets: [{ topic: opts.on.name, offset: last.offset, seq: responder.seq(opts.on.name) }],
+      });
+    }
+    for (const t of timers.splice(0)) t.fn();
+    const results = caller.inbox.flatMap((m) =>
+      m.t === 'result' && m.re?.startsWith('r') ? [m.p] : [],
+    );
+    const gaps = responder.inbox.flatMap((m) => (m.t === 'deliver' && m.p.gap ? [m.p.gap] : []));
+    return {
+      delivered: answered,
+      replied: results.filter((r) => r.ok).length,
+      timedOut: results.filter((r) => !r.ok && r.error.code === 'timeout').length,
+      gaps,
+    };
+  }
+
+  it('answers every call when the burst fits the credit (control)', async () => {
+    expect(await burst({ n: 50, on: price })).toMatchObject({
+      delivered: 50,
+      replied: 50,
+      timedOut: 0,
+    });
+  });
+
+  // Fails today (isoloop#288): requests appended past the retention before the
+  // responder is pumped are evicted undelivered. The responder gets a `gap`,
+  // nobody answers, and each caller waits out its own timeout. Flip to `it`
+  // once the decision on #288 lands.
+  it.fails('answers 1,000 calls at once on a topic keeping 100, with the full credit', async () => {
+    expect(await burst({ n: 1_000, on: price })).toMatchObject({ replied: 1_000, timedOut: 0 });
+  });
+
+  it.fails('answers 1,000 calls on a topic keeping 100 when 300 are still uncommitted', async () => {
+    const r = await burst({ n: 1_000, held: 300, on: price });
+    expect(r).toMatchObject({ replied: 1_300, timedOut: 0, gaps: [] });
+  });
+
+  it('answers the same burst on a topic keeping 2,000', async () => {
+    expect(await burst({ n: 1_000, held: 300, on: wide })).toMatchObject({
+      replied: 1_300,
+      timedOut: 0,
+    });
+  });
+});
