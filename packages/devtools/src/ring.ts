@@ -155,10 +155,10 @@ export function summaryOf(arcs: readonly Arc[], checks: readonly Check[]): strin
   return parts.length > 0 ? parts.join('. ') : 'All checks pass';
 }
 
-/** The SVG path of arc `i` of `RING_SLOTS` on a circle: a gap between neighbours. */
+/** The SVG path of arc `i` of `RING_SLOTS` on a circle. Neighbours overlap a hair so no seam shows. */
 export function arcPath(i: number, cx: number, cy: number, r: number): string {
   const step = 360 / RING_SLOTS;
-  const gap = 6;
+  const gap = -0.8;
   const a0 = ((-90 + i * step + gap / 2) * Math.PI) / 180;
   const a1 = ((-90 + (i + 1) * step - gap / 2) * Math.PI) / 180;
   const p = (a: number): string =>

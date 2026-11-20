@@ -84,18 +84,21 @@ const FAB_MARK = 46;
 const RING_PERIOD = 2.4;
 
 /**
- * The wave: every arc fades up and down on the same clock, each a step behind
- * the last (the delays are set per arc), so brightness runs around the ring.
- * A failing arc pulses faster; a grey one sits still. Reduced motion: no motion.
+ * The wave: every arc brightens and dims on the same clock, each a step behind
+ * the last (the delays are set per arc), so brightness runs round the ring. The
+ * colour is animated, not the opacity, so where two arcs overlap by a hair no
+ * seam shows. A failing arc pulses faster; a grey one sits still. Reduced
+ * motion: no motion.
  */
 const RING_CSS = `
-@keyframes dt-flow { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-@keyframes dt-alarm { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
-.dt-ring path { animation: dt-flow ${RING_PERIOD}s ease-in-out infinite; }
+@keyframes dt-flow-ok { 0%, 100% { stroke: #15803d; } 50% { stroke: #22c55e; } }
+@keyframes dt-flow-unwell { 0%, 100% { stroke: #a16207; } 50% { stroke: #f59e0b; } }
+@keyframes dt-alarm { 0%, 100% { stroke: #ef4444; } 50% { stroke: #7f1d1d; } }
+.dt-ring path[data-level="ok"] { animation: dt-flow-ok ${RING_PERIOD}s ease-in-out infinite; }
+.dt-ring path[data-level="unwell"] { animation: dt-flow-unwell ${RING_PERIOD}s ease-in-out infinite; }
 .dt-ring path[data-level="failed"] { animation: dt-alarm 0.9s ease-in-out infinite; }
-.dt-ring path[data-level="unknown"] { animation: none; opacity: 0.45; }
 @media (prefers-reduced-motion: reduce) {
-  .dt-ring path, .dt-ring path[data-level="failed"] { animation: none; opacity: 1; }
+  .dt-ring path { animation: none; }
 }
 `;
 
@@ -103,7 +106,7 @@ const LEVEL_COLOR: Record<Level, string> = {
   ok: '#22c55e',
   unwell: '#f59e0b',
   failed: '#ef4444',
-  unknown: '#64748b',
+  unknown: '#334155',
 };
 
 const STEP: Record<DevtoolsPosition, Record<'horizontal' | 'vertical', DevtoolsPosition>> = {
@@ -196,7 +199,7 @@ function Fab(props: {
                 d={arcPath(i, FAB_SIZE / 2, FAB_SIZE / 2, FAB_SIZE / 2 - 4)}
                 stroke={LEVEL_COLOR[c.level]}
                 stroke-width="3"
-                stroke-linecap="round"
+                stroke-linecap="butt"
                 fill="none"
                 style={`animation-delay:-${((i / RING_SLOTS) * RING_PERIOD).toFixed(2)}s;`}
               >
