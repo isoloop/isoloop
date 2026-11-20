@@ -1,6 +1,6 @@
 # Writing the docs
 
-These rules apply to the guides in [`docs/guide`](guide/), the TSDoc that the API reference is generated from, the "build with Isoloop" skill, and the `AGENTS.md` snippet in getting started. They're decided in [M4c](plans/m4c-docs.md), decisions 9, 19, 20 and 30. Rules marked **(checked)** fail `pnpm docs:check`. The steward reviews the rest on each PR.
+These rules apply to the guides in [`docs/guide`](guide/), the TSDoc that the API reference is generated from, the package READMEs, the changesets, the "build with Isoloop" skill, and the `AGENTS.md` snippet in getting started. They're decided in [M4c](plans/m4c-docs.md), decisions 9, 19, 20 and 30. Rules marked **(checked)** fail `pnpm docs:check`. The steward reviews the rest on each PR.
 
 ## Voice
 
@@ -54,6 +54,17 @@ One sentence: what this page covers and who it's for.
 - **`## See also`** links related guides and the ADRs behind the page. The API reference links each symbol to its guides on its own (from `docs/guide/map.json`), so the guides don't link the reference symbol by symbol.
 
 The API reference (`docs/api/`) is generated from TSDoc, so it's never edited by hand.
+
+## Package READMEs
+
+A package's `README.md` is what npm shows, so it says what the package is and sends the reader to the guide. It holds four things, in this order:
+
+1. **A lead sentence:** what the package is, and `@experimental` or **Internal** when it is.
+2. **The install command.**
+3. **One snippet:** the smallest call that uses it.
+4. **A link to its guide.**
+
+Limits, defaults, options and behaviour live in the guide, not the README, so there is one place to keep current. An internal package with no guide lists its entry points instead of the snippet and the link.
 
 ## Code blocks
 

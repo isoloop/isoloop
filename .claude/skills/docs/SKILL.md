@@ -30,11 +30,16 @@ Done when every item on both lists has its guides named, or is marked "reference
 | A new feature | A section in the guide that covers its area. If no guide fits, a new guide (step 4). TSDoc on every new export. |
 | Changed behaviour | Every section, in every guide found in step 1, that describes the old behaviour. The TSDoc of the exports involved. |
 | A renamed export | Every page that names it, in prose and in code. |
+| A new name for something users see or type (an option value, a CLI flag, an error code, a tab, button or column in the panel), or a changed limit | Every place that states it: the guides, the package README, the changeset, the TSDoc, and the site's feature entries (through Site impact). Search for the old name or figure; don't rely on the map. |
 | A removed export or feature | Rewrite or delete every section that names it. If a whole guide goes, step 4. |
 | A new limit found | The guide's `## Limits`, and "What Isoloop can't hide" if it applies to Isoloop as a whole. |
 | A new or changed measurement | The figure, with its device, build, version and date, and its link to the results. |
 
 TSDoc follows the bar in `docs/writing.md` § TSDoc.
+
+**The changeset** says what changed, as shipped. It gives a limit, a default or a count only with the exact figure the guide gives; otherwise it leaves it to the guide.
+
+**An ADR the change makes stale** is fixed in its own PR, since ADR changes go to the maintainer. Open it as a draft that says "after #N" (the code PR), with no date, and rebase it once #N merges: only then does the ADR describe code that exists.
 
 Done when every item from step 1 has its docs change, or the PR description gives the reason it needs none.
 
