@@ -116,7 +116,7 @@ kernel.spawn({ id: 'devtools', url, grants: { publish: [], subscribe: [], inspec
   };
   ```
 
-- **Skipped records reach the reader (amended 2026-11-19).** The host's `Inspector.tap` and `ctx.inspector.tap` both take `onSkipped?: (count: number) => void`, `@experimental`. It's called with each count of records the bus left out over `maxPerSec` (decision 3), the `skipped` messages the tap's port already carries, at most one a second. Before, the isolate side dropped them, so a reader couldn't tell a quiet topic from one over the cap. Readers that pass nothing see no change. The devtools panel's Log header shows the cap and the total skipped since the log was opened (`50/s cap · N skipped`), starting again from zero when it's reopened.
+- **Skipped records reach the reader (amended 2026-11-19).** The host's `Inspector.tap` and `ctx.inspector.tap` both take `onSkipped?: (count: number) => void`, `@experimental`. It's called with each count of records the bus left out over `maxPerSec` (decision 3), the `skipped` messages the tap's port already carries, at most one a second. Before, the isolate side dropped them, so a reader couldn't tell a quiet topic from one over the cap. Readers that pass nothing see no change. The devtools panel's Messages header (the Log tab, until it was renamed on 2026-11-20) shows the cap and the total skipped since the tab was opened (`50/s cap · N skipped`), starting again from zero when it's reopened.
 
 ### 7. A versioned, additive message format
 
