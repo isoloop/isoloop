@@ -90,7 +90,7 @@ flowchart LR
 | `@isoloop/runtime` | isolate worker | `protocol`, `dom/worker` | `host`, `bus` |
 | `@isoloop/react`, `@isoloop/preact` | isolate worker | `runtime`, the framework (peer dep) | `host` |
 | `@isoloop/balancer` (experimental) | main thread | `host` (the public kernel API and the internal `claimPools`) | `runtime`, `bus` ([ADR 0017](../adr/0017-opt-in-balancer.md)) |
-| `@isoloop/devtools` (experimental) | main thread (the mount), isolate worker (the panel, a visual isolate) | `host` (mount); `preact` and `runtime` (panel) | `bus`; the mount must not depend on `runtime`, nor the panel on `host` |
+| `@isoloop/devtools` (experimental) | main thread (the mount), isolate worker (the panel, a visual isolate) | `host` (mount); `preact`, `runtime` and `protocol` (panel) | `bus`; the mount must not depend on `runtime`, nor the panel on `host` |
 | `@isoloop/webmcp` (experimental) | main thread | `host` | `runtime`, `bus` ([ADR 0018](../adr/0018-tools-for-agents.md)) |
 | `isoloop` (`packages/cli`) | Node | `bus` (contracts, JSON Schema), `protocol` (the dev MCP wire) | every browser package (`host`, `runtime`, `dom`, the adapters) |
 
