@@ -1,6 +1,6 @@
 # M3j: Balancer gaps
 
-**Status:** in progress (grilled 2026-11-17; decisions 14–17 added 2026-11-18, 18–21 after the bench run the same day, 22–25 after the re-run on 2026-11-19, 26–30 after the fault runs on next.4 the same day, and 31–32 after the runs on next.5 and next.6). An amendment to [ADR 0017](../adr/0017-opt-in-balancer.md) was accepted on 2026-11-17, a second (decisions 14–16) on 2026-11-18, a third (decision 22) on 2026-11-19, and a fourth (decision 27) the same day. An amendment to [ADR 0016](../adr/0016-fewer-messages-per-record.md) (decision 18) was accepted on 2026-11-18 and shipped in `0.1.0-next.3`. The balancer change is built in `isoloop/isoloop`, and the processor changes and the measurement in `isoloop/web`. M3j ships as a `0.1.0-next.N` prerelease, then `processor-v0.3.0`, tagged by the user.
+**Status:** in progress (grilled 2026-11-17; decisions 14–17 added 2026-11-18, 18–21 after the bench run the same day, 22–25 after the re-run on 2026-11-19, 26–30 after the fault runs on next.4 the same day, and 31–32 after the runs on next.5 and next.6, decision 32 accepted on 2026-11-20). An amendment to [ADR 0017](../adr/0017-opt-in-balancer.md) was accepted on 2026-11-17, a second (decisions 14–16) on 2026-11-18, a third (decision 22) on 2026-11-19, and a fourth (decision 27) the same day. An amendment to [ADR 0016](../adr/0016-fewer-messages-per-record.md) (decision 18) was accepted on 2026-11-18 and shipped in `0.1.0-next.3`. The balancer change is built in `isoloop/isoloop`, and the processor changes and the measurement in `isoloop/web`. M3j ships as a `0.1.0-next.N` prerelease, then `processor-v0.3.0`, tagged by the user.
 
 **Goal:** `@isoloop/balancer` sees work its busy time misses, packs quiet members back while work keeps arriving, lets members out of the quarantine, and stops placing or reviving an isolate the kernel has given up on.
 
@@ -176,7 +176,7 @@ Task 6d ran the fault and faults-then-calm mixes on hauseserver on web `c4503e5`
 - **The cause is in the runtime, not the balancer.** A pool's worker closed itself when its member table emptied (`shutdownMember`, `packages/runtime/src/bootstrap.ts`). A member leaves that table when its shutdown starts, so the worker closed while other members were still shutting down. Their `bye` was lost, and each stop waited out its 1 s grace. The host's loader still counted those members, kept the closed worker, and sent the next start into it.
 - **The runs show it:** in each of the 3, the last two moves out of `balancer-quarantine-1` before the timeouts cost 1.07 to 1.10 s, against about 0.2 s for the others.
 
-31. **A pool's worker never closes itself;** the loader ends it after its last member, as design §4.2 says ([#285](https://github.com/isoloop/isoloop/pull/285), with a test that failed without it). Released in `0.1.0-next.6` (task 3f), web on it (task 5f, web#193), and every mix measured again on it (task 6e), the normal one too: the next.3 normal runs showed the same 1 s moves out of the quarantine.
+31. **A pool's worker never closes itself;** the loader ends it after its last member, as design §4.2 says ([#285](https://github.com/isoloop/isoloop/pull/285), with a test that failed without it). Released in `0.1.0-next.6` (task 3f), web on it (task 5f, web#193), and every mix measured again on it (task 6e), the normal one too: in each of the 10 balancer runs of the next.3 normal mix (task 6b, web `2b7e4d6`), the first moves out of the quarantine cost 1.03 to 1.10 s, the same 1 s grace.
 
 ### Found by the runs on next.6 (2026-11-19)
 
@@ -187,7 +187,7 @@ Task 6e ran all three mixes on hauseserver from 17:38 to 20:57 UTC on web `718f2
 - **No pack back in the calm:** the two pools carry 44 to 75 % of a core each, and a merge must stay under 40 %. That's the rule working, not a gap.
 - **The move budget kept an offender in the quarantine past the 2-minute cap** in 5 of the 6 calm runs, until its third move in 5 minutes aged out. Every move counts toward the budget, as ADR 0017 decision 6 says.
 
-32. **The move budget stays as it is** (finding 7 of the write-up), named in its known limits. M3j's measurement is done.
+32. **The move budget stays as it is** (finding 7 of the write-up), named in its known limits. Accepted by the user on 2026-11-20. M3j's measurement is done.
 
 ## Tasks
 
