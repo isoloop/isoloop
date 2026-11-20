@@ -5,8 +5,16 @@ import { useCallback } from 'react';
 import { useIsolate } from '../context';
 
 /**
- * A function that sends a request on `topic` and resolves with the reply.
- * It rejects with a `BusError`, `timeout` after `timeoutMs` (default 30 s).
+ * A function that sends a request on `topic` and resolves with the first valid reply.
+ * The function is stable while `topic` is the same.
+ *
+ * @param topic - A topic with a `reply` schema.
+ * @returns `(value, opts?) => Promise<reply>`. `opts` takes `key` and `timeoutMs`
+ *   (default 30 s). The promise rejects with a `BusError`: `timeout` when no reply came
+ *   in time, `dropped` when retention removed the request before any subscriber got it,
+ *   `reply_invalid` when the reply failed the `reply` schema, `not_requestable` on a
+ *   topic without one, and the publish codes (`forbidden`, `invalid`, `too_large`,
+ *   `unknown_topic`, `bus_unavailable`) for the request itself.
  * @experimental
  */
 export function useRequest<In, ROut>(

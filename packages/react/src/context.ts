@@ -9,7 +9,13 @@ export const IsolateCtx: Context<IsolateContext | null> = createContext<IsolateC
   null,
 );
 
-/** The isolate context. Throws outside a component that `defineIsolate` rendered. */
+/**
+ * The isolate's context, as `start(ctx)` gets it: `ctx.bus`, `ctx.host`, `ctx.config` and
+ * the rest.
+ *
+ * @returns The context of the isolate this component runs in.
+ * @throws `Error` outside a component that `defineIsolate` rendered.
+ */
 export function useIsolate(): IsolateContext {
   const ctx = useContext(IsolateCtx);
   if (!ctx) throw new Error('useIsolate: not inside a component rendered by defineIsolate()');
@@ -17,9 +23,12 @@ export function useIsolate(): IsolateContext {
 }
 
 /**
- * `ctx.portalRoot`: the container inside this isolate's surface for modals,
- * tooltips, toasts and menus (ADR 0015), for `createPortal` or a library's
- * container option. Throws in a headless isolate.
+ * The container inside this isolate's surface for modals, tooltips, toasts and menus
+ * (`ctx.portalRoot`), for `createPortal` or a library's container option. Content
+ * portalled there stays inside the isolate's surface.
+ *
+ * @returns The portal container.
+ * @throws `Error` in a headless isolate, or outside a component that `defineIsolate` rendered.
  */
 export function usePortalRoot(): Element {
   const portal: unknown = useIsolate().portalRoot;

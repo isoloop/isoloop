@@ -15,8 +15,11 @@ import {
 } from 'preact';
 import { IsolateCtx } from './context';
 
-/** Props every isolate component gets: `manifest.config`, passed through. */
-export type IsolateProps = { config: unknown };
+/** The props `defineIsolate` passes to the isolate's component. */
+export type IsolateProps = {
+  /** The `config` the isolate was spawned with (`manifest.config`), passed through unchanged; `undefined` when it has none. */
+  config: unknown;
+};
 
 type BoundaryProps = { ctx: IsolateContext; children?: ComponentChildren };
 
@@ -85,6 +88,31 @@ function bindBatches(ctx: IsolateContext): void {
   Reflect.set(options, BOUND, true);
 }
 
+/**
+ * Makes `Component` an isolate: the module's default export, which renders it into the
+ * isolate's surface (with Preact) and unmounts it on shutdown, so effects clean up and
+ * subscriptions end. Every hook in this package works inside it.
+ *
+ * A render error is caught at the root and reported as this isolate's own crash, so in
+ * a pool it fails only this member. The isolate needs a surface: started headless, it
+ * throws an `Error` at start.
+ *
+ * @param Component - The root component. It gets {@link IsolateProps}.
+ * @returns The isolate definition, stamped with the runtime version it was built against.
+ * @example
+ * ```tsx
+ * import { defineIsolate, usePublish, useTopic } from '@isoloop/preact';
+ * import { count } from './topics';
+ *
+ * function Counter() {
+ *   const n = useTopic(count, { from: 'earliest' }) ?? 0;
+ *   const publish = usePublish(count);
+ *   return <button onClick={() => void publish(n + 1)}>Count: {n}</button>;
+ * }
+ *
+ * export default defineIsolate(Counter);
+ * ```
+ */
 export function defineIsolate(Component: ComponentType<IsolateProps>): IsolateDefinition {
   return {
     // The version this isolate was built against (ADR 0012), as runtime's `defineIsolate` stamps it.

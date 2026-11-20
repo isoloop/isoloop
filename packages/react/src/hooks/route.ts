@@ -6,7 +6,13 @@
 import { routeTopic, type RouteValue } from '@isoloop/protocol';
 import { useTopic } from './topic';
 
-/** The current route, or `undefined` until the first record arrives (or with routing off). */
+/**
+ * The host's current location. The route is read only while a component uses this hook.
+ *
+ * @returns The current route, or `undefined` until the first one arrives, and always
+ *   with routing off.
+ * @throws `Error` outside a component that `defineIsolate` rendered.
+ */
 export function useRoute(): RouteValue | undefined {
   return useTopic(routeTopic, { from: 'earliest' });
 }
