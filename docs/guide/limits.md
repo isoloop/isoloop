@@ -88,7 +88,7 @@ On the plant dashboard (72 widgets), native + workers against Isoloop's `matched
 
 Other devices and engines tell a different story:
 
-- **On an older phone** (Safari 16.6, 2026-11-13), the plant dashboard's native build held 60 frames a second at 1 and 5 kHz, and the Isoloop placements did worse the more workers they used: at 5 kHz, 59.5 frames a second with 1 worker and 5.6 with 105 ([engine constraints §2](../investigations/engine-constraints.md#2-webkit-presents-worker-drawn-canvas-frames-through-the-main-thread)).
+- **On an older iOS phone** (Safari 16.6, 2026-11-13), the plant dashboard's native build held 60 frames a second at 1 and 5 kHz, and the Isoloop placements did worse the more workers they used: at 5 kHz, 59.5 frames a second with 1 worker and 5.6 with 105 ([engine constraints §2](../investigations/engine-constraints.md#2-webkit-presents-worker-drawn-canvas-frames-through-the-main-thread)).
 - **In Playwright's WebKit on Linux,** every frame a worker draws on a transferred canvas costs the main thread time, so pages with many canvas widgets slow down there ([§2](../investigations/engine-constraints.md#2-webkit-presents-worker-drawn-canvas-frames-through-the-main-thread)). Safari 26.5 on an iPad doesn't show it.
 - **Each worker has its own heap.** The kernel warns past 32 live workers (`workers.budget`, [hosting](hosting.md#placement-rules)). [Pools](pools.md) share a worker to save memory, at the cost of a shared event loop and fate.
 
