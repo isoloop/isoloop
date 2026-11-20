@@ -26,7 +26,7 @@ export type TopicDef<In, Out = In, RIn = never, ROut = RIn> = {
   readonly name: string;
   /** Required. `unchecked<T>()` is the explicit opt-out. */
   readonly schema: StandardSchemaV1<In, Out>;
-  /** Required for `bus.request`. */
+  /** Required for `bus.request`. @experimental */
   readonly reply?: StandardSchemaV1<RIn, ROut>;
   readonly retention: Retention;
   /** Rough structured size limit per record. Default 256 KiB. */

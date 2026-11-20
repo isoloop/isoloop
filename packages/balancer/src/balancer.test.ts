@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createBalancer } from './balancer';
+import { balance } from './balancer';
 import { memoryLoads, SimKernel } from './sim';
-import type { Balancer, BalancerOptions, FailedEvent, MoveEvent } from './types';
+import type { BalancerOf, BalancerOptions, FailedEvent, MoveEvent } from './types';
 
 let sim: SimKernel;
-let balancer: Balancer;
+let balancer: BalancerOf;
 let moves: MoveEvent[];
 
 const start = (opts: BalancerOptions = {}, sim_ = new SimKernel()): void => {
   sim = sim_;
-  balancer = createBalancer(sim, { maxWorkers: 10, ...opts });
+  balancer = balance(sim, { maxWorkers: 10, ...opts });
   moves = [];
   balancer.on('move', (e) => moves.push(e));
 };
@@ -447,7 +447,7 @@ describe('after a move', () => {
 describe('one balancer per kernel', () => {
   it('a second balancer on the same kernel throws balancer_exists', () => {
     start();
-    expect(() => createBalancer(sim)).toThrow(expect.objectContaining({ code: 'balancer_exists' }));
+    expect(() => balance(sim)).toThrow(expect.objectContaining({ code: 'balancer_exists' }));
   });
 
   it('allows a new balancer once the first is disposed; the old one spawns nothing', async () => {
@@ -458,10 +458,10 @@ describe('one balancer per kernel', () => {
     first.dispose(); // twice is harmless
     expect(() => first.spawn({ id: 'b' })).toThrow(/disposed/);
     // The kernel's claim is free again.
-    balancer = createBalancer(sim, { maxWorkers: 10 });
+    balancer = balance(sim, { maxWorkers: 10 });
     expect(() => balancer.spawn({ id: 'c' })).not.toThrow();
     // And held again by the new one.
-    expect(() => createBalancer(sim)).toThrow(expect.objectContaining({ code: 'balancer_exists' }));
+    expect(() => balance(sim)).toThrow(expect.objectContaining({ code: 'balancer_exists' }));
     await wait(100);
   });
 
@@ -474,9 +474,7 @@ describe('one balancer per kernel', () => {
       pools: () => [],
       on: () => () => {},
     };
-    expect(() => createBalancer(plain)).toThrow(
-      expect.objectContaining({ code: 'invalid_config' }),
-    );
+    expect(() => balance(plain)).toThrow(expect.objectContaining({ code: 'invalid_config' }));
   });
 
   it("names its pools balancer-N and its quarantines balancer-quarantine-N, which plain spawn can't use", () => {

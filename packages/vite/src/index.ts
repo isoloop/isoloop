@@ -16,7 +16,7 @@ import { devMcpGuard, type DevMcpGuardOptions } from './guard';
 
 export { devCsp, headersFor, WORKERS_ID, type HeaderOptions, type WorkersOptions } from './dev';
 
-export { ISOLATES_ID, MANIFEST, type BuildOptions, type IsolateManifest } from './build';
+export { ISOLATES_ID, MANIFEST, type BuildOptions, type BuildManifest } from './build';
 
 export type { DevMcpGuardOptions } from './guard';
 

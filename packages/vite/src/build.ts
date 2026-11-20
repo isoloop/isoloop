@@ -32,7 +32,7 @@ export type BuildOptions = {
 };
 
 /** What `isoloop-manifest.json` holds: each isolate's file, relative to the output directory. */
-export type IsolateManifest = { isolates: Record<string, string> };
+export type BuildManifest = { isolates: Record<string, string> };
 
 export function buildPlugin(o: BuildOptions): Plugin {
   const isolates = o.isolates ?? {};
@@ -106,7 +106,7 @@ export function buildPlugin(o: BuildOptions): Plugin {
     },
     generateBundle(_opts, bundle) {
       if (Object.keys(isolates).length === 0) return;
-      const manifest: IsolateManifest = { isolates: {} };
+      const manifest: BuildManifest = { isolates: {} };
       if (o.library) {
         for (const chunk of Object.values(bundle)) {
           if (chunk.type === 'chunk' && chunk.isEntry && chunk.name in isolates) {

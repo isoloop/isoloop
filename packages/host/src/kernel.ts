@@ -38,7 +38,7 @@ import {
   requestOptionsProblem,
   type AgentsConfig,
   type AgentTool,
-  type RequestOptions,
+  type KernelRequestOptions,
 } from './agents';
 import { createBusController, HOST_CONNECTION_PREFIX, type BusController } from './bus/controller';
 import { createCompositor, type FallbackRender, type SurfaceStats } from './compositor';
@@ -395,7 +395,7 @@ export interface Kernel {
   request<In, ROut>(
     topic: TopicRef<In, any, any, ROut>,
     value: In,
-    opts?: RequestOptions,
+    opts?: KernelRequestOptions,
   ): Promise<ROut>;
   /**
    * The tools exposed through `agents.expose` (ADR 0018, decision 2), with

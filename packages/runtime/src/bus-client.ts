@@ -40,6 +40,14 @@ import {
   type TypedRecord,
 } from '@isoloop/protocol';
 
+/** `request`'s options. @experimental */
+export type RequestOptions = {
+  /** The request record's key. */
+  key?: string;
+  /** Default 30 s: the call rejects with `BusError('timeout')` after it. */
+  timeoutMs?: number;
+};
+
 export type SubscribeOptions = {
   /**
    * Default `latest`. With `group`, it applies only while the group has no
@@ -48,9 +56,9 @@ export type SubscribeOptions = {
    * group is (ADR 0016, point 14).
    */
   from?: StartPosition;
-  /** Share the topic with other subscribers of the same group: each record goes to one of them. */
+  /** Share the topic with other subscribers of the same group: each record goes to one of them. @experimental */
   group?: string;
-  /** Default true: commit each record once its handler settles. */
+  /** Default true: commit each record once its handler settles. @experimental */
   autoCommit?: boolean;
   /**
    * A bus restart lost this memory topic (ADR 0007). Clear what was built
@@ -78,17 +86,22 @@ export interface BusClient {
    * `timeoutMs` (default 30 s), or with `dropped` at once when the topic's
    * retention removed the request before the bus delivered it to any
    * subscriber.
+   * @experimental
    */
   request<In, ROut>(
     topic: TopicRef<In, any, any, ROut>,
     value: In,
-    opts?: { key?: string; timeoutMs?: number },
+    opts?: RequestOptions,
   ): Promise<ROut>;
-  /** Answers a request record delivered to this isolate; the broker checks `value` against the topic's `reply` schema. */
+  /**
+   * Answers a request record delivered to this isolate; the broker checks `value` against the topic's `reply` schema.
+   * @experimental
+   */
   reply(record: TypedRecord<unknown>, value: unknown): Promise<void>;
   /**
    * Commits a record by hand, for `autoCommit: false`: that record and every
    * one delivered before it on its subscription count as settled.
+   * @experimental
    */
   commit(record: TypedRecord<unknown>): void;
 }

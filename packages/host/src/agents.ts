@@ -65,7 +65,7 @@ export type AgentTool = {
 };
 
 /** `kernel.request`'s options (ADR 0018, decision 4). @experimental */
-export type RequestOptions = {
+export type KernelRequestOptions = {
   key?: string;
   /** Default 30 s, the bus's. Transports pass `agents.timeoutMs` (`AgentTool.timeoutMs`). */
   timeoutMs?: number;
@@ -90,7 +90,7 @@ export function agentsConfigProblem(a: AgentsConfig): string | undefined {
 }
 
 /** `request`'s options problems, or `undefined`. */
-export function requestOptionsProblem(o: RequestOptions): string | undefined {
+export function requestOptionsProblem(o: KernelRequestOptions): string | undefined {
   const t = o.timeoutMs;
   if (t !== undefined && !(typeof t === 'number' && Number.isFinite(t) && t > 0))
     return 'timeoutMs must be a positive number of milliseconds';

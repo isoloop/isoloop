@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build, defaultClientConditions } from 'vite';
 import { afterEach, describe, expect, it } from 'vitest';
-import { isoloop, MANIFEST, type IsoloopOptions, type IsolateManifest } from './index';
+import { isoloop, MANIFEST, type IsoloopOptions, type BuildManifest } from './index';
 
 // M3a task 16: builds emit one ES module per isolate, exports kept, and a
 // manifest of their files, in an app and in library mode.
@@ -16,7 +16,7 @@ afterEach(async () => {
   await Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));
 });
 
-async function run(o: IsoloopOptions): Promise<{ out: string; manifest: IsolateManifest }> {
+async function run(o: IsoloopOptions): Promise<{ out: string; manifest: BuildManifest }> {
   const out = await mkdtemp(join(tmpdir(), 'isoloop-vite-'));
   dirs.push(out);
   await build({
@@ -29,7 +29,7 @@ async function run(o: IsoloopOptions): Promise<{ out: string; manifest: IsolateM
   });
   const parsed: unknown = JSON.parse(await readFile(join(out, MANIFEST), 'utf8'));
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the plugin wrote it
-  return { out, manifest: parsed as IsolateManifest };
+  return { out, manifest: parsed as BuildManifest };
 }
 
 async function startOf(file: string): Promise<unknown> {
