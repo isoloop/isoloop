@@ -69,7 +69,7 @@ const kernel = createKernel({ contracts: { url: contractsUrl, list }, workers })
 | `retention` | required | How much of the topic the bus keeps: `{ kind: 'last-n', n }`, `{ kind: 'time', ms }`, or `{ kind: 'compacted' }` (the latest record per key). |
 | `durability` | `'memory'` | `'persistent'` keeps the topic in OPFS, so it survives a bus crash and a reload. Where OPFS isn't available, or another tab holds it, the topic behaves as `'memory'` and the kernel emits `bus:durability_degraded`. |
 | `maxRecordBytes` | 256 KiB (`DEFAULT_MAX_RECORD_BYTES`) | A record over it rejects with `too_large`. |
-| `reply` | none | A schema for replies, which makes the topic requestable ([below](#request-and-reply)). |
+| `reply` | none | A schema for replies, which makes the topic requestable (`@experimental`, [below](#request-and-reply)). |
 | `seed` | none | Starts the topic from an older one ([below](#versions-and-migrations)). |
 | `tool` | none | Describes a requestable topic as a tool for agents (`@experimental`, [agents guide](agents.md)). |
 
@@ -163,7 +163,7 @@ A migration that `map` can't express (joining topics, calling a server) is a hea
 
 ## Request and reply
 
-A topic with a `reply` schema is **requestable**. The request is an ordinary record on the topic, and the reply goes straight back to the caller, outside the log. `ReplyInputOf` and `ReplyOutputOf` give the reply's two types.
+Request and reply are `@experimental` in 0.1. A topic with a `reply` schema is **requestable**. The request is an ordinary record on the topic, and the reply goes straight back to the caller, outside the log. `ReplyInputOf` and `ReplyOutputOf` give the reply's two types.
 
 ```ts
 import { defineIsolate } from '@isoloop/runtime';
