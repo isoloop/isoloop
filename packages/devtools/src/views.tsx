@@ -14,7 +14,8 @@ import type { IsolateInspector } from '@isoloop/runtime';
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { BusView, type BusSub } from './bus-view';
-import { LogView } from './log-view';
+import { EventsView, problemCount } from './events-view';
+import { MessagesView } from './messages-view';
 import { SubTabs, subId, subPanelId, type SubItem } from './subtabs';
 
 /** How long the block control busy-loops an isolate's worker. */
@@ -98,6 +99,12 @@ const CSS = `
 .dt-sr { position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; }
 .dt-log-row { cursor: pointer; }
+.dt-ev-bad .dt-ev-dot { color: #ef4444; }
+.dt-ev-warn .dt-ev-dot { color: #f59e0b; }
+.dt-ev-good .dt-ev-dot { color: #22c55e; }
+.dt-ev-info .dt-ev-dot { color: #64748b; }
+.dt-ev-bad td.dt-vclip { color: #fca5a5; }
+.dt-ev-warn td.dt-vclip { color: #fcd34d; }
 .dt-log-row:hover { background: #172033; }
 .dt-log-row[aria-expanded="true"] { background: #172033; }
 .dt-table tr.dt-log-detail td { white-space: normal; background: #0b1220; padding: 6px 8px; }
@@ -375,12 +382,13 @@ function IsolatesView(props: { snap: InspectSnapshot; sub: IsolatesSub }) {
   );
 }
 
-type Tab = 'isolates' | 'bus' | 'log';
+type Tab = 'isolates' | 'bus' | 'events' | 'messages';
 
 const TABS: readonly { id: Tab; label: string }[] = [
   { id: 'isolates', label: 'Isolates' },
   { id: 'bus', label: 'Bus' },
-  { id: 'log', label: 'Log' },
+  { id: 'events', label: 'Events' },
+  { id: 'messages', label: 'Messages' },
 ];
 
 const tabId = (t: Tab): string => `dt-tab-${t}`;
@@ -396,6 +404,7 @@ export function Body(props: { snap: InspectSnapshot | undefined }): JSX.Element 
     ctx.styles(CSS);
   }, []);
   const { snap } = props;
+  const eventProblems = snap ? problemCount(snap.events) : 0;
   // Arrow keys move between tabs and focus the new one (the WAI-ARIA tabs
   // pattern); focus is a host call, since the DOM lives on the page.
   const buttons = useRef<Partial<Record<Tab, unknown>>>({});
@@ -438,7 +447,8 @@ export function Body(props: { snap: InspectSnapshot | undefined }): JSX.Element 
       );
     }
     view = <BusView bus={snap.bus} sub={busSub} />;
-  } else if (tab === 'log') view = <LogView />;
+  } else if (tab === 'events') view = <EventsView snap={snap} />;
+  else if (tab === 'messages') view = <MessagesView />;
   else {
     // No pools, no Pools tab; a selected Pools tab falls back to the isolates.
     const hasPools = snap.pools.length > 0;
@@ -485,13 +495,18 @@ export function Body(props: { snap: InspectSnapshot | undefined }): JSX.Element 
               }}
             >
               {t.label}
+              {t.id === 'events' && eventProblems > 0 ? (
+                <span class="dt-badge" title="Problems among the recent events">
+                  {eventProblems}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
         {subBar}
       </div>
       <div
-        class={tab === 'log' ? 'dt-scroll dt-scroll-fill' : 'dt-scroll'}
+        class={tab === 'messages' || tab === 'events' ? 'dt-scroll dt-scroll-fill' : 'dt-scroll'}
         role="tabpanel"
         id={subBar ? subPanelId(subGroup) : panelId(tab)}
         aria-labelledby={subBar ? subId(subGroup, subValue) : tabId(tab)}

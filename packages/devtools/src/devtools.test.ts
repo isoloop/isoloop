@@ -256,8 +256,8 @@ describe('@isoloop/devtools (M4b task 7)', () => {
     expect(shadow()?.textContent).toContain('No subscriptions');
 
     // The choice is kept while the panel is open, even across the other tabs.
-    find('[data-tab="log"]')?.click();
-    await waitFor(() => find('[data-view="log"]'));
+    find('[data-tab="messages"]')?.click();
+    await waitFor(() => find('[data-view="messages"]'));
     // The log's toolbar sits outside the part that scrolls.
     expect(find('.dt-log-rows')?.contains(find('.dt-log-bar'))).toBe(false);
     expect(find('[data-subtab]')).toBeNull();
@@ -323,6 +323,35 @@ describe('@isoloop/devtools (M4b task 7)', () => {
     button.click();
     expect(write).toHaveBeenCalledWith('{"a": 1}');
     button.remove();
+  });
+
+  it('lists the kernel events, newest first, and opens one to its data', async () => {
+    const k = kernel();
+    mount(k);
+    (await waitFor(fab)).click();
+    await waitFor(panel);
+    await waitFor(() => find('[data-tab="events"]'));
+    find('[data-tab="events"]')?.click();
+    const row = await waitFor(() =>
+      shadow()?.querySelector('[data-event="isolate:state"][data-level]'),
+    );
+    expect(row?.textContent).toContain('isoloop-devtools');
+    expect(find('[data-events-table]')).not.toBeNull();
+
+    // The filter narrows the list; a miss says so.
+    const filter = await waitFor(() => find('[data-events-filter]'));
+    if (!(filter instanceof HTMLInputElement)) throw new Error('no filter');
+    filter.value = 'no-such-isolate';
+    filter.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    await waitFor(() => shadow()?.textContent?.includes('No events match'));
+    filter.value = '';
+    filter.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    await waitFor(() => find('[data-events-table]'));
+
+    // A row opens into its data.
+    shadow()?.querySelector<HTMLElement>('[data-event="isolate:state"] .dt-chev')?.click();
+    const detail = await waitFor(() => find('[data-event-detail]'));
+    expect(detail.textContent).toContain('"state"');
   });
 
   it('stretches across the width or fills the window, and restores', async () => {

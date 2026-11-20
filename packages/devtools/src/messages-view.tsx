@@ -1,5 +1,5 @@
 /*
- * The live record log (M4b plan, item 2; ADR 0020, decision 3): records
+ * The messages tab: the live record log (M4b plan, item 2; ADR 0020, decision 3): records
  * appended to the bus, copied from a tap while the Log tab is open, newest
  * first. A tap isn't a consumer, so it isn't in the bus figures, and the
  * host reopens it after a bus restart, so the log carries on. The tap sends
@@ -41,7 +41,7 @@ const GLANCE = 240;
 
 type Entry = InspectRecord & { n: number; glance: Part[] };
 
-export function LogView(): JSX.Element {
+export function MessagesView(): JSX.Element {
   const ctx = useIsolate();
   const inspector = ctx.inspector;
   const [filter, setFilter] = useState('');
@@ -68,7 +68,7 @@ export function LogView(): JSX.Element {
   }, [inspector, applied, paused]);
 
   return (
-    <div class="dt-view dt-log" data-view="log">
+    <div class="dt-view dt-log" data-view="messages">
       <form
         class="dt-log-bar"
         onSubmit={(e) => {
