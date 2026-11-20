@@ -12,7 +12,11 @@ If none of the limits below stop you, carry on with the [hosting guide](hosting.
 
 The worker has no layout, so it can't answer layout questions synchronously. The DOM an isolate sees ([ADR 0010](../adr/0010-own-render-bridge.md), decision 2) leaves these out on purpose, with no fake values:
 
-- **Sizes and positions:** `getBoundingClientRect()`, `getComputedStyle()`, `offsetWidth` and the other offset and client sizes don't exist on the worker's elements. Calling a missing method throws a `TypeError`, and a missing property reads `undefined`.
+- **Sizes, positions and animations:** these throw a `NotSupportedError` whose message says what to use instead, so a library that reaches for one fails at that line rather than on a `NaN` size later:
+  - the methods `getBoundingClientRect()`, `getClientRects()`, `animate()` and `getAnimations()` on every element, and `getComputedStyle()` on the worker's `window`;
+  - reading `offsetWidth`, `offsetHeight`, `offsetTop`, `offsetLeft`, `offsetParent`, `clientWidth`, `clientHeight`, `clientTop`, `clientLeft`, `scrollWidth` or `scrollHeight`.
+
+  The members exist, so a feature check such as `'animate' in el` finds them and the call then throws. Other members the worker's DOM doesn't have are absent: calling one throws a `TypeError`, and reading one gives `undefined`.
 - **Focus:** elements have no `focus()` method, and `document.activeElement` is always `null`.
 - **Scrolling:** `scrollTop` and `scrollLeft` are read only, as of the last `scroll` event the element got, and stay `0` until the element listens for `scroll`. The page owns scrolling.
 - **Selection and editing:** there's no `Range`, no selection API and no `contenteditable`.
@@ -89,7 +93,7 @@ On the plant dashboard (72 widgets), native + workers against Isoloop's `matched
 Other devices and engines tell a different story:
 
 - **On an older iOS phone** (Safari 16.6, 2026-11-13), the plant dashboard's native build held 60 frames a second at 1 and 5 kHz, and the Isoloop placements did worse the more workers they used: at 5 kHz, 59.5 frames a second with 1 worker and 5.6 with 105 ([engine constraints §2](../investigations/engine-constraints.md#2-webkit-presents-worker-drawn-canvas-frames-through-the-main-thread)).
-- **In Playwright's WebKit on Linux,** every frame a worker draws on a transferred canvas costs the main thread time, so pages with many canvas widgets slow down there ([§2](../investigations/engine-constraints.md#2-webkit-presents-worker-drawn-canvas-frames-through-the-main-thread)). Safari 26.5 on an iPad doesn't show it.
+- **In Playwright's WebKit on Linux,** every frame a worker draws on a transferred canvas costs the main thread time, so pages with many canvas widgets slow down there ([§2](../investigations/engine-constraints.md#2-webkit-presents-worker-drawn-canvas-frames-through-the-main-thread)). Safari 26.5 on a recent iPadOS tablet doesn't show it.
 - **Each worker has its own heap.** The kernel warns past 32 live workers (`workers.budget`, [hosting](hosting.md#placement-rules)). [Pools](pools.md) share a worker to save memory, at the cost of a shared event loop and fate.
 
 Every recorded run, in both directions, is in [`isoloop/web`'s plant comparison](https://github.com/isoloop/web/blob/9b50967b0971871ec9671d7dce8d115eb16f6d19/apps/dashboards/plant/comparison/README.md).

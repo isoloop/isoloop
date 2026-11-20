@@ -817,6 +817,66 @@ function defineHandlers(proto: WEventTarget): void {
 
 defineHandlers(WElement.prototype);
 
+/** What a layout read should use instead: the host measures the real element. */
+const MEASURE =
+  'ask the host with `ctx.host.measure(node)` (`useHost().measure` in React and Preact)';
+const ANIMATE = 'animate with CSS transitions or animations, set through classes or `style`';
+
+/**
+ * Layout members a worker can't have (ADR 0010, amended 2026-11-16, point 5),
+ * by name, with what to use instead. They exist so a read or a call fails
+ * with `NotSupportedError` and a hint, never with a fake value or a bare
+ * `undefined`. `scrollTop` and `scrollLeft` aren't here: they read the offsets
+ * of the last `scroll` event.
+ */
+export const LAYOUT_METHODS: Readonly<Record<string, string>> = {
+  getBoundingClientRect: MEASURE,
+  getClientRects: MEASURE,
+  animate: ANIMATE,
+  getAnimations: ANIMATE,
+};
+
+/** Read-only layout properties, as for {@link LAYOUT_METHODS}. */
+export const LAYOUT_PROPERTIES: Readonly<Record<string, string>> = {
+  offsetWidth: MEASURE,
+  offsetHeight: MEASURE,
+  offsetTop: MEASURE,
+  offsetLeft: MEASURE,
+  offsetParent: MEASURE,
+  clientWidth: MEASURE,
+  clientHeight: MEASURE,
+  clientTop: MEASURE,
+  clientLeft: MEASURE,
+  scrollWidth: MEASURE,
+  scrollHeight: MEASURE,
+};
+
+/** The error a layout member throws: `NotSupportedError`, naming what to use instead. */
+export const layoutError = (name: string, instead: string): Error =>
+  domError('NotSupportedError', `${name} needs layout, which an isolate doesn't have; ${instead}`);
+
+function defineLayoutStubs(proto: WElement): void {
+  for (const [name, instead] of Object.entries(LAYOUT_METHODS)) {
+    Object.defineProperty(proto, name, {
+      configurable: true,
+      writable: true,
+      value(): never {
+        throw layoutError(`${name}()`, instead);
+      },
+    });
+  }
+  for (const [name, instead] of Object.entries(LAYOUT_PROPERTIES)) {
+    Object.defineProperty(proto, name, {
+      configurable: true,
+      get(): never {
+        throw layoutError(name, instead);
+      },
+    });
+  }
+}
+
+defineLayoutStubs(WElement.prototype);
+
 export class WHTMLElement extends WElement {}
 export class WSVGElement extends WElement {}
 /** Only for `instanceof` checks; never created by the host (the registry drops iframes). */

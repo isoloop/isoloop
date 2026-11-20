@@ -12,6 +12,7 @@ import {
   WNode,
   WSVGElement,
   WText,
+  layoutError,
   type WorkerDom,
 } from './dom';
 
@@ -44,5 +45,14 @@ export function install(dom: WorkerDom, scope: object): void {
   define('document', dom.document);
   if (!('window' in scope)) define('window', scope);
   for (const [name, value] of Object.entries(DOM_GLOBALS)) define(name, value);
+  // Computed styles need layout too (ADR 0010, amended 2026-11-16, point 5).
+  if (!('getComputedStyle' in scope)) {
+    define('getComputedStyle', (): never => {
+      throw layoutError(
+        'getComputedStyle()',
+        'read the styles the isolate set (`el.style`), or ask the host for sizes with `ctx.host.measure(node)`',
+      );
+    });
+  }
   dom.document.defaultView = scope;
 }
