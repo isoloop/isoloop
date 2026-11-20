@@ -198,7 +198,7 @@
       "to": "opfs",
       "y": 540,
       "label": "Web Lock (waits ≤ 2 s), restore",
-      "note": "no lock or no sync handles: memory, bus:durability-degraded"
+      "note": "no lock or no sync handles: memory, bus:durability_degraded"
     },
     {
       "id": "restored",

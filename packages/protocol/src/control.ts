@@ -25,8 +25,8 @@ export type TopicConfig = {
   seed?: { from: string; follow: boolean };
 };
 
-/** Why persistent topics run in memory (`bus:durability-degraded`). */
-export type DurabilityDegraded = 'another-tab' | 'no-sync-access' | 'open-failed';
+/** Why persistent topics run in memory (`bus:durability_degraded`). */
+export type DurabilityDegraded = 'another_tab' | 'no_sync_access' | 'open_failed';
 
 /**
  * Seeding news (ADR 0003, decision 18). `rejected`: a source record `map`

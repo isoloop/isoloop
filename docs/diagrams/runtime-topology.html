@@ -744,7 +744,7 @@
         <ul>
           <li>Started before any isolate and supervised like one: beats, restarts, and after two crashes while loading, a safe-mode boot that sets the newest segment aside.</li>
           <li>After a restart, isolates get a new port (reattach) and keep running. Past the restart limit the bus is failed: isolates keep running and their bus calls reject with bus_unavailable.</li>
-          <li>Persistent topics need the isoloop-bus Web Lock and sync access handles; without them they run in memory and the kernel emits bus:durability-degraded.</li>
+          <li>Persistent topics need the isoloop-bus Web Lock and sync access handles; without them they run in memory and the kernel emits bus:durability_degraded.</li>
         </ul>
       </div>
     </div>

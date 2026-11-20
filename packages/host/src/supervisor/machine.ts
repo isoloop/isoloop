@@ -31,21 +31,21 @@ export type CrashReason =
   /** A fatal `error` message from the isolate. */
   | 'error'
   /** The worker's `error` or `messageerror` event. */
-  | 'worker-error'
+  | 'worker_error'
   /** No `ready` within `readyTimeoutMs` of the spawn. */
-  | 'ready-timeout'
+  | 'ready_timeout'
   /** Blocked for `killAfterMs` without a beat; the worker was terminated. */
   | 'unresponsive'
   /** `new Worker` threw. */
-  | 'spawn-failed'
+  | 'spawn_failed'
   /** `ready.renderFmt` isn't one the host speaks. Fails at once: a restart can't fix it (ADR 0011). */
-  | 'render-fmt-mismatch'
+  | 'render_format_mismatch'
   /** The bus couldn't load its contracts. Fails at once: the error is deterministic (ADR 0003). */
-  | 'bus-failed'
+  | 'bus_failed'
   /** `ready.requires` is newer than this host's `VERSION`. Fails at once (ADR 0012). */
-  | 'runtime-too-old'
+  | 'runtime_too_old'
   /** `ready.requires` is older than this host's `FLOOR`. Fails at once (ADR 0012). */
-  | 'isolate-too-old';
+  | 'isolate_too_old';
 
 export type SupervisorConfig = {
   /** `never` fails on the first crash. */
@@ -103,7 +103,7 @@ export type SupervisorInput =
   | {
       k: 'versionMismatch';
       at: number;
-      reason: 'runtime-too-old' | 'isolate-too-old';
+      reason: 'runtime_too_old' | 'isolate_too_old';
       message: string;
     }
   /** The bus failed its contracts check: stop and fail, no restart. */
@@ -208,7 +208,7 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
     case 'tick':
       if (s.hidden) return same;
       if (s.state === 'loading' && input.at - s.spawnedAt > cfg.readyTimeoutMs)
-        return crash(s, input.at, 'ready-timeout', `No ready within ${cfg.readyTimeoutMs} ms`, cfg);
+        return crash(s, input.at, 'ready_timeout', `No ready within ${cfg.readyTimeoutMs} ms`, cfg);
       if (s.state === 'running' && input.at - s.lastBeatAt > cfg.blockedAfterMs)
         return {
           s: { ...s, state: 'blocked' },
@@ -225,7 +225,7 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
       return crash(s, input.at, 'error', input.message, cfg);
 
     case 'workerError':
-      return live(s.state) ? crash(s, input.at, 'worker-error', input.message, cfg) : same;
+      return live(s.state) ? crash(s, input.at, 'worker_error', input.message, cfg) : same;
 
     case 'poolCrash':
       return live(s.state) ? crash(s, input.at, input.reason, input.message, cfg) : same;
@@ -233,11 +233,11 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
     case 'spawnFailed':
       return s.state === 'stopped' || s.state === 'failed'
         ? same
-        : crash(s, input.at, 'spawn-failed', input.message, cfg);
+        : crash(s, input.at, 'spawn_failed', input.message, cfg);
 
     case 'renderFmtMismatch':
       return s.state === 'loading'
-        ? crash(s, input.at, 'render-fmt-mismatch', input.message, cfg, true)
+        ? crash(s, input.at, 'render_format_mismatch', input.message, cfg, true)
         : same;
 
     case 'versionMismatch':
@@ -248,7 +248,7 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
     case 'busFailed':
       return s.state === 'stopped' || s.state === 'failed'
         ? same
-        : crash(s, input.at, 'bus-failed', input.message, cfg, true);
+        : crash(s, input.at, 'bus_failed', input.message, cfg, true);
 
     case 'stop':
       if (s.state === 'stopped' || s.state === 'failed') return same;

@@ -51,7 +51,7 @@ export type IsolateInspector = {
    */
   restart(id: string): Promise<void>;
   /**
-   * Ends an isolate's worker as a crash (`worker-error`), so the supervisor
+   * Ends an isolate's worker as a crash (`worker_error`), so the supervisor
    * restarts it. For a pooled isolate that ends the pool's worker: every
    * member crashes and restarts, and the feed shows each one. Resolves once
    * the kill is sent, not when the isolate is back.

@@ -501,12 +501,12 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
     else if (!OpfsStorage.available()) {
       // No sync access handles here: memory, with a warning (M2b task 15).
       storage = new MemoryStorage();
-      degraded = 'no-sync-access';
+      degraded = 'no_sync_access';
     } else if (await takeBusLock(p.restart ? RESTART_LOCK_WAIT_MS : 0)) storage = new OpfsStorage();
     else {
       // Another tab's bus owns the files: this one runs everything in memory.
       storage = new MemoryStorage();
-      degraded = 'another-tab';
+      degraded = 'another_tab';
     }
     let quarantined: string[] | undefined;
     let stored: StoredState;
@@ -518,7 +518,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
       console.warn('[isoloop] persistent topics are in memory: storage failed to open', e);
       storage = new MemoryStorage();
       stored = await storage.open();
-      degraded = 'open-failed';
+      degraded = 'open_failed';
     }
     let built: Awaited<ReturnType<typeof build>>;
     try {
@@ -540,7 +540,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
       console.warn('[isoloop] persistent topics are in memory: reading them back failed', e);
       storage = new MemoryStorage();
       built = await build(list, storage, await storage.open(), dev);
-      degraded = 'open-failed';
+      degraded = 'open_failed';
     }
     const { b, restored } = built;
     broker = b;

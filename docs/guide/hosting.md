@@ -10,7 +10,7 @@ Read it before deploying an app. In development, `@isoloop/vite` sends the heade
 
 1. The kernel starts a module worker from the **isolate bootstrap** (`workers.isolateBootstrap`). Browsers only start workers from the page's own origin, so the bootstrap is served by the host app.
 2. The bootstrap `import()`s the isolate module at `manifest.src`. That URL can be on another origin, such as a CDN.
-3. The isolate replies `ready` within `heartbeat.readyTimeoutMs` (10 s by default), or it crashes with reason `ready-timeout`.
+3. The isolate replies `ready` within `heartbeat.readyTimeoutMs` (10 s by default), or it crashes with reason `ready_timeout`.
 
 ## The bus worker and the contracts module
 
@@ -42,7 +42,7 @@ const kernel = createKernel({
 
 Without Vite, `?worker&url` or your bundler's equivalent gives the two URLs.
 
-If the contracts module fails to load or is invalid (`contracts_failed`, `contracts_invalid`, `contracts_mismatch`, `reserved_topic`), it isn't retried. The kernel emits `bus:failed { code }`, every isolate fails with reason `bus-failed`, and later `spawn` calls throw `bus_failed`.
+If the contracts module fails to load or is invalid (`contracts_failed`, `contracts_invalid`, `contracts_mismatch`, `reserved_topic`), it isn't retried. The kernel emits `bus:failed { code }`, every isolate fails with reason `bus_failed`, and later `spawn` calls throw `bus_failed`.
 
 ## Persistent topics and a discarded tab
 
@@ -50,7 +50,7 @@ Topics with `durability: 'persistent'` live in the origin's private file system,
 
 Memory topics don't survive a discarded tab. A browser may freeze a hidden tab and later discard it to save memory ([ADR 0001](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls)); when the user comes back, the page loads afresh, and only persistent topics still hold their records. Make a topic persistent if losing it on a discard would be a problem.
 
-Only one tab's bus owns the files. In a second tab, and where the browser has no sync access handles or the files can't be opened (some private windows), persistent topics run in memory and the kernel emits `bus:durability-degraded { reason }`.
+Only one tab's bus owns the files. In a second tab, and where the browser has no sync access handles or the files can't be opened (some private windows), persistent topics run in memory and the kernel emits `bus:durability_degraded { reason }`.
 
 ## Content Security Policy
 
@@ -87,7 +87,7 @@ Without them the import fails and the isolate crashes with reason `error` and a 
 - **One worker per isolate by default** ([ADR 0001](../adr/0001-one-worker-per-isolate.md)). An isolate, headless or visual, can name a pool (`manifest.pool`) and share a worker with the other isolates naming it; pool members share an event loop, globals and fate: if one stops responding or takes the worker down, the whole pool restarts (each member's `isolate:crash` names the `pool`); a member's own fatal error restarts only that member. Visual members also share one document, so they can read each other's DOM and input: keep widgets that handle secrets on their own worker ([ADR 0015](../adr/0015-visual-pools.md)). A pool suspends only as a whole, when every member is idle and opts in, and any member's wake wakes it. See [Worker pools](pools.md) for when to pool and what members share. Pool names starting with `balancer-` are reserved for the opt-in [balancer](balancer.md), which places isolates by measured load; `kernel.spawn` rejects them with `reserved_pool`.
 - **Suspension is opt-in.** `manifest.suspend: 'when-idle'` (60 s) or `{ whenIdle: { afterMs } }` lets an idle isolate's worker be shut down and woken later (ADR 0001); the default `'never'` keeps it running, in a hidden tab too.
 - **Worker budget.** Passing `workers.budget` live workers (32 by default) logs one warning and emits `workers:budget`. It never blocks a spawn. Each worker has its own heap, so the right number depends on the device.
-- **Spawn failures.** If `new Worker` throws (say, the browser is out of memory), the isolate crashes with reason `spawn-failed`, then gets the normal backoff and restart limit.
+- **Spawn failures.** If `new Worker` throws (say, the browser is out of memory), the isolate crashes with reason `spawn_failed`, then gets the normal backoff and restart limit.
 
 ## Stopping
 

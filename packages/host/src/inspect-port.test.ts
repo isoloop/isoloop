@@ -203,7 +203,7 @@ describe('the controls over the port', () => {
     await waitFor(() => k.isolates().find((i) => i.id === 'T')?.state === 'running');
     const reports = inspectorIsolate(k, { do: 'control', action: 'kill', target: 'T' });
     await waitFor(() => step(reports, 'done') !== undefined);
-    await waitFor(() => got.some((e) => e.id === 'T' && e.reason === 'worker-error'));
+    await waitFor(() => got.some((e) => e.id === 'T' && e.reason === 'worker_error'));
     await waitFor(() => {
       const t = k.isolates().find((i) => i.id === 'T');
       return t?.state === 'running' && t.restarts === 1;

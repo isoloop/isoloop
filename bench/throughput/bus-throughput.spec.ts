@@ -136,7 +136,7 @@ for (const durability of ['memory', 'persistent'] as const) {
           busReadyMs = performance.now() - t0;
         });
         let degraded: string | undefined;
-        kernel.on('bus:durability-degraded', ({ reason }) => {
+        kernel.on('bus:durability_degraded', ({ reason }) => {
           degraded = reason;
         });
         const ctl = { name: 'tp.ctl.v1' };

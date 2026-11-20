@@ -189,7 +189,7 @@ describe('bus worker', () => {
 });
 
 describe('bus worker without OPFS sync access handles (M2b task 15)', () => {
-  it('starts in memory and reports no-sync-access; persistent topics work as memory ones', async () => {
+  it('starts in memory and reports no_sync_access; persistent topics work as memory ones', async () => {
     const bus = startBus(
       fixture('persistent-contracts'),
       persistentList.topics.map(topicConfig),
@@ -203,7 +203,7 @@ describe('bus worker without OPFS sync access handles (M2b task 15)', () => {
       engine: 'ts',
       storage: 'memory',
       restored: [],
-      degraded: 'no-sync-access',
+      degraded: 'no_sync_access',
     });
     const a = bus.attach('A');
     await a.call('subscribe', { topic: 'kept.v1', from: 'earliest' });

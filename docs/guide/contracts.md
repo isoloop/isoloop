@@ -67,7 +67,7 @@ const kernel = createKernel({ contracts: { url: contractsUrl, list }, workers })
 | --- | --- | --- |
 | `schema` | required | A [Standard Schema](https://standardschema.dev) V1: Zod 4, Valibot and ArkType all implement it. `unchecked<T>()` is the explicit opt-out. |
 | `retention` | required | How much of the topic the bus keeps: `{ kind: 'last-n', n }`, `{ kind: 'time', ms }`, or `{ kind: 'compacted' }` (the latest record per key). |
-| `durability` | `'memory'` | `'persistent'` keeps the topic in OPFS, so it survives a bus crash and a reload ([ADR 0007](../adr/0007-bus-worker-supervision.md)). Where OPFS isn't available, or another tab holds it, the topic behaves as `'memory'` and the kernel emits `bus:durability-degraded`. |
+| `durability` | `'memory'` | `'persistent'` keeps the topic in OPFS, so it survives a bus crash and a reload ([ADR 0007](../adr/0007-bus-worker-supervision.md)). Where OPFS isn't available, or another tab holds it, the topic behaves as `'memory'` and the kernel emits `bus:durability_degraded`. |
 | `maxRecordBytes` | 256 KiB (`DEFAULT_MAX_RECORD_BYTES`) | A record over it rejects with `too_large`. |
 | `reply` | none | A schema for replies, which makes the topic requestable ([below](#request-and-reply)). |
 | `seed` | none | Starts the topic from an older one ([below](#versions-and-migrations)). |
@@ -244,7 +244,7 @@ Contract problems fail at start, not at the first publish:
    - `contracts_invalid`: the module has no default export made by `contracts()`;
    - `reserved_topic`: the module defines an `isoloop.*` topic.
 
-These failures are deterministic, so the bus isn't restarted. The kernel emits `bus:failed` with the code. Isolates already spawned fail with reason `bus-failed`, and later `spawn()` calls throw `bus_failed`.
+These failures are deterministic, so the bus isn't restarted. The kernel emits `bus:failed` with the code. Isolates already spawned fail with reason `bus_failed`, and later `spawn()` calls throw `bus_failed`.
 
 Isolates don't wait for the contracts to load. The bus accepts their subscriptions at once and holds their publishes until the contracts are in, up to 1,000 per isolate's port, after which publishes reject with `bus_unavailable`.
 

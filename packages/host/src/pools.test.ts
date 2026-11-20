@@ -125,11 +125,11 @@ describe('worker pools (M2c)', () => {
       k.spawn({ id: 'D', src: counter });
       await waitFor(() => crashes.some((c) => c.id === 'B'), 5000);
       expect(crashes.find((c) => c.id === 'B')).toMatchObject({
-        reason: 'worker-error',
+        reason: 'worker_error',
         pool: 'p',
       });
       expect(crashes.find((c) => c.id === 'A')).toMatchObject({
-        reason: 'worker-error',
+        reason: 'worker_error',
         pool: 'p',
       });
       expect(crashes.some((c) => c.id === 'D')).toBe(false);

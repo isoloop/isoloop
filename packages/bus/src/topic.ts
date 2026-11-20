@@ -35,7 +35,7 @@ export type TopicDef<In, Out = In, RIn = never, ROut = RIn> = {
    * Default `memory`. `persistent` keeps the topic in OPFS (ADR 0007): it
    * survives a bus crash and a reload. Where OPFS isn't available, or another
    * tab holds it, it behaves as `memory` and the kernel emits
-   * `bus:durability-degraded`.
+   * `bus:durability_degraded`.
    */
   readonly durability?: 'memory' | 'persistent';
   /**

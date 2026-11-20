@@ -275,10 +275,10 @@
       "dot": "rose",
       "title": "Straight to Failed, no restart",
       "items": [
-        "render-fmt-mismatch: ready reports a render format the host doesn't speak.",
-        "runtime-too-old or isolate-too-old: ready.requires is outside the host's [FLOOR, VERSION] (ADR 0012).",
-        "bus-failed: the bus couldn't load its contracts.",
-        "Other crashes (error, worker-error, ready-timeout, unresponsive, spawn-failed) restart until 3 restarts within 60 s."
+        "render_format_mismatch: ready reports a render format the host doesn't speak.",
+        "runtime_too_old or isolate_too_old: ready.requires is outside the host's [FLOOR, VERSION] (ADR 0012).",
+        "bus_failed: the bus couldn't load its contracts.",
+        "Other crashes (error, worker_error, ready_timeout, unresponsive, spawn_failed) restart until 3 restarts within 60 s."
       ]
     },
     {
