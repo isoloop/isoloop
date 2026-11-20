@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   checkCoverage,
+  checkApiPages,
   checkHistory,
   checkLinks,
   checkShape,
@@ -125,6 +126,8 @@ describe('item 3: relative links', () => {
 });
 
 const history = (md: string): string[] => messages(checkHistory('docs/guide/g.md', md));
+const apiPage = (md: string): string[] =>
+  messages(checkApiPages([{ file: 'docs/api/host.md', md }]));
 
 describe('item 3b: how it works, not why it was decided', () => {
   it('fails a link into the ADRs or the plans, relative or absolute', () => {
@@ -140,6 +143,13 @@ describe('item 3b: how it works, not why it was decided', () => {
     expect(history('As ADR 0015 says.')).toHaveLength(1);
     expect(history('ADRs 0007 and 0008')).toHaveLength(1);
     expect(history('See ADR-0001, or ADR 17.')).toHaveLength(1);
+  });
+
+  it('holds for the generated API pages too', () => {
+    expect(
+      apiPage('# @isoloop/host\n\nThe lead.\n\nThe tools exposed (ADR 0018, decision 2).'),
+    ).toEqual(["line 5: public docs don't name ADRs; say how it works, not why it was decided"]);
+    expect(apiPage('# @isoloop/host\n\nThe lead.\n\n```ts nocheck\n// ADR 0001\n```')).toEqual([]);
   });
 
   it('passes ADRs in code and other links', () => {
@@ -176,6 +186,7 @@ const x = (name: string, kind: ExportKind, entry = 'pkg'): ApiExport => ({
   kind,
   key: `k:${name}`,
   home: entry,
+  decls: [],
   tags: [],
   documented: true,
 });

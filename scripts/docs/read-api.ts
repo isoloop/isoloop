@@ -4,12 +4,21 @@
 // TypeScript 7.1's `typescript/sync` changes the imports here and nothing
 // else. Its conformance suite is read-api.test.ts.
 import {
+  isClassDeclaration,
   isExpressionWithTypeArguments,
+  isIdentifier,
+  isInterfaceDeclaration,
+  isPrivateIdentifier,
   isQualifiedName,
+  isStringLiteral,
+  isTypeAliasDeclaration,
+  isTypeLiteralNode,
   isTypeQueryNode,
   isTypeReferenceNode,
+  isVariableDeclarationList,
   type Node,
 } from 'tsrs/ast';
+import { readFileSync } from 'node:fs';
 import {
   API,
   ModuleKind,
@@ -42,7 +51,22 @@ export type ApiExport = {
   tags: readonly { name: string; text: string }[];
   /** Whether the declaration has a doc comment. */
   documented: boolean;
+  /** Its declarations as the `.d.ts` has them (several for an overloaded function). */
+  decls: readonly ApiDecl[];
 };
+
+/** One declaration's source, for the reference (decision 27). */
+export type ApiDecl = {
+  /** The declaration's text, without its doc comment. */
+  text: string;
+  /** Its doc comment, `/** … *\/` included, or `''`. */
+  doc: string;
+  /** For an interface, a class or a type alias of an object type: its named members, in order. */
+  members: readonly ApiMember[];
+};
+
+/** A named member of an interface, a class or an object type. */
+export type ApiMember = { name: string; text: string; doc: string };
 
 export type ApiModel = {
   /** Each entry point's exports, `@internal` ones left out, in the order given. */
@@ -149,6 +173,10 @@ export function readApi(files: readonly EntryFile[], cwd: string): ApiModel {
           .getJsDocTagsOfSymbol(r.sym)
           .map((t) => ({ name: t.name, text: t.text ?? '' })),
         documented: checker.getDocumentationCommentOfSymbol(r.sym).trim() !== '',
+        decls: r.sym.declarations.flatMap((d) => {
+          const decl = declOf(d.resolve(), d.path);
+          return decl ? [decl] : [];
+        }),
       });
     }
     const syms = raw.map((r) => r.sym);
@@ -156,6 +184,59 @@ export function readApi(files: readonly EntryFile[], cwd: string): ApiModel {
   } finally {
     api.close();
   }
+}
+
+const texts = new Map<string, string>();
+const fileText = (path: string): string => {
+  let t = texts.get(path);
+  if (t === undefined) {
+    t = readFileSync(path, 'utf8');
+    texts.set(path, t);
+  }
+  return t;
+};
+
+/** The text and the doc comment of `n`: from after its last doc comment (or its start) to its end. */
+function span(n: Node, text: string): { text: string; doc: string } {
+  const doc = n.jsDoc?.at(-1);
+  const from = doc ? doc.end : n.pos;
+  return {
+    text: text.slice(from, n.end).trim(),
+    doc: doc ? text.slice(text.indexOf('/**', doc.pos), doc.end).trim() : '',
+  };
+}
+
+/** The members of an interface, a class or a type alias of an object type. */
+function membersOf(n: Node): readonly Node[] {
+  if (isInterfaceDeclaration(n) || isClassDeclaration(n)) return n.members;
+  if (isTypeAliasDeclaration(n) && isTypeLiteralNode(n.type)) return n.type.members;
+  return [];
+}
+
+const isNode = (v: unknown): v is Node =>
+  typeof v === 'object' && v !== null && 'kind' in v && typeof v.kind === 'number';
+
+/** A member's name, when it has a plain one (not a computed one, nor a call or index signature). */
+function nameOf(m: Node): string | undefined {
+  const name = 'name' in m ? m.name : undefined;
+  if (!isNode(name)) return undefined;
+  return isIdentifier(name) || isStringLiteral(name) || isPrivateIdentifier(name)
+    ? name.text
+    : undefined;
+}
+
+/** A declaration's text, doc comment and members. A variable's are its statement's (`declare const …`). */
+function declOf(n: Node | undefined, path: string): ApiDecl | undefined {
+  if (!n) return undefined;
+  const text = fileText(path);
+  const statement = isVariableDeclarationList(n.parent) ? n.parent.parent : n;
+  return {
+    ...span(statement, text),
+    members: membersOf(n).flatMap((m) => {
+      const name = nameOf(m);
+      return name === undefined ? [] : [{ name, ...span(m, text) }];
+    }),
+  };
 }
 
 /** The references graph, from every exported declaration outwards, within the packages read. */
