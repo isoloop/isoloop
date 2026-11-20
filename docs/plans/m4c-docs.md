@@ -168,7 +168,7 @@ About one evening each ([conventions](README.md#conventions)). One PR per task. 
 
 | # | Task | Repo | Files | Tests | Needs |
 | --- | --- | --- | --- | --- | --- |
-| 21 | (M4d task 7) The TSDoc pass at decision 30's bar and `docs:check` item 7, inside M4d task 1; the `freeze` group in `pending` decided and emptied (decision 36) | library | `packages/*/src`, `scripts/docs/tsdoc.ts` | unit: an export without a comment fails, an `@example` that doesn't type-check fails | the freeze (maintainer) |
+| 21 | (M4d task 7) The TSDoc pass at decision 30's bar and `docs:check` item 7. *Amended 2026-11-20:* the `freeze` group in `pending` is decided by the API review and emptied by M4d task 3, before this pass | library | `packages/*/src`, `scripts/docs/tsdoc.ts` | unit: an export without a comment fails, an `@example` that doesn't type-check fails | the freeze (maintainer) |
 | 22 | (M4d task 8) The API generator: `docs/api/<package>.md` from the published `.d.ts` through `readApi`, with the drift test | library | `scripts/docs/api.ts`, `docs/api/` | unit: a fixture `.d.ts`; CI: drift fails | 21 |
 | 23 | (M4d task 9) The CLI page from `args.ts`; each symbol's links to its guides from `map.json` | library | `scripts/docs/api.ts`, `docs/api/cli.md` | unit: every command and flag listed; a symbol's guide links | 22 |
 | 24 | (M4d task 10) The API pages on the site, Experimental pills, the API in `llms-full.txt` | web | `apps/site/build/docs/`, `apps/site/content/docs.json` | unit: an `@experimental` symbol gets the pill; smoke and axe on the API pages | 11, 12, 23 |
