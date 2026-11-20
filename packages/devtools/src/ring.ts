@@ -165,3 +165,18 @@ export function arcPath(i: number, cx: number, cy: number, r: number): string {
     `${(cx + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`;
   return `M${p(a0)}A${r} ${r} 0 0 1 ${p(a1)}`;
 }
+
+/**
+ * The pie slice of arc `i` on a circle of radius `r` about (`cx`, `cy`), at the
+ * same angles as `arcPath`: the logo filled with these puts each colour on the
+ * same side of the button as its arc in the ring.
+ */
+export function wedgePath(i: number, cx: number, cy: number, r: number): string {
+  const step = 360 / RING_SLOTS;
+  const over = 0.8;
+  const a0 = ((-90 + i * step - over / 2) * Math.PI) / 180;
+  const a1 = ((-90 + (i + 1) * step + over / 2) * Math.PI) / 180;
+  const p = (a: number): string =>
+    `${(cx + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`;
+  return `M${cx} ${cy}L${p(a0)}A${r} ${r} 0 0 1 ${p(a1)}Z`;
+}

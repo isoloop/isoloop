@@ -73,6 +73,9 @@ const shortcut = () =>
 const fab = () => find('button[data-health]');
 const panel = () => find('[data-isoloop-devtools-panel]');
 
+const arcs = () => shadow()?.querySelectorAll('.dt-ring path[data-level]').length ?? 0;
+const wedges = () => shadow()?.querySelectorAll('.dt-mark path[data-level]').length ?? 0;
+
 const hover = (el: HTMLElement) =>
   el.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, composed: true }));
 
@@ -352,6 +355,35 @@ describe('@isoloop/devtools (M4b task 7)', () => {
     shadow()?.querySelector<HTMLElement>('[data-event="isolate:state"] .dt-chev')?.click();
     const detail = await waitFor(() => find('[data-event-detail]'));
     expect(detail.textContent).toContain('"state"');
+  });
+
+  describe('healthStatus', () => {
+    it("'ring' is the default: twelve arcs round a white logo", async () => {
+      const k = kernel();
+      mount(k);
+      const button = await waitFor(fab);
+      await waitFor(() => arcs() === 12);
+      expect(wedges()).toBe(0);
+      expect(button.getAttribute('aria-label')).toContain('Open Isoloop devtools');
+    });
+
+    it("'radar' also fills the logo with the twelve colours", async () => {
+      const k = kernel();
+      mount(k, { healthStatus: 'radar' });
+      await waitFor(fab);
+      await waitFor(() => arcs() === 12);
+      expect(wedges()).toBe(12);
+    });
+
+    it("'off' is a plain white ring with no status on the button", async () => {
+      const k = kernel();
+      mount(k, { healthStatus: 'off' });
+      const button = await waitFor(fab);
+      expect(arcs()).toBe(0);
+      expect(wedges()).toBe(0);
+      expect(shadow()?.querySelector('.dt-ring circle')).not.toBeNull();
+      expect(button.getAttribute('aria-label')).toBe('Open Isoloop devtools (Alt+Shift+D)');
+    });
   });
 
   it('stretches across the width or fills the window, and restores', async () => {

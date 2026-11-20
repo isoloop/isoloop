@@ -15,6 +15,16 @@ import type { FallbackRender, Kernel } from '@isoloop/host';
 /** The corner the floating button and the docked panel sit in. @experimental */
 export type DevtoolsPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
+/**
+ * How the closed button shows the kernel's health:
+ * - `'ring'`: a ring of twelve arcs, one stretch of isolates each, coloured by
+ *   their worst state, with a wave of brightness running round it;
+ * - `'radar'`: the same ring, with the logo filled by the same twelve colours;
+ * - `'off'`: a plain white ring, with no status on the button.
+ * @experimental
+ */
+export type HealthStatus = 'ring' | 'radar' | 'off';
+
 /** @experimental */
 export type DevtoolsOptions = {
   /**
@@ -26,6 +36,8 @@ export type DevtoolsOptions = {
   src?: string;
   /** Where the closed button and the opened panel sit. Default `'bottom-right'`. */
   position?: DevtoolsPosition;
+  /** How the closed button shows the kernel's health. Default `'ring'`. */
+  healthStatus?: HealthStatus;
   /** The panel isolate's id in the kernel. Default `'isoloop-devtools'`. */
   id?: string;
 };
@@ -97,6 +109,7 @@ const fallbackFor =
 export function connectDevtools(kernel: Kernel, o: DevtoolsOptions = {}): () => Promise<void> {
   const id = o.id ?? 'isoloop-devtools';
   const position = o.position ?? 'bottom-right';
+  const healthStatus = o.healthStatus ?? 'ring';
   const surface = document.createElement('div');
   surface.setAttribute('data-isoloop-devtools', '');
   // Inline, so it wins over the shadow root's `:host` rule.
@@ -110,7 +123,7 @@ export function connectDevtools(kernel: Kernel, o: DevtoolsOptions = {}): () => 
     id,
     src: o.src ?? panelUrl(),
     surface,
-    config: { position },
+    config: { position, healthStatus },
     grants: { publish: [], subscribe: [], inspect: true },
     fallback: fallbackFor(position),
   });

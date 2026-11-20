@@ -15,9 +15,18 @@ import type { InspectSnapshot } from '@isoloop/protocol';
 import type { IsolateDefinition } from '@isoloop/runtime';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { healthOf, useFeed, type Health } from './feed';
-import type { DevtoolsPosition } from './index';
+import type { DevtoolsPosition, HealthStatus } from './index';
 import { loadUi, saveUi, type PanelMode, type UiState } from './persist';
-import { arcPath, arcsOf, checksOf, RING_SLOTS, summaryOf, type Arc, type Level } from './ring';
+import {
+  arcPath,
+  arcsOf,
+  checksOf,
+  RING_SLOTS,
+  summaryOf,
+  wedgePath,
+  type Arc,
+  type Level,
+} from './ring';
 import { createRecorder, type Recorder } from './event-store';
 import { Body } from './views';
 
@@ -39,6 +48,12 @@ const MARK =
   'M33.9 79.4L31.7 79.4L28.4 79.2L26.3 78.8L23.5 78.1L19.9 76.6L17.1 75.0L15.2 73.7L12.5 71.4L10.6 69.3L9.1 67.3L7.7 65.0L6.6 62.1L5.9 59.7L5.4 56.7L5.2 53.3L0.1 53.2L5.4 43.7L6.0 40.3L6.9 36.7L7.9 33.8L9.2 30.7L11.1 27.0L13.9 22.9L15.5 20.8L17.6 18.4L19.9 16.2L24.2 12.7L26.7 11.0L30.5 8.9L33.9 7.4L38.6 5.7L42.9 4.8L47.5 4.3L51.6 4.2L55.2 4.5L59.2 5.2L63.8 6.5L67.3 7.9L71.6 10.1L75.4 12.5L77.7 14.3L80.1 16.5L83.3 19.8L84.9 21.8L87.1 25.0L89.7 29.6L90.9 32.3L92.3 36.0L93.1 38.8L93.8 42.0L94.3 45.9L99.7 46.1L94.4 55.9L93.2 60.7L91.6 65.4L91.6 65.5L91.1 64.8L80.0 46.2L86.0 46.1L85.9 43.7L85.5 41.3L84.8 38.3L84.2 36.4L83.4 34.2L82.0 31.0L80.2 27.8L79.0 26.1L77.7 24.4L75.7 22.1L72.1 18.8L68.7 16.3L66.4 15.0L64.2 13.9L59.9 12.3L56.3 11.5L53.7 11.1L51.6 10.9L48.7 10.9L46.3 11.0L41.5 11.9L37.6 13.1L33.7 14.7L30.7 16.3L26.5 19.4L23.9 21.7L20.8 25.1L18.3 28.5L16.5 31.8L15.5 34.2L14.4 37.6L13.8 40.1L13.5 43.5L13.7 44.0L19.3 53.1L19.2 53.2L13.5 53.3L13.1 53.4L13.3 55.3L14.1 58.4L15.3 61.4L16.6 63.6L18.4 65.9L21.0 68.3L23.7 70.0L25.9 71.0L27.2 71.4L30.2 71.9L32.1 72.1L34.7 71.9L36.7 71.7L38.9 71.1L41.0 70.5L42.6 69.8L44.5 68.7L46.1 67.6L46.9 66.9L48.5 65.0L49.4 63.2L50.0 61.4L50.2 59.5L50.3 51.2L77.6 35.1L77.7 36.5L77.8 65.2L77.7 65.4L72.0 68.8L71.4 69.1L71.3 69.0L71.1 65.9L70.4 62.0L70.3 47.3L70.1 47.2L57.1 54.8L57.0 62.0L56.9 63.3L56.5 65.2L55.7 67.4L54.6 69.5L53.1 71.4L51.8 72.6L49.8 74.2L47.6 75.6L45.7 76.6L43.0 77.7L38.4 78.9ZM32.8 39.5L30.1 38.1L23.1 33.9L24.4 33.1L49.9 18.0L69.9 29.5L69.1 30.0L62.6 33.8L50.1 26.5L42.6 30.6L38.9 33.0L37.5 34.1L35.2 36.3ZM30.2 60.9L30.0 60.9L30.0 51.5L30.2 49.0L30.6 46.7L31.1 45.0L31.8 43.2L32.9 41.0L35.1 37.9L36.9 35.9L38.5 34.5L42.3 31.9L49.5 27.8L49.7 30.0L49.7 35.2L49.6 41.0L44.9 38.4L43.4 39.6L41.6 41.4L39.8 43.7L38.6 45.9L37.8 48.4L37.5 50.7L37.5 52.6L41.1 54.7L41.2 54.9ZM50.6 40.8L50.6 27.9L61.5 34.4L60.5 35.0ZM49.7 50.4L40.3 45.0L40.5 44.4L41.8 42.7L43.7 40.6L44.9 39.6L45.0 39.5L45.8 39.9L49.9 42.3L70.9 30.1L77.5 33.9ZM33.6 71.1L31.4 71.1L22.3 65.5L22.4 34.7L32.2 40.3L31.0 42.7L30.2 44.8L29.5 47.4L29.2 48.9L29.0 51.4L29.1 61.8L39.0 67.7L41.4 69.2L40.1 69.8L37.4 70.6L35.1 71.0ZM42.9 68.5L42.6 68.6L42.5 68.2L42.6 54.6L38.4 52.0L38.6 49.0L39.0 47.6L39.7 45.8L49.3 51.4L49.3 59.7L49.0 61.4L48.6 62.7L47.7 64.6L46.8 65.6L45.2 67.2ZM69.4 61.3L58.5 55.0L69.3 48.7L69.4 48.8L69.4 48.9L69.5 58.3L69.5 61.2ZM41.6 68.0L41.4 68.0L40.4 67.4L30.9 61.9L30.8 61.7L41.6 55.8ZM56.1 69.2L55.9 69.3L55.8 69.2L56.7 67.6L57.3 65.8L57.9 63.2L58.0 60.9L58.0 56.0L58.1 55.9L58.6 56.2L68.6 62.0L68.6 62.1ZM52.8 95.6L46.0 95.6L43.1 95.3L39.3 94.7L35.8 93.7L33.2 92.7L31.2 91.8L27.6 89.9L24.4 87.7L22.2 86.0L19.3 83.3L17.5 81.4L15.6 79.1L13.5 76.1L11.3 72.6L10.2 70.5L10.3 70.5L12.2 72.4L14.3 74.1L18.5 77.0L22.6 78.7L25.0 79.4L28.2 80.0L31.8 82.6L35.8 84.6L38.6 85.7L42.4 86.6L46.4 87.0L49.3 86.9L51.8 86.4L53.9 85.5L55.9 84.2L58.2 82.0L59.4 80.3L60.3 78.7L61.5 75.3L61.9 72.9L62.0 71.4L61.9 69.0L61.6 67.3L69.5 62.7L69.8 64.0L70.3 67.6L70.4 70.4L70.2 73.0L69.8 75.6L69.3 77.6L68.4 80.1L67.2 82.2L64.8 85.6L62.7 87.7L60.4 89.6L58.1 91.1L56.3 92.1L53.2 93.4L49.7 94.5L50.3 94.5L51.7 94.4L54.4 93.7L57.7 92.3L60.3 90.9L62.9 88.9L64.5 87.4L66.2 85.5L67.8 83.2L68.8 81.4L72.0 78.9L75.4 75.7L78.1 72.4L81.1 68.0L83.6 63.1L84.7 60.3L85.6 57.5L91.1 66.7L89.0 71.1L87.1 74.2L84.5 77.9L82.4 80.5L78.8 84.2L75.5 86.9L72.0 89.3L69.1 91.0L64.8 92.9L60.7 94.2L56.2 95.2ZM50.6 81.7L50.6 74.8L52.9 72.9L54.7 71.0L60.7 67.7L61.0 69.5L61.1 71.6L60.9 73.9L60.5 75.4ZM49.7 82.3L49.4 82.3L45.6 80.1L43.2 78.6L46.9 77.0L49.7 75.5Z';
 
 const font = 'font:12px/1.4 ui-sans-serif,system-ui,sans-serif;';
+
+const configStatus = (config: unknown): HealthStatus => {
+  const v: unknown =
+    typeof config === 'object' && config !== null ? Reflect.get(config, 'healthStatus') : undefined;
+  return v === 'radar' || v === 'off' ? v : 'ring';
+};
 
 const configPosition = (config: unknown): DevtoolsPosition => {
   const p: unknown =
@@ -97,11 +112,17 @@ const RING_CSS = `
 @keyframes dt-flow-ok { 0%, 100% { stroke: #15803d; } 50% { stroke: #22c55e; } }
 @keyframes dt-flow-unwell { 0%, 100% { stroke: #a16207; } 50% { stroke: #f59e0b; } }
 @keyframes dt-alarm { 0%, 100% { stroke: #ef4444; } 50% { stroke: #7f1d1d; } }
+@keyframes dt-fill-ok { 0%, 100% { fill: #15803d; } 50% { fill: #4ade80; } }
+@keyframes dt-fill-unwell { 0%, 100% { fill: #a16207; } 50% { fill: #fbbf24; } }
+@keyframes dt-fill-alarm { 0%, 100% { fill: #ef4444; } 50% { fill: #7f1d1d; } }
 .dt-ring path[data-level="ok"] { animation: dt-flow-ok ${RING_PERIOD}s ease-in-out infinite; }
 .dt-ring path[data-level="unwell"] { animation: dt-flow-unwell ${RING_PERIOD}s ease-in-out infinite; }
 .dt-ring path[data-level="failed"] { animation: dt-alarm 0.9s ease-in-out infinite; }
+.dt-mark path[data-level="ok"] { animation: dt-fill-ok ${RING_PERIOD}s ease-in-out infinite; }
+.dt-mark path[data-level="unwell"] { animation: dt-fill-unwell ${RING_PERIOD}s ease-in-out infinite; }
+.dt-mark path[data-level="failed"] { animation: dt-fill-alarm 0.9s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .dt-ring path { animation: none; }
+  .dt-ring path, .dt-mark path { animation: none; }
 }
 `;
 
@@ -137,6 +158,7 @@ function Fab(props: {
   health: Health;
   arcs: Arc[];
   summary: string;
+  status: HealthStatus;
   onOpen: () => void;
   onMove: (to: DevtoolsPosition) => void;
 }) {
@@ -182,8 +204,8 @@ function Fab(props: {
           type="button"
           data-isoloop-devtools-toggle=""
           data-health={props.health}
-          aria-label={`Open Isoloop devtools (Alt+Shift+D). ${props.summary}`}
-          title={`Isoloop devtools (Alt+Shift+D)\n${props.summary}`}
+          aria-label={`Open Isoloop devtools (Alt+Shift+D)${props.summary ? `. ${props.summary}` : ''}`}
+          title={`Isoloop devtools (Alt+Shift+D)${props.summary ? `\n${props.summary}` : ''}`}
           onClick={props.onOpen}
           style={`position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:${FAB_SIZE / 2}px;border:0;background:#111827;box-shadow:0 0 0 3px rgb(0 0 0 / 0.35),0 4px 14px rgb(0 0 0 / 0.7);color:#e5e7eb;cursor:pointer;padding:0;overflow:hidden;${font}`}
         >
@@ -195,24 +217,63 @@ function Fab(props: {
             aria-hidden="true"
             style="position:absolute;inset:0;"
           >
-            {props.arcs.map((c, i) => (
-              <path
-                key={c.id}
-                data-level={c.level}
-                d={arcPath(i, FAB_SIZE / 2, FAB_SIZE / 2, FAB_SIZE / 2 - RING_WIDTH / 2)}
-                stroke={LEVEL_COLOR[c.level]}
-                stroke-width={RING_WIDTH}
-                stroke-linecap="butt"
+            {props.status === 'off' ? (
+              <circle
+                cx={FAB_SIZE / 2}
+                cy={FAB_SIZE / 2}
+                r={FAB_SIZE / 2 - RING_WIDTH / 2}
                 fill="none"
-                style={`animation-delay:-${((i / RING_SLOTS) * RING_PERIOD).toFixed(2)}s;`}
-              >
-                <title>{c.label}</title>
-              </path>
-            ))}
+                stroke="#f8fafc"
+                stroke-width={RING_WIDTH}
+              />
+            ) : (
+              props.arcs.map((c, i) => (
+                <path
+                  key={c.id}
+                  data-level={c.level}
+                  d={arcPath(i, FAB_SIZE / 2, FAB_SIZE / 2, FAB_SIZE / 2 - RING_WIDTH / 2)}
+                  stroke={LEVEL_COLOR[c.level]}
+                  stroke-width={RING_WIDTH}
+                  stroke-linecap="butt"
+                  fill="none"
+                  style={`animation-delay:-${((i / RING_SLOTS) * RING_PERIOD).toFixed(2)}s;`}
+                >
+                  <title>{c.label}</title>
+                </path>
+              ))
+            )}
           </svg>
-          <svg width={FAB_MARK} height={FAB_MARK} viewBox="0 0 100 100" aria-hidden="true">
-            <path d={MARK} fill="#fff" fill-rule="evenodd" />
-          </svg>
+          {props.status === 'radar' ? (
+            // The logo filled by the same twelve colours, each on its arc's side.
+            <svg
+              class="dt-mark"
+              width={FAB_MARK}
+              height={FAB_MARK}
+              viewBox="0 0 100 100"
+              aria-hidden="true"
+            >
+              <defs>
+                <clipPath id="dt-mark-clip">
+                  <path d={MARK} clip-rule="evenodd" />
+                </clipPath>
+              </defs>
+              <g clip-path="url(#dt-mark-clip)">
+                {props.arcs.map((c, i) => (
+                  <path
+                    key={c.id}
+                    data-level={c.level}
+                    d={wedgePath(i, 50, 50, 75)}
+                    fill={LEVEL_COLOR[c.level]}
+                    style={`animation-delay:-${((i / RING_SLOTS) * RING_PERIOD).toFixed(2)}s;`}
+                  />
+                ))}
+              </g>
+            </svg>
+          ) : (
+            <svg width={FAB_MARK} height={FAB_MARK} viewBox="0 0 100 100" aria-hidden="true">
+              <path d={MARK} fill="#fff" fill-rule="evenodd" />
+            </svg>
+          )}
         </button>
         {hover ? (
           <>
@@ -408,6 +469,7 @@ function Dock(props: {
 
 function Panel({ config }: IsolateProps) {
   const ctx = useIsolate();
+  const status = configStatus(config);
   useEffect(() => {
     ctx.styles(RING_CSS);
   }, []);
@@ -450,8 +512,9 @@ function Panel({ config }: IsolateProps) {
       <Fab
         position={ui.position}
         health={healthOf(snap)}
-        arcs={arcsOf(snap)}
-        summary={summaryOf(arcsOf(snap), checksOf(snap))}
+        arcs={status === 'off' ? [] : arcsOf(snap)}
+        summary={status === 'off' ? '' : summaryOf(arcsOf(snap), checksOf(snap))}
+        status={status}
         onOpen={() => {
           update({ open: true });
         }}
