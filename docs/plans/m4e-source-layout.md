@@ -8,7 +8,12 @@
 - `0.1.0-next.11` is on npm, and the bundle-size guide is in the site's docs at that pin. It goes live with the maintainer's next `site-v*` tag.
 - No M4e PR changed the public API, as the API check reports it.
 
-**Status (2026-11-21):** grilled (Q1–Q31, yes to all). ADR 0021 was accepted the same day (#347), so tasks 3–17 can start. `0.1.0` ([M4d](m4d-release.md), task 14) waits for this epic.
+**Status (2026-11-21):** done. Grilled (Q1–Q31, yes to all), and ADR 0021 was accepted the same day (#347). Every task below is done, with two added on the way (3b and 5b). `0.1.0-next.11` is on npm with the bundle-size guide in the site's docs at that pin (web#240), and the guide goes live with the maintainer's next `site-v*` tag. No M4e PR changed the public API, as the API check reports it. `0.1.0` ([M4d](m4d-release.md), task 14) no longer waits for this epic.
+
+**Changed while it was built:**
+- **Task 3b** turned the three import rules back on with the code fixed, rather than off (the maintainer, on the grilling's Q34). One `import/default` hit is left in `e2e/harness/src/main.ts`, on Vite's `?worker&url` imports. It fires only when `dist/` exists, so CI, which lints before the build, doesn't see it.
+- **Task 5b** made the API check leave out imports, private declarations no export reaches, and minified `_` and `$` aliases, so task 13 read as no public change.
+- **Task 14 landed before task 13,** which waited for the maintainer. The version PR (#366) re-recorded the guard's table at `0.1.0-next.11`, and the guide's figures with it.
 
 M4e has no demo or write-up of its own, unlike the other epics (plans [conventions](README.md#conventions)). It ends with the bundle-size guide, and the launch post may link that.
 
@@ -66,21 +71,23 @@ M4e has no demo or write-up of its own, unlike the other epics (plans [conventio
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | ADR 0021, to the maintainer | done (#347) | library | `docs/adr/0021-source-layout-and-entry-points.md`, `docs/adr/README.md` | — (maintainer) | the grilling |
 | 2 | This plan, M4e's rows in the plans index and the M4 overview, and M4d task 14 waiting for M4e, to the maintainer | done (#348) | library | `docs/plans/m4e-source-layout.md`, `docs/plans/README.md`, `docs/plans/m4-devtools-release.md`, `docs/plans/m4d-release.md` | — (maintainer) | the grilling |
-| 3 | The checks: the layout test, with `pending` listing the 11 packages to move; `import/no-cycle` and `unicorn/filename-case`; `map.json`'s paths in `docs:check`; the `./dist/` paths in `sideEffects` in `check-exports`; the `CONTRIBUTING.md` bullet | after task 1 | library | `scripts/layout/`, `.oxlintrc.json`, `scripts/docs/check.ts`, `scripts/check-exports.ts`, `CONTRIBUTING.md` | unit: each rule fails on a planted case and passes on `main` with `pending` | 1 |
-| 4 | Diagram anchors: each of the 113 citations carries the text of its first cited line; the diagrams test checks it, and the anchor script finds a moved line again | after task 1 | library | `docs/diagrams/*.json`, `docs/diagrams/diagrams.test.ts`, the anchor script | the test fails on a shifted line | 1 |
-| 5 | The API check compares exported names and their declarations, so a list's shape and the `@internal` names inside one don't count; a notice when a `no-changeset` PR changes the dist JS. To the maintainer | after task 1 | library | `scripts/ci/api-check.ts` | unit: protocol's and bus's `export *` rewritten as lists reads as no change; a changed declaration still counts; the notice appears | 1 |
-| 6 | Explicit lists in protocol's and bus's entries; `oxc/no-barrel-file` (threshold 0) on | after task 5 | library | `packages/protocol/src/index.ts`, `packages/bus/src/index.ts`, `.oxlintrc.json` | the API check reports no change; the dist JS is identical | 5 |
-| 7 | Move protocol and codec | after tasks 3 and 4 | library | `packages/{protocol,codec}/src`, the living docs that cite them | every move PR, below | 3, 4 |
-| 8 | Move bus | | library | `packages/bus/src` | every move PR | 7 |
-| 9 | Move runtime; `render/index.ts` becomes `render/render.ts` | | library | `packages/runtime/src` | every move PR | 8 |
-| 10 | Move host; `supervisor/index.ts` goes | | library | `packages/host/src` | every move PR | 9 |
-| 11 | Move react and preact | | library | `packages/{react,preact}/src` | every move PR | 10 |
-| 12 | Move devtools, balancer, vite and cli; `pending` goes | | library | `packages/{devtools,balancer,vite,cli}/src`, `packages/balancer/test` | every move PR | 11 |
-| 13 | The bus entry stops exporting 21 of its 22 `@internal` names (`isContracts` stays for the CLI); the throughput bench imports `TsEngine` from source; a patch changeset. To the maintainer | after task 6 | library | `packages/bus/src/index.ts`, `bench/throughput/engine.bench.ts`, `.changeset/` | typecheck; the API check reports no public change | 6 |
-| 14 | The bundle guard: `bench/bundle-size`, its CI step after the build, the budgets and the recorded table; bus's worker and the devtools panel declared in `sideEffects` (a patch changeset); the `pnpm bench:bundle` row and the §9 line | after task 12 | library | `bench/bundle-size/`, `.github/workflows/ci.yml`, `packages/{bus,devtools}/package.json`, `CONTRIBUTING.md`, `docs/design/system-design.md` | it fails on a planted top-level side effect, on a script missing from `sideEffects`, and on a crossed budget | 12 |
-| 15 | The bundle-size guide and its `map.json` entry, to the maintainer | after task 14 | library | `docs/guide/bundle-size.md`, `docs/guide/map.json` | `docs:check` | 14 |
-| 16 | `0.1.0-next.11`: the version PR, then the Prerelease workflow | after tasks 13–15 | library | `.changeset/` | the Prerelease workflow | 13, 14, 15 |
-| 17 | isoloop/web: the pin at `next.11`, the guide in `docs.json`, the feature proofs on the new paths | after task 16 | web | `apps/site/library.lock`, `apps/site/content/docs.json`, `apps/site/content/features/*.json` | `check-pin`, the site build, the proofs check | 16 |
+| 3 | The checks: the layout test, with `pending` listing the 11 packages to move; `import/no-cycle` and `unicorn/filename-case`; `map.json`'s paths in `docs:check`; the `./dist/` paths in `sideEffects` in `check-exports`; the `CONTRIBUTING.md` bullet | done (#349) | library | `scripts/layout/`, `.oxlintrc.json`, `scripts/docs/check.ts`, `scripts/check-exports.ts`, `CONTRIBUTING.md` | unit: each rule fails on a planted case and passes on `main` with `pending` | 1 |
+| 3b | The three import rules back on (`import/default`, `import/no-named-as-default-member`, `import/no-unassigned-import`), with the code fixed (the maintainer, on Q34) | done (#351) | library | `.oxlintrc.json`, the files they flagged | lint: 0 hits before the build | 3 |
+| 4 | Diagram anchors: each of the 113 citations carries the text of its first cited line; the diagrams test checks it, and the anchor script finds a moved line again | done (#353) | library | `docs/diagrams/*.json`, `docs/diagrams/diagrams.test.ts`, the anchor script | the test fails on a shifted line | 1 |
+| 5 | The API check compares exported names and their declarations, so a list's shape and the `@internal` names inside one don't count; a notice when a `no-changeset` PR changes the dist JS. To the maintainer | done (#350) | library | `scripts/ci/api-check.ts` | unit: protocol's and bus's `export *` rewritten as lists reads as no change; a changed declaration still counts; the notice appears | 1 |
+| 5b | The API check leaves out imports, private declarations no export reaches, and minified `_` and `$` aliases, so task 13 reads as no public change. To the maintainer | done (#361) | library | `scripts/ci/api-check.ts` | unit: imports, an unreached private type, a reached one, the `_` alias | 5 |
+| 6 | Explicit lists in protocol's and bus's entries; `oxc/no-barrel-file` (threshold 0) on | done (#352) | library | `packages/protocol/src/index.ts`, `packages/bus/src/index.ts`, `.oxlintrc.json` | the API check reports no change; the dist JS is identical | 5 |
+| 7 | Move protocol and codec | done (#354) | library | `packages/{protocol,codec}/src`, the living docs that cite them | every move PR, below | 3, 4 |
+| 8 | Move bus | done (#355) | library | `packages/bus/src` | every move PR | 7 |
+| 9 | Move runtime; `render/index.ts` becomes `render/render.ts` | done (#356) | library | `packages/runtime/src` | every move PR | 8 |
+| 10 | Move host; `supervisor/index.ts` goes | done (#358) | library | `packages/host/src` | every move PR | 9 |
+| 11 | Move react and preact | done (#359) | library | `packages/{react,preact}/src` | every move PR | 10 |
+| 12 | Move devtools, balancer, vite and cli; `pending` goes | done (#360) | library | `packages/{devtools,balancer,vite,cli}/src`, `packages/balancer/test` | every move PR | 11 |
+| 13 | The bus entry stops exporting 21 of its 22 `@internal` names (`isContracts` stays for the CLI); the throughput bench imports `TsEngine` from source; a patch changeset. To the maintainer | done (#362) | library | `packages/bus/src/index.ts`, `bench/throughput/engine.bench.ts`, `.changeset/` | typecheck; the API check reports no public change | 6 |
+| 14 | The bundle guard: `bench/bundle-size`, its CI step after the build, the budgets and the recorded table; bus's worker and the devtools panel declared in `sideEffects` (a patch changeset); the `pnpm bench:bundle` row and the §9 line | done (#363) | library | `bench/bundle-size/`, `.github/workflows/ci.yml`, `packages/{bus,devtools}/package.json`, `CONTRIBUTING.md`, `docs/design/system-design.md` | it fails on a planted top-level side effect, on a script missing from `sideEffects`, and on a crossed budget | 12 |
+| 15 | The bundle-size guide and its `map.json` entry, to the maintainer | done (#364) | library | `docs/guide/bundle-size.md`, `docs/guide/map.json` | `docs:check` | 14 |
+| 16 | `0.1.0-next.11`: the version PR, then the Prerelease workflow | done (#366) | library | `.changeset/` | the Prerelease workflow | 13, 14, 15 |
+| 17 | isoloop/web: the pin at `next.11`, the guide in `docs.json`, the feature proofs on the new paths | done (web#240) | web | `apps/site/library.lock`, `apps/site/content/docs.json`, `apps/site/content/features/*.json` | `check-pin`, the site build, the proofs check | 16 |
 
 **Every move PR (tasks 7–12)** carries:
 - the moves and their import paths
