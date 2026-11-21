@@ -4,10 +4,18 @@
 // (`dist/**/*.d.ts`, written by tsdown from `isolatedDeclarations`):
 // - normalised: comments and formatting ignored, chunk hashes ignored, export
 //   lists sorted, declarations marked `@internal` left out;
-// - compared per package as a set of top-level statements.
+// - compared per package by exported names and their declarations (ADR 0021,
+//   decision 8): `export type X = …` reads the same as `type X = …` with
+//   `export { X }`, `type` modifiers in lists don't count, and an `@internal`
+//   name goes out of the lists with its declaration.
 // A changed package needs (a) a changeset bumping it at least `minor`,
 // (b) a change under docs/ or to TSDoc in its src/, and (c) a "Site impact:"
 // other than `none`. The changed declarations go to the job summary.
+//
+// It also compares the dist JS, without tsdown's `// src/<path>` comments.
+// When a package's JS changed and no changeset in the PR bumps it, the summary
+// says so: a notice, not a failure, since a refactor may change output on
+// purpose. A move that keeps file names changes nothing there.
 import { execFileSync } from 'node:child_process';
 import {
   appendFileSync,
@@ -174,6 +182,93 @@ export function exportedNames(stmts: Iterable<string>): Set<string> {
   return out;
 }
 
+const DECLARATION =
+  /^(?:abstract )?(?:function|const|let|class|interface|type|enum|namespace)\s*([A-Za-z_$][\w$]*)/;
+
+/** The top-level names a declaration file marks `@internal`: the declarations `dropInternal` removes. */
+export function internalNames(src: string): Set<string> {
+  const out = new Set<string>();
+  const re =
+    /\/\*\*(?:(?!\*\/)[\s\S])*?@internal[\s\S]*?\*\/\s*(?:export\s+)?(?:declare\s+)?((?:abstract\s+)?(?:function|const|let|class|interface|type|enum|namespace)\s+[A-Za-z_$][\w$]*)/g;
+  for (const m of src.matchAll(re)) {
+    const name = DECLARATION.exec((m[1] ?? '').replace(/\s+/g, ' '))?.[1];
+    if (name) out.add(name);
+  }
+  return out;
+}
+
+/**
+ * A package's declaration files as a set of normalised statements in which only
+ * exported names and their declarations count. Declarations lose `export` and
+ * `declare`, and each file's exported names become one sorted `export{…}`, so a
+ * list and an exported declaration read the same. `type` modifiers in lists
+ * don't count, and `@internal` names leave the lists along with their
+ * declarations.
+ */
+export function surfaceOf(files: readonly string[]): Set<string> {
+  const internal = new Set(files.flatMap((f) => [...internalNames(f)]));
+  const keep = (item: string): string | undefined => {
+    const bare = item.trim().replace(/^type /, '');
+    const [left = '', right] = bare.split(/ as /);
+    return bare === '' || internal.has(left) || (right !== undefined && internal.has(right))
+      ? undefined
+      : bare;
+  };
+  const out = new Set<string>();
+  for (const src of files) {
+    const exported = new Set<string>();
+    for (const s of statements(src)) {
+      const list = /^(export|import)(?: type)?\{([^}]*)\}(from ?['"][^'"]*['"])?;?$/.exec(s);
+      if (list) {
+        const [, kw = '', items = '', from = ''] = list;
+        const kept = items.split(',').flatMap((i) => keep(i) ?? []);
+        if (kw === 'export' && from === '') for (const k of kept) exported.add(k);
+        else if (kept.length > 0) {
+          kept.sort();
+          out.add(`${kw}{${kept.join(',')}}${from};`);
+        }
+        continue;
+      }
+      if (s.startsWith('export default')) {
+        out.add(s);
+        continue;
+      }
+      const body = s.replace(/^export /, '').replace(/^declare /, '');
+      const name = DECLARATION.exec(body)?.[1];
+      if (name === undefined) {
+        out.add(s);
+        continue;
+      }
+      out.add(body);
+      if (s.startsWith('export ') && !internal.has(name)) exported.add(name);
+    }
+    if (exported.size > 0) {
+      const list = [...exported];
+      list.sort();
+      out.add(`export{${list.join(',')}}`);
+    }
+  }
+  return out;
+}
+
+/** Dist JS without tsdown's module comments (`// src/<path>`, `// ../protocol/dist/index.js`) or chunk hashes. */
+export function normaliseJs(text: string): string {
+  return text
+    .replace(/^\/\/ \S+\.(?:[cm]?[jt]sx?|json)$\n?/gm, '')
+    .replace(/-[A-Za-z0-9_-]{8}(\.(?:d\.)?[mc]?[jt]s)/g, '-#$1');
+}
+
+/** The files of two builds of one package that differ once normalised (chunk hashes dropped from their names). */
+export function changedJs(
+  before: ReadonlyMap<string, string>,
+  now: ReadonlyMap<string, string>,
+): string[] {
+  const files = new Set([...before.keys(), ...now.keys()]);
+  const out = [...files].filter((n) => before.get(n) !== now.get(n));
+  out.sort();
+  return out;
+}
+
 function allNames(m: Map<string, Set<string>>): Set<string> {
   const out = new Set<string>();
   for (const stmts of m.values()) for (const n of exportedNames(stmts)) out.add(n);
@@ -209,29 +304,60 @@ function guidesNaming(root: string, gone: Set<string>): { file: string; message:
     .flatMap((f) => checkRemovedNames(`docs/guide/${f}`, readFileSync(join(dir, f), 'utf8'), gone));
 }
 
-function dtsFiles(dir: string): string[] {
+function distFiles(dir: string, match: RegExp): string[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap((name) => {
     const p = join(dir, name);
-    return statSync(p).isDirectory() ? dtsFiles(p) : /\.d\.[mc]?ts$/.test(name) ? [p] : [];
+    return statSync(p).isDirectory() ? distFiles(p, match) : match.test(name) ? [p] : [];
   });
 }
 
-/** Published package name → its normalised declaration statements. */
-function surface(root: string): Map<string, Set<string>> {
-  const out = new Map<string, Set<string>>();
+/** Published package name → its directory under `packages/`. */
+function published(root: string): Map<string, string> {
+  const out = new Map<string, string>();
   for (const dir of readdirSync(join(root, 'packages'))) {
     const pkgFile = join(root, 'packages', dir, 'package.json');
     if (!existsSync(pkgFile)) continue;
     const pkg = readPackage(pkgFile);
-    if (pkg.private) continue;
-    const set = new Set<string>();
-    for (const f of dtsFiles(join(root, 'packages', dir, 'dist'))) {
-      for (const s of statements(readFileSync(f, 'utf8'))) set.add(s);
-    }
-    out.set(pkg.name, set);
+    if (!pkg.private) out.set(pkg.name, join(root, 'packages', dir));
   }
   return out;
+}
+
+/** Published package name → its normalised declarations (`surfaceOf`). */
+function surface(root: string): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const [name, dir] of published(root)) {
+    const files = distFiles(join(dir, 'dist'), /\.d\.[mc]?ts$/);
+    out.set(name, surfaceOf(files.map((f) => readFileSync(f, 'utf8'))));
+  }
+  return out;
+}
+
+/** Published package name → its dist JS by file, normalised (`normaliseJs`). */
+function distJs(root: string): Map<string, Map<string, string>> {
+  const out = new Map<string, Map<string, string>>();
+  for (const [name, dir] of published(root)) {
+    const files = new Map<string, string>();
+    for (const f of distFiles(join(dir, 'dist'), /\.[mc]?js$/)) {
+      const key = normaliseJs(relative(join(dir, 'dist'), f));
+      files.set(key, normaliseJs(readFileSync(f, 'utf8')));
+    }
+    out.set(name, files);
+  }
+  return out;
+}
+
+/** Packages whose dist JS changed with no changeset in the PR bumping them, and the files. */
+export function unannouncedJs(
+  before: ReadonlyMap<string, ReadonlyMap<string, string>>,
+  now: ReadonlyMap<string, ReadonlyMap<string, string>>,
+  bumped: ReadonlyMap<string, string>,
+): { name: string; files: string[] }[] {
+  return [...now]
+    .filter(([name]) => !bumped.has(name))
+    .map(([name, files]) => ({ name, files: changedJs(before.get(name) ?? new Map(), files) }))
+    .filter((c) => c.files.length > 0);
 }
 
 function build(root: string): void {
@@ -295,16 +421,33 @@ function main(): void {
 
   build(root);
   const head = surface(root);
+  const headJs = distJs(root);
   const baseDir = mkdtempSync(join(tmpdir(), 'api-base-'));
   sh(root, 'git', ['worktree', 'add', '--detach', baseDir, base]);
   try {
     build(baseDir);
     const before = surface(baseDir);
+    const beforeJs = distJs(baseDir);
+    const bumped = bumps(root, base);
     const dirs = new Map<string, string>();
     for (const dir of readdirSync(join(root, 'packages'))) {
       const f = join(root, 'packages', dir, 'package.json');
       if (existsSync(f)) dirs.set(readPackage(f).name, relative(root, join(root, 'packages', dir)));
     }
+
+    // The JS notice (ADR 0021, decision 8): output that changed with no changeset.
+    const quiet = unannouncedJs(beforeJs, headJs, bumped);
+    const jsNotice = (): void => {
+      if (quiet.length === 0) return;
+      say('\n### Changed output without a changeset\n');
+      say(
+        "The dist JS of these packages changed beyond tsdown's source-path comments, and no changeset in this PR bumps them. A refactor may do that on purpose; a change users can see needs a changeset.\n",
+      );
+      for (const q of quiet) say(`- \`${q.name}\`: ${q.files.map((f) => `\`${f}\``).join(', ')}`);
+      console.log(
+        `::notice title=API check::dist JS changed without a changeset: ${quiet.map((q) => q.name).join(', ')}`,
+      );
+    };
 
     const changes: { name: string; added: string[]; removed: string[] }[] = [];
     for (const [name, now] of head) {
@@ -315,6 +458,7 @@ function main(): void {
     }
     if (changes.length === 0) {
       say('## API check\n\nThe published declarations are unchanged.');
+      jsNotice();
       return;
     }
 
@@ -323,7 +467,6 @@ function main(): void {
     const stale = guidesNaming(root, gone);
 
     const impact = parseSiteImpact(prBody());
-    const bumped = bumps(root, base);
     let failed = false;
     say('## API check\n\nThe public API changed:');
     for (const c of changes) {
@@ -345,6 +488,7 @@ function main(): void {
       for (const s of c.added) say(`+ ${s}`);
       say('```');
     }
+    jsNotice();
     if (stale.length > 0) {
       failed = true;
       say('\n### Guides that name a removed export\n');
