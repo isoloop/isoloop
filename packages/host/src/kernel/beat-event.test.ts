@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createKernel, type Kernel, type KernelEvents } from './index';
+import { createKernel, type Kernel, type KernelEvents } from '../index';
 
 // `isolate:beat` (ADR 0017): every heartbeat, per member, as it arrives.
 
-const bootstrap = `${new URL('../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
-const burn = new URL('./__fixtures__/burn.ts', import.meta.url).href;
+const bootstrap = `${new URL('../../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
+const burn = new URL('../__fixtures__/burn.ts', import.meta.url).href;
 
 type Beat = KernelEvents['isolate:beat'];
 

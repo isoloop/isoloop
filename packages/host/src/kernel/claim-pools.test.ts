@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { claimPools, createKernel, KernelError, type Kernel } from './index';
+import { claimPools, createKernel, KernelError, type Kernel } from '../index';
 
 // Reserved pools (ADR 0017): `balancer-…` pool names belong to
 // @isoloop/balancer, which gets them through `claimPools`, once per kernel.
 
-const bootstrap = `${new URL('../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
-const counter = new URL('./__fixtures__/counter.ts', import.meta.url).href;
+const bootstrap = `${new URL('../../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
+const counter = new URL('../__fixtures__/counter.ts', import.meta.url).href;
 
 const kernels: Kernel[] = [];
 afterEach(async () => {

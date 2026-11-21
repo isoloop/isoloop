@@ -50,14 +50,14 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/host/src/kernel.ts",
-          "line": 741,
-          "end_line": 747,
+          "path": "packages/host/src/kernel/kernel.ts",
+          "line": 740,
+          "end_line": 746,
           "label": "unsupported_browser",
           "anchor": "export function createKernel(config: KernelConfig): Kernel {"
         },
         {
-          "path": "packages/host/src/features.ts",
+          "path": "packages/host/src/kernel/features.ts",
           "line": 45,
           "end_line": 74,
           "label": "the features checked",
@@ -81,9 +81,9 @@
           "anchor": "export function step(s: IsolateSupervision, input: SupervisorInput, cfg: SupervisorConfig): Step {"
         },
         {
-          "path": "packages/host/src/kernel.ts",
-          "line": 1038,
-          "end_line": 1059,
+          "path": "packages/host/src/kernel/kernel.ts",
+          "line": 1037,
+          "end_line": 1058,
           "label": "pool fate",
           "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
           "anchor_offset": 1
@@ -99,7 +99,7 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/host/src/compositor.ts",
+          "path": "packages/host/src/render/compositor.ts",
           "line": 1,
           "end_line": 9,
           "label": "applies batches per frame",
@@ -117,7 +117,7 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/host/src/compositor.ts",
+          "path": "packages/host/src/render/compositor.ts",
           "line": 6,
           "end_line": 8,
           "label": "shadow host per surface",
@@ -193,7 +193,7 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/host/src/loader.ts",
+          "path": "packages/host/src/kernel/loader.ts",
           "line": 132,
           "end_line": 153,
           "label": "own worker",
@@ -218,7 +218,7 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/host/src/loader.ts",
+          "path": "packages/host/src/kernel/loader.ts",
           "line": 155,
           "end_line": 201,
           "label": "members join one worker",

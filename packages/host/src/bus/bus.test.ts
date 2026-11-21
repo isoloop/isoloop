@@ -2,15 +2,21 @@
 // Isolates run a test bootstrap that speaks the bus protocol directly.
 import type { BusRecord } from '@isoloop/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list, { count, notes, report, saved, type Report } from './__fixtures__/contracts';
-import { BusError, createKernel, type Kernel, type KernelConfig, type KernelEvents } from './index';
+import list, { count, notes, report, saved, type Report } from '../__fixtures__/contracts';
+import {
+  BusError,
+  createKernel,
+  type Kernel,
+  type KernelConfig,
+  type KernelEvents,
+} from '../index';
 
 const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
-const busWorker = worker('../../bus/src/worker.ts');
-const bootstrap = worker('./__fixtures__/bus-bootstrap.ts');
-const contractsUrl = new URL('./__fixtures__/contracts.ts', import.meta.url).href;
-const src = new URL('./__fixtures__/throws.ts', import.meta.url).href; // never imported by the test bootstrap
+const busWorker = worker('../../../bus/src/worker.ts');
+const bootstrap = worker('../__fixtures__/bus-bootstrap.ts');
+const contractsUrl = new URL('../__fixtures__/contracts.ts', import.meta.url).href;
+const src = new URL('../__fixtures__/throws.ts', import.meta.url).href; // never imported by the test bootstrap
 
 const ALL = { publish: ['*'], subscribe: ['*'] };
 
@@ -284,7 +290,7 @@ describe('bus controller', () => {
 
   it('quota: bus:quota once past 80 %; when full, persistent publishes reject and memory topics carry on (M2b)', async () => {
     const { kernel, log } = setup({
-      workers: { isolateBootstrap: bootstrap, bus: worker('./__fixtures__/quota-bus.ts') },
+      workers: { isolateBootstrap: bootstrap, bus: worker('../__fixtures__/quota-bus.ts') },
     });
     const quota = log('bus:quota');
     const metrics = log('bus:metrics');
@@ -304,7 +310,7 @@ describe('bus controller', () => {
     'on %s, persistent topics are written at once, not at the next group commit (M2b)',
     async (event) => {
       const { kernel, log } = setup({
-        workers: { isolateBootstrap: bootstrap, bus: worker('./__fixtures__/slow-commit-bus.ts') },
+        workers: { isolateBootstrap: bootstrap, bus: worker('../__fixtures__/slow-commit-bus.ts') },
       });
       const ready = log('bus:ready');
       await vi.waitUntil(() => ready.length >= 1, { timeout: 3000 });
@@ -329,8 +335,9 @@ describe('bus controller', () => {
     await expect(first.kernel.dropTopic(saved.name)).rejects.toMatchObject({ code: 'invalid' });
     await first.kernel.destroy();
 
-    const withoutSaved = new URL('./__fixtures__/contracts-without-saved.ts', import.meta.url).href;
-    const { default: smaller } = await import('./__fixtures__/contracts-without-saved');
+    const withoutSaved = new URL('../__fixtures__/contracts-without-saved.ts', import.meta.url)
+      .href;
+    const { default: smaller } = await import('../__fixtures__/contracts-without-saved');
     const next = () => setup({ contracts: { url: withoutSaved, list: smaller } });
     // The destroyed kernel's bus may hold the files a moment longer.
     let second = next();

@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createKernel, type Kernel, type KernelConfig, type KernelEvents } from './index';
+import { createKernel, type Kernel, type KernelConfig, type KernelEvents } from '../index';
 
 // Worker pools, the host side (M2c task 2, ADR 0001): headless isolates naming
 // the same pool share one worker, started with the first member and gone
 // after the last. Visual pools (M2d, ADR 0015) are in visual-pools.test.ts.
 
-const bootstrap = `${new URL('../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
-const counter = new URL('./__fixtures__/counter.ts', import.meta.url).href;
-const spin = new URL('./__fixtures__/spin.ts', import.meta.url).href;
-const throws = new URL('./__fixtures__/throws.ts', import.meta.url).href;
-const timerThrows = new URL('./__fixtures__/timer-throws.ts', import.meta.url).href;
+const bootstrap = `${new URL('../../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
+const counter = new URL('../__fixtures__/counter.ts', import.meta.url).href;
+const spin = new URL('../__fixtures__/spin.ts', import.meta.url).href;
+const throws = new URL('../__fixtures__/throws.ts', import.meta.url).href;
+const timerThrows = new URL('../__fixtures__/timer-throws.ts', import.meta.url).href;
 
 const kernels: Kernel[] = [];
 afterEach(async () => {

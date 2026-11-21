@@ -32,7 +32,7 @@
       "size": [170, 66],
       "sources": [
         {
-          "path": "packages/host/src/loader.ts",
+          "path": "packages/host/src/kernel/loader.ts",
           "line": 203,
           "end_line": 208,
           "label": "own worker or pool member",
@@ -40,7 +40,7 @@
           "anchor_offset": 1
         },
         {
-          "path": "packages/host/src/loader.ts",
+          "path": "packages/host/src/kernel/loader.ts",
           "line": 1,
           "end_line": 9,
           "label": "a pool's worker lives with its members",
@@ -58,7 +58,7 @@
       "size": [170, 66],
       "sources": [
         {
-          "path": "packages/host/src/loader.ts",
+          "path": "packages/host/src/kernel/loader.ts",
           "line": 132,
           "end_line": 153,
           "label": "one worker per isolate",
@@ -75,7 +75,7 @@
       "size": [170, 66],
       "sources": [
         {
-          "path": "packages/host/src/loader.ts",
+          "path": "packages/host/src/kernel/loader.ts",
           "line": 132,
           "end_line": 153,
           "label": "one worker per isolate",
@@ -92,7 +92,7 @@
       "size": [170, 66],
       "sources": [
         {
-          "path": "packages/host/src/loader.ts",
+          "path": "packages/host/src/kernel/loader.ts",
           "line": 132,
           "end_line": 153,
           "label": "one worker per isolate",

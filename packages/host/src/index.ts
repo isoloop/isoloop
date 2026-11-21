@@ -11,13 +11,19 @@ export {
   type KernelConfig,
   type KernelEvent,
   type KernelEvents,
-} from './kernel';
-export type { Backoff, CrashReason, IsolateState } from './supervisor';
-export type { FallbackInfo, FallbackRender, SurfaceStats } from './compositor';
-export type { NavigateRequest, OnNavigate } from './router';
-export type { AgentsConfig, AgentTool, KernelRequestOptions, ToolJsonSchema } from './agents';
+} from './kernel/kernel';
+export type { CrashReason, IsolateState } from './supervisor/machine';
+export type { Backoff } from './supervisor/timers';
+export type { FallbackInfo, FallbackRender, SurfaceStats } from './render/compositor';
+export type { NavigateRequest, OnNavigate } from './router/router';
+export type {
+  AgentsConfig,
+  AgentTool,
+  KernelRequestOptions,
+  ToolJsonSchema,
+} from './agents/agents';
 export type { RequestVia } from '@isoloop/protocol';
-export type { Inspector } from './inspect';
+export type { Inspector } from './inspect/inspect';
 export type {
   InspectBeat,
   InspectBus,

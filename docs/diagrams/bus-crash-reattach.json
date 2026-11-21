@@ -50,16 +50,16 @@
           "anchor": "worker = w;"
         },
         {
-          "path": "packages/host/src/kernel.ts",
-          "line": 1413,
-          "end_line": 1421,
+          "path": "packages/host/src/kernel/kernel.ts",
+          "line": 1412,
+          "end_line": 1420,
           "label": "ready again: wake headless",
           "anchor": "ready: (first) => {"
         },
         {
-          "path": "packages/host/src/kernel.ts",
-          "line": 1463,
-          "end_line": 1474,
+          "path": "packages/host/src/kernel/kernel.ts",
+          "line": 1462,
+          "end_line": 1473,
           "label": "a new port per isolate",
           "anchor": "reattach: (id) => {"
         }

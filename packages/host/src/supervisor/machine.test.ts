@@ -511,7 +511,7 @@ describe('restart policy (fake clock)', () => {
 
 describe('wake order (ADR 0001)', () => {
   it('visible surfaces first, top to bottom then left to right; headless last, in queue order', async () => {
-    const { wakeOrder } = await import('../kernel');
+    const { wakeOrder } = await import('../kernel/kernel');
     expect(
       wakeOrder([
         { id: 'h1', rect: undefined },

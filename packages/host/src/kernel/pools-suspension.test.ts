@@ -1,12 +1,12 @@
 // Pool suspension (M2c task 6, ADR 0001), on the real runtime and bus worker:
 // a pool suspends only as a whole, and any member's wake condition wakes it.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list, { count, report } from './__fixtures__/contracts';
-import { createKernel, type Kernel } from './index';
+import list, { count, report } from '../__fixtures__/contracts';
+import { createKernel, type Kernel } from '../index';
 
 const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
-const src = new URL('./__fixtures__/sleepy.ts', import.meta.url).href;
+const src = new URL('../__fixtures__/sleepy.ts', import.meta.url).href;
 const ALL = { publish: ['*'], subscribe: ['*'] };
 const IDLE = { whenIdle: { afterMs: 300 } } as const;
 
@@ -22,10 +22,10 @@ afterEach(async () => {
 
 function setup() {
   const kernel = createKernel({
-    contracts: { url: new URL('./__fixtures__/contracts.ts', import.meta.url).href, list },
+    contracts: { url: new URL('../__fixtures__/contracts.ts', import.meta.url).href, list },
     workers: {
-      isolateBootstrap: worker('../../runtime/src/bootstrap.ts'),
-      bus: worker('../../bus/src/worker.ts'),
+      isolateBootstrap: worker('../../../runtime/src/bootstrap.ts'),
+      bus: worker('../../../bus/src/worker.ts'),
     },
   });
   kernels.push(kernel);

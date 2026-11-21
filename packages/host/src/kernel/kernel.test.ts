@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createKernel, type Kernel, type KernelEvents } from './index';
+import { createKernel, type Kernel, type KernelEvents } from '../index';
 
 // The bootstrap is loaded by URL, as in production: host never imports runtime.
 // `?worker_file&type=module` makes Vite serve it as a worker entry; otherwise
 // Vitest's browser runner rewrites its dynamic import() for the page.
-const bootstrap = `${new URL('../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
-const counter = new URL('./__fixtures__/counter.ts', import.meta.url).href;
+const bootstrap = `${new URL('../../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
+const counter = new URL('../__fixtures__/counter.ts', import.meta.url).href;
 
 const kernels: Kernel[] = [];
 afterEach(async () => {

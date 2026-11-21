@@ -3,14 +3,14 @@
 // each renders into its own surface; a hang in any member restarts its whole
 // pool, which redraws, while other pools and own workers keep drawing.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list, { count, report } from './__fixtures__/contracts';
-import { createKernel, type Kernel, type KernelEvents } from './index';
+import list, { count, report } from '../__fixtures__/contracts';
+import { createKernel, type Kernel, type KernelEvents } from '../index';
 
 const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
-const widget = new URL('./__fixtures__/pool-widget.ts', import.meta.url).href;
-const feed = new URL('./__fixtures__/pool-feed.ts', import.meta.url).href;
-const reach = new URL('./__fixtures__/pool-reach.ts', import.meta.url).href;
+const widget = new URL('../__fixtures__/pool-widget.ts', import.meta.url).href;
+const feed = new URL('../__fixtures__/pool-feed.ts', import.meta.url).href;
+const reach = new URL('../__fixtures__/pool-reach.ts', import.meta.url).href;
 
 const kernels: Kernel[] = [];
 afterEach(async () => {
@@ -22,10 +22,10 @@ const ALL = { publish: ['*'], subscribe: ['*'] };
 
 function setup() {
   const kernel = createKernel({
-    contracts: { url: new URL('./__fixtures__/contracts.ts', import.meta.url).href, list },
+    contracts: { url: new URL('../__fixtures__/contracts.ts', import.meta.url).href, list },
     workers: {
-      isolateBootstrap: worker('../../runtime/src/bootstrap.ts'),
-      bus: worker('../../bus/src/worker.ts'),
+      isolateBootstrap: worker('../../../runtime/src/bootstrap.ts'),
+      bus: worker('../../../bus/src/worker.ts'),
     },
     heartbeat: { everyMs: 50, blockedAfterMs: 200, killAfterMs: 600 },
     supervisor: { backoff: { initialMs: 50, maxMs: 50 } },

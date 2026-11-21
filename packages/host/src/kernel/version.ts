@@ -3,7 +3,7 @@
  * isolate stamped `requires` runs if `FLOOR <= requires <= VERSION`.
  */
 import { compareVersions, majorMinor } from '@isoloop/protocol';
-import { version } from '../package.json';
+import { version } from '../../package.json';
 
 /** This host's Isoloop `major.minor`, from the package version at build time. */
 export const VERSION: string = majorMinor(version) ?? '0.0';

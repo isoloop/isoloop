@@ -2,12 +2,12 @@
 // and 3) against the real bus worker: taps, reads, the restart count.
 import type { BusMetrics, BusToTap, RecordPreview } from '@isoloop/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list from './__fixtures__/contracts';
-import { createBusController, type BusController } from './bus/controller';
-import { DEFAULT_SUPERVISOR_CONFIG } from './supervisor/machine';
+import list from '../__fixtures__/contracts';
+import { createBusController, type BusController } from '../bus/controller';
+import { DEFAULT_SUPERVISOR_CONFIG } from '../supervisor/machine';
 
-const busWorker = `${new URL('../../bus/src/worker.ts', import.meta.url).href}?worker_file&type=module`;
-const contractsUrl = new URL('./__fixtures__/contracts.ts', import.meta.url).href;
+const busWorker = `${new URL('../../../bus/src/worker.ts', import.meta.url).href}?worker_file&type=module`;
+const contractsUrl = new URL('../__fixtures__/contracts.ts', import.meta.url).href;
 
 const noop = (): void => {};
 

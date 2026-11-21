@@ -2,16 +2,16 @@
 // against real workers and the real bus, the controls, and the host
 // `Inspector`'s tap, records and controls.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list, { count, report } from './__fixtures__/contracts';
-import { createKernel, KernelError, type Kernel, type KernelEvents } from './index';
+import list, { count, report } from '../__fixtures__/contracts';
+import { createKernel, KernelError, type Kernel, type KernelEvents } from '../index';
 
 const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
-const bootstrap = worker('../../runtime/src/bootstrap.ts');
-const busWorker = worker('../../bus/src/worker.ts');
-const contractsUrl = new URL('./__fixtures__/contracts.ts', import.meta.url).href;
-const inspectorSrc = new URL('./__fixtures__/inspector.ts', import.meta.url).href;
-const burn = new URL('./__fixtures__/burn.ts', import.meta.url).href;
+const bootstrap = worker('../../../runtime/src/bootstrap.ts');
+const busWorker = worker('../../../bus/src/worker.ts');
+const contractsUrl = new URL('../__fixtures__/contracts.ts', import.meta.url).href;
+const inspectorSrc = new URL('../__fixtures__/inspector.ts', import.meta.url).href;
+const burn = new URL('../__fixtures__/burn.ts', import.meta.url).href;
 
 const kernels: Kernel[] = [];
 afterEach(async () => {

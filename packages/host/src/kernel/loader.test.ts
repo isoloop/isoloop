@@ -5,12 +5,12 @@ import {
   type Kernel,
   type KernelConfig,
   type KernelEvents,
-} from './index';
+} from '../index';
 
 // Loader hardening (plan m1-kernel, task 3). Cross-origin loading is an E2E test.
 
-const bootstrap = `${new URL('../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
-const counter = new URL('./__fixtures__/counter.ts', import.meta.url).href;
+const bootstrap = `${new URL('../../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
+const counter = new URL('../__fixtures__/counter.ts', import.meta.url).href;
 
 const kernels: Kernel[] = [];
 afterEach(async () => {
@@ -109,7 +109,7 @@ describe('shutdown', () => {
 
   it('an isolate that never says bye is terminated when the grace period runs out', async () => {
     const k = kernel();
-    const a = k.spawn({ id: 'A', src: new URL('./__fixtures__/spin.ts', import.meta.url).href });
+    const a = k.spawn({ id: 'A', src: new URL('../__fixtures__/spin.ts', import.meta.url).href });
     await waitFor(() => a.snapshot().state === 'running');
     // spin.ts stops yielding 300 ms after start.
     await new Promise((r) => setTimeout(r, 400));

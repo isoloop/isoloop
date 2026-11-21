@@ -2,12 +2,12 @@
 // → the bus worker's checks, with the real runtime and BusClient. The broker's
 // unit tests cover the rules; this covers the grants reaching them.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list, { count, notes, report } from './__fixtures__/contracts';
-import { createKernel, type Kernel, type KernelEvents } from './index';
+import list, { count, notes, report } from '../__fixtures__/contracts';
+import { createKernel, type Kernel, type KernelEvents } from '../index';
 
 const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
-const src = new URL('./__fixtures__/grants.ts', import.meta.url).href;
+const src = new URL('../__fixtures__/grants.ts', import.meta.url).href;
 
 type Seen = { id: string; seen: string[]; published: Record<string, string> };
 const isSeen = (v: unknown): v is Seen =>
@@ -21,10 +21,10 @@ afterEach(async () => {
 describe('grants (I4)', () => {
   it('an isolate can only publish and receive the topics its manifest grants', async () => {
     const kernel = createKernel({
-      contracts: { url: new URL('./__fixtures__/contracts.ts', import.meta.url).href, list },
+      contracts: { url: new URL('../__fixtures__/contracts.ts', import.meta.url).href, list },
       workers: {
-        isolateBootstrap: worker('../../runtime/src/bootstrap.ts'),
-        bus: worker('../../bus/src/worker.ts'),
+        isolateBootstrap: worker('../../../runtime/src/bootstrap.ts'),
+        bus: worker('../../../bus/src/worker.ts'),
       },
     });
     kernels.push(kernel);

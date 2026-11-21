@@ -38,7 +38,7 @@ import {
   type SupervisorConfig,
   type SupervisorEffect,
   type SupervisorInput,
-} from '../supervisor';
+} from '../supervisor/machine';
 
 export type BusFailure =
   /** The contracts module couldn't be used: the kernel can't start (ADR 0003). */

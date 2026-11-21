@@ -244,7 +244,7 @@ interface Kernel {
 }
 ```
 
-`IsolateManifest` is `{ id, src, surface?: Element, config?, grants?, fallback?, pool?, suspend?, bus?: { onReset? } }` (`packages/host/src/kernel.ts`).
+`IsolateManifest` is `{ id, src, surface?: Element, config?, grants?, fallback?, pool?, suspend?, bus?: { onReset? } }` (`packages/host/src/kernel/kernel.ts`).
 
 Defaults: heartbeat `100 / 400 / 10_000` ms, ready timeout `10_000` ms, frame budget `8` ms, supervisor `one-for-one`, 3 restarts in 60 s, backoff `250 ms × 2ⁿ` capped at 4 s.
 

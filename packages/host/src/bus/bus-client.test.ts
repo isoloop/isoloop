@@ -1,11 +1,11 @@
 // The isolate BusClient on the real runtime and bus worker (plan m2-bus task 9).
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list, { count, report } from './__fixtures__/contracts';
-import { createKernel, type Kernel, type KernelEvents } from './index';
+import list, { count, report } from '../__fixtures__/contracts';
+import { createKernel, type Kernel, type KernelEvents } from '../index';
 
 const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
-const src = new URL('./__fixtures__/bus-isolate.ts', import.meta.url).href;
+const src = new URL('../__fixtures__/bus-isolate.ts', import.meta.url).href;
 
 type Seen = { id: string; values?: unknown[]; failed?: number };
 
@@ -17,10 +17,10 @@ afterEach(async () => {
 function setup(commitIntervalMs?: number) {
   const kernel = createKernel({
     ...(commitIntervalMs === undefined ? {} : { bus: { commitIntervalMs } }),
-    contracts: { url: new URL('./__fixtures__/contracts.ts', import.meta.url).href, list },
+    contracts: { url: new URL('../__fixtures__/contracts.ts', import.meta.url).href, list },
     workers: {
-      isolateBootstrap: worker('../../runtime/src/bootstrap.ts'),
-      bus: worker('../../bus/src/worker.ts'),
+      isolateBootstrap: worker('../../../runtime/src/bootstrap.ts'),
+      bus: worker('../../../bus/src/worker.ts'),
     },
     supervisor: { backoff: { initialMs: 50 } },
   });

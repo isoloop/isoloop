@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createCompositor } from './compositor';
-import type { HostRenderBridge } from './render/bridge';
+import type { HostRenderBridge } from './bridge';
 
 /** A fake clock and frame queue: `tick()` runs one frame. */
 function fakeFrames() {

@@ -7,17 +7,17 @@ import {
   type InspectMessage,
 } from '@isoloop/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list from './__fixtures__/contracts';
+import list from '../__fixtures__/contracts';
 import { createInspectFeed } from './inspect';
-import { createKernel, type Kernel } from './index';
+import { createKernel, type Kernel } from '../index';
 
 const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
-const bootstrap = worker('../../runtime/src/bootstrap.ts');
-const busWorker = worker('../../bus/src/worker.ts');
-const contractsUrl = new URL('./__fixtures__/contracts.ts', import.meta.url).href;
-const burn = new URL('./__fixtures__/burn.ts', import.meta.url).href;
-const throws = new URL('./__fixtures__/throws.ts', import.meta.url).href;
+const bootstrap = worker('../../../runtime/src/bootstrap.ts');
+const busWorker = worker('../../../bus/src/worker.ts');
+const contractsUrl = new URL('../__fixtures__/contracts.ts', import.meta.url).href;
+const burn = new URL('../__fixtures__/burn.ts', import.meta.url).href;
+const throws = new URL('../__fixtures__/throws.ts', import.meta.url).href;
 
 const kernels: Kernel[] = [];
 afterEach(async () => {

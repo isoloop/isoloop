@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createKernel, KernelError } from '../kernel';
+import { createKernel, KernelError } from '../kernel/kernel';
 import { createRegistry, isSafeUrl } from './registry';
 
 const reg = createRegistry({

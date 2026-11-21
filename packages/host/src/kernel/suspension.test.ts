@@ -1,12 +1,12 @@
 // Opt-in suspension (plan m2-bus task 12b, ADR 0001), on the real runtime and
 // bus worker.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list, { count, notes, report, small } from './__fixtures__/contracts';
-import { createKernel, type Kernel, type KernelConfig, type KernelEvents } from './index';
+import list, { count, notes, report, small } from '../__fixtures__/contracts';
+import { createKernel, type Kernel, type KernelConfig, type KernelEvents } from '../index';
 
 const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
-const src = new URL('./__fixtures__/sleepy.ts', import.meta.url).href;
+const src = new URL('../__fixtures__/sleepy.ts', import.meta.url).href;
 const ALL = { publish: ['*'], subscribe: ['*'] };
 const IDLE = { whenIdle: { afterMs: 300 } } as const;
 
@@ -29,10 +29,10 @@ afterEach(async () => {
 
 function setup(extra: Partial<KernelConfig> = {}) {
   const kernel = createKernel({
-    contracts: { url: new URL('./__fixtures__/contracts.ts', import.meta.url).href, list },
+    contracts: { url: new URL('../__fixtures__/contracts.ts', import.meta.url).href, list },
     workers: {
-      isolateBootstrap: worker('../../runtime/src/bootstrap.ts'),
-      bus: worker('../../bus/src/worker.ts'),
+      isolateBootstrap: worker('../../../runtime/src/bootstrap.ts'),
+      bus: worker('../../../bus/src/worker.ts'),
     },
     ...extra,
   });

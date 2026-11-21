@@ -105,7 +105,7 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/host/src/compositor.ts",
+          "path": "packages/host/src/render/compositor.ts",
           "line": 1,
           "end_line": 9,
           "label": "first batch of a frame always applies",
@@ -113,16 +113,16 @@
           "anchor_offset": 1
         },
         {
-          "path": "packages/host/src/compositor.ts",
+          "path": "packages/host/src/render/compositor.ts",
           "line": 204,
           "end_line": 218,
           "label": "the frame loop",
           "anchor": "if (appliedAny && now() - frameStart >= frameBudgetMs) {"
         },
         {
-          "path": "packages/host/src/kernel.ts",
-          "line": 1270,
-          "end_line": 1273,
+          "path": "packages/host/src/kernel/kernel.ts",
+          "line": 1269,
+          "end_line": 1272,
           "label": "a patch joins its surface's queue",
           "anchor": "case 'patch':"
         }
@@ -171,14 +171,14 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/host/src/compositor.ts",
+          "path": "packages/host/src/render/compositor.ts",
           "line": 245,
           "end_line": 259,
           "label": "shadow host, shell, mount",
           "anchor": "attach: writing<Parameters<Compositor['attach']>>((id, target, bridge, send) => {"
         },
         {
-          "path": "packages/host/src/compositor.ts",
+          "path": "packages/host/src/render/compositor.ts",
           "line": 228,
           "end_line": 236,
           "label": "isolate CSS stays in the shadow root",
@@ -220,17 +220,17 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/host/src/kernel.ts",
-          "line": 1061,
-          "end_line": 1108,
+          "path": "packages/host/src/kernel/kernel.ts",
+          "line": 1060,
+          "end_line": 1107,
           "label": "measure, focus, scrollIntoView",
           "anchor": "* Host calls (design §4.7). DOM calls run after every patch the isolate",
           "anchor_offset": 1
         },
         {
-          "path": "packages/host/src/kernel.ts",
-          "line": 1139,
-          "end_line": 1163,
+          "path": "packages/host/src/kernel/kernel.ts",
+          "line": 1138,
+          "end_line": 1162,
           "label": "requestCanvas",
           "anchor": "case 'requestCanvas': {"
         }
@@ -269,7 +269,7 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/host/src/events.ts",
+          "path": "packages/host/src/render/events.ts",
           "line": 1,
           "end_line": 31,
           "label": "default actions, forwarded types",
@@ -277,7 +277,7 @@
           "anchor_offset": 1
         },
         {
-          "path": "packages/host/src/events.ts",
+          "path": "packages/host/src/render/events.ts",
           "line": 56,
           "end_line": 105,
           "label": "listeners and per-frame coalescing",
@@ -301,7 +301,7 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/host/src/router.ts",
+          "path": "packages/host/src/router/router.ts",
           "line": 1,
           "end_line": 10,
           "label": "the host owns the URL",
@@ -309,9 +309,9 @@
           "anchor_offset": 1
         },
         {
-          "path": "packages/host/src/kernel.ts",
-          "line": 1507,
-          "end_line": 1516,
+          "path": "packages/host/src/kernel/kernel.ts",
+          "line": 1506,
+          "end_line": 1515,
           "label": "links go through the router",
           "anchor": "/** A render bridge for one isolate: links go through the router when routing is on. */"
         }
