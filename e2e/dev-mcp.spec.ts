@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { expect, test, type Page } from '@playwright/test';
-import './harness-types';
 import { HARNESS, ISOLATES_CORS } from './servers';
 
 // The dev MCP end to end (M4a task 8): the official MCP SDK client ↔ the real

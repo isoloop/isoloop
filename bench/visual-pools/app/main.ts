@@ -3,8 +3,6 @@
 // reports start-up and the time from a record being published to its patch
 // being applied.
 import { createApplier, type SanitisePolicy } from '../../../packages/dom/src/host/applier.ts';
-import FeedWorker from './feed-worker.ts?worker';
-import WidgetWorker from './widget-worker.tsx?worker';
 import { now } from './records.ts';
 
 const OPEN: SanitisePolicy = {
@@ -68,7 +66,9 @@ window.visualGate = {
             surfaces.append(container);
             watched.push(container);
             const applier = createApplier(container, OPEN);
-            const w = new WidgetWorker();
+            const w = new Worker(new URL('./widget-worker.tsx', import.meta.url), {
+              type: 'module',
+            });
             w.addEventListener('message', (e: MessageEvent<{ t: string; batch?: unknown }>) => {
               if (e.data.t === 'batch') queue.push({ apply: () => applier.apply(e.data.batch) });
               // Ready once the batches before it are on screen.
@@ -80,7 +80,7 @@ window.visualGate = {
       ),
     );
     const startMs = performance.now() - t0;
-    const feed = new FeedWorker();
+    const feed = new Worker(new URL('./feed-worker.ts', import.meta.url), { type: 'module' });
     const feedPorts = channels.map((c) => c.port1);
     feed.postMessage({ ports: feedPorts }, feedPorts);
     return { startMs, workers: groups.length };

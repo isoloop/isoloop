@@ -20,7 +20,6 @@
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
-import '../../e2e/harness-types';
 import { HARNESS } from '../../e2e/servers';
 
 const SUBSCRIBERS = 10;

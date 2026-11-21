@@ -1,6 +1,5 @@
 /// <reference lib="dom" />
 import { expect, test, type Page } from '@playwright/test';
-import './harness-types';
 import { HARNESS, ISOLATES_CORS } from './servers';
 
 // The adapter conformance suite (M3a task 13, the epic's done-criterion): one

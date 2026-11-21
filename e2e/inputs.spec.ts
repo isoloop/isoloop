@@ -1,6 +1,5 @@
 /// <reference lib="dom" />
 import { expect, test, type Page } from '@playwright/test';
-import './harness-types';
 import { HARNESS, ISOLATES_CORS } from './servers';
 
 // EventBridge, default actions and host-owned inputs (plan m1-kernel, task 8),

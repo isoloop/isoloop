@@ -1,6 +1,5 @@
 /// <reference lib="dom" />
 import { expect, test } from '@playwright/test';
-import './harness-types';
 import { HARNESS } from './servers';
 
 // The browser feature check (plan m1-kernel, task 3b) passes in every engine CI runs.

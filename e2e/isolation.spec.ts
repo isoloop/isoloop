@@ -1,6 +1,5 @@
 /// <reference lib="dom" />
 import { expect, test, type Page } from '@playwright/test';
-import './harness-types';
 import { expectRestarts, expectState, openLoops, pane, stateOf, type LoopsOptions } from './loops';
 import { HARNESS, ISOLATES_CORS } from './servers';
 

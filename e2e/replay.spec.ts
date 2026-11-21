@@ -1,6 +1,5 @@
 /// <reference lib="dom" />
 import { expect, test, type Page } from '@playwright/test';
-import './harness-types';
 import { expectRestarts, expectState, openLoops, pane } from './loops';
 
 // The M2 done-criterion (RFC 0001): a restarted isolate rebuilds its state

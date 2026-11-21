@@ -42,14 +42,9 @@
     // names in kebab-case. The layout test (scripts/layout) checks the rest.
     "import/no-cycle": "error",
     "unicorn/filename-case": ["error", { "case": "kebabCase" }],
-    // Three of the import plugin's category rules misread code written on
-    // purpose: Vite's `?worker` modules have a default export the rule can't
-    // see (import/default); `fc.assert` is fast-check's documented style
-    // (no-named-as-default-member); bootstraps and type-only harness files are
-    // imported for their side effects (no-unassigned-import).
-    "import/default": "off",
-    "import/no-named-as-default-member": "off",
-    "import/no-unassigned-import": "off"
+    // The two worker fixtures that start the runtime import its bootstrap, a
+    // script, for what it does when it loads (ADR 0021, decision 6).
+    "import/no-unassigned-import": ["error", { "allow": ["@isoloop/runtime/bootstrap"] }]
   },
   // Dependency rules (system design §2). Each package lists the @isoloop/*
   // packages it may import; everything else under the scope is an error.

@@ -1,5 +1,5 @@
 import type { Retention, TopicConfig } from '@isoloop/protocol';
-import fc from 'fast-check';
+import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { runEngineConformance } from '../../test/engine-conformance';
 import { FakeDisk } from '../../test/fake-disk';

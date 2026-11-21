@@ -3,7 +3,6 @@ import { createReadStream, existsSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { chromium, expect, test } from '@playwright/test';
-import './harness-types';
 
 /*
  * Memory per isolate (ADR 0020, decision 4, M4b task 5b): on a cross-origin

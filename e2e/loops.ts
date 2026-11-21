@@ -1,6 +1,5 @@
 /// <reference lib="dom" />
 import { expect, type Page } from '@playwright/test';
-import './harness-types';
 import { HARNESS, ISOLATES_CORS } from './servers';
 
 // The proof of concept's page, mounted on the harness: the four-loops

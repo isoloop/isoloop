@@ -23,7 +23,6 @@
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import '../../e2e/harness-types';
 import { HARNESS } from '../../e2e/servers';
 
 const CLICKS = 100;
