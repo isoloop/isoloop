@@ -23,7 +23,7 @@
       }
     },
     "balancer": {
-      "paths": ["packages/balancer/src/", "packages/runtime/src/busy.ts"],
+      "paths": ["packages/balancer/src/", "packages/runtime/src/pools/busy.ts"],
       "exports": {
         "@isoloop/balancer": ["createBalancer"]
       }
@@ -71,7 +71,7 @@
       "paths": [
         "packages/host/src/inspect.ts",
         "packages/host/src/memory.ts",
-        "packages/runtime/src/inspector.ts",
+        "packages/runtime/src/isolate/inspector.ts",
         "packages/bus/src/server/tap.ts",
         "packages/bus/src/server/preview.ts"
       ],
@@ -92,7 +92,7 @@
     },
     "limits": {
       "paths": [
-        "packages/runtime/src/host-calls.ts",
+        "packages/runtime/src/isolate/host-calls.ts",
         "packages/host/src/events.ts",
         "packages/host/src/features.ts",
         "packages/host/src/render/registry.ts",
@@ -103,7 +103,7 @@
       }
     },
     "pools": {
-      "paths": ["packages/runtime/src/freeze.ts"],
+      "paths": ["packages/runtime/src/pools/freeze.ts"],
       "exports": {
         "@isoloop/host": ["PoolSnapshot"],
         "@isoloop/react": ["usePortalRoot"],
@@ -139,8 +139,8 @@
     },
     "isolates": {
       "paths": [
-        "packages/runtime/src/vanilla.ts",
-        "packages/runtime/src/bus-client.ts",
+        "packages/runtime/src/isolate/vanilla.ts",
+        "packages/runtime/src/bus/bus-client.ts",
         "packages/runtime/src/bootstrap.ts",
         "packages/react/src/",
         "packages/preact/src/",
@@ -208,7 +208,7 @@
         "packages/bus/src/server/server.ts",
         "packages/bus/src/engine/",
         "packages/bus/src/storage/",
-        "packages/runtime/src/bus-client.ts",
+        "packages/runtime/src/bus/bus-client.ts",
         "packages/host/src/bus/"
       ],
       "exports": {
@@ -224,7 +224,7 @@
     "dev-tools": {
       "paths": [
         "packages/devtools/src/",
-        "packages/runtime/src/inspector.ts",
+        "packages/runtime/src/isolate/inspector.ts",
         "packages/host/src/inspect.ts",
         "packages/protocol/src/topics/grants.ts"
       ],

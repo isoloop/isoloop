@@ -15,10 +15,10 @@ afterEach(() => {
   for (const w of workers.splice(0)) w.terminate();
 });
 
-const member = new URL('./__fixtures__/pool-member.ts', import.meta.url).href;
+const member = new URL('../__fixtures__/pool-member.ts', import.meta.url).href;
 
 function pool() {
-  const worker = new Worker(new URL('./bootstrap.ts', import.meta.url), { type: 'module' });
+  const worker = new Worker(new URL('../bootstrap.ts', import.meta.url), { type: 'module' });
   workers.push(worker);
   const got: Msg[] = [];
   const errors: string[] = [];

@@ -31,7 +31,7 @@
       "tag": "own bus port",
       "sources": [
         {
-          "path": "packages/runtime/src/bus-client.ts",
+          "path": "packages/runtime/src/bus/bus-client.ts",
           "line": 1,
           "end_line": 27,
           "label": "bus client: results, commits, re-sends",
@@ -238,7 +238,7 @@
           "anchor": "#deliver(sub: Subscription, records: BusRecord[], gap?: { from: number; to: number }): number {"
         },
         {
-          "path": "packages/runtime/src/bus-client.ts",
+          "path": "packages/runtime/src/bus/bus-client.ts",
           "line": 6,
           "end_line": 13,
           "label": "handlers settle, then commit",

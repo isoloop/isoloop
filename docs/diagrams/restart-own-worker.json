@@ -87,7 +87,7 @@
       "sublabel": "new worker",
       "sources": [
         {
-          "path": "packages/runtime/src/bus-client.ts",
+          "path": "packages/runtime/src/bus/bus-client.ts",
           "line": 6,
           "end_line": 13,
           "label": "at least once, commits per interval",

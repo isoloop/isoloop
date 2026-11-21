@@ -21,9 +21,9 @@ import {
   type IsolateToHost,
   type ShutdownReason,
 } from '@isoloop/protocol';
-import { busy, installBusy, type Life } from './busy';
-import { freezeBuiltins } from './freeze';
-import type { VanillaRuntime } from './vanilla';
+import { busy, installBusy, type Life } from './pools/busy';
+import { freezeBuiltins } from './pools/freeze';
+import type { VanillaRuntime } from './isolate/vanilla';
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -164,7 +164,7 @@ async function boot(m: Member, init: InitPayload): Promise<void> {
   // The runtime first, so the DOM subset is the worker's `document` before
   // the isolate module loads: React checks for a DOM at load time (M3a).
   // Loaded on demand, so a worker's first beat doesn't wait for the subset.
-  const { createVanillaIsolate } = await import('./vanilla');
+  const { createVanillaIsolate } = await import('./isolate/vanilla');
   // In the member's frame: what it registers while being built (its bus
   // port's listener, among others) is billed to it (ADR 0017).
   const runtime = busy.run(busy.of(m.name, m.life), createVanillaIsolate, undefined, [

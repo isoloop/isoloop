@@ -109,7 +109,7 @@
       "size": [170, 66],
       "sources": [
         {
-          "path": "packages/runtime/src/render/index.ts",
+          "path": "packages/runtime/src/render/render.ts",
           "line": 55,
           "end_line": 67,
           "label": "one document, a root per member",
@@ -126,7 +126,7 @@
       "size": [170, 66],
       "sources": [
         {
-          "path": "packages/runtime/src/render/index.ts",
+          "path": "packages/runtime/src/render/render.ts",
           "line": 55,
           "end_line": 67,
           "label": "one document, a root per member",
@@ -150,7 +150,7 @@
           "anchor": "const name = msg.isolate;"
         },
         {
-          "path": "packages/runtime/src/freeze.ts",
+          "path": "packages/runtime/src/pools/freeze.ts",
           "line": 1,
           "end_line": 60,
           "label": "frozen built-ins, protected properties",

@@ -1,5 +1,5 @@
 import { parentPort, workerData } from 'node:worker_threads';
-import { freezeBuiltins } from '../../packages/runtime/src/freeze.ts';
+import { freezeBuiltins } from '../../packages/runtime/src/pools/freeze.ts';
 import { freezeBuiltins as freezePrevious } from './freeze-previous.ts';
 import { WORKLOADS } from './workloads.ts';
 

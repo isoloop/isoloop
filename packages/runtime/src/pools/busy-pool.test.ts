@@ -12,7 +12,7 @@ afterEach(() => {
   for (const w of workers.splice(0)) w.terminate();
 });
 
-const src = new URL('./__fixtures__/busy-member.ts', import.meta.url).href;
+const src = new URL('../__fixtures__/busy-member.ts', import.meta.url).href;
 
 type Beat = { t: 'beat'; p: { idle?: IdleReport; members?: Record<string, IdleReport> } };
 const isBeat = (d: unknown): d is Beat =>
@@ -20,7 +20,7 @@ const isBeat = (d: unknown): d is Beat =>
 
 /** Starts a worker with `members` (by name; `undefined`: an own worker) and sums their busy time. */
 function start(members: { name: string | undefined; config: unknown }[]) {
-  const worker = new Worker(new URL('./bootstrap.ts', import.meta.url), { type: 'module' });
+  const worker = new Worker(new URL('../bootstrap.ts', import.meta.url), { type: 'module' });
   workers.push(worker);
   const sums = new Map<string, number>();
   worker.addEventListener('message', (e: MessageEvent<unknown>) => {
@@ -94,7 +94,7 @@ describe('busy time in the beat', () => {
 
 /** A pool the test drives member by member: ticks, busy time, stops and inits. */
 function pool() {
-  const worker = new Worker(new URL('./bootstrap.ts', import.meta.url), { type: 'module' });
+  const worker = new Worker(new URL('../bootstrap.ts', import.meta.url), { type: 'module' });
   workers.push(worker);
   const ticks = new Map<string, number>();
   const sums = new Map<string, number>();

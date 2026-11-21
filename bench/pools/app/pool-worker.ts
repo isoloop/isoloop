@@ -7,7 +7,7 @@
  * is how many workers the members are spread over.
  */
 import { PROTOCOL, type InitPayload } from '@isoloop/protocol';
-import { createVanillaIsolate } from '../../../packages/runtime/src/vanilla.ts';
+import { createVanillaIsolate } from '../../../packages/runtime/src/isolate/vanilla.ts';
 import members from 'virtual:members';
 
 declare const self: DedicatedWorkerGlobalScope;

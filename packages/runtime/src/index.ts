@@ -4,8 +4,8 @@ export {
   type IsolateContext,
   type IsolateDefinition,
   type IsolateRoot,
-} from './vanilla';
-export type { BusClient, RequestOptions, SubscribeOptions } from './bus-client';
-export type { IsolateInspector } from './inspector';
+} from './isolate/vanilla';
+export type { BusClient, RequestOptions, SubscribeOptions } from './bus/bus-client';
+export type { IsolateInspector } from './isolate/inspector';
 export { BusError } from '@isoloop/protocol';
-export { HostCallError, type HostApi, type ScrollIntoViewOptionsLike } from './host-calls';
+export { HostCallError, type HostApi, type ScrollIntoViewOptionsLike } from './isolate/host-calls';

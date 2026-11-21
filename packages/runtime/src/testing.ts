@@ -12,9 +12,9 @@ import {
   type TopicRef,
   type TypedRecord,
 } from '@isoloop/protocol';
-import type { BusClient, SubscribeOptions } from './bus-client';
-import type { HostApi } from './host-calls';
-import type { IsolateContext, IsolateRoot } from './vanilla';
+import type { BusClient, SubscribeOptions } from './bus/bus-client';
+import type { HostApi } from './isolate/host-calls';
+import type { IsolateContext, IsolateRoot } from './isolate/vanilla';
 
 type Sub = {
   topic: string;

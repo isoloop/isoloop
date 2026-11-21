@@ -16,7 +16,7 @@ import {
   type WorkerDom,
 } from '@isoloop/dom/worker';
 import type { IsolateToHost, SerializedEvent } from '@isoloop/protocol';
-import { busy, nativeQueueMicrotask, type MemberKey } from '../busy';
+import { busy, nativeQueueMicrotask, type MemberKey } from '../pools/busy';
 
 export { ISOLOOP_DOM_FMT };
 

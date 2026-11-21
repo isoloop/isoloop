@@ -32,7 +32,6 @@ export type Project = { include: readonly string[]; exclude: readonly string[] }
  * so the list only shrinks; the last move deletes it.
  */
 export const PENDING: readonly string[] = [
-  'runtime',
   'host',
   'react',
   'preact',
