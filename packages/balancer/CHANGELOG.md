@@ -1,5 +1,11 @@
 # @isoloop/balancer
 
+## 0.1.0-next.11
+
+### Patch Changes
+
+- @isoloop/host@0.1.0-next.11
+
 ## 0.1.0-next.10
 
 ### Patch Changes

@@ -32,12 +32,12 @@ A PR that crosses a budget runs `--record` and says in its description why the s
 ## Recorded
 
 <!-- table:start -->
-Recorded 2026-11-21: Isoloop `0.1.0-next.10`, Vite 8.3.7 (Rolldown 1.2.18), minified, with only the framework left out.
+Recorded 2026-11-21: Isoloop `0.1.0-next.11`, Vite 8.3.7 (Rolldown 1.2.18), minified, with only the framework left out.
 
 | Item | Minified | Gzipped | Budget |
 | --- | --- | --- | --- |
 | import-time · @isoloop/balancer | 22 B | 42 B | 512 B |
-| import-time · @isoloop/bus | 186 B | 165 B | 512 B |
+| import-time · @isoloop/bus | 49 B | 56 B | 512 B |
 | import-time · @isoloop/bus/testing | 0 B | 0 B | 0 B |
 | import-time · @isoloop/codec | 1.6 KB | 798 B | 2.0 KB |
 | import-time · @isoloop/devtools | 0 B | 0 B | 0 B |
@@ -57,10 +57,10 @@ Recorded 2026-11-21: Isoloop `0.1.0-next.10`, Vite 8.3.7 (Rolldown 1.2.18), mini
 | app · host page | 64.8 KB | 22.8 KB | 68.5 KB |
 | app · host page with devtools | 66.4 KB | 23.4 KB | 70.0 KB |
 | app · host page with the balancer | 79.3 KB | 27.7 KB | 83.5 KB |
-| app · contracts module | 4.1 KB | 1.8 KB | 4.5 KB |
+| app · contracts module | 4.0 KB | 1.7 KB | 4.5 KB |
 | app · React isolate | 2.7 KB | 1.4 KB | 3.0 KB |
 | app · Preact isolate | 2.9 KB | 1.5 KB | 3.5 KB |
-| app · vanilla isolate | 1.5 KB | 842 B | 2.0 KB |
+| app · vanilla isolate | 1.5 KB | 843 B | 2.0 KB |
 | script · @isoloop/bus/worker | 58.8 KB | 20.4 KB | 62.0 KB |
 | script · @isoloop/devtools/panel | 13.1 KB | 5.5 KB | 14.0 KB |
 | script · @isoloop/runtime/bootstrap | 42.3 KB | 14.7 KB | 44.5 KB |

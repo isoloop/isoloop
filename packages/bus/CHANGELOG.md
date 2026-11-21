@@ -1,5 +1,14 @@
 # @isoloop/bus
 
+## 0.1.0-next.11
+
+### Patch Changes
+
+- 4e670e2: `@isoloop/bus` no longer exports the names its entry carried for the bus worker's own use, all marked `@internal`: `Broker`, `TsEngine`, `MemoryStorage`, the engine and broker types (`LogEngine`, `LogStorage`, `BusPort`, `BrokerOptions` and the rest), and the helpers `publishId`, `estimateSize`, `effectiveDurability`, `toIssues`, `topicConfig` and `isUnchecked`. The public API is unchanged.
+- f973a86: `@isoloop/bus` and `@isoloop/devtools` name their scripts in `sideEffects`: the bus worker (`./dist/bus-worker.js`) and the devtools panel (`./dist/panel.js`) run code when they load, so a bundler that meets one in an `import` keeps it rather than dropping it. Their other files stay side-effect-free.
+- @isoloop/codec@0.1.0-next.11
+  - @isoloop/protocol@0.1.0-next.11
+
 ## 0.1.0-next.10
 
 ### Patch Changes
