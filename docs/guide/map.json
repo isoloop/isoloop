@@ -116,7 +116,7 @@
         "packages/bus/src/standard-schema.ts",
         "packages/bus/src/json-schema.ts",
         "packages/bus/src/seed.ts",
-        "packages/protocol/src/grants.ts",
+        "packages/protocol/src/topics/grants.ts",
         "packages/cli/src/commands/contracts-export.ts"
       ],
       "exports": {
@@ -226,7 +226,7 @@
         "packages/devtools/src/",
         "packages/runtime/src/inspector.ts",
         "packages/host/src/inspect.ts",
-        "packages/protocol/src/grants.ts"
+        "packages/protocol/src/topics/grants.ts"
       ],
       "exports": {}
     },

@@ -7,8 +7,8 @@
 
 import type { BusMetrics, RecordPreview } from './control';
 import { envelopeGuard, type Envelope, type MessageTypes } from './envelope';
-import type { CallResult } from './errors';
-import type { Grants } from './grants';
+import type { CallResult } from '../errors/errors';
+import type { Grants } from '../topics/grants';
 
 /**
  * One isolate in the feed, as `kernel.isolates()` has it.

@@ -1,5 +1,5 @@
 import { envelopeGuard, type Envelope, type MessageTypes } from './envelope';
-import type { CallResult } from './errors';
+import type { CallResult } from '../errors/errors';
 
 /** One record in a topic's log. */
 export type BusRecord = {

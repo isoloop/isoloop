@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isErrorCode, isSystemTopic, matchAny, matchTopic } from './index';
+import { isErrorCode, isSystemTopic, matchAny, matchTopic } from '../index';
 
 describe('matchTopic', () => {
   it.each([

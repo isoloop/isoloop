@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareVersions, isIsolateToHost, majorMinor } from './index';
+import { compareVersions, isIsolateToHost, majorMinor } from '../index';
 
 describe('version stamps (ADR 0012)', () => {
   it('majorMinor keeps major.minor and drops the rest', () => {

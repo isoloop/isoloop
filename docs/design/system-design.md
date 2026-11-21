@@ -191,7 +191,7 @@ export type CallError = { code: ErrorCode; message: string; issues?: { message: 
 export type CallResult = { ok: true; value: unknown } | { ok: false; error: CallError };
 ```
 
-The source of truth is `packages/protocol/src` (`envelope.ts`, `isolate.ts`, `bus.ts`, `control.ts`, `commits.ts`, `errors.ts`); this block follows it.
+The source of truth is `packages/protocol/src`: `messages/` (`envelope.ts`, `isolate.ts`, `bus.ts`, `control.ts`), `topics/commits.ts` and `errors/errors.ts`; this block follows it.
 
 `init` / `ready` are the version handshake. The host sends its supported range. The isolate replies with the runtime version and render format it actually uses, or posts `error { fatal: true, code: 'protocol_mismatch' }`. Each side drops (and counts) envelopes with an unknown `v` or `t`, so old isolates don't crash on new message types.
 

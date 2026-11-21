@@ -39,7 +39,7 @@
           "anchor_offset": 1
         },
         {
-          "path": "packages/protocol/src/bus.ts",
+          "path": "packages/protocol/src/messages/bus.ts",
           "line": 60,
           "end_line": 107,
           "label": "publish id and bus port messages",
@@ -58,7 +58,7 @@
       "tag": "control port",
       "sources": [
         {
-          "path": "packages/protocol/src/control.ts",
+          "path": "packages/protocol/src/messages/control.ts",
           "line": 163,
           "end_line": 167,
           "label": "host publish on the control port",
@@ -273,7 +273,7 @@
       "tag": "commits per port",
       "sources": [
         {
-          "path": "packages/protocol/src/bus.ts",
+          "path": "packages/protocol/src/messages/bus.ts",
           "line": 83,
           "end_line": 88,
           "label": "commits, ADR 0016",

@@ -1,17 +1,17 @@
-export { PROTOCOL, assertNever, envelopeGuard, isEnvelope } from './envelope';
-export type { AnyEnvelope, Envelope, MessageTypes } from './envelope';
-export { ERROR_CODES, isErrorCode } from './errors';
-export type { CallError, CallResult, ErrorCode, ErrorPayload, Issue } from './errors';
-export { SYSTEM_TOPIC_PREFIX, isSystemTopic, matchAny, matchTopic } from './grants';
-export type { Grants } from './grants';
-export type { EventType, Mods, SerializedEvent } from './events';
+export { PROTOCOL, assertNever, envelopeGuard, isEnvelope } from './messages/envelope';
+export type { AnyEnvelope, Envelope, MessageTypes } from './messages/envelope';
+export { ERROR_CODES, isErrorCode } from './errors/errors';
+export type { CallError, CallResult, ErrorCode, ErrorPayload, Issue } from './errors/errors';
+export { SYSTEM_TOPIC_PREFIX, isSystemTopic, matchAny, matchTopic } from './topics/grants';
+export type { Grants } from './topics/grants';
+export type { EventType, Mods, SerializedEvent } from './messages/events';
 export {
   HOST_TO_ISOLATE,
   ISOLATE_TO_HOST,
   MAX_BLOCK_MS,
   isHostToIsolate,
   isIsolateToHost,
-} from './isolate';
+} from './messages/isolate';
 export type {
   HostMethod,
   HostToIsolate,
@@ -20,7 +20,7 @@ export type {
   IsolateToHost,
   Rect,
   ShutdownReason,
-} from './isolate';
+} from './messages/isolate';
 export {
   BUS_TO_ISOLATE,
   ISOLATE_TO_BUS,
@@ -29,7 +29,7 @@ export {
   isIsolateToBus,
   isRecordReq,
   isRequestVia,
-} from './bus';
+} from './messages/bus';
 export type {
   BusRecord,
   BusToIsolate,
@@ -38,7 +38,7 @@ export type {
   RecordReq,
   RequestVia,
   StartPosition,
-} from './bus';
+} from './messages/bus';
 export {
   DEFAULT_COMMIT_INTERVAL_MS,
   DEFAULT_CREDIT,
@@ -46,9 +46,9 @@ export {
   commitIntervalProblem,
   createCommitter,
   deliveryPoints,
-} from './commits';
-export type { CommitOffsets, CommitPoint, Committer, CommitterOptions } from './commits';
-export { BusError } from './bus-error';
+} from './topics/commits';
+export type { CommitOffsets, CommitPoint, Committer, CommitterOptions } from './topics/commits';
+export { BusError } from './errors/bus-error';
 export {
   BUS_TO_HOST,
   BUS_TO_TAP,
@@ -61,7 +61,7 @@ export {
   isBusToTap,
   isHostToBus,
   isTapToBus,
-} from './control';
+} from './messages/control';
 export type {
   BusMetrics,
   BusToHost,
@@ -73,12 +73,12 @@ export type {
   SeedEvent,
   TapToBus,
   TopicConfig,
-} from './control';
-export { checks, systemSchema, systemTopic } from './system-topics';
-export type { Check, SystemSchema, SystemTopicDef } from './system-topics';
-export { ROUTE_KEY, SYSTEM_TOPICS, routeTopic } from './route';
-export type { RouteValue } from './route';
-export { topicConfigOf } from './topics';
+} from './messages/control';
+export { checks, systemSchema, systemTopic } from './topics/system-topics';
+export type { Check, SystemSchema, SystemTopicDef } from './topics/system-topics';
+export { ROUTE_KEY, SYSTEM_TOPICS, routeTopic } from './topics/route';
+export type { RouteValue } from './topics/route';
+export { topicConfigOf } from './topics/topics';
 export type {
   ContractsList,
   SchemaTypes,
@@ -86,15 +86,15 @@ export type {
   TopicRef,
   TopicShape,
   TypedRecord,
-} from './topics';
-export { compareVersions, majorMinor } from './version';
+} from './topics/topics';
+export { compareVersions, majorMinor } from './messages/version';
 export {
   JSON_SCHEMA_TARGET,
   UNCHECKED_VENDOR,
   hasJsonSchema,
   jsonSchemaOf,
   topicJsonSchemas,
-} from './json-schema';
+} from './topics/json-schema';
 export type {
   JsonSchema,
   JsonSchemaPair,
@@ -103,7 +103,7 @@ export type {
   StandardJSONSchemaV1,
   TopicJsonSchemas,
   TopicJsonSchemasResult,
-} from './json-schema';
+} from './topics/json-schema';
 export {
   CLI_TO_PAGE,
   DEV_MCP_CLOSE,
@@ -112,7 +112,7 @@ export {
   PAGE_TO_CLI,
   isCliToPage,
   isPageToCli,
-} from './dev-mcp';
+} from './messages/dev-mcp';
 export type {
   CliToPage,
   DevMcpCall,
@@ -123,7 +123,7 @@ export type {
   DevMcpTool,
   DevMcpWelcome,
   PageToCli,
-} from './dev-mcp';
+} from './messages/dev-mcp';
 export {
   INSPECT_COALESCE_MS,
   INSPECT_MEMORY_MS,
@@ -134,7 +134,7 @@ export {
   isInspectMessage,
   isInspectToIsolate,
   isIsolateToInspect,
-} from './inspect';
+} from './messages/inspect';
 export type {
   InspectBeat,
   InspectBus,
@@ -148,4 +148,4 @@ export type {
   InspectSnapshot,
   InspectToIsolate,
   IsolateToInspect,
-} from './inspect';
+} from './messages/inspect';

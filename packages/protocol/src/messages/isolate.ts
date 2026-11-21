@@ -1,7 +1,7 @@
 import { envelopeGuard, type Envelope, type MessageTypes } from './envelope';
-import type { CallResult, ErrorPayload } from './errors';
+import type { CallResult, ErrorPayload } from '../errors/errors';
 import type { SerializedEvent } from './events';
-import type { Grants } from './grants';
+import type { Grants } from '../topics/grants';
 
 /** Why the host asks an isolate to shut down. `suspend` keeps its offsets, to replay what it missed on waking. */
 export type ShutdownReason = 'stop' | 'restart' | 'suspend';

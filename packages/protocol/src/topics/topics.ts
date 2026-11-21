@@ -1,5 +1,5 @@
-import type { BusRecord } from './bus';
-import type { Retention, TopicConfig } from './control';
+import type { BusRecord } from '../messages/bus';
+import type { Retention, TopicConfig } from '../messages/control';
 
 /*
  * Topic handles as host and isolate code see them. The bus defines topics
