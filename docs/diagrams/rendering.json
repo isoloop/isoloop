@@ -39,9 +39,10 @@
       "sources": [
         {
           "path": "packages/runtime/src/vanilla.ts",
-          "line": 160,
-          "end_line": 163,
-          "label": "ctx.root is the render root"
+          "line": 203,
+          "end_line": 206,
+          "label": "ctx.root is the render root",
+          "anchor": "id: init.isolateId,"
         }
       ]
     },
@@ -57,13 +58,17 @@
           "path": "packages/dom/src/worker/dom.ts",
           "line": 1,
           "end_line": 11,
-          "label": "what Preact and React call, recorded"
+          "label": "what Preact and React call, recorded",
+          "anchor": "* The worker-side DOM subset (ADR 0010 point 2): exactly what Preact and",
+          "anchor_offset": 1
         },
         {
           "path": "packages/dom/src/worker/install.ts",
-          "line": 35,
-          "end_line": 48,
-          "label": "installed as document and window"
+          "line": 40,
+          "end_line": 64,
+          "label": "installed as document and window",
+          "anchor": "* Exposes `dom` as the worker's `document`, `window` and DOM classes, so",
+          "anchor_offset": 1
         }
       ]
     },
@@ -77,15 +82,17 @@
       "sources": [
         {
           "path": "packages/dom/src/worker/dom.ts",
-          "line": 1198,
-          "end_line": 1233,
-          "label": "records batched per microtask"
+          "line": 1309,
+          "end_line": 1344,
+          "label": "records batched per microtask",
+          "anchor": "/** A root's recorder: records batched per microtask (or `schedule`) into `onBatch`. */"
         },
         {
           "path": "packages/runtime/src/render/index.ts",
           "line": 111,
           "end_line": 126,
-          "label": "a batch and its styles in one patch"
+          "label": "a batch and its styles in one patch",
+          "anchor": "const postPatch = (batch: DomBatch): void => {"
         }
       ]
     },
@@ -101,19 +108,23 @@
           "path": "packages/host/src/compositor.ts",
           "line": 1,
           "end_line": 9,
-          "label": "first batch of a frame always applies"
+          "label": "first batch of a frame always applies",
+          "anchor": "* Owns every surface and is the only code that writes to them (design §4.4).",
+          "anchor_offset": 1
         },
         {
           "path": "packages/host/src/compositor.ts",
-          "line": 196,
-          "end_line": 210,
-          "label": "the frame loop"
+          "line": 204,
+          "end_line": 218,
+          "label": "the frame loop",
+          "anchor": "if (appliedAny && now() - frameStart >= frameBudgetMs) {"
         },
         {
           "path": "packages/host/src/kernel.ts",
-          "line": 1111,
-          "end_line": 1114,
-          "label": "a patch joins its surface's queue"
+          "line": 1270,
+          "end_line": 1273,
+          "label": "a patch joins its surface's queue",
+          "anchor": "case 'patch':"
         }
       ]
     },
@@ -129,19 +140,25 @@
           "path": "packages/dom/src/host/applier.ts",
           "line": 1,
           "end_line": 8,
-          "label": "applies under a container"
+          "label": "applies under a container",
+          "anchor": "* The host half of isoloop-dom@1 (ADR 0011 point 6): applies batches under a",
+          "anchor_offset": 1
         },
         {
           "path": "packages/host/src/render/registry.ts",
           "line": 1,
           "end_line": 15,
-          "label": "sanitiser and host components"
+          "label": "sanitiser and host components",
+          "anchor": "* Component registry and sanitiser (design §4.5, invariant I9). Every tag,",
+          "anchor_offset": 1
         },
         {
           "path": "packages/host/src/render/registry.ts",
           "line": 293,
           "end_line": 321,
-          "label": "the element, attribute and property rules"
+          "label": "the element, attribute and property rules",
+          "anchor": "element(tag, ns) {",
+          "anchor_offset": 1
         }
       ]
     },
@@ -155,15 +172,17 @@
       "sources": [
         {
           "path": "packages/host/src/compositor.ts",
-          "line": 237,
-          "end_line": 251,
-          "label": "shadow host, shell, mount"
+          "line": 245,
+          "end_line": 259,
+          "label": "shadow host, shell, mount",
+          "anchor": "attach: writing<Parameters<Compositor['attach']>>((id, target, bridge, send) => {"
         },
         {
           "path": "packages/host/src/compositor.ts",
-          "line": 220,
-          "end_line": 228,
-          "label": "isolate CSS stays in the shadow root"
+          "line": 228,
+          "end_line": 236,
+          "label": "isolate CSS stays in the shadow root",
+          "anchor": "/** Isolate CSS lives in the shadow root only, so it can't leak out; host tokens inherit in as custom properties. */"
         }
       ]
     },
@@ -179,13 +198,16 @@
           "path": "packages/runtime/src/host-calls.ts",
           "line": 1,
           "end_line": 5,
-          "label": "call and result, 5 s timeout"
+          "label": "call and result, 5 s timeout",
+          "anchor": "* Host calls from the isolate side (design §4.7): `call` envelopes answered",
+          "anchor_offset": 1
         },
         {
           "path": "packages/runtime/src/host-calls.ts",
-          "line": 93,
-          "end_line": 100,
-          "label": "pending patches flushed first"
+          "line": 128,
+          "end_line": 135,
+          "label": "pending patches flushed first",
+          "anchor": "const call = (method: HostMethod, node: unknown, extra: unknown[] = []): Promise<unknown> => {"
         }
       ]
     },
@@ -199,15 +221,18 @@
       "sources": [
         {
           "path": "packages/host/src/kernel.ts",
-          "line": 902,
-          "end_line": 949,
-          "label": "measure, focus, scrollIntoView"
+          "line": 1061,
+          "end_line": 1108,
+          "label": "measure, focus, scrollIntoView",
+          "anchor": "* Host calls (design §4.7). DOM calls run after every patch the isolate",
+          "anchor_offset": 1
         },
         {
           "path": "packages/host/src/kernel.ts",
-          "line": 980,
-          "end_line": 1004,
-          "label": "requestCanvas"
+          "line": 1139,
+          "end_line": 1163,
+          "label": "requestCanvas",
+          "anchor": "case 'requestCanvas': {"
         }
       ]
     },
@@ -223,13 +248,15 @@
           "path": "packages/runtime/src/render/index.ts",
           "line": 185,
           "end_line": 191,
-          "label": "an event from the host"
+          "label": "an event from the host",
+          "anchor": "receive(e) {"
         },
         {
           "path": "packages/dom/src/worker/dom.ts",
-          "line": 1186,
-          "end_line": 1196,
-          "label": "dispatched to the node it names"
+          "line": 1297,
+          "end_line": 1307,
+          "label": "dispatched to the node it names",
+          "anchor": "function deliverTo(node: WNode | undefined, event: DomEvent): void {"
         }
       ]
     },
@@ -245,19 +272,23 @@
           "path": "packages/host/src/events.ts",
           "line": 1,
           "end_line": 31,
-          "label": "default actions, forwarded types"
+          "label": "default actions, forwarded types",
+          "anchor": "* EventBridge (design §4.6): one delegated listener per event type on each",
+          "anchor_offset": 1
         },
         {
           "path": "packages/host/src/events.ts",
           "line": 56,
           "end_line": 105,
-          "label": "listeners and per-frame coalescing"
+          "label": "listeners and per-frame coalescing",
+          "anchor": "for (const type of FORWARDED_EVENTS) {"
         },
         {
           "path": "packages/dom/src/host/applier.ts",
-          "line": 222,
-          "end_line": 235,
-          "label": "only listeners the isolate registered"
+          "line": 228,
+          "end_line": 241,
+          "label": "only listeners the isolate registered",
+          "anchor": "eventFor(e) {"
         }
       ]
     },
@@ -273,13 +304,16 @@
           "path": "packages/host/src/router.ts",
           "line": 1,
           "end_line": 10,
-          "label": "the host owns the URL"
+          "label": "the host owns the URL",
+          "anchor": "* Routing (ADR 0002). The host owns the URL; the kernel only reports it on",
+          "anchor_offset": 1
         },
         {
           "path": "packages/host/src/kernel.ts",
-          "line": 1348,
-          "end_line": 1357,
-          "label": "links go through the router"
+          "line": 1507,
+          "end_line": 1516,
+          "label": "links go through the router",
+          "anchor": "/** A render bridge for one isolate: links go through the router when routing is on. */"
         }
       ]
     }

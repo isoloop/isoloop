@@ -22,9 +22,10 @@
       "sources": [
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 115,
-          "end_line": 124,
-          "label": "init, protocol check, heartbeat"
+          "line": 153,
+          "end_line": 162,
+          "label": "init, protocol check, heartbeat",
+          "anchor": "async function boot(m: Member, init: InitPayload): Promise<void> {"
         }
       ]
     },
@@ -36,21 +37,24 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 303,
-          "end_line": 345,
-          "label": "crash, backoff, spawn"
+          "line": 328,
+          "end_line": 370,
+          "label": "crash, backoff, spawn",
+          "anchor": "function crash("
         },
         {
           "path": "packages/host/src/kernel.ts",
-          "line": 907,
-          "end_line": 932,
-          "label": "attach before init"
+          "line": 1304,
+          "end_line": 1340,
+          "label": "attach before init",
+          "anchor": "const start = (slot: Slot, o: { wake?: boolean } = {}): void => {"
         },
         {
           "path": "packages/host/src/kernel.ts",
-          "line": 833,
-          "end_line": 850,
-          "label": "ready: format and version check"
+          "line": 1205,
+          "end_line": 1222,
+          "label": "ready: format and version check",
+          "anchor": "case 'ready': {"
         }
       ]
     },
@@ -62,15 +66,17 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 381,
-          "end_line": 395,
-          "label": "attach a new port"
+          "line": 426,
+          "end_line": 440,
+          "label": "attach a new port",
+          "anchor": "const connect: BusController['connect'] = (isolateId, grants, opts = {}) => {"
         },
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 440,
-          "end_line": 448,
-          "label": "detach keeps offsets"
+          "line": 515,
+          "end_line": 523,
+          "label": "detach keeps offsets",
+          "anchor": "detach(isolateId, opts = {}) {"
         }
       ]
     },
@@ -84,7 +90,8 @@
           "path": "packages/runtime/src/bus-client.ts",
           "line": 6,
           "end_line": 13,
-          "label": "at least once, commits per interval"
+          "label": "at least once, commits per interval",
+          "anchor": "* - `subscribe` runs handlers one record at a time, in order. With"
         }
       ]
     }

@@ -51,15 +51,17 @@
       "sources": [
         {
           "path": "packages/host/src/kernel.ts",
-          "line": 470,
-          "end_line": 476,
-          "label": "unsupported_browser"
+          "line": 741,
+          "end_line": 747,
+          "label": "unsupported_browser",
+          "anchor": "export function createKernel(config: KernelConfig): Kernel {"
         },
         {
           "path": "packages/host/src/features.ts",
           "line": 45,
           "end_line": 74,
-          "label": "the features checked"
+          "label": "the features checked",
+          "anchor": "const ORDER: readonly Feature[] = ["
         }
       ]
     },
@@ -73,15 +75,18 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 175,
-          "end_line": 301,
-          "label": "state machine"
+          "line": 200,
+          "end_line": 326,
+          "label": "state machine",
+          "anchor": "export function step(s: IsolateSupervision, input: SupervisorInput, cfg: SupervisorConfig): Step {"
         },
         {
           "path": "packages/host/src/kernel.ts",
-          "line": 673,
-          "end_line": 694,
-          "label": "pool fate"
+          "line": 1038,
+          "end_line": 1059,
+          "label": "pool fate",
+          "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
+          "anchor_offset": 1
         }
       ]
     },
@@ -97,7 +102,9 @@
           "path": "packages/host/src/compositor.ts",
           "line": 1,
           "end_line": 9,
-          "label": "applies batches per frame"
+          "label": "applies batches per frame",
+          "anchor": "* Owns every surface and is the only code that writes to them (design §4.4).",
+          "anchor_offset": 1
         }
       ]
     },
@@ -113,7 +120,8 @@
           "path": "packages/host/src/compositor.ts",
           "line": 6,
           "end_line": 8,
-          "label": "shadow host per surface"
+          "label": "shadow host per surface",
+          "anchor": "* work (I8). Batches are never split; leftovers roll to the next frame. Each surface is an <iso-surface> shadow host with the kernel's"
         }
       ]
     },
@@ -129,13 +137,16 @@
           "path": "packages/host/src/bus/controller.ts",
           "line": 1,
           "end_line": 10,
-          "label": "starts and supervises the bus"
+          "label": "starts and supervises the bus",
+          "anchor": "* The bus controller (design §1, ADR 0005, ADR 0007). Starts the bus worker",
+          "anchor_offset": 1
         },
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 381,
-          "end_line": 395,
-          "label": "attach: a port per isolate"
+          "line": 426,
+          "end_line": 440,
+          "label": "attach: a port per isolate",
+          "anchor": "const connect: BusController['connect'] = (isolateId, grants, opts = {}) => {"
         }
       ]
     },
@@ -149,9 +160,10 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 477,
-          "end_line": 479,
-          "label": "kernel.subscribe's own port"
+          "line": 611,
+          "end_line": 613,
+          "label": "kernel.subscribe's own port",
+          "anchor": "subscribe(sub) {"
         }
       ]
     },
@@ -165,9 +177,10 @@
       "sources": [
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 134,
-          "end_line": 140,
-          "label": "imports the isolate module"
+          "line": 187,
+          "end_line": 193,
+          "label": "imports the isolate module",
+          "anchor": "mod = await import(/* @vite-ignore */ init.src);"
         }
       ]
     },
@@ -181,15 +194,18 @@
       "sources": [
         {
           "path": "packages/host/src/loader.ts",
-          "line": 84,
-          "end_line": 103,
-          "label": "own worker"
+          "line": 132,
+          "end_line": 153,
+          "label": "own worker",
+          "anchor": "const loadOwn = (o: LoadOptions): LoadedWorker => {"
         },
         {
           "path": "packages/runtime/src/worker.ts",
           "line": 1,
-          "end_line": 33,
-          "label": "tiny worker entry"
+          "end_line": 38,
+          "label": "tiny worker entry",
+          "anchor": "* The isolate worker's entry, as `@isoloop/vite` loads it: tiny on purpose.",
+          "anchor_offset": 2
         }
       ]
     },
@@ -203,15 +219,17 @@
       "sources": [
         {
           "path": "packages/host/src/loader.ts",
-          "line": 105,
-          "end_line": 148,
-          "label": "members join one worker"
+          "line": 155,
+          "end_line": 201,
+          "label": "members join one worker",
+          "anchor": "const loadMember = (o: LoadOptions, name: string): LoadedWorker => {"
         },
         {
           "path": "packages/runtime/src/render/index.ts",
-          "line": 54,
-          "end_line": 66,
-          "label": "one document, a root per member"
+          "line": 55,
+          "end_line": 67,
+          "label": "one document, a root per member",
+          "anchor": "* A pool's one document (ADR 0015): every visual member renders into its own"
         }
       ]
     },
@@ -225,15 +243,18 @@
       "sources": [
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 199,
-          "end_line": 220,
-          "label": "pool init, built-ins frozen first"
+          "line": 253,
+          "end_line": 277,
+          "label": "pool init, built-ins frozen first",
+          "anchor": "const name = msg.isolate;"
         },
         {
           "path": "packages/runtime/src/freeze.ts",
           "line": 1,
           "end_line": 60,
-          "label": "frozen built-ins"
+          "label": "frozen built-ins",
+          "anchor": "* Frozen built-ins for pools (M2c task 7, decision 6). Pool members share one",
+          "anchor_offset": 1
         }
       ]
     },
@@ -247,9 +268,10 @@
       "sources": [
         {
           "path": "packages/protocol/src/control.ts",
-          "line": 15,
-          "end_line": 26,
-          "label": "retention and durability per topic"
+          "line": 28,
+          "end_line": 39,
+          "label": "retention and durability per topic",
+          "anchor": "export type TopicConfig = {"
         }
       ]
     },
@@ -263,15 +285,18 @@
       "sources": [
         {
           "path": "packages/bus/src/engine/ts-engine.ts",
-          "line": 21,
-          "end_line": 30,
-          "label": "resident bytes, page() back"
+          "line": 22,
+          "end_line": 31,
+          "label": "resident bytes, page() back",
+          "anchor": "* Durable topics: about how many encoded bytes of records each keeps in",
+          "anchor_offset": 1
         },
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 833,
-          "end_line": 857,
-          "label": "persistent values must encode"
+          "line": 1021,
+          "end_line": 1045,
+          "label": "persistent values must encode",
+          "anchor": "#check(name: string, r: Validated | undefined, persistent = false): CallResult {"
         }
       ]
     },
@@ -285,21 +310,24 @@
       "sources": [
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 707,
-          "end_line": 763,
-          "label": "publish gates"
+          "line": 830,
+          "end_line": 886,
+          "label": "publish gates",
+          "anchor": "#publish("
         },
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 795,
-          "end_line": 827,
-          "label": "dedup, check, append, fan out"
+          "line": 918,
+          "end_line": 957,
+          "label": "dedup, check, append, fan out",
+          "anchor": "#finish(name: string, topic: Topic, p: Pending): void {"
         },
         {
           "path": "packages/bus/src/server.ts",
-          "line": 339,
-          "end_line": 346,
-          "label": "the bus worker's beat"
+          "line": 411,
+          "end_line": 418,
+          "label": "the bus worker's beat",
+          "anchor": "const startBeat = (everyMs: number): void => {"
         }
       ]
     },
@@ -313,15 +341,17 @@
       "sources": [
         {
           "path": "packages/bus/src/server.ts",
-          "line": 422,
-          "end_line": 436,
-          "label": "OPFS or the memory fallback"
+          "line": 496,
+          "end_line": 510,
+          "label": "OPFS or the memory fallback",
+          "anchor": "const persistent = p.topics.some((t) => t.durability === 'persistent');"
         },
         {
           "path": "packages/bus/src/storage/lock.ts",
           "line": 1,
           "end_line": 10,
-          "label": "one tab writes the files"
+          "label": "one tab writes the files",
+          "anchor": "/** The Web Lock the bus worker holding the origin's OPFS files keeps (ADR 0007, decision 6). */"
         }
       ]
     }

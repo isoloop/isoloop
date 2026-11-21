@@ -33,14 +33,18 @@
         {
           "path": "packages/runtime/src/bus-client.ts",
           "line": 1,
-          "end_line": 21,
-          "label": "bus client: results, commits, re-sends"
+          "end_line": 27,
+          "label": "bus client: results, commits, re-sends",
+          "anchor": "* The isolate's bus client (design §5, §6.3, ADR 0007). Talks to the bus",
+          "anchor_offset": 1
         },
         {
           "path": "packages/protocol/src/bus.ts",
-          "line": 20,
-          "end_line": 54,
-          "label": "publish id and bus port messages"
+          "line": 60,
+          "end_line": 107,
+          "label": "publish id and bus port messages",
+          "anchor": "* Identifies a publish so a re-send after a bus crash isn't appended twice to",
+          "anchor_offset": 1
         }
       ]
     },
@@ -55,9 +59,11 @@
       "sources": [
         {
           "path": "packages/protocol/src/control.ts",
-          "line": 91,
-          "end_line": 95,
-          "label": "host publish on the control port"
+          "line": 163,
+          "end_line": 167,
+          "label": "host publish on the control port",
+          "anchor": "* `kernel.publish`. With `id` set, the bus replies with `result`. The host",
+          "anchor_offset": 1
         }
       ]
     },
@@ -72,9 +78,10 @@
       "sources": [
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 720,
-          "end_line": 745,
-          "label": "forbidden, unknown_topic, too_large"
+          "line": 843,
+          "end_line": 868,
+          "label": "forbidden, unknown_topic, too_large",
+          "anchor": "const system = isSystemTopic(name);"
         }
       ]
     },
@@ -89,9 +96,10 @@
       "sources": [
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 762,
-          "end_line": 793,
-          "label": "validate, then drain in order"
+          "line": 885,
+          "end_line": 916,
+          "label": "validate, then drain in order",
+          "anchor": "this.#enqueue(name, topic, pending, validate(topic.def.schema, value));"
         }
       ]
     },
@@ -106,15 +114,17 @@
       "sources": [
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 716,
-          "end_line": 719,
-          "label": "counted by error code"
+          "line": 839,
+          "end_line": 842,
+          "label": "counted by error code",
+          "anchor": "const settle = (r: CallResult): void => {"
         },
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 833,
-          "end_line": 857,
-          "label": "invalid, not_encodable"
+          "line": 1021,
+          "end_line": 1045,
+          "label": "invalid, not_encodable",
+          "anchor": "#check(name: string, r: Validated | undefined, persistent = false): CallResult {"
         }
       ]
     },
@@ -129,9 +139,10 @@
       "sources": [
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 795,
-          "end_line": 805,
-          "label": "a re-send gets its old offset"
+          "line": 918,
+          "end_line": 928,
+          "label": "a re-send gets its old offset",
+          "anchor": "#finish(name: string, topic: Topic, p: Pending): void {"
         }
       ]
     },
@@ -145,15 +156,17 @@
       "sources": [
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 93,
-          "end_line": 98,
-          "label": "publishes wait while seeding"
+          "line": 113,
+          "end_line": 118,
+          "label": "publishes wait while seeding",
+          "anchor": "queue: Pending[];"
         },
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 517,
-          "end_line": 520,
-          "label": "released when the seed ends"
+          "line": 579,
+          "end_line": 582,
+          "label": "released when the seed ends",
+          "anchor": "/** A seed ended: the topic takes its waiting publishes, then its waiting subscribes. */"
         }
       ]
     },
@@ -168,15 +181,17 @@
       "sources": [
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 806,
-          "end_line": 827,
-          "label": "check, quota, append, fan out"
+          "line": 929,
+          "end_line": 957,
+          "label": "check, quota, append, fan out",
+          "anchor": "const checked = this.#check(name, p.result, topic.def.durability === 'persistent');"
         },
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 861,
-          "end_line": 872,
-          "label": "persistent: ack after flush"
+          "line": 1049,
+          "end_line": 1060,
+          "label": "persistent: ack after flush",
+          "anchor": "/** Acknowledged once its batch is on disk (ADR 0007, decision 2). */"
         }
       ]
     },
@@ -191,15 +206,18 @@
       "sources": [
         {
           "path": "packages/bus/src/engine/ts-engine.ts",
-          "line": 21,
-          "end_line": 30,
-          "label": "resident bytes, page() back"
+          "line": 22,
+          "end_line": 31,
+          "label": "resident bytes, page() back",
+          "anchor": "* Durable topics: about how many encoded bytes of records each keeps in",
+          "anchor_offset": 1
         },
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 1162,
-          "end_line": 1172,
-          "label": "evicted records paged in"
+          "line": 1427,
+          "end_line": 1437,
+          "label": "evicted records paged in",
+          "anchor": "#pump(sub: Subscription): void {"
         }
       ]
     },
@@ -214,15 +232,17 @@
       "sources": [
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 1142,
-          "end_line": 1184,
-          "label": "deliver under credit"
+          "line": 1405,
+          "end_line": 1449,
+          "label": "deliver under credit",
+          "anchor": "#deliver(sub: Subscription, records: BusRecord[], gap?: { from: number; to: number }): number {"
         },
         {
           "path": "packages/runtime/src/bus-client.ts",
           "line": 6,
           "end_line": 13,
-          "label": "handlers settle, then commit"
+          "label": "handlers settle, then commit",
+          "anchor": "* - `subscribe` runs handlers one record at a time, in order. With"
         }
       ]
     },
@@ -236,9 +256,10 @@
       "sources": [
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 1186,
-          "end_line": 1200,
-          "label": "by key hash or round-robin"
+          "line": 1451,
+          "end_line": 1469,
+          "label": "by key hash or round-robin",
+          "anchor": "/** The member a record goes to: by key hash, or round-robin when keyless. */"
         }
       ]
     },
@@ -253,15 +274,18 @@
       "sources": [
         {
           "path": "packages/protocol/src/bus.ts",
-          "line": 38,
-          "end_line": 43,
-          "label": "commits, ADR 0016"
+          "line": 83,
+          "end_line": 88,
+          "label": "commits, ADR 0016",
+          "anchor": "* Each entry is the highest settled offset of one subscription on this port",
+          "anchor_offset": 1
         },
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 1054,
-          "end_line": 1060,
-          "label": "commit per subscription"
+          "line": 1303,
+          "end_line": 1319,
+          "label": "commit per subscription",
+          "anchor": "#commit("
         }
       ]
     }

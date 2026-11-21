@@ -4,6 +4,7 @@
 // fails here. It doesn't check layout, wording or arrows.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { citations, problemOf } from './anchors.ts';
 import { DEFAULT_COMMIT_INTERVAL_MS } from '../../packages/protocol/src/commits.ts';
 import { DEFAULT_FRAME_BUDGET_MS } from '../../packages/host/src/compositor.ts';
 import { FORWARDED_EVENTS } from '../../packages/host/src/events.ts';
@@ -97,13 +98,19 @@ describe('core diagrams', () => {
     }
   });
 
-  it('cites only files that still exist', () => {
+  // Citations follow main: each one's anchor is the text of a line it cites.
+  // `node docs/diagrams/anchors.ts --fix` finds a moved one again.
+  it("keeps every citation's anchor on its line", () => {
     const root = new URL('../../', import.meta.url);
+    const readRepo = (p: string): string | undefined => {
+      const url = new URL(p, root);
+      return existsSync(url) ? readFileSync(url, 'utf8') : undefined;
+    };
     for (const name of NAMES) {
-      const text = readFileSync(new URL(`${name}.json`, dir), 'utf8');
-      for (const m of text.matchAll(/"path":\s*"([^"]+)"/g)) {
-        expect(existsSync(new URL(m[1] ?? '', root)), `${name}: ${m[1]}`).toBe(true);
-      }
+      const json: unknown = JSON.parse(readFileSync(new URL(`${name}.json`, dir), 'utf8'));
+      const cites = citations(json);
+      expect(cites.length, name).toBeGreaterThan(0);
+      for (const c of cites) expect(problemOf(c, readRepo), `${name}: ${c.label}`).toBeUndefined();
     }
   });
 
