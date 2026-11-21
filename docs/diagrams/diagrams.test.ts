@@ -5,7 +5,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { citations, problemOf } from './anchors.ts';
-import { DEFAULT_COMMIT_INTERVAL_MS } from '../../packages/protocol/src/commits.ts';
+import { DEFAULT_COMMIT_INTERVAL_MS } from '../../packages/protocol/src/topics/commits.ts';
 import { DEFAULT_FRAME_BUDGET_MS } from '../../packages/host/src/compositor.ts';
 import { FORWARDED_EVENTS } from '../../packages/host/src/events.ts';
 import type { IsolateManifest } from '../../packages/host/src/kernel.ts';

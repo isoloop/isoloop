@@ -6,7 +6,7 @@ import {
   type BusRecord,
   type RecordReq,
   type RequestVia,
-} from './index';
+} from '../index';
 
 describe('request records (ADR 0018, decision 4)', () => {
   it('knows the agent transports', () => {

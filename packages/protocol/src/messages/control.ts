@@ -1,7 +1,7 @@
 import { envelopeGuard, type Envelope, type MessageTypes } from './envelope';
-import type { CallResult, ErrorCode, ErrorPayload, Issue } from './errors';
+import type { CallResult, ErrorCode, ErrorPayload, Issue } from '../errors/errors';
 import type { PublishId, RecordReq, RequestVia } from './bus';
-import type { Grants } from './grants';
+import type { Grants } from '../topics/grants';
 
 /**
  * What a topic's log keeps: `last-n`, the newest `n` records; `time`, the

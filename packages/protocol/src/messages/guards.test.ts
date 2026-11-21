@@ -18,7 +18,7 @@ import {
   type HostToIsolate,
   type IsolateToBus,
   type IsolateToHost,
-} from './index';
+} from '../index';
 
 const env = (t: string): unknown => ({ v: 1, t, p: {} });
 

@@ -6,7 +6,7 @@
  * differs, and ignore message types they don't know.
  */
 import { envelopeGuard, type Envelope, type MessageTypes } from './envelope';
-import type { Issue } from './errors';
+import type { Issue } from '../errors/errors';
 
 /**
  * An exposed tool as the page sends it: `kernel.tools()` without `topic`.

@@ -1,5 +1,5 @@
-import type { Retention } from './control';
-import type { Issue } from './errors';
+import type { Retention } from '../messages/control';
+import type { Issue } from '../errors/errors';
 import { isSystemTopic } from './grants';
 
 /**

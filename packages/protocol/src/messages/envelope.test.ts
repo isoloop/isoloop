@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertNever, isEnvelope, PROTOCOL } from './index';
+import { assertNever, isEnvelope, PROTOCOL } from '../index';
 
 describe('PROTOCOL', () => {
   it('speaks v1 and accepts v1', () => {
