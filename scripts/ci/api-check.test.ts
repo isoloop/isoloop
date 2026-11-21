@@ -117,6 +117,43 @@ describe('surfaceOf: names and their declarations (ADR 0021, decision 8)', () =>
 
 const js = (files: Record<string, string>): Map<string, string> => new Map(Object.entries(files));
 
+/** An exported function whose options type is private, with `a` typed as `t`. */
+const uses = (t: string): string =>
+  `type Options = { a: ${t} };\ndeclare function f(o: Options): void;\nexport { f };`;
+
+/** A chunk exporting `unchecked` under an alias, as tsdown writes one. */
+const chunk = (alias: string): string =>
+  `declare function unchecked(): void;\nexport { unchecked${alias} };`;
+
+describe('surfaceOf: what isn\u2019t API (ADR 0021, decision 8)', () => {
+  it('leaves imports out', () => {
+    const a =
+      "import { BusRecord, CallError } from '@isoloop/protocol';\nexport declare function f(): void;";
+    const b = "import { BusRecord } from '@isoloop/protocol';\nexport declare function f(): void;";
+    expect(surfaceOf([b])).toEqual(surfaceOf([a]));
+  });
+
+  it('leaves out a private declaration nothing exported reaches', () => {
+    const withHelper = [
+      'type AppendId = { epoch: number; seq: number };',
+      'declare function f(): void;',
+      'export { f };',
+    ].join('\n');
+    expect(surfaceOf([withHelper])).toEqual(
+      surfaceOf(['declare function f(): void;\nexport { f };']),
+    );
+  });
+
+  it('still counts a private declaration an exported one uses', () => {
+    expect(surfaceOf([uses('number')])).not.toEqual(surfaceOf([uses('string')]));
+  });
+
+  it('reads minified aliases the same, `_` included', () => {
+    expect(surfaceOf([chunk(' as _')])).toEqual(surfaceOf([chunk('')]));
+    expect(surfaceOf([chunk(' as t')])).toEqual(surfaceOf([chunk('')]));
+  });
+});
+
 describe('the JS notice', () => {
   it("ignores tsdown's module comments and chunk hashes", () => {
     const before = '// src/kernel.ts\nconst a = 1;\nimport { b } from "./records-qo23ZEsQ.js";\n';
