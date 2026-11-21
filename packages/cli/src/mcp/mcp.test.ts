@@ -17,8 +17,8 @@ import {
   type PageToCli,
 } from '@isoloop/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { Io } from '../io';
-import { main } from '../main';
+import type { Io } from '../program/io';
+import { main } from '../program/main';
 import { originMatcher, tokenMatches } from './pairing';
 import { UNTRUSTED_SENTENCE } from './server';
 import { readMessages } from './stdio';

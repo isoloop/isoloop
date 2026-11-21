@@ -1,4 +1,4 @@
-export { createBalancer } from './balancer';
+export { createBalancer } from './balancer/balancer';
 export type {
   ArrivedEvent,
   Balancer,
@@ -14,4 +14,4 @@ export type {
   PlacementState,
   Report,
   SpikeEvent,
-} from './types';
+} from './balancer/types';

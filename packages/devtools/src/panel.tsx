@@ -14,9 +14,9 @@ import { defineIsolate, useIsolate, type IsolateProps } from '@isoloop/preact';
 import type { InspectSnapshot } from '@isoloop/protocol';
 import type { IsolateDefinition } from '@isoloop/runtime';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { healthOf, useFeed, type Health } from './feed';
+import { healthOf, useFeed, type Health } from './feed/feed';
 import type { DevtoolsPosition, HealthStatus } from './index';
-import { loadUi, saveUi, type PanelMode, type UiState } from './persist';
+import { loadUi, saveUi, type PanelMode, type UiState } from './panel/persist';
 import {
   arcPath,
   arcsOf,
@@ -26,9 +26,9 @@ import {
   wedgePath,
   type Arc,
   type Level,
-} from './ring';
-import { createRecorder, type Recorder } from './event-store';
-import { Body } from './views';
+} from './panel/ring';
+import { createRecorder, type Recorder } from './feed/event-store';
+import { Body } from './views/views';
 
 const POSITIONS: readonly DevtoolsPosition[] = [
   'bottom-right',

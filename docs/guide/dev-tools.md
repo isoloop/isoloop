@@ -112,7 +112,7 @@ kernel.spawn({
 });
 ```
 
-The panel does the same in `packages/devtools/src/feed.ts`: it keeps one snapshot, applies each message to it, and fetches a fresh snapshot 100 ms after an event.
+The panel does the same in `packages/devtools/src/feed/feed.ts`: it keeps one snapshot, applies each message to it, and fetches a fresh snapshot 100 ms after an event.
 
 - **`ctx.inspector` is `undefined` without the grant,** so check once, as above.
 - **Never pooled.** Spawning an isolate with `inspect: true` into a pool fails with `invalid_config`, because a pool merges its members' grants.

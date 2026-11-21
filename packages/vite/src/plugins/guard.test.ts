@@ -5,12 +5,12 @@ import { fileURLToPath } from 'node:url';
 import { build, defaultClientConditions } from 'vite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { isDevMcpModule } from './guard';
-import { isoloop, type IsoloopOptions } from './index';
+import { isoloop, type IsoloopOptions } from '../index';
 
 // M4a task 7 (ADR 0018, decision 8): a production build that still contains
 // `@isoloop/host/dev-mcp` fails, unless `allowDevMcp: true`.
 
-const root = fileURLToPath(new URL('./__fixtures__/dev-mcp', import.meta.url));
+const root = fileURLToPath(new URL('../__fixtures__/dev-mcp', import.meta.url));
 const dirs: string[] = [];
 afterEach(async () => {
   await Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));

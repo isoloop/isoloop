@@ -44,7 +44,7 @@
         "packages/host/src/kernel/kernel.ts",
         "packages/host/src/render/registry.ts",
         "packages/vite/src/index.ts",
-        "packages/vite/src/build.ts",
+        "packages/vite/src/plugins/build.ts",
         "packages/vite/client.d.ts"
       ],
       "exports": {

@@ -10,15 +10,21 @@
  * ```
  */
 import type { Plugin } from 'vite';
-import { buildPlugin, type BuildOptions } from './build';
-import { devPlugin, type HeaderOptions, type WorkersOptions } from './dev';
-import { devMcpGuard, type DevMcpGuardOptions } from './guard';
+import { buildPlugin, type BuildOptions } from './plugins/build';
+import { devPlugin, type HeaderOptions, type WorkersOptions } from './plugins/dev';
+import { devMcpGuard, type DevMcpGuardOptions } from './plugins/guard';
 
-export { devCsp, headersFor, WORKERS_ID, type HeaderOptions, type WorkersOptions } from './dev';
+export {
+  devCsp,
+  headersFor,
+  WORKERS_ID,
+  type HeaderOptions,
+  type WorkersOptions,
+} from './plugins/dev';
 
-export { ISOLATES_ID, MANIFEST, type BuildOptions, type BuildManifest } from './build';
+export { ISOLATES_ID, MANIFEST, type BuildOptions, type BuildManifest } from './plugins/build';
 
-export type { DevMcpGuardOptions } from './guard';
+export type { DevMcpGuardOptions } from './plugins/guard';
 
 /** The options of `isoloop()`: headers, worker URLs, the isolate build and the dev MCP check. */
 export type IsoloopOptions = HeaderOptions & WorkersOptions & BuildOptions & DevMcpGuardOptions;

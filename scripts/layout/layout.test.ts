@@ -42,11 +42,10 @@ const good: Record<string, string> = {
   'packages/a/test/fake.ts': 'export const fake = 1;\n',
 };
 
-const check = (files: Record<string, string>, pending: string[] = [], p = projects) =>
-  checkLayout(repo(files), p, pending);
+const check = (files: Record<string, string>, p = projects) => checkLayout(repo(files), p);
 
-const messages = (files: Record<string, string>, pending: string[] = [], p = projects): string[] =>
-  check(files, pending, p).map((x) => `${x.file}: ${x.message}`);
+const messages = (files: Record<string, string>, p = projects): string[] =>
+  check(files, p).map((x) => `${x.file}: ${x.message}`);
 
 describe('the layout check', () => {
   it('passes a package that follows ADR 0021', () => {
@@ -154,9 +153,7 @@ describe('the layout check', () => {
       ...projects,
       { include: ['packages/a/src/**/*.browser.test.ts'], exclude: [] },
     ];
-    expect(check({ ...good, 'packages/a/src/area/x.browser.test.ts': '' }, [], browser)).toEqual(
-      [],
-    );
+    expect(check({ ...good, 'packages/a/src/area/x.browser.test.ts': '' }, browser)).toEqual([]);
   });
 
   it('rule 7: every file a test or fixture loads by URL exists', () => {
@@ -195,15 +192,6 @@ describe('the layout check', () => {
     expect(out).toEqual([
       expect.stringContaining('packages/a/package.json: sideEffects names ./src/gone.ts'),
     ]);
-  });
-
-  it('skips rules 1–3 for a pending package, until it complies', () => {
-    const messy = { ...good, 'packages/a/src/helper.ts': 'export {};\n' };
-    expect(check(messy, ['a'])).toEqual([]);
-    expect(messages(good, ['a'])).toEqual([
-      expect.stringContaining('packages/a follows ADR 0021 now; take it out of PENDING'),
-    ]);
-    expect(messages(good, ['gone'])).toEqual([expect.stringContaining('PENDING names gone')]);
   });
 
   it('holds on this repo', async () => {

@@ -7,7 +7,14 @@
 // `maxRestarts`, a member's crash past that many restarts within 60 s fails
 // it (`isolate:failed`), as the kernel's supervisor does; it stays down until
 // `restart`.
-import type { BeatLike, CrashLike, FailedLike, KernelLike, ManifestLike, PoolLike } from './types';
+import type {
+  BeatLike,
+  CrashLike,
+  FailedLike,
+  KernelLike,
+  ManifestLike,
+  PoolLike,
+} from '../src/balancer/types';
 
 const BEAT_MS = 100;
 

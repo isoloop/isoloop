@@ -8,14 +8,14 @@
  */
 import { Fragment, type JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { detailOf, levelOfEvent, subjectOf, type EventLevel } from './event-level';
+import { detailOf, levelOfEvent, subjectOf, type EventLevel } from '../feed/event-level';
 import {
   KEEP_SESSIONS,
   PER_SESSION,
   type Recorder,
   type SessionInfo,
   type StoredEvent,
-} from './event-store';
+} from '../feed/event-store';
 import { highlight } from './format';
 
 const pad = (n: number, w = 2): string => String(n).padStart(w, '0');
