@@ -22,15 +22,17 @@
       "sources": [
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 92,
-          "end_line": 112,
-          "label": "a member leaves, the worker stays"
+          "line": 110,
+          "end_line": 133,
+          "label": "a member leaves, the worker stays",
+          "anchor": "/** `shutdown` for a member: `bye` once its handlers settle or the grace runs out. */"
         },
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 70,
-          "end_line": 90,
-          "label": "one beat per worker"
+          "line": 88,
+          "end_line": 108,
+          "label": "one beat per worker",
+          "anchor": "function startHeartbeat(everyMs: number): void {"
         }
       ]
     },
@@ -42,15 +44,18 @@
       "sources": [
         {
           "path": "packages/host/src/kernel.ts",
-          "line": 673,
-          "end_line": 694,
-          "label": "pool fate"
+          "line": 1038,
+          "end_line": 1059,
+          "label": "pool fate",
+          "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
+          "anchor_offset": 1
         },
         {
           "path": "packages/host/src/loader.ts",
-          "line": 105,
-          "end_line": 148,
-          "label": "join the pool, leave it"
+          "line": 155,
+          "end_line": 201,
+          "label": "join the pool, leave it",
+          "anchor": "const loadMember = (o: LoadOptions, name: string): LoadedWorker => {"
         }
       ]
     },
@@ -62,15 +67,17 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 381,
-          "end_line": 395,
-          "label": "attach a new port"
+          "line": 426,
+          "end_line": 440,
+          "label": "attach a new port",
+          "anchor": "const connect: BusController['connect'] = (isolateId, grants, opts = {}) => {"
         },
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 440,
-          "end_line": 448,
-          "label": "detach keeps offsets"
+          "line": 515,
+          "end_line": 523,
+          "label": "detach keeps offsets",
+          "anchor": "detach(isolateId, opts = {}) {"
         }
       ]
     },
@@ -82,9 +89,10 @@
       "sources": [
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 199,
-          "end_line": 220,
-          "label": "built-ins frozen before the first member"
+          "line": 253,
+          "end_line": 277,
+          "label": "built-ins frozen before the first member",
+          "anchor": "const name = msg.isolate;"
         }
       ]
     }

@@ -22,15 +22,17 @@
       "sources": [
         {
           "path": "packages/runtime/src/bus-client.ts",
-          "line": 14,
-          "end_line": 20,
-          "label": "reattach: re-subscribe, re-send"
+          "line": 20,
+          "end_line": 26,
+          "label": "reattach: re-subscribe, re-send",
+          "anchor": "* - On `reattach` (a bus restart) it swaps the port, drops the commits still"
         },
         {
           "path": "packages/runtime/src/bus-client.ts",
-          "line": 343,
-          "end_line": 369,
-          "label": "reattach in order"
+          "line": 439,
+          "end_line": 468,
+          "label": "reattach in order",
+          "anchor": "reattach(next) {"
         }
       ]
     },
@@ -42,21 +44,24 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 300,
-          "end_line": 338,
-          "label": "new bus, safe mode, reattach"
+          "line": 341,
+          "end_line": 383,
+          "label": "new bus, safe mode, reattach",
+          "anchor": "worker = w;"
         },
         {
           "path": "packages/host/src/kernel.ts",
-          "line": 999,
-          "end_line": 1007,
-          "label": "ready again: wake headless"
+          "line": 1413,
+          "end_line": 1421,
+          "label": "ready again: wake headless",
+          "anchor": "ready: (first) => {"
         },
         {
           "path": "packages/host/src/kernel.ts",
-          "line": 1048,
-          "end_line": 1059,
-          "label": "a new port per isolate"
+          "line": 1463,
+          "end_line": 1474,
+          "label": "a new port per isolate",
+          "anchor": "reattach: (id) => {"
         }
       ]
     },
@@ -68,9 +73,10 @@
       "sources": [
         {
           "path": "packages/bus/src/server.ts",
-          "line": 339,
-          "end_line": 346,
-          "label": "the bus beats"
+          "line": 411,
+          "end_line": 418,
+          "label": "the bus beats",
+          "anchor": "const startBeat = (everyMs: number): void => {"
         }
       ]
     },
@@ -82,15 +88,17 @@
       "sources": [
         {
           "path": "packages/bus/src/server.ts",
-          "line": 408,
-          "end_line": 436,
-          "label": "boot: lock, OPFS or memory"
+          "line": 482,
+          "end_line": 510,
+          "label": "boot: lock, OPFS or memory",
+          "anchor": "const boot = async (p: Extract<HostToBus, { t: 'boot' }>['p']): Promise<void> => {"
         },
         {
           "path": "packages/bus/src/broker.ts",
-          "line": 958,
-          "end_line": 961,
-          "label": "one reset per memory topic"
+          "line": 1191,
+          "end_line": 1194,
+          "label": "one reset per memory topic",
+          "anchor": "if (conn.reset && !conn.reset.has(name) && !this.#durable(name)) {"
         }
       ]
     },
@@ -104,7 +112,8 @@
           "path": "packages/bus/src/storage/lock.ts",
           "line": 1,
           "end_line": 10,
-          "label": "isoloop-bus Web Lock"
+          "label": "isoloop-bus Web Lock",
+          "anchor": "/** The Web Lock the bus worker holding the origin's OPFS files keeps (ADR 0007, decision 6). */"
         }
       ]
     }

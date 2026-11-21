@@ -2,7 +2,7 @@
 
 How the Isoloop runtime is put together, for a developer evaluating it. Each diagram is an [Archify](https://github.com/tt-a1i/archify) candidate (`<name>.json`) and its rendered page (`<name>.html`). Both are committed, so nothing here needs Archify to build or view. The site (`isoloop/web`, ADR 0002, decision 6) fetches this folder at a sha on `main` and shows the pages on its "how it works" page.
 
-Each was drawn from the code at the commit in its JSON's `meta.repository.revision`, which its cited sources link to: `f825ffb` for the first seven, `9c9b968` for `rendering`.
+Each page was rendered at the commit in its JSON's `meta.repository.revision`, and its cited sources link to the code there: `f825ffb` for the first seven, `9c9b968` for `rendering`. The JSON's citations follow main (below), so their lines can differ from what a page links to until it's rendered again.
 
 | Order | File | What it shows |
 | --- | --- | --- |
@@ -25,15 +25,17 @@ Each page takes `?theme=light|dark`, which wins over the viewer's saved choice a
 - **Timings and limits:** the lifecycle and pool-restart labels match `DEFAULT_SUPERVISOR_CONFIG` (blocked after, killed after, restarts within the window). The bus diagram's commit label matches `DEFAULT_COMMIT_INTERVAL_MS`.
 - **Rendering:** the frame budget on the compositor's card and in the "A frame" card matches `DEFAULT_FRAME_BUDGET_MS`, and the "Events back" card lists exactly `FORWARDED_EVENTS`, in order.
 - **Placement:** the field the placement diagram names is the manifest's `pool`. In the placement and topology diagrams, a pool region is one thread, an own-worker region has one thread per isolate, and each region's isolate count matches its cards.
-- **Sources:** every file any diagram cites still exists.
+- **Sources:** citations follow main. Each one carries `anchor`, the text of its first cited line that occurs once in its file (`anchor_offset` lines into the range when that isn't its first line), and the test fails when that text isn't on its line.
+  - **After moving or editing cited code,** run `node docs/diagrams/anchors.ts --fix`. It finds each citation again: a moved file by its name in the same package (ADR 0021 keeps file names on a move), then the anchor's one line in it.
+  - **A citation it can't find needs a person:** the cited code changed, so the diagram may need redrawing.
 
-It doesn't check layout, wording or arrows. When the code changes what a diagram shows, redraw it and update `meta.repository.revision` and the cited lines.
+It doesn't check layout, wording or arrows. When the code changes what a diagram shows, redraw it.
 
 ## Re-rendering
 
 Archify isn't part of this repo's toolchain. To re-render after editing a JSON:
 
-1. Install the Archify skill or CLI.
+1. Install the Archify skill or CLI, and set each changed diagram's `meta.repository.revision` to the main commit you render from, so its page links to the lines its citations name.
 2. From the repo root, for each changed diagram, run:
 
    ```bash

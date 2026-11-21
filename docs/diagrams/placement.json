@@ -33,15 +33,19 @@
       "sources": [
         {
           "path": "packages/host/src/loader.ts",
-          "line": 150,
-          "end_line": 155,
-          "label": "own worker or pool member"
+          "line": 203,
+          "end_line": 208,
+          "label": "own worker or pool member",
+          "anchor": "load: (o) => (o.pool === undefined ? loadOwn(o) : loadMember(o, o.pool)),",
+          "anchor_offset": 1
         },
         {
           "path": "packages/host/src/loader.ts",
           "line": 1,
           "end_line": 9,
-          "label": "a pool's worker lives with its members"
+          "label": "a pool's worker lives with its members",
+          "anchor": "* Turns a manifest into a running worker (design §4.2): a module worker from",
+          "anchor_offset": 1
         }
       ]
     },
@@ -55,9 +59,10 @@
       "sources": [
         {
           "path": "packages/host/src/loader.ts",
-          "line": 84,
-          "end_line": 103,
-          "label": "one worker per isolate"
+          "line": 132,
+          "end_line": 153,
+          "label": "one worker per isolate",
+          "anchor": "const loadOwn = (o: LoadOptions): LoadedWorker => {"
         }
       ]
     },
@@ -71,9 +76,10 @@
       "sources": [
         {
           "path": "packages/host/src/loader.ts",
-          "line": 84,
-          "end_line": 103,
-          "label": "one worker per isolate"
+          "line": 132,
+          "end_line": 153,
+          "label": "one worker per isolate",
+          "anchor": "const loadOwn = (o: LoadOptions): LoadedWorker => {"
         }
       ]
     },
@@ -87,9 +93,10 @@
       "sources": [
         {
           "path": "packages/host/src/loader.ts",
-          "line": 84,
-          "end_line": 103,
-          "label": "one worker per isolate"
+          "line": 132,
+          "end_line": 153,
+          "label": "one worker per isolate",
+          "anchor": "const loadOwn = (o: LoadOptions): LoadedWorker => {"
         }
       ]
     },
@@ -103,9 +110,10 @@
       "sources": [
         {
           "path": "packages/runtime/src/render/index.ts",
-          "line": 54,
-          "end_line": 66,
-          "label": "one document, a root per member"
+          "line": 55,
+          "end_line": 67,
+          "label": "one document, a root per member",
+          "anchor": "* A pool's one document (ADR 0015): every visual member renders into its own"
         }
       ]
     },
@@ -119,9 +127,10 @@
       "sources": [
         {
           "path": "packages/runtime/src/render/index.ts",
-          "line": 54,
-          "end_line": 66,
-          "label": "one document, a root per member"
+          "line": 55,
+          "end_line": 67,
+          "label": "one document, a root per member",
+          "anchor": "* A pool's one document (ADR 0015): every visual member renders into its own"
         }
       ]
     },
@@ -135,15 +144,18 @@
       "sources": [
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 199,
-          "end_line": 220,
-          "label": "a pool takes one init per member"
+          "line": 253,
+          "end_line": 277,
+          "label": "a pool takes one init per member",
+          "anchor": "const name = msg.isolate;"
         },
         {
           "path": "packages/runtime/src/freeze.ts",
           "line": 1,
           "end_line": 60,
-          "label": "frozen built-ins, protected properties"
+          "label": "frozen built-ins, protected properties",
+          "anchor": "* Frozen built-ins for pools (M2c task 7, decision 6). Pool members share one",
+          "anchor_offset": 1
         }
       ]
     },
@@ -157,9 +169,10 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 381,
-          "end_line": 395,
-          "label": "a MessageChannel per isolate"
+          "line": 426,
+          "end_line": 440,
+          "label": "a MessageChannel per isolate",
+          "anchor": "const connect: BusController['connect'] = (isolateId, grants, opts = {}) => {"
         }
       ]
     }
