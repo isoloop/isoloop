@@ -2,7 +2,7 @@
 // `kernel.tools()` and `kernel.request` against the real bus worker.
 import { routeTopic } from '@isoloop/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list, { act, ask, nojson, told, untooled } from './__fixtures__/agents-contracts';
+import list, { act, ask, nojson, told, untooled } from '../__fixtures__/agents-contracts';
 import {
   BusError,
   createKernel,
@@ -10,14 +10,14 @@ import {
   type Kernel,
   type KernelConfig,
   type KernelEvents,
-} from './index';
+} from '../index';
 
 const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
-const busWorker = worker('../../bus/src/worker.ts');
-const bootstrap = worker('./__fixtures__/responder-bootstrap.ts');
-const contractsUrl = new URL('./__fixtures__/agents-contracts.ts', import.meta.url).href;
-const src = new URL('./__fixtures__/throws.ts', import.meta.url).href; // never imported by the test bootstrap
+const busWorker = worker('../../../bus/src/worker.ts');
+const bootstrap = worker('../__fixtures__/responder-bootstrap.ts');
+const contractsUrl = new URL('../__fixtures__/agents-contracts.ts', import.meta.url).href;
+const src = new URL('../__fixtures__/throws.ts', import.meta.url).href; // never imported by the test bootstrap
 
 const kernels: Kernel[] = [];
 afterEach(async () => {

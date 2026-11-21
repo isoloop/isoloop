@@ -37,9 +37,9 @@ import {
   type PageToCli,
   type TopicRef,
 } from '@isoloop/protocol';
-import type { AgentTool } from './agents';
-import type { Inspector } from './inspect';
-import type { Kernel } from './kernel';
+import type { AgentTool } from './agents/agents';
+import type { Inspector } from './inspect/inspect';
+import type { Kernel } from './kernel/kernel';
 
 /** `connectDevMCP`'s options. @experimental */
 export type DevMcpOptions = {

@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createKernel, type Kernel, type KernelConfig, type KernelEvents } from './index';
+import { createKernel, type Kernel, type KernelConfig, type KernelEvents } from '../index';
 
 // Supervisor wiring against real workers (plan m1-kernel, task 2).
 
-const bootstrap = `${new URL('../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
+const bootstrap = `${new URL('../../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
 const fixture = (name: string): string =>
-  new URL(`./__fixtures__/${name}.ts`, import.meta.url).href;
+  new URL(`../__fixtures__/${name}.ts`, import.meta.url).href;
 
 const kernels: Kernel[] = [];
 afterEach(async () => {

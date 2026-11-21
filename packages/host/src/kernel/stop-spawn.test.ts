@@ -3,12 +3,12 @@
 // shut down, so its `bye` comes after the new one has started: the new one
 // must keep its bus subscription, its pool member and its surface.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list, { count, report } from './__fixtures__/contracts';
-import { createKernel, type IsolateManifest, type Kernel } from './index';
+import list, { count, report } from '../__fixtures__/contracts';
+import { createKernel, type IsolateManifest, type Kernel } from '../index';
 
 const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
-const src = new URL('./__fixtures__/respawned.ts', import.meta.url).href;
+const src = new URL('../__fixtures__/respawned.ts', import.meta.url).href;
 const ALL = { publish: ['*'], subscribe: ['*'] };
 const SLOW_STOP_MS = 300;
 
@@ -32,10 +32,10 @@ afterEach(async () => {
 
 function setup() {
   const kernel = createKernel({
-    contracts: { url: new URL('./__fixtures__/contracts.ts', import.meta.url).href, list },
+    contracts: { url: new URL('../__fixtures__/contracts.ts', import.meta.url).href, list },
     workers: {
-      isolateBootstrap: worker('../../runtime/src/bootstrap.ts'),
-      bus: worker('../../bus/src/worker.ts'),
+      isolateBootstrap: worker('../../../runtime/src/bootstrap.ts'),
+      bus: worker('../../../bus/src/worker.ts'),
     },
   });
   kernels.push(kernel);

@@ -12,7 +12,7 @@ import {
   type SanitisePolicy,
 } from '@isoloop/dom/host';
 import type { EventType, SerializedEvent } from '@isoloop/protocol';
-import { listenEvents } from '../events';
+import { listenEvents } from './events';
 import type { HostRenderBridge } from './bridge';
 import type { ComponentRegistry } from './registry';
 

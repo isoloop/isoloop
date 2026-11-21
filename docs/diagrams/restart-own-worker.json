@@ -43,16 +43,16 @@
           "anchor": "function crash("
         },
         {
-          "path": "packages/host/src/kernel.ts",
-          "line": 1304,
-          "end_line": 1340,
+          "path": "packages/host/src/kernel/kernel.ts",
+          "line": 1303,
+          "end_line": 1339,
           "label": "attach before init",
           "anchor": "const start = (slot: Slot, o: { wake?: boolean } = {}): void => {"
         },
         {
-          "path": "packages/host/src/kernel.ts",
-          "line": 1205,
-          "end_line": 1222,
+          "path": "packages/host/src/kernel/kernel.ts",
+          "line": 1204,
+          "end_line": 1221,
           "label": "ready: format and version check",
           "anchor": "case 'ready': {"
         }

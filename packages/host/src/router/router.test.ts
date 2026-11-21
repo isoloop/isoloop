@@ -1,7 +1,7 @@
 import type { CallResult, RouteValue } from '@isoloop/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list from './__fixtures__/contracts';
-import { createKernel, type Kernel } from './index';
+import list from '../__fixtures__/contracts';
+import { createKernel, type Kernel } from '../index';
 import { createRouter, normaliseBase, pathWithin, type RouterOptions } from './router';
 
 const start = location.href;
@@ -170,10 +170,10 @@ describe('routing: false', () => {
     const add = vi.spyOn(window, 'addEventListener');
     const kernel = createKernel({
       routing: false,
-      contracts: { url: new URL('./__fixtures__/contracts.ts', import.meta.url).href, list },
+      contracts: { url: new URL('../__fixtures__/contracts.ts', import.meta.url).href, list },
       workers: {
         isolateBootstrap: 'unused.js',
-        bus: `${new URL('../../bus/src/worker.ts', import.meta.url).href}?worker_file&type=module`,
+        bus: `${new URL('../../../bus/src/worker.ts', import.meta.url).href}?worker_file&type=module`,
       },
     });
     kernels.push(kernel);

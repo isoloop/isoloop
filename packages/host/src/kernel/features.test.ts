@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { missingFeatures, type Feature } from './features';
-import { createKernel, KernelError } from './index';
+import { createKernel, KernelError } from '../index';
 
 // Browser feature check (plan m1-kernel, task 3b).
 

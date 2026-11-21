@@ -8,7 +8,7 @@
  * and a fallback slot, kept across restarts.
  */
 import type { SerializedEvent } from '@isoloop/protocol';
-import type { HostRenderBridge } from './render/bridge';
+import type { HostRenderBridge } from './bridge';
 
 /** One isolate's surface, as the compositor sees it: `IsolateSnapshot.surface`. */
 export type SurfaceStats = {

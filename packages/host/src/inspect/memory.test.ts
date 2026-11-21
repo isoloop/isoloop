@@ -7,14 +7,14 @@
 import { INSPECT_MEMORY_MS, type InspectMessage } from '@isoloop/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInspectFeed, type InspectSources } from './inspect';
-import { createKernel, type Kernel } from './index';
-import { workerUrl } from './loader';
+import { createKernel, type Kernel } from '../index';
+import { workerUrl } from '../kernel/loader';
 import { bytesByWorkerUrl, memoryByIsolate, memoryMeasure } from './memory';
 
-const bootstrap = `${new URL('../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
+const bootstrap = `${new URL('../../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
 /** The tiny entry, `@isoloop/runtime/worker`, which `@isoloop/vite` loads. */
-const entry = `${new URL('../../runtime/src/worker.ts', import.meta.url).href}?worker_file&type=module`;
-const counter = new URL('./__fixtures__/counter.ts', import.meta.url).href;
+const entry = `${new URL('../../../runtime/src/worker.ts', import.meta.url).href}?worker_file&type=module`;
+const counter = new URL('../__fixtures__/counter.ts', import.meta.url).href;
 
 const worker = (url: string, bytes: number) => ({
   bytes,

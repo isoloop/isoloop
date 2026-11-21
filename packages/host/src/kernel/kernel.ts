@@ -39,30 +39,29 @@ import {
   type AgentsConfig,
   type AgentTool,
   type KernelRequestOptions,
-} from './agents';
-import { createBusController, HOST_CONNECTION_PREFIX, type BusController } from './bus/controller';
-import { createCompositor, type FallbackRender, type SurfaceStats } from './compositor';
+} from '../agents/agents';
+import { createBusController, HOST_CONNECTION_PREFIX, type BusController } from '../bus/controller';
+import { createCompositor, type FallbackRender, type SurfaceStats } from '../render/compositor';
 import { missingFeatures } from './features';
-import { createInspectFeed, serveInspectPort, type Inspector } from './inspect';
+import { createInspectFeed, serveInspectPort, type Inspector } from '../inspect/inspect';
 import { createLoader, ENTRY_MARK, type LoadedWorker } from './loader';
-import { memoryMeasure, type MemoryWorker } from './memory';
-import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from './render/isoloop-dom';
-import { createRouter, type OnNavigate, type Router } from './router';
+import { memoryMeasure, type MemoryWorker } from '../inspect/memory';
+import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from '../render/isoloop-dom';
+import { createRouter, type OnNavigate, type Router } from '../router/router';
 import { checkRequires } from './version';
-import { createRegistry, type ComponentRegistry, type HostComponent } from './render/registry';
+import { createRegistry, type ComponentRegistry, type HostComponent } from '../render/registry';
+import { DEFAULT_BACKOFF, type Backoff } from '../supervisor/timers';
 import {
-  DEFAULT_BACKOFF,
   DEFAULT_SUPERVISOR_CONFIG,
   initialSupervision,
   step,
-  type Backoff,
   type CrashReason,
   type IsolateState,
   type IsolateSupervision,
   type SupervisorConfig,
   type SupervisorEffect,
   type SupervisorInput,
-} from './supervisor';
+} from '../supervisor/machine';
 
 /** What `createKernel` takes: the workers, the topics, and how isolates are supervised. */
 export type KernelConfig = {

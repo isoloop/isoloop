@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createKernel, type Kernel, type KernelEvents } from './index';
+import { createKernel, type Kernel, type KernelEvents } from '../index';
 
 // ADR 0012 decision 4 end to end: a real bootstrap reports `requires` in
 // ready, and the kernel checks it against `[FLOOR, VERSION]`, here 0.3 to 0.5.
@@ -14,9 +14,9 @@ vi.mock('./version', async (orig) => {
   };
 });
 
-const bootstrap = `${new URL('../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
+const bootstrap = `${new URL('../../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
 const fixture = (name: string): string =>
-  new URL(`./__fixtures__/${name}.ts`, import.meta.url).href;
+  new URL(`../__fixtures__/${name}.ts`, import.meta.url).href;
 
 const kernels: Kernel[] = [];
 afterEach(async () => {

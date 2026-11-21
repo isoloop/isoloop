@@ -43,15 +43,15 @@
       "sublabel": "supervisor + loader",
       "sources": [
         {
-          "path": "packages/host/src/kernel.ts",
-          "line": 1038,
-          "end_line": 1059,
+          "path": "packages/host/src/kernel/kernel.ts",
+          "line": 1037,
+          "end_line": 1058,
           "label": "pool fate",
           "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
           "anchor_offset": 1
         },
         {
-          "path": "packages/host/src/loader.ts",
+          "path": "packages/host/src/kernel/loader.ts",
           "line": 155,
           "end_line": 201,
           "label": "join the pool, leave it",

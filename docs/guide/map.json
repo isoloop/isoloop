@@ -3,7 +3,7 @@
   "guides": {
     "agents": {
       "paths": [
-        "packages/host/src/agents.ts",
+        "packages/host/src/agents/agents.ts",
         "packages/host/src/dev-mcp.ts",
         "packages/cli/src/mcp/",
         "packages/cli/src/commands/mcp.ts",
@@ -41,7 +41,7 @@
     },
     "getting-started": {
       "paths": [
-        "packages/host/src/kernel.ts",
+        "packages/host/src/kernel/kernel.ts",
         "packages/host/src/render/registry.ts",
         "packages/vite/src/index.ts",
         "packages/vite/src/build.ts",
@@ -59,7 +59,7 @@
     },
     "hosting": {
       "paths": [
-        "packages/host/src/loader.ts",
+        "packages/host/src/kernel/loader.ts",
         "packages/vite/src/",
         "packages/runtime/src/bootstrap.ts"
       ],
@@ -69,8 +69,8 @@
     },
     "inspection": {
       "paths": [
-        "packages/host/src/inspect.ts",
-        "packages/host/src/memory.ts",
+        "packages/host/src/inspect/inspect.ts",
+        "packages/host/src/inspect/memory.ts",
         "packages/runtime/src/isolate/inspector.ts",
         "packages/bus/src/server/tap.ts",
         "packages/bus/src/server/preview.ts"
@@ -93,8 +93,8 @@
     "limits": {
       "paths": [
         "packages/runtime/src/isolate/host-calls.ts",
-        "packages/host/src/events.ts",
-        "packages/host/src/features.ts",
+        "packages/host/src/render/events.ts",
+        "packages/host/src/kernel/features.ts",
         "packages/host/src/render/registry.ts",
         "packages/dom/src/worker/"
       ],
@@ -144,7 +144,7 @@
         "packages/runtime/src/bootstrap.ts",
         "packages/react/src/",
         "packages/preact/src/",
-        "packages/host/src/router.ts"
+        "packages/host/src/router/router.ts"
       ],
       "exports": {
         "@isoloop/host": ["NavigateRequest", "OnNavigate"],
@@ -185,7 +185,7 @@
     "supervision": {
       "paths": [
         "packages/host/src/supervisor/",
-        "packages/host/src/compositor.ts",
+        "packages/host/src/render/compositor.ts",
         "packages/host/src/bus/controller.ts"
       ],
       "exports": {
@@ -225,7 +225,7 @@
       "paths": [
         "packages/devtools/src/",
         "packages/runtime/src/isolate/inspector.ts",
-        "packages/host/src/inspect.ts",
+        "packages/host/src/inspect/inspect.ts",
         "packages/protocol/src/topics/grants.ts"
       ],
       "exports": {}

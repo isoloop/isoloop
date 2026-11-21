@@ -173,9 +173,9 @@
           "anchor": "case 'suspend':"
         },
         {
-          "path": "packages/host/src/kernel.ts",
-          "line": 961,
-          "end_line": 975,
+          "path": "packages/host/src/kernel/kernel.ts",
+          "line": 960,
+          "end_line": 974,
           "label": "a pool wakes as a whole",
           "anchor": "case 'wake':"
         }
