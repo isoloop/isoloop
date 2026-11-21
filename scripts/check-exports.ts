@@ -2,6 +2,9 @@
 // to exists, and is in its `files`. `pnpm pack` publishes `publishConfig.exports`
 // in place of `exports`, so that's the map users resolve. CI runs this after
 // the build; @isoloop/vite once shipped index.mjs behind an index.js export.
+// The `./dist/` paths in `sideEffects` must exist too (ADR 0021, decision 8):
+// a stale one would let a bundler drop a script it names. The layout test
+// checks the `./src/` ones.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -36,9 +39,14 @@ for (const d of readdirSync('packages', { withFileTypes: true })) {
     else if (!files.some((f) => rel === f || rel.startsWith(`${f}/`)))
       problems.push(`${name}: ${t} isn't in "files"`);
   }
+  const sideEffects = field(manifest, 'sideEffects');
+  for (const s of Array.isArray(sideEffects) ? sideEffects : []) {
+    if (typeof s === 'string' && s.startsWith('./dist/') && !existsSync(join(dir, s.slice(2))))
+      problems.push(`${name}: sideEffects names ${s}, which the build didn't write`);
+  }
 }
 if (problems.length > 0) {
   console.error(problems.join('\n'));
   process.exit(1);
 }
-console.log('every published export resolves');
+console.log('every published export and sideEffects path resolves');

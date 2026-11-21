@@ -15,6 +15,8 @@
     "restriction": "off",
     "nursery": "off"
   },
+  // oxlint's defaults, plus `import` for import/no-cycle (ADR 0021, decision 8).
+  "plugins": ["typescript", "unicorn", "oxc", "import"],
   // Type-aware rules outside the categories above, added by name: promise
   // handling, `any` leaking out of message payloads, and exhaustive switches
   // over message unions.
@@ -35,7 +37,19 @@
     // targetOrigin, so every hit would be a false positive.
     "unicorn/require-post-message-target-origin": "off",
     // The E2E test hook e2e/loops.ts puts on window (invariant I7).
-    "no-underscore-dangle": ["error", { "allow": ["__isoloop"] }]
+    "no-underscore-dangle": ["error", { "allow": ["__isoloop"] }],
+    // The source layout (ADR 0021, decision 8): no import cycles, and file
+    // names in kebab-case. The layout test (scripts/layout) checks the rest.
+    "import/no-cycle": "error",
+    "unicorn/filename-case": ["error", { "case": "kebabCase" }],
+    // Three of the import plugin's category rules misread code written on
+    // purpose: Vite's `?worker` modules have a default export the rule can't
+    // see (import/default); `fc.assert` is fast-check's documented style
+    // (no-named-as-default-member); bootstraps and type-only harness files are
+    // imported for their side effects (no-unassigned-import).
+    "import/default": "off",
+    "import/no-named-as-default-member": "off",
+    "import/no-unassigned-import": "off"
   },
   // Dependency rules (system design §2). Each package lists the @isoloop/*
   // packages it may import; everything else under the scope is an error.
