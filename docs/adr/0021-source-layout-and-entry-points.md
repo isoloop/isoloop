@@ -1,6 +1,6 @@
 # ADR 0021: Source layout and entry points
 
-- **Status:** Proposed (2026-11-21), after grilling (Q1–Q31, yes to all). One change since the grilling: decision 6 budgets the code each library entry runs on import, measured with side effects assumed. It replaces Q17's check that a side-effect-only import leaves 0 B, which `sideEffects: false` makes pass whatever the code does.
+- **Status:** Accepted (2026-11-21), after grilling (Q1–Q31, yes to all). One change since the grilling, accepted with the ADR: decision 6 budgets the code each library entry runs on import, measured with side effects assumed. It replaces Q17's check that a side-effect-only import leaves 0 B, which `sideEffects: false` makes pass whatever the code does.
 - **Date:** 2026-11-21
 - **Builds on:** [ADR 0009](0009-toolchain.md) rules 3 to 5 (the `@isoloop/source` condition, the dependency rules, lint rules added by name), [ADR 0011](0011-dom-package.md) decision 5 (dom's four folders), and the API freeze with its check ([M4d](../plans/m4d-release.md), decision F1).
 - **Plan:** [M4e](../plans/m4e-source-layout.md).
