@@ -41,6 +41,8 @@
     // The source layout (ADR 0021, decision 8): no import cycles, and file
     // names in kebab-case. The layout test (scripts/layout) checks the rest.
     "import/no-cycle": "error",
+    // Entries name what they export: no `export *` (ADR 0021, decision 3).
+    "oxc/no-barrel-file": ["error", { "threshold": 0 }],
     "unicorn/filename-case": ["error", { "case": "kebabCase" }],
     // The two worker fixtures that start the runtime import its bootstrap, a
     // script, for what it does when it loads (ADR 0021, decision 6).
