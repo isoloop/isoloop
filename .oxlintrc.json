@@ -396,6 +396,16 @@
         "typescript/no-unsafe-call": "off",
         "typescript/no-unsafe-member-access": "off"
       }
+    },
+    {
+      // Vite's `?worker&url` imports give the built worker's URL as their
+      // default export. Once `dist/` exists, import/default resolves the
+      // package's worker script instead and finds no default export. An inline
+      // disable can't be used: CI lints before the build, so it would be unused.
+      "files": ["e2e/harness/src/main.ts"],
+      "rules": {
+        "import/default": "off"
+      }
     }
   ],
   "ignorePatterns": [

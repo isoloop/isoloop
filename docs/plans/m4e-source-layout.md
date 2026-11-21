@@ -11,7 +11,7 @@
 **Status (2026-11-21):** done. Grilled (Q1–Q31, yes to all), and ADR 0021 was accepted the same day (#347). Every task below is done, with two added on the way (3b and 5b). `0.1.0-next.11` is on npm with the bundle-size guide in the site's docs at that pin (web#240), and the guide goes live with the maintainer's next `site-v*` tag. No M4e PR changed the public API, as the API check reports it. `0.1.0` ([M4d](m4d-release.md), task 14) no longer waits for this epic.
 
 **Changed while it was built:**
-- **Task 3b** turned the three import rules back on with the code fixed, rather than off (the maintainer, on the grilling's Q34). One `import/default` hit is left in `e2e/harness/src/main.ts`, on Vite's `?worker&url` imports. It fires only when `dist/` exists, so CI, which lints before the build, doesn't see it.
+- **Task 3b** turned the three import rules back on with the code fixed, rather than off (the maintainer, on the grilling's Q34). One `import/default` hit, on Vite's `?worker&url` imports in `e2e/harness/src/main.ts`, fired only when `dist/` existed. That file now has a one-file override (#368), because CI lints before the build and an inline disable would be unused there.
 - **Task 5b** made the API check leave out imports, private declarations no export reaches, and minified `_` and `$` aliases, so task 13 read as no public change.
 - **Task 14 landed before task 13,** which waited for the maintainer. The version PR (#366) re-recorded the guard's table at `0.1.0-next.11`, and the guide's figures with it.
 
