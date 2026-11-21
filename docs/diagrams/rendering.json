@@ -38,7 +38,7 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/runtime/src/vanilla.ts",
+          "path": "packages/runtime/src/isolate/vanilla.ts",
           "line": 203,
           "end_line": 206,
           "label": "ctx.root is the render root",
@@ -88,7 +88,7 @@
           "anchor": "/** A root's recorder: records batched per microtask (or `schedule`) into `onBatch`. */"
         },
         {
-          "path": "packages/runtime/src/render/index.ts",
+          "path": "packages/runtime/src/render/render.ts",
           "line": 111,
           "end_line": 126,
           "label": "a batch and its styles in one patch",
@@ -195,7 +195,7 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/runtime/src/host-calls.ts",
+          "path": "packages/runtime/src/isolate/host-calls.ts",
           "line": 1,
           "end_line": 5,
           "label": "call and result, 5 s timeout",
@@ -203,7 +203,7 @@
           "anchor_offset": 1
         },
         {
-          "path": "packages/runtime/src/host-calls.ts",
+          "path": "packages/runtime/src/isolate/host-calls.ts",
           "line": 128,
           "end_line": 135,
           "label": "pending patches flushed first",
@@ -245,7 +245,7 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/runtime/src/render/index.ts",
+          "path": "packages/runtime/src/render/render.ts",
           "line": 185,
           "end_line": 191,
           "label": "an event from the host",

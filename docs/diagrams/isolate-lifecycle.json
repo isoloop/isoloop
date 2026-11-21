@@ -88,14 +88,14 @@
           "anchor": "case 'stop':"
         },
         {
-          "path": "packages/runtime/src/bus-client.ts",
+          "path": "packages/runtime/src/bus/bus-client.ts",
           "line": 469,
           "end_line": 473,
           "label": "close awaits the last commits",
           "anchor": "async close() {"
         },
         {
-          "path": "packages/runtime/src/vanilla.ts",
+          "path": "packages/runtime/src/isolate/vanilla.ts",
           "line": 289,
           "end_line": 297,
           "label": "commits before bye",

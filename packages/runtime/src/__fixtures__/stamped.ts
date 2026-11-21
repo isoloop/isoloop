@@ -1,5 +1,5 @@
 // Test isolate (M3a task 11): built with defineIsolate, so it carries `requires`.
-import { defineIsolate, type IsolateDefinition } from '../vanilla';
+import { defineIsolate, type IsolateDefinition } from '../isolate/vanilla';
 
 const def: IsolateDefinition = defineIsolate({
   start() {},

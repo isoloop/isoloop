@@ -13,13 +13,13 @@ import {
   type IsolateToHost,
   type ShutdownReason,
 } from '@isoloop/protocol';
-import { createBusClient, type BusClient } from './bus-client';
-import { BUSY, busy, type BusyHook, type MemberKey } from './busy';
+import { createBusClient, type BusClient } from '../bus/bus-client';
+import { BUSY, busy, type BusyHook, type MemberKey } from '../pools/busy';
 import { createHostCalls, type HostApi } from './host-calls';
 import { createKeepAwake } from './keep-awake';
 import { WNode } from '@isoloop/dom/worker';
-import { createRender } from './render';
-import { version } from '../package.json';
+import { createRender } from '../render/render';
+import { version } from '../../package.json';
 
 /**
  * What a render root offers, structurally, so DOM-typed isolate code can pass

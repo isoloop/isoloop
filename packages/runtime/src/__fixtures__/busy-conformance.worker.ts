@@ -5,7 +5,7 @@
  * do. Each check runs under the natives first, then wrapped, and the two
  * results must match. Posts `{ failures }`.
  */
-import { createBusy, installBusy } from '../busy';
+import { createBusy, installBusy } from '../pools/busy';
 
 declare const self: DedicatedWorkerGlobalScope;
 

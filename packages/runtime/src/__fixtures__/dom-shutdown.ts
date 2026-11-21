@@ -1,5 +1,5 @@
 // Test isolate: an onShutdown handler that changes the DOM after a delay.
-import { defineIsolate, type IsolateDefinition } from '../vanilla';
+import { defineIsolate, type IsolateDefinition } from '../isolate/vanilla';
 
 const isolate: IsolateDefinition = defineIsolate({
   start(ctx) {

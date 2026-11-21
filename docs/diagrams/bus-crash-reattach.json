@@ -21,14 +21,14 @@
       "sublabel": "keeps running",
       "sources": [
         {
-          "path": "packages/runtime/src/bus-client.ts",
+          "path": "packages/runtime/src/bus/bus-client.ts",
           "line": 20,
           "end_line": 26,
           "label": "reattach: re-subscribe, re-send",
           "anchor": "* - On `reattach` (a bus restart) it swaps the port, drops the commits still"
         },
         {
-          "path": "packages/runtime/src/bus-client.ts",
+          "path": "packages/runtime/src/bus/bus-client.ts",
           "line": 439,
           "end_line": 468,
           "label": "reattach in order",
