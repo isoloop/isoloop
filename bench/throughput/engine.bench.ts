@@ -1,4 +1,4 @@
-import { TsEngine } from '@isoloop/bus';
+import { TsEngine } from '../../packages/bus/src/engine/ts-engine.ts';
 import type { Retention } from '@isoloop/protocol';
 import { expect, it } from 'vitest';
 

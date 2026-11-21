@@ -3,13 +3,12 @@ import * as v from 'valibot';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
 import { testContracts } from '../testing';
+import { isUnchecked, topicConfig } from './topic';
 import {
   ContractsError,
   contracts,
   isContracts,
-  isUnchecked,
   topic,
-  topicConfig,
   unchecked,
   type AnyTopicDef,
   type InputOf,
