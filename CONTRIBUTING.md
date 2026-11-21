@@ -41,6 +41,7 @@ Tools are only called through these root scripts, never as binaries ([ADR 0009](
 | `pnpm bench` | Node micro-benches (`bench/**/*.bench.ts`, e.g. the log engine), kept out of `pnpm test`. |
 | `pnpm bench:click-to-paint` / `pnpm bench:throughput` / `pnpm bench:memory` | Playwright benches in the browser: click-to-paint latency in all three engines, bus throughput and memory per idle isolate in Chromium. Report only; results go to `bench-results/`. |
 | `pnpm bench:codec` | The codec evaluation (`bench/codec`, [investigation](docs/investigations/codec.md)) in all three engines: our codec against MessagePack, CBOR and JSON. Report only, in the log. `pnpm bench` runs its Node half, with bundle sizes. |
+| `pnpm bench:bundle` | After `pnpm build`: what each import adds to an app, through Vite's own build. Each library entry's import-time code, seven app bundles and the four scripts are checked against `bench/bundle-size/budgets.json`, and every script must be in its package's `sideEffects`. `--record` measures again, resets the budgets and rewrites the [table](bench/bundle-size/README.md). CI runs it. |
 | `pnpm test:install-browsers` | Installs Chromium, Firefox and WebKit for Playwright. |
 | `pnpm build` | tsdown for the packages, Vite for the E2E harness and the bench apps. |
 
@@ -65,7 +66,7 @@ The examples (basic and the dashboards) and the website live in [isoloop/web](ht
 
 `.github/workflows/ci.yml` runs on every PR and on `main`:
 
-- **`check`:** format check, lint, typecheck, `test:node` and build.
+- **`check`:** format check, lint, typecheck, `test:node` and build, then `check-exports`, `docs:check` and the bundle guard (`pnpm bench:bundle`) on the built packages.
 - **After `check` passes, in parallel:**
   - **`browser`:** `test:browser`, in Chromium, plus Firefox and WebKit for the bus.
   - **`e2e`:** `pnpm e2e` once per engine (Chromium, Firefox, WebKit).

@@ -687,6 +687,8 @@ Starting targets, to be calibrated in M1/M2 benches and then enforced in CI with
 | Bus throughput, TS engine, 10 subscribers, 200-byte records | ≥ 50k records/s delivered (M2: 45.5k on CI; [M5b spike](../plans/m5b-delivery-batching.md)) | `bench/throughput` |
 | Restart to first paint (no replay) | ≤ 300 ms after backoff | E2E timing |
 
+Bundle sizes have budgets of their own: each library entry's import-time code, the app bundles and the scripts, in [`bench/bundle-size`](../../bench/bundle-size/README.md), checked in CI.
+
 The click-to-paint budget is one frame because a render through `postMessage` can arrive just after the frame a main-thread change would make. Chromium's `DeferRendererTasksAfterInput` holds the worker's `patch` past the next frame after real input; Firefox renders a frame right after input, before the patch arrives. WebKit shows no overhead today. Winning that frame back is the `SharedArrayBuffer` render-channel evaluation in M5 ([investigation](../investigations/click-to-paint-latency.md)).
 
 ## 10. Testing strategy
