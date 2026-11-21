@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { build, createServer, type Plugin, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { isoloop } from './index';
+import { isoloop } from '../index';
 
 // @isoloop/devtools in a Vite dev server: its default panel URL,
 // `new URL('./panel.js', import.meta.url)`, has to reach the published

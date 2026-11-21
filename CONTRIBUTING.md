@@ -92,7 +92,7 @@ Other editors need three things:
   - **Everything else** lives in one level of folders named for a concept from the system design, never by kind (`utils`, `types`).
   - **`index.ts`** is only ever an entry.
   - **Tests** sit next to the code they test. `src/__fixtures__/` holds the files they load by URL, and `test/` the helpers they import.
-  - **Checks:** `pnpm test` checks the layout (`scripts/layout/`). A package still in that test's `PENDING` list skips the first three rules. oxlint fails import cycles and file names that aren't kebab-case.
+  - **Checks:** `pnpm test` checks the layout (`scripts/layout/`). oxlint fails import cycles and file names that aren't kebab-case.
 - **New web APIs:** a PR that starts using one links its [Baseline](https://web.dev/baseline) status. The target is Baseline "widely available" ([ADR 0009](docs/adr/0009-toolchain.md#rules), rule 7).
 - **Versions are pinned exactly** in the `catalog:` of `pnpm-workspace.yaml`, and pnpm refuses releases younger than 3 days. Dependabot sends one grouped PR a week.
 

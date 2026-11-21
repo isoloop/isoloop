@@ -5,5 +5,5 @@
     // for `toSorted` (Safari 16, below the 16.4 floor).
     "lib": ["ES2023", "DOM"]
   },
-  "include": ["src"]
+  "include": ["src", "test"]
 }

@@ -5,8 +5,8 @@ import { createBalancer } from './balancer';
 // Against the real kernel: the balancer claims its pools through the host's
 // claimPools (ADR 0017), once per kernel.
 
-const bootstrap = `${new URL('../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
-const counter = new URL('../../host/src/__fixtures__/counter.ts', import.meta.url).href;
+const bootstrap = `${new URL('../../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
+const counter = new URL('../../../host/src/__fixtures__/counter.ts', import.meta.url).href;
 
 const kernels: Kernel[] = [];
 afterEach(async () => {

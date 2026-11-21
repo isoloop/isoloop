@@ -4,12 +4,12 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build, defaultClientConditions } from 'vite';
 import { afterEach, describe, expect, it } from 'vitest';
-import { isoloop, MANIFEST, type IsoloopOptions, type BuildManifest } from './index';
+import { isoloop, MANIFEST, type IsoloopOptions, type BuildManifest } from '../index';
 
 // M3a task 16: builds emit one ES module per isolate, exports kept, and a
 // manifest of their files, in an app and in library mode.
 
-const root = fileURLToPath(new URL('./__fixtures__/app', import.meta.url));
+const root = fileURLToPath(new URL('../__fixtures__/app', import.meta.url));
 const isolates = { counter: 'iso/counter.ts', clock: 'iso/clock.ts' };
 const dirs: string[] = [];
 afterEach(async () => {

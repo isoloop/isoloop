@@ -1,12 +1,12 @@
 import { fileURLToPath } from 'node:url';
 import { createServer, defaultClientConditions, type ViteDevServer } from 'vite';
 import { afterEach, describe, expect, it } from 'vitest';
-import { isoloop, type IsoloopOptions } from './index';
+import { isoloop, type IsoloopOptions } from '../index';
 
 // M3a task 15: a Vite dev server with the plugin serves both worker bundles,
 // exposes their URLs, and sends the hosting guide's headers.
 
-const root = fileURLToPath(new URL('./__fixtures__/app', import.meta.url));
+const root = fileURLToPath(new URL('../__fixtures__/app', import.meta.url));
 const servers: ViteDevServer[] = [];
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((s) => s.close()));

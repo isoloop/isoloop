@@ -246,21 +246,9 @@
       // The panel: a visual isolate, drawn in a worker.
       "files": [
         "packages/devtools/src/panel.tsx",
-        "packages/devtools/src/views.tsx",
-        "packages/devtools/src/bus-view.tsx",
-        "packages/devtools/src/messages-view.tsx",
-        "packages/devtools/src/events-view.tsx",
-        "packages/devtools/src/record-detail.tsx",
-        "packages/devtools/src/subtabs.tsx",
-        "packages/devtools/src/event-level.ts",
-        "packages/devtools/src/event-level.test.ts",
-        "packages/devtools/src/event-store.ts",
-        "packages/devtools/src/event-store.test.ts",
-        "packages/devtools/src/format.ts",
-        "packages/devtools/src/format.test.ts",
-        "packages/devtools/src/ring.ts",
-        "packages/devtools/src/feed.ts",
-        "packages/devtools/src/persist.ts"
+        "packages/devtools/src/panel/**",
+        "packages/devtools/src/views/**",
+        "packages/devtools/src/feed/**"
       ],
       "rules": {
         "no-restricted-imports": [

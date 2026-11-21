@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { balance } from './balancer';
-import { memoryLoads, SimKernel } from './sim';
+import { memoryLoads, SimKernel } from '../../test/sim';
 import type { BalancerOf, BalancerOptions, FailedEvent, MoveEvent } from './types';
 
 let sim: SimKernel;

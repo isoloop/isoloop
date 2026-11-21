@@ -14,7 +14,7 @@
 import type { InspectEvent } from '@isoloop/protocol';
 import type { IsolateInspector } from '@isoloop/runtime';
 import { levelOfEvent } from './event-level';
-import { database, EVENTS_STORE, SESSIONS_STORE, settle } from './persist';
+import { database, EVENTS_STORE, SESSIONS_STORE, settle } from '../panel/persist';
 
 /** How many earlier sessions are kept besides the current one. */
 export const KEEP_SESSIONS = 3;

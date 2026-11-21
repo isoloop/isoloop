@@ -15,7 +15,7 @@ import type { IsolateInspector } from '@isoloop/runtime';
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { BusView, type BusSub } from './bus-view';
-import type { Recorder } from './event-store';
+import type { Recorder } from '../feed/event-store';
 import { EventsView } from './events-view';
 import { MessagesView } from './messages-view';
 import { SubTabs, subId, subPanelId, type SubItem } from './subtabs';

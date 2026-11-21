@@ -20,9 +20,9 @@ import {
   type JsonSchema,
   type ToolSpec,
 } from '@isoloop/bus';
-import { UsageError } from '../args';
-import { EXIT, type Command } from '../command';
-import { resolvePath } from '../io';
+import { UsageError } from '../program/args';
+import { EXIT, type Command } from '../program/command';
+import { resolvePath } from '../program/io';
 
 /** One topic in the exported document. */
 export type ExportedTopic = {

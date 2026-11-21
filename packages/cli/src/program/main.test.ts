@@ -1,11 +1,11 @@
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseArgs, UsageError } from './args';
-import type { ExportedContracts } from './commands/contracts-export';
+import type { ExportedContracts } from '../commands/contracts-export';
 import type { Io } from './io';
 import { main, version } from './main';
 
-const fixtures = fileURLToPath(new URL('./__fixtures__/', import.meta.url));
+const fixtures = fileURLToPath(new URL('../__fixtures__/', import.meta.url));
 
 /** An in-memory Io: captured streams and files; modules load through Vitest. */
 function memoryIo() {

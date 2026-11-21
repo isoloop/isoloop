@@ -6,13 +6,13 @@
  * It runs until stdin ends.
  */
 import { DEV_MCP_CLOSE, DEV_MCP_PORT } from '@isoloop/protocol';
-import { UsageError } from '../args';
-import { EXIT, type Command } from '../command';
+import { UsageError } from '../program/args';
+import { EXIT, type Command } from '../program/command';
 import { listenForPages } from '../mcp/pages';
 import { DEFAULT_ORIGIN, newToken, originMatcher } from '../mcp/pairing';
 import { DevMcpServer } from '../mcp/server';
 import { frame, readMessages } from '../mcp/stdio';
-import { version } from '../version';
+import { version } from '../program/version';
 
 function portOf(value: string | true | undefined): number {
   if (value === undefined) return DEV_MCP_PORT;

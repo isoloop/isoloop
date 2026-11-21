@@ -5,8 +5,8 @@
  */
 import { flagsHelp, parseArgs, UsageError } from './args';
 import { EXIT, type Command } from './command';
-import { contractsExport } from './commands/contracts-export';
-import { mcp } from './commands/mcp';
+import { contractsExport } from '../commands/contracts-export';
+import { mcp } from '../commands/mcp';
 import type { Io } from './io';
 import { version } from './version';
 

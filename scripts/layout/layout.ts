@@ -1,6 +1,5 @@
 // The source layout of ADR 0021 (decision 8), checked over every package.
-// `pnpm test` runs it through layout.test.ts. Rules 1–3 skip the packages in
-// PENDING; the others apply everywhere from the start.
+// `pnpm test` runs it through layout.test.ts.
 //
 // 1. The top of `src/` holds only entries and tests named after them.
 // 2. `index.ts` is only ever an entry.
@@ -25,13 +24,6 @@ export type Repo = {
 
 /** A Vitest project's file globs, repo-relative. */
 export type Project = { include: readonly string[]; exclude: readonly string[] };
-
-/**
- * Packages not moved to ADR 0021's layout yet (M4e tasks 7–12). Rules 1–3 skip
- * them. A package that already complies fails the check until it's removed,
- * so the list only shrinks; the last move deletes it.
- */
-export const PENDING: readonly string[] = ['devtools', 'balancer', 'vite', 'cli'];
 
 const ADR = 'ADR 0021';
 const FIXTURES = '__fixtures__';
@@ -364,12 +356,8 @@ export function checkSideEffects(pkg: Package, exists: (path: string) => boolean
 
 // --- All of it ---------------------------------------------------------------
 
-/** Every rule over the repo. `pending` defaults to PENDING. */
-export function checkLayout(
-  repo: Repo,
-  projects: readonly Project[],
-  pending: readonly string[] = PENDING,
-): Problem[] {
+/** Every rule over the repo. */
+export function checkLayout(repo: Repo, projects: readonly Project[]): Problem[] {
   const has = new Set(repo.files);
   const dirs = new Set(
     repo.files.flatMap((f) =>
@@ -382,21 +370,8 @@ export function checkLayout(
   const exists = (p: string): boolean => has.has(p) || dirs.has(p.replace(/\/$/, ''));
   const pkgs = packagesOf(repo);
   const problems: Problem[] = [];
-  const known = new Set(pkgs.map((p) => posix.basename(p.dir)));
-  for (const name of pending)
-    if (!known.has(name))
-      problems.push({
-        file: 'scripts/layout/layout.ts',
-        message: `PENDING names ${name}, which isn't a package`,
-      });
   for (const pkg of pkgs) {
-    const tree = checkTree(pkg, repo.files);
-    if (!pending.includes(posix.basename(pkg.dir))) problems.push(...tree);
-    else if (tree.length === 0)
-      problems.push({
-        file: 'scripts/layout/layout.ts',
-        message: `${pkg.dir} follows ${ADR} now; take it out of PENDING`,
-      });
+    problems.push(...checkTree(pkg, repo.files));
     problems.push(
       ...checkFixtures(pkg, repo.files),
       ...checkEscapes(pkg, repo.files, repo.read),

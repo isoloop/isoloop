@@ -6,7 +6,7 @@
  * best-effort: without storage (a private window, blocked site data) the
  * panel starts from its defaults and keeps working.
  */
-import type { DevtoolsPosition } from './index';
+import type { DevtoolsPosition } from '../index';
 
 /** What the panel keeps. */
 export type UiState = {
