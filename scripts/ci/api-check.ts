@@ -100,7 +100,8 @@ function itemEnd(s: string, from: number): number {
  * letters shift whenever a shared chunk changes, which isn't an API change.
  */
 function names(list: string): string {
-  const minified = /^[a-z]{1,2}$/;
+  // One or two characters, as tsdown's minifier picks them (`t`, `_`, `$1`).
+  const minified = /^[a-z_$][a-z0-9_$]?$/;
   const out = list
     .split(',')
     .map((item) => {
@@ -203,7 +204,9 @@ export function internalNames(src: string): Set<string> {
  * `declare`, and each file's exported names become one sorted `export{…}`, so a
  * list and an exported declaration read the same. `type` modifiers in lists
  * don't count, and `@internal` names leave the lists along with their
- * declarations.
+ * declarations. Imports don't count either, and neither does a private
+ * declaration no exported one reaches: a helper type that only a removed
+ * `@internal` declaration used isn't API.
  */
 export function surfaceOf(files: readonly string[]): Set<string> {
   const internal = new Set(files.flatMap((f) => [...internalNames(f)]));
@@ -215,14 +218,18 @@ export function surfaceOf(files: readonly string[]): Set<string> {
       : bare;
   };
   const out = new Set<string>();
+  const declarations = new Map<string, string[]>();
+  const roots = new Set<string>();
   for (const src of files) {
     const exported = new Set<string>();
     for (const s of statements(src)) {
       const list = /^(export|import)(?: type)?\{([^}]*)\}(from ?['"][^'"]*['"])?;?$/.exec(s);
       if (list) {
         const [, kw = '', items = '', from = ''] = list;
+        if (kw === 'import') continue;
         const kept = items.split(',').flatMap((i) => keep(i) ?? []);
-        if (kw === 'export' && from === '') for (const k of kept) exported.add(k);
+        for (const k of kept) roots.add(k.split(' as ')[0] ?? k);
+        if (from === '') for (const k of kept) exported.add(k);
         else if (kept.length > 0) {
           kept.sort();
           out.add(`${kw}{${kept.join(',')}}${from};`);
@@ -239,8 +246,11 @@ export function surfaceOf(files: readonly string[]): Set<string> {
         out.add(s);
         continue;
       }
-      out.add(body);
-      if (s.startsWith('export ') && !internal.has(name)) exported.add(name);
+      declarations.set(name, [...(declarations.get(name) ?? []), body]);
+      if (s.startsWith('export ') && !internal.has(name)) {
+        exported.add(name);
+        roots.add(name);
+      }
     }
     if (exported.size > 0) {
       const list = [...exported];
@@ -248,6 +258,17 @@ export function surfaceOf(files: readonly string[]): Set<string> {
       out.add(`export{${list.join(',')}}`);
     }
   }
+  // The declarations exported names reach, through the names their text uses.
+  const reached = new Set<string>();
+  const queue = [...roots];
+  for (let name = queue.pop(); name !== undefined; name = queue.pop()) {
+    if (reached.has(name) || !declarations.has(name)) continue;
+    reached.add(name);
+    for (const body of declarations.get(name) ?? [])
+      for (const id of body.match(/[A-Za-z_$][\w$]*/g) ?? []) if (!reached.has(id)) queue.push(id);
+  }
+  for (const [name, bodies] of declarations)
+    if (reached.has(name)) for (const b of bodies) out.add(b);
   return out;
 }
 
