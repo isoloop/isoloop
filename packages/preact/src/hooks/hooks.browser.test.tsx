@@ -3,7 +3,7 @@ import type { TopicRef } from '@isoloop/protocol';
 import { createTestContext, type TestContextOptions } from '@isoloop/runtime/testing';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { afterEach, describe, expect, it } from 'vitest';
-import { defineIsolate, useHost, useRequest, useRoute } from './index';
+import { defineIsolate, useHost, useRequest, useRoute } from '../index';
 
 // M3a task 8: requests, host calls and the route, on the project's Preact major.
 

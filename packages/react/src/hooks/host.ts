@@ -4,7 +4,7 @@
  * them after pending patches apply.
  */
 import type { HostApi } from '@isoloop/runtime';
-import { useIsolate } from '../context';
+import { useIsolate } from '../isolate/context';
 
 /**
  * The isolate's host calls (`ctx.host`): `measure`, `focus`, `scrollIntoView` and

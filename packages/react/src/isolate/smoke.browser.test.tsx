@@ -1,7 +1,7 @@
 import { mountFixture, SMOKE_STEPS, snapshot } from '@isoloop/dom/testing';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, test } from 'vitest';
-import { App } from './__fixtures__/app';
+import { App } from '../__fixtures__/app';
 
 const cleanups: (() => void)[] = [];
 afterEach(() => {
@@ -16,7 +16,7 @@ const tick = () => new Promise((r) => setTimeout(r, 30));
 // container has it.
 test('React in a worker renders what React renders into the DOM', async () => {
   const host = mountFixture(
-    new Worker(new URL('./__fixtures__/smoke.worker.tsx', import.meta.url), { type: 'module' }),
+    new Worker(new URL('../__fixtures__/smoke.worker.tsx', import.meta.url), { type: 'module' }),
   );
   const real = document.createElement('div');
   document.body.append(real);

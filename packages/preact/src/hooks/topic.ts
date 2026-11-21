@@ -4,7 +4,7 @@
  */
 import type { StartPosition, TopicRef } from '@isoloop/protocol';
 import { useCallback, useLayoutEffect, useState } from 'preact/hooks';
-import { useIsolate } from '../context';
+import { useIsolate } from '../isolate/context';
 
 /** Options for {@link useTopic}. */
 export type UseTopicOptions = {

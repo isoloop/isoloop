@@ -5,7 +5,7 @@
  * installs and the container the adapter claims.
  */
 import { afterEach, expect, it } from 'vitest';
-import { busyWorker, stopBusyWorkers } from './__fixtures__/busy-worker';
+import { busyWorker, stopBusyWorkers } from '../__fixtures__/busy-worker';
 
 afterEach(() => {
   stopBusyWorkers();
@@ -13,10 +13,10 @@ afterEach(() => {
 
 it("bills a heavy React member's renders to it, not its light neighbour", async () => {
   const w = busyWorker(
-    new Worker(new URL('./__fixtures__/busy-bootstrap.worker.ts', import.meta.url), {
+    new Worker(new URL('../__fixtures__/busy-bootstrap.worker.ts', import.meta.url), {
       type: 'module',
     }),
-    new URL('./__fixtures__/busy-member.tsx', import.meta.url).href,
+    new URL('../__fixtures__/busy-member.tsx', import.meta.url).href,
     [
       // Its renders change nothing in the DOM: only the commit hook names it.
       { name: 'heavy', config: { burnMs: 3, everyMs: 23, quiet: true } },

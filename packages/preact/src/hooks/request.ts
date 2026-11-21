@@ -2,7 +2,7 @@
 import type { TopicRef } from '@isoloop/protocol';
 import type { RequestOptions } from '@isoloop/runtime';
 import { useCallback } from 'preact/hooks';
-import { useIsolate } from '../context';
+import { useIsolate } from '../isolate/context';
 
 /**
  * A function that sends a request on `topic` and resolves with the first valid reply.

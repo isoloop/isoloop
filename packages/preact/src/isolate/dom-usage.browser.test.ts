@@ -5,7 +5,7 @@ import { inject, test } from 'vitest';
 // committed log must match, so a framework update that calls something new
 // fails its Dependabot PR. `pnpm dom:usage` rewrites the logs.
 test('the subset has every DOM member this Preact major uses', async () => {
-  const worker = new Worker(new URL('./__fixtures__/usage.worker.tsx', import.meta.url), {
+  const worker = new Worker(new URL('../__fixtures__/usage.worker.tsx', import.meta.url), {
     type: 'module',
   });
   await checkDomUsage(
