@@ -415,6 +415,21 @@ export function mapNotices(map: DocsMap, changed: readonly string[]): Problem[] 
   });
 }
 
+/**
+ * Every path the map names exists (ADR 0021, decision 8): a stale one would
+ * never match, and its guide's notice would stop without a word.
+ */
+export function checkMapPaths(map: DocsMap, exists: (path: string) => boolean): Problem[] {
+  return Object.entries(map.guides).flatMap(([slug, g]) =>
+    g.paths
+      .filter((p) => !exists(p))
+      .map((p) => ({
+        file: MAP,
+        message: `guides.${slug}.paths names ${p}, which doesn't exist; follow the move`,
+      })),
+  );
+}
+
 // --- Running it ----------------------------------------------------------------
 
 /** The entry points of the user-facing packages that have types, in reference order. */
@@ -496,6 +511,7 @@ function main(): void {
 
   if (!guidesOnly) {
     const map = parseMap(readFileSync(join(root, MAP), 'utf8'));
+    problems.push(...checkMapPaths(map, (p) => existsSync(join(root, p))));
     const files = entryFiles(root);
     const missing = files.filter((f) => !existsSync(f.file));
     if (missing.length > 0) {

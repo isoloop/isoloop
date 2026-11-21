@@ -7,6 +7,7 @@ import {
   checkApiPages,
   checkHistory,
   checkLinks,
+  checkMapPaths,
   checkShape,
   checkWords,
   mapNotices,
@@ -288,5 +289,19 @@ describe('the map notice', () => {
     ]);
     expect(mapNotices(map(), ['packages/pkg/src/a.ts', 'docs/guide/g.md'])).toEqual([]);
     expect(mapNotices(map(), ['packages/other/a.ts'])).toEqual([]);
+  });
+});
+
+const onlyPkgDir = (p: string): boolean => p === 'packages/pkg/src/';
+
+describe("the map's paths", () => {
+  it('names a path that no longer exists, so a move takes the map with it', () => {
+    expect(checkMapPaths(map(), onlyPkgDir)).toEqual([]);
+    expect(checkMapPaths(map(), () => false)).toEqual([
+      {
+        file: 'docs/guide/map.json',
+        message: "guides.g.paths names packages/pkg/src/, which doesn't exist; follow the move",
+      },
+    ]);
   });
 });
