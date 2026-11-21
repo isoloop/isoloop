@@ -32,7 +32,7 @@ Every message is plain, structured-cloneable data, the same for the host's `Insp
 | --- | --- |
 | `snapshot()` | Isolates, pools, the bus (its state, restart count and latest metrics) and the last 200 events. |
 | `on(fn)` | Feed messages from now on (below). Returns the function that stops them. |
-| `tap(o, fn)` | Copies records appended to topics matching `o.topics` to `fn`, at most `o.maxPerSec` a second (default 50). The cap counts in fixed one-second windows (`openTap` in `packages/bus/src/tap.ts`), so up to twice `o.maxPerSec` can arrive within about a second, either side of a window boundary. `o.onSkipped` gets each count of records left out over the cap, at most once a second. Returns the function that ends it. Throws `bus_unavailable` without contracts. |
+| `tap(o, fn)` | Copies records appended to topics matching `o.topics` to `fn`, at most `o.maxPerSec` a second (default 50). The cap counts in fixed one-second windows (`openTap` in `packages/bus/src/server/tap.ts`), so up to twice `o.maxPerSec` can arrive within about a second, either side of a window boundary. `o.onSkipped` gets each count of records left out over the cap, at most once a second. Returns the function that ends it. Throws `bus_unavailable` without contracts. |
 | `records(topic, { last })` | The last `last` records the topic still retains (at most 100), oldest first. Rejects with a `BusError`. |
 | `restart(id)`, `kill(id)`, `block(id, ms)` | The controls (below). |
 | `close()` | Stops this inspector's listeners and taps, and makes its controls reject. `snapshot()` still works. |

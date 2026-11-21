@@ -6,7 +6,7 @@
  * `Date`, typed arrays, and stops writing once it has enough.
  */
 import { PREVIEW_CHARS, type BusRecord, type RecordPreview } from '@isoloop/protocol';
-import { estimateSize } from './size';
+import { estimateSize } from '../broker/size';
 
 /** Typed arrays and `ArrayBuffer`s show their length, not their contents. */
 const binary = (v: object): string | undefined => {

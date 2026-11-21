@@ -1,12 +1,12 @@
 import type { Grants } from '@isoloop/protocol';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { connect, flush } from '../test/memory-port';
+import { connect, flush } from '../../test/memory-port';
 import { Broker } from './broker';
-import { TsEngine } from './engine/ts-engine';
+import { TsEngine } from '../engine/ts-engine';
 import type { SeedEvent } from '@isoloop/protocol';
 import { SEED_BATCH, SEED_DONE, SEED_FROM, SEED_HEAD, SEED_REJECTED } from './seed';
-import { contracts, topic, topicConfig, unchecked, type AnyTopicDef } from './topic';
+import { contracts, topic, topicConfig, unchecked, type AnyTopicDef } from '../contracts/topic';
 
 const all: Grants = { publish: ['*'], subscribe: ['*'] };
 

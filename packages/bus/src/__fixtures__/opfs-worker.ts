@@ -3,12 +3,12 @@
 // its result or the error it threw.
 import type { Retention } from '@isoloop/protocol';
 import { connect } from '../../test/memory-port';
-import { Broker } from '../broker';
+import { Broker } from '../broker/broker';
 import { TsEngine } from '../engine/ts-engine';
 import { decodeFrame, frameOffset, scanFrames } from '../storage/frame';
 import { type CompactionStep, OpfsStorage, type OpfsStorageOptions } from '../storage/opfs';
-import { SEED_DONE, SEED_FROM, SEED_HEAD } from '../seed';
-import { contracts, topic, topicConfig, unchecked } from '../topic';
+import { SEED_DONE, SEED_FROM, SEED_HEAD } from '../broker/seed';
+import { contracts, topic, topicConfig, unchecked } from '../contracts/topic';
 
 declare const self: DedicatedWorkerGlobalScope;
 

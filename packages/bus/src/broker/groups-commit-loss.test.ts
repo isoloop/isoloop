@@ -11,10 +11,10 @@ import {
   type StartPosition,
 } from '@isoloop/protocol';
 import { describe, expect, it } from 'vitest';
-import { connect, flush, type FakeIsolate } from '../test/memory-port';
+import { connect, flush, type FakeIsolate } from '../../test/memory-port';
 import { Broker } from './broker';
-import { TsEngine } from './engine/ts-engine';
-import { contracts, topic, unchecked } from './topic';
+import { TsEngine } from '../engine/ts-engine';
+import { contracts, topic, unchecked } from '../contracts/topic';
 
 const all: Grants = { publish: ['*'], subscribe: ['*'] };
 const T = 'jobs.v1';

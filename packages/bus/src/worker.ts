@@ -4,7 +4,7 @@
  * URL and talks to it on the control port; see `server.ts`.
  */
 import type { BusToHost, ErrorPayload } from '@isoloop/protocol';
-import { serve } from './server';
+import { serve } from './server/server';
 
 declare const self: DedicatedWorkerGlobalScope;
 

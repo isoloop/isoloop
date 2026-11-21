@@ -1,6 +1,6 @@
 import type { BusRecord, ErrorCode, Issue } from '@isoloop/protocol';
-import type { LogEngine, NewRecord } from './engine/types';
-import type { AnyTopicDef } from './topic';
+import type { LogEngine, NewRecord } from '../engine/types';
+import type { AnyTopicDef } from '../contracts/topic';
 
 /** How many source records one step of the seed loop reads before it yields. */
 export const SEED_BATCH = 256;

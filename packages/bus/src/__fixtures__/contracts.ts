@@ -1,6 +1,6 @@
 // A contracts module, as a host would serve it to the bus worker.
 import { z } from 'zod';
-import { contracts, topic, type Contracts, type TopicDef } from '../topic';
+import { contracts, topic, type Contracts, type TopicDef } from '../contracts/topic';
 
 type Note = { text: string; by: string };
 

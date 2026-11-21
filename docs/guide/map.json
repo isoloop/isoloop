@@ -72,8 +72,8 @@
         "packages/host/src/inspect.ts",
         "packages/host/src/memory.ts",
         "packages/runtime/src/inspector.ts",
-        "packages/bus/src/tap.ts",
-        "packages/bus/src/preview.ts"
+        "packages/bus/src/server/tap.ts",
+        "packages/bus/src/server/preview.ts"
       ],
       "exports": {
         "@isoloop/host": [
@@ -112,10 +112,10 @@
     },
     "contracts": {
       "paths": [
-        "packages/bus/src/topic.ts",
-        "packages/bus/src/standard-schema.ts",
-        "packages/bus/src/json-schema.ts",
-        "packages/bus/src/seed.ts",
+        "packages/bus/src/contracts/topic.ts",
+        "packages/bus/src/contracts/standard-schema.ts",
+        "packages/bus/src/contracts/json-schema.ts",
+        "packages/bus/src/broker/seed.ts",
         "packages/protocol/src/topics/grants.ts",
         "packages/cli/src/commands/contracts-export.ts"
       ],
@@ -203,9 +203,9 @@
     },
     "bus": {
       "paths": [
-        "packages/bus/src/topic.ts",
-        "packages/bus/src/broker.ts",
-        "packages/bus/src/server.ts",
+        "packages/bus/src/contracts/topic.ts",
+        "packages/bus/src/broker/broker.ts",
+        "packages/bus/src/server/server.ts",
         "packages/bus/src/engine/",
         "packages/bus/src/storage/",
         "packages/runtime/src/bus-client.ts",

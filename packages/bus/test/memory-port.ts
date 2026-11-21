@@ -1,5 +1,5 @@
 import type { BusRecord, BusToIsolate, CallResult, Grants, IsolateToBus } from '@isoloop/protocol';
-import type { Broker, BusPort } from '../src/broker';
+import type { Broker, BusPort } from '../src/broker/broker';
 
 /** An isolate's end of an in-memory bus port: what it was sent, and a way to send. */
 export type FakeIsolate = {

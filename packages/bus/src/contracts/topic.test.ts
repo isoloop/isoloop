@@ -2,7 +2,7 @@ import { SYSTEM_TOPICS, checks, systemSchema, systemTopic, type TopicRef } from 
 import * as v from 'valibot';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
-import { testContracts } from './testing';
+import { testContracts } from '../testing';
 import {
   ContractsError,
   contracts,
@@ -18,7 +18,7 @@ import {
   type ReplyOutputOf,
   type TopicDef,
   type ToolSpec,
-} from './index';
+} from '../index';
 import { toIssues, type StandardSchemaV1 } from './standard-schema';
 
 const validate = async <O>(s: StandardSchemaV1<unknown, O>, value: unknown) =>
