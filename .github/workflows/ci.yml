@@ -49,6 +49,8 @@ jobs:
       - run: pnpm test:node
       - run: pnpm build
       - run: node scripts/check-exports.ts
+      # Bundle budgets and the scripts' sideEffects (ADR 0021, decisions 6 and 7).
+      - run: pnpm bench:bundle
       # The docs rules and the map's coverage of the built .d.ts (M4c decision 22).
       - run: pnpm docs:check
         env:

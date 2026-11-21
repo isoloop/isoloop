@@ -4,7 +4,10 @@
   "description": "Devtools panel for Isoloop, drawn by an isolate of its own and fed by the inspection feed.",
   "license": "MIT",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/panel.tsx",
+    "./dist/panel.js"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/isoloop/isoloop.git",

@@ -4,7 +4,10 @@
   "description": "Log bus that runs in its own worker: topics, schemas, offsets, replay.",
   "license": "MIT",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/worker.ts",
+    "./dist/bus-worker.js"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/isoloop/isoloop.git",

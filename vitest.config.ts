@@ -83,11 +83,11 @@ export default defineConfig({
       node('vite'),
       node('cli'),
       node('webmcp'),
-      // The CI scripts' logic (scripts/ci).
+      // The CI scripts' logic (scripts/ci), and the bundle guard's (bench/bundle-size).
       {
         test: {
           name: 'scripts',
-          include: ['scripts/**/*.test.ts'],
+          include: ['scripts/**/*.test.ts', 'bench/bundle-size/**/*.test.ts'],
           environment: 'node',
         },
       },
