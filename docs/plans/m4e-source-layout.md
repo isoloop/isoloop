@@ -8,7 +8,7 @@
 - `0.1.0-next.11` is on npm, and the bundle-size guide is in the site's docs at that pin. It goes live with the maintainer's next `site-v*` tag.
 - No M4e PR changed the public API, as the API check reports it.
 
-**Status (2026-11-21):** grilled (Q1–Q31, yes to all). ADR 0021 is with the maintainer, and no M4e code merges before it's accepted. `0.1.0` ([M4d](m4d-release.md), task 14) waits for this epic.
+**Status (2026-11-21):** grilled (Q1–Q31, yes to all). ADR 0021 was accepted the same day (#347), so tasks 3–17 can start. `0.1.0` ([M4d](m4d-release.md), task 14) waits for this epic.
 
 M4e has no demo or write-up of its own, unlike the other epics (plans [conventions](README.md#conventions)). It ends with the bundle-size guide, and the launch post may link that.
 
@@ -20,7 +20,7 @@ M4e has no demo or write-up of its own, unlike the other epics (plans [conventio
    - M4d's tasks 12 and 13
 2. **The rules are ADR 0021's:**
    - entries, areas, barrels, tests and fixtures, moves, the tree-shaking contract, budgets, enforcement, and the folder map (Q2, Q4–Q8, Q14–Q22, Q25)
-   - accepted before any M4e code merges
+   - accepted on 2026-11-21 (#347), before any M4e code
 3. **The guide is a user guide, `docs/guide/bundle-size.md`** (Q3, Q26).
    - **Sections:**
      - When to use it
@@ -64,8 +64,8 @@ M4e has no demo or write-up of its own, unlike the other epics (plans [conventio
 
 | # | Task | When | Repo | Files | Tests | Depends on |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | ADR 0021, to the maintainer | now | library | `docs/adr/0021-source-layout-and-entry-points.md`, `docs/adr/README.md` | — (maintainer) | the grilling |
-| 2 | This plan, M4e's rows in the plans index and the M4 overview, and M4d task 14 waiting for M4e, to the maintainer | now | library | `docs/plans/m4e-source-layout.md`, `docs/plans/README.md`, `docs/plans/m4-devtools-release.md`, `docs/plans/m4d-release.md` | — (maintainer) | the grilling |
+| 1 | ADR 0021, to the maintainer | done (#347) | library | `docs/adr/0021-source-layout-and-entry-points.md`, `docs/adr/README.md` | — (maintainer) | the grilling |
+| 2 | This plan, M4e's rows in the plans index and the M4 overview, and M4d task 14 waiting for M4e, to the maintainer | done (#348) | library | `docs/plans/m4e-source-layout.md`, `docs/plans/README.md`, `docs/plans/m4-devtools-release.md`, `docs/plans/m4d-release.md` | — (maintainer) | the grilling |
 | 3 | The checks: the layout test, with `pending` listing the 11 packages to move; `import/no-cycle` and `unicorn/filename-case`; `map.json`'s paths in `docs:check`; the `./dist/` paths in `sideEffects` in `check-exports`; the `CONTRIBUTING.md` bullet | after task 1 | library | `scripts/layout/`, `.oxlintrc.json`, `scripts/docs/check.ts`, `scripts/check-exports.ts`, `CONTRIBUTING.md` | unit: each rule fails on a planted case and passes on `main` with `pending` | 1 |
 | 4 | Diagram anchors: each of the 113 citations carries the text of its first cited line; the diagrams test checks it, and the anchor script finds a moved line again | after task 1 | library | `docs/diagrams/*.json`, `docs/diagrams/diagrams.test.ts`, the anchor script | the test fails on a shifted line | 1 |
 | 5 | The API check compares exported names and their declarations, so a list's shape and the `@internal` names inside one don't count; a notice when a `no-changeset` PR changes the dist JS. To the maintainer | after task 1 | library | `scripts/ci/api-check.ts` | unit: protocol's and bus's `export *` rewritten as lists reads as no change; a changed declaration still counts; the notice appears | 1 |
