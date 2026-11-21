@@ -4,7 +4,7 @@
 
 **Done when** (RFC 0001): `0.1.0` is published with provenance, and the launch post is out.
 
-**Status (2026-11-20):** the API freeze started on the maintainer's word ("there is nothing else pending"). The API review was read at `538d688` (`0.1.0-next.8`) and the maintainer said yes to all its decisions (below). Tasks 1–11 are done (2026-11-20 and 21): the API review's decisions (#333–#335), the freeze declared in `0.1.0-next.9` (#336), the TSDoc pass and its check, the API and CLI reference, and `0.1.0-next.10` (#344), with the docs and the API reference live on isoloop.dev as `site-v0.6.0`. Tasks 12–14 wait for the maintainer's last pass over the landing page. Done ahead: the Changesets pipeline and ADR 0019 (below), and every package, the new `@isoloop/devtools`, `@isoloop/webmcp` and the `isoloop` CLI included, on npm under `next` (latest `0.1.0-next.10`), published by `prerelease.yml` through trusted publishing (with provenance).
+**Status (2026-11-20):** the API freeze started on the maintainer's word ("there is nothing else pending"). The API review was read at `538d688` (`0.1.0-next.8`) and the maintainer said yes to all its decisions (below). Tasks 1–11 are done (2026-11-20 and 21): the API review's decisions (#333–#335), the freeze declared in `0.1.0-next.9` (#336), the TSDoc pass and its check, the API and CLI reference, and `0.1.0-next.10` (#344), with the docs and the API reference live on isoloop.dev as `site-v0.6.0`. Tasks 12–14 wait for the maintainer's last pass over the landing page, and task 14 also waits for [M4e](m4e-source-layout.md) (the source layout, added 2026-11-21). Done ahead: the Changesets pipeline and ADR 0019 (below), and every package, the new `@isoloop/devtools`, `@isoloop/webmcp` and the `isoloop` CLI included, on npm under `next` (latest `0.1.0-next.10`), published by `prerelease.yml` through trusted publishing (with provenance).
 
 ## Decisions (2026-11-20, the API review; maintainer, yes to all)
 
@@ -60,7 +60,7 @@ The public docs say how Isoloop works and how to use it, not why it was decided 
 | 11 | `0.1.0-next.10` with the TSDoc and `docs/api`, and the site's pin bump. The docs go live on the maintainer's `site-v*` tag | done (#344 `0.1.0-next.10`; web#230 pin, web#231 release; live as `site-v0.6.0` on 2026-11-21) | both | `library.lock`, `docs.json` | `check-pin`, the site build | 10 |
 | 12 | The release pipeline: the `v*` tag workflow (CI, publish, Pages), a trust entry on every package, and the stage-only decision (main work item 2) | after the maintainer's landing-page pass | library | `.github/workflows/release.yml` | a dry run | 6 |
 | 13 | The launch post, with "Isoloop for agents" (main work item 4) | after the maintainer's landing-page pass | library or social | `docs/posts/` | — (maintainer) | 11 |
-| 14 | `0.1.0`: `changeset pre exit`, the version PR, the tag | after the maintainer's landing-page pass | library | `.changeset/` | full CI | 12, 13 |
+| 14 | `0.1.0`: `changeset pre exit`, the version PR, the tag | after the maintainer's landing-page pass and M4e | library | `.changeset/` | full CI | 12, 13, and [M4e](m4e-source-layout.md)'s done-when |
 
 M4c task 25 (search) can start once task 10 is merged, and needn't land before the docs go live. M4c task 26 (the skill link in `llms.txt`) waits for M4a task 12, and task 27 (the M4c write-up) comes after task 11.
 
