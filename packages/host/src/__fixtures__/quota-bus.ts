@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 // The bus worker with a stubbed storage estimate (bus.test.ts, M2b task 14):
 // 81 % used for the first two reads, then full.
-import { serve } from '../../../bus/src/server';
+import { serve } from '../../../bus/src/server/server';
 
 declare const self: DedicatedWorkerGlobalScope;
 

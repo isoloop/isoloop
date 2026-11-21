@@ -23,15 +23,15 @@ import {
   MAX_READ,
   type TopicConfig,
 } from '@isoloop/protocol';
-import { Broker, publishId, type BrokerStats, type BusPort } from './broker';
-import { MemoryStorage } from './engine/memory-storage';
-import { TsEngine } from './engine/ts-engine';
-import type { LogStorage, StoredState } from './engine/types';
-import { takeBusLock } from './storage/lock';
-import { OpfsStorage } from './storage/opfs';
+import { Broker, publishId, type BrokerStats, type BusPort } from '../broker/broker';
+import { MemoryStorage } from '../engine/memory-storage';
+import { TsEngine } from '../engine/ts-engine';
+import type { LogStorage, StoredState } from '../engine/types';
+import { takeBusLock } from '../storage/lock';
+import { OpfsStorage } from '../storage/opfs';
 import { recordPreview } from './preview';
 import { openTap } from './tap';
-import { isContracts, topicConfig, type Contracts } from './topic';
+import { isContracts, topicConfig, type Contracts } from '../contracts/topic';
 
 /** The part of a worker scope the bus uses. */
 export type BusScope = {

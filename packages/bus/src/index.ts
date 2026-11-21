@@ -1,6 +1,11 @@
-export { toIssues } from './standard-schema';
-export type { StandardSchemaV1 } from './standard-schema';
-export { JSON_SCHEMA_TARGET, hasJsonSchema, jsonSchemaOf, topicJsonSchemas } from './json-schema';
+export { toIssues } from './contracts/standard-schema';
+export type { StandardSchemaV1 } from './contracts/standard-schema';
+export {
+  JSON_SCHEMA_TARGET,
+  hasJsonSchema,
+  jsonSchemaOf,
+  topicJsonSchemas,
+} from './contracts/json-schema';
 export type {
   JsonSchema,
   JsonSchemaPair,
@@ -9,7 +14,7 @@ export type {
   StandardJSONSchemaV1,
   TopicJsonSchemas,
   TopicJsonSchemasResult,
-} from './json-schema';
+} from './contracts/json-schema';
 export {
   ContractsError,
   DEFAULT_MAX_RECORD_BYTES,
@@ -19,7 +24,7 @@ export {
   topic,
   topicConfig,
   unchecked,
-} from './topic';
+} from './contracts/topic';
 export type {
   AnyTopicDef,
   Contracts,
@@ -30,7 +35,7 @@ export type {
   Retention,
   ToolSpec,
   TopicDef,
-} from './topic';
+} from './contracts/topic';
 export type { EngineOptions, LogEngine, LogStorage, NewRecord, StoredState } from './engine/types';
 export { MemoryStorage, effectiveDurability } from './engine/memory-storage';
 export { TsEngine, type TsEngineOptions } from './engine/ts-engine';
@@ -40,6 +45,13 @@ export {
   HOST_PRODUCER,
   KERNEL_PRODUCER,
   publishId,
-} from './broker';
-export type { BrokerOptions, BrokerStats, BusPort, Publisher, TapSink, Timers } from './broker';
-export { estimateSize } from './size';
+} from './broker/broker';
+export type {
+  BrokerOptions,
+  BrokerStats,
+  BusPort,
+  Publisher,
+  TapSink,
+  Timers,
+} from './broker/broker';
+export { estimateSize } from './broker/size';

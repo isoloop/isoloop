@@ -292,9 +292,9 @@
           "anchor_offset": 1
         },
         {
-          "path": "packages/bus/src/broker.ts",
-          "line": 1021,
-          "end_line": 1045,
+          "path": "packages/bus/src/broker/broker.ts",
+          "line": 1026,
+          "end_line": 1050,
           "label": "persistent values must encode",
           "anchor": "#check(name: string, r: Validated | undefined, persistent = false): CallResult {"
         }
@@ -309,21 +309,21 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/bus/src/broker.ts",
-          "line": 830,
-          "end_line": 886,
+          "path": "packages/bus/src/broker/broker.ts",
+          "line": 835,
+          "end_line": 891,
           "label": "publish gates",
           "anchor": "#publish("
         },
         {
-          "path": "packages/bus/src/broker.ts",
-          "line": 918,
-          "end_line": 957,
+          "path": "packages/bus/src/broker/broker.ts",
+          "line": 923,
+          "end_line": 962,
           "label": "dedup, check, append, fan out",
           "anchor": "#finish(name: string, topic: Topic, p: Pending): void {"
         },
         {
-          "path": "packages/bus/src/server.ts",
+          "path": "packages/bus/src/server/server.ts",
           "line": 411,
           "end_line": 418,
           "label": "the bus worker's beat",
@@ -340,7 +340,7 @@
       "size": [155, 66],
       "sources": [
         {
-          "path": "packages/bus/src/server.ts",
+          "path": "packages/bus/src/server/server.ts",
           "line": 496,
           "end_line": 510,
           "label": "OPFS or the memory fallback",

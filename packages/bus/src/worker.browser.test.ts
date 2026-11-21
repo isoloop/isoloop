@@ -12,7 +12,7 @@ import type {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import list from './__fixtures__/contracts';
 import persistentList from './__fixtures__/persistent-contracts';
-import { topicConfig } from './topic';
+import { topicConfig } from './contracts/topic';
 
 const fixture = (name: string): string =>
   new URL(`./__fixtures__/${name}.ts`, import.meta.url).href;

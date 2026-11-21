@@ -7,7 +7,7 @@
  * delivery.
  */
 import { DEFAULT_TAP_PER_SEC, isTapToBus, type BusToTap } from '@isoloop/protocol';
-import type { Broker } from './broker';
+import type { Broker } from '../broker/broker';
 import { recordPreview } from './preview';
 
 /** The part of a `MessagePort` a tap uses. */

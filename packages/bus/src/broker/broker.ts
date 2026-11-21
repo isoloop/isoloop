@@ -15,7 +15,7 @@ import {
   type SeedEvent,
   type StartPosition,
 } from '@isoloop/protocol';
-import type { AppendId, LogEngine, NewRecord } from './engine/types';
+import type { AppendId, LogEngine, NewRecord } from '../engine/types';
 import { estimateSize } from './size';
 import {
   copySeed,
@@ -27,8 +27,13 @@ import {
   seedPending,
   type SeedVerdict,
 } from './seed';
-import { toIssues, type StandardSchemaV1 } from './standard-schema';
-import { DEFAULT_MAX_RECORD_BYTES, topicConfig, type AnyTopicDef, type Contracts } from './topic';
+import { toIssues, type StandardSchemaV1 } from '../contracts/standard-schema';
+import {
+  DEFAULT_MAX_RECORD_BYTES,
+  topicConfig,
+  type AnyTopicDef,
+  type Contracts,
+} from '../contracts/topic';
 
 /**
  * One isolate's bus connection, as the broker sees it. The bus worker wraps a

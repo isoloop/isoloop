@@ -1,6 +1,6 @@
 import type { Issue } from '@isoloop/protocol';
-import { toIssues, type StandardSchemaV1 } from './standard-schema';
-import type { Contracts } from './topic';
+import { toIssues, type StandardSchemaV1 } from './contracts/standard-schema';
+import type { Contracts } from './contracts/topic';
 
 /** Sample values for one topic. An array is shorthand for `{ values }`. */
 export type TopicSamples =

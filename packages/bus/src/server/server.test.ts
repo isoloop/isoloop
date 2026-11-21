@@ -1,8 +1,8 @@
 import type { BusToHost, BusToIsolate, CallResult, HostToBus } from '@isoloop/protocol';
 import { describe, expect, it, vi } from 'vitest';
-import list, { counts, notes } from './__fixtures__/contracts';
+import list, { counts, notes } from '../__fixtures__/contracts';
 import { loadContracts, mismatchedTopics, serve } from './server';
-import { contracts, topicConfig } from './topic';
+import { contracts, topicConfig } from '../contracts/topic';
 
 const TOPICS = list.topics.map(topicConfig);
 const noop = (): void => {};

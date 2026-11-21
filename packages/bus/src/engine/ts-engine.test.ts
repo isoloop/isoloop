@@ -5,8 +5,8 @@ import { runEngineConformance } from '../../test/engine-conformance';
 import { FakeDisk } from '../../test/fake-disk';
 import { connect, flush } from '../../test/memory-port';
 import { ReferenceEngine } from '../../test/reference-engine';
-import { Broker } from '../broker';
-import { contracts, topic, unchecked } from '../topic';
+import { Broker } from '../broker/broker';
+import { contracts, topic, unchecked } from '../contracts/topic';
 import { APPENDED_WINDOW, TsEngine } from './ts-engine';
 
 runEngineConformance('ts', (opts) => new TsEngine(opts));

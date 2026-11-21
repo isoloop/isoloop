@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 // The bus worker in a browser without OPFS sync access handles (M2b task 15).
-import { serve } from '../server';
+import { serve } from '../server/server';
 
 declare const self: DedicatedWorkerGlobalScope;
 

@@ -10,14 +10,14 @@ import {
 } from '@isoloop/protocol';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { connect, flush } from '../test/memory-port';
-import list from './__fixtures__/contracts';
-import { Broker } from './broker';
-import { TsEngine } from './engine/ts-engine';
+import { connect, flush } from '../../test/memory-port';
+import list from '../__fixtures__/contracts';
+import { Broker } from '../broker/broker';
+import { TsEngine } from '../engine/ts-engine';
 import { previewText } from './preview';
 import { serve } from './server';
 import { openTap, type TapPort } from './tap';
-import { contracts, topic, topicConfig, unchecked } from './topic';
+import { contracts, topic, topicConfig, unchecked } from '../contracts/topic';
 
 const notes = topic('notes.v1', {
   schema: unchecked<unknown>(),

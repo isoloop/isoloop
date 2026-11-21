@@ -1,4 +1,4 @@
-import { contracts, topic, unchecked, type Contracts, type TopicDef } from '../topic';
+import { contracts, topic, unchecked, type Contracts, type TopicDef } from '../contracts/topic';
 
 /** A persistent topic and a memory one (worker.browser.test.ts, M2b). */
 export const kept: TopicDef<number> = topic('kept.v1', {

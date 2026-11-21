@@ -1,12 +1,12 @@
 import { checks, systemSchema, systemTopic, type Grants } from '@isoloop/protocol';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { FakeDisk } from '../test/fake-disk';
-import { connect, fakeIsolate, flush } from '../test/memory-port';
+import { FakeDisk } from '../../test/fake-disk';
+import { connect, fakeIsolate, flush } from '../../test/memory-port';
 import { Broker, type BrokerOptions } from './broker';
-import { TsEngine } from './engine/ts-engine';
-import type { StandardSchemaV1 } from './standard-schema';
-import { contracts, topic, unchecked } from './topic';
+import { TsEngine } from '../engine/ts-engine';
+import type { StandardSchemaV1 } from '../contracts/standard-schema';
+import { contracts, topic, unchecked } from '../contracts/topic';
 
 const items = topic('cart.items.v1', {
   schema: z.object({ sku: z.string(), qty: z.number().int().default(1) }),
