@@ -1,6 +1,5 @@
 /// <reference lib="dom" />
 import { expect, test } from '@playwright/test';
-import './harness-types';
 import { HARNESS, ISOLATES_CORS } from './servers';
 
 /*

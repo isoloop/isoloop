@@ -1,6 +1,5 @@
 // The gate page: starts N members as own workers or as one pool, and says
 // how long it took until every member's start() had returned.
-import PoolWorker from './pool-worker.ts?worker';
 
 declare global {
   interface Window {
@@ -21,7 +20,7 @@ window.gate = {
       groups.map(
         (group) =>
           new Promise<void>((resolve) => {
-            const w = new PoolWorker();
+            const w = new Worker(new URL('./pool-worker.ts', import.meta.url), { type: 'module' });
             live.push(w);
             let left = group.length;
             w.addEventListener('message', () => {

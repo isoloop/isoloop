@@ -1,6 +1,5 @@
 /// <reference lib="dom" />
 import { expect, test } from '@playwright/test';
-import './harness-types';
 import { HARNESS, ISOLATES_CORS, ISOLATES_NO_CORS } from './servers';
 
 // Loader hardening (plan m1-kernel, task 3), on the blank harness page.

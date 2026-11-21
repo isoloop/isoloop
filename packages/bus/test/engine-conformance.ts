@@ -1,5 +1,5 @@
 import type { BusRecord, Retention, TopicConfig } from '@isoloop/protocol';
-import fc from 'fast-check';
+import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { LogEngine, NewRecord } from '../src/engine/types';
 

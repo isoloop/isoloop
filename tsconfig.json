@@ -16,6 +16,7 @@
     "e2e",
     "scripts",
     "bench/click-to-paint",
+    "bench/throughput/bus-throughput.spec.ts",
     "docs/diagrams"
   ],
   // The harness page and the adapter fixtures have their own DOM tsconfigs.

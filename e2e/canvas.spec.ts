@@ -1,6 +1,5 @@
 /// <reference lib="dom" />
 import { expect, test } from '@playwright/test';
-import './harness-types';
 import { HARNESS, ISOLATES_CORS } from './servers';
 
 // requestCanvas (M3a task 14, design §4.7): an isolate draws on the canvas
