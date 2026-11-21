@@ -5,7 +5,7 @@
  */
 import type { StartPosition, TopicRef } from '@isoloop/protocol';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
-import { useIsolate } from '../context';
+import { useIsolate } from '../isolate/context';
 
 /** Options for {@link useTopic}. */
 export type UseTopicOptions = {

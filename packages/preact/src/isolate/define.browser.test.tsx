@@ -2,7 +2,7 @@ import type { TopicRef } from '@isoloop/protocol';
 import { createTestContext } from '@isoloop/runtime/testing';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createPortal } from 'preact/compat';
-import { defineIsolate, usePortalRoot, usePublish, useTopic } from './index';
+import { defineIsolate, usePortalRoot, usePublish, useTopic } from '../index';
 
 // M3a task 7: rendering and topics, on the project's Preact major. The
 // context is a test double; the real worker path is the adapter E2E suite.

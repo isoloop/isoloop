@@ -31,14 +31,7 @@ export type Project = { include: readonly string[]; exclude: readonly string[] }
  * them. A package that already complies fails the check until it's removed,
  * so the list only shrinks; the last move deletes it.
  */
-export const PENDING: readonly string[] = [
-  'react',
-  'preact',
-  'devtools',
-  'balancer',
-  'vite',
-  'cli',
-];
+export const PENDING: readonly string[] = ['devtools', 'balancer', 'vite', 'cli'];
 
 const ADR = 'ADR 0021';
 const FIXTURES = '__fixtures__';

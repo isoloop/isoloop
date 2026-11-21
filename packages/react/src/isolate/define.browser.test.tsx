@@ -3,7 +3,7 @@ import { createTestContext } from '@isoloop/runtime/testing';
 import { StrictMode, startTransition, useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createPortal } from 'react-dom';
-import { defineIsolate, usePortalRoot, usePublish, useTopic } from './index';
+import { defineIsolate, usePortalRoot, usePublish, useTopic } from '../index';
 
 // M3a task 9: rendering and topics, on the project's React major. The
 // context is a test double; the real worker path is the adapter E2E suite.

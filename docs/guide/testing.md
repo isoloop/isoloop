@@ -155,7 +155,7 @@ it('flushes on shutdown', async () => {
 
 ### An isolate with a root
 
-Give `root` an element on the test page, and the isolate renders into it, so the test needs a DOM: a browser test (Vitest's browser mode), or a DOM library in Node. The adapters' own tests work this way: they create an element, start `defineIsolate(Component)` with `createTestContext({ root })`, and read the element ([`hooks.browser.test.tsx`](../../packages/react/src/hooks.browser.test.tsx) in the React adapter). The DOM there is the browser's, not the worker DOM an isolate gets in production ([What Isoloop can't hide](limits.md)).
+Give `root` an element on the test page, and the isolate renders into it, so the test needs a DOM: a browser test (Vitest's browser mode), or a DOM library in Node. The adapters' own tests work this way: they create an element, start `defineIsolate(Component)` with `createTestContext({ root })`, and read the element ([`hooks.browser.test.tsx`](../../packages/react/src/hooks/hooks.browser.test.tsx) in the React adapter). The DOM there is the browser's, not the worker DOM an isolate gets in production ([What Isoloop can't hide](limits.md)).
 
 ## Test your contracts
 

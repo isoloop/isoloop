@@ -10,7 +10,7 @@ afterEach(() => {
 // document, each rendering into its own root; each surface gets only its
 // member's records and its clicks reach only that member.
 test('two React members in one worker render into two surfaces', async () => {
-  const worker = new Worker(new URL('./__fixtures__/two-members.worker.tsx', import.meta.url), {
+  const worker = new Worker(new URL('../__fixtures__/two-members.worker.tsx', import.meta.url), {
     type: 'module',
   });
   const surfaces = mountMembers(worker, 2);
@@ -36,7 +36,7 @@ test('two React members in one worker render into two surfaces', async () => {
 // as that member's own; the other member keeps rendering, and its modal lands
 // in its portal root, inside its own surface.
 test("a member's render error stays its own, and its neighbour's modal lands in its own surface", async () => {
-  const worker = new Worker(new URL('./__fixtures__/pool-members.worker.tsx', import.meta.url), {
+  const worker = new Worker(new URL('../__fixtures__/pool-members.worker.tsx', import.meta.url), {
     type: 'module',
   });
   const reported: { member: number; message: string }[] = [];

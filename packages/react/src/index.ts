@@ -2,8 +2,8 @@
  * The React adapter (ADR 0010): `defineIsolate(Component)` and the bus and
  * host hooks, on React 18 and 19.
  */
-export { defineIsolate, type IsolateProps } from './define';
-export { useIsolate, usePortalRoot } from './context';
+export { defineIsolate, type IsolateProps } from './isolate/define';
+export { useIsolate, usePortalRoot } from './isolate/context';
 export { usePublish, useTopic, type UseTopicOptions } from './hooks/topic';
 export { useRequest } from './hooks/request';
 export type { RequestOptions } from '@isoloop/runtime';

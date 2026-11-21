@@ -1,7 +1,7 @@
 import { mountFixture } from '@isoloop/dom/testing';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, test } from 'vitest';
-import { Checkbox } from './__fixtures__/checkbox';
+import { Checkbox } from '../__fixtures__/checkbox';
 
 const cleanups: (() => void)[] = [];
 afterEach(() => {
@@ -19,7 +19,7 @@ const box = (root: Element): HTMLInputElement => {
 // in the markets dashboard) is drawn the same as React draws it in the page.
 test('a controlled checkbox updated later is drawn as React draws it', async () => {
   const host = mountFixture(
-    new Worker(new URL('./__fixtures__/checkbox.worker.tsx', import.meta.url), {
+    new Worker(new URL('../__fixtures__/checkbox.worker.tsx', import.meta.url), {
       type: 'module',
     }),
   );
