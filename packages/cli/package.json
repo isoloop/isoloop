@@ -1,7 +1,7 @@
 {
   "name": "isoloop",
   "version": "0.1.0-next.11",
-  "description": "The Isoloop command line: export contracts as JSON Schema, run the dev MCP server, and later add the agent skill.",
+  "description": "The Isoloop command line: export contracts as JSON Schema, run the dev MCP server, and add the agent skill.",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -19,7 +19,7 @@
     "node": ">=26"
   },
   "scripts": {
-    "build": "tsdown src/cli.ts --platform node --no-dts --no-fixed-extension",
+    "build": "tsdown src/cli.ts --platform node --no-dts --no-fixed-extension && node -e \"require('node:fs').cpSync('../../skills', 'dist/skills', { recursive: true })\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

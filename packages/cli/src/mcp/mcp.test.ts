@@ -83,6 +83,9 @@ async function startMcp(
     },
     err: (t) => void (err += t),
     cwd: process.cwd(),
+    skills: '',
+    readFile: () => Promise.resolve(undefined),
+    mkdir: () => Promise.resolve(),
     writeFile: () => Promise.resolve(),
     load: () => Promise.reject(new Error('no modules')),
   };
@@ -536,6 +539,9 @@ describe('isoloop mcp', () => {
       out: () => {},
       err: (t) => void (err += t),
       cwd: process.cwd(),
+      skills: '',
+      readFile: () => Promise.resolve(undefined),
+      mkdir: () => Promise.resolve(),
       writeFile: () => Promise.resolve(),
       load: () => Promise.reject(new Error('no')),
     });
