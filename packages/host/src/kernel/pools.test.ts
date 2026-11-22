@@ -116,6 +116,18 @@ describe('worker pools (M2c)', () => {
       expect(running(k, ['Q', 'D'])).toBe(true);
     });
 
+    it('every other member of a pool that stopped responding gets the same message, naming one member once', async () => {
+      const k = kernel(fast);
+      const crashes: KernelEvents['isolate:crash'][] = [];
+      k.on('isolate:crash', (e) => crashes.push(e));
+      k.spawn({ id: 'A', src: spin, pool: 'p' });
+      for (const id of ['B', 'C', 'E']) k.spawn({ id, src: counter, pool: 'p' });
+      await waitFor(() => ['B', 'C', 'E'].every((id) => crashes.some((c) => c.id === id)), 5000);
+      const message = (id: string) => crashes.find((c) => c.id === id)?.message;
+      const why = `pool "p" restarted: "A" stopped responding (${message('A')})`;
+      expect([message('B'), message('C'), message('E')]).toEqual([why, why, why]);
+    });
+
     it('an uncaught error in a member timer takes the worker down: the pool restarts', async () => {
       const k = kernel(fast);
       const crashes: KernelEvents['isolate:crash'][] = [];

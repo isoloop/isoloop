@@ -1036,7 +1036,9 @@ export function createKernel(config: KernelConfig): Kernel {
     const { s, effects } = step(slot.sup, input, cfg);
     slot.sup = s;
     run(slot, effects);
-    if (loaded?.pool !== undefined) poolFate(slot, loaded, effects);
+    // A member that crashed with its pool doesn't pass the crash on: poolFate
+    // is already going through the others, with the message they all share.
+    if (loaded?.pool !== undefined && input.k !== 'poolCrash') poolFate(slot, loaded, effects);
   };
 
   /**

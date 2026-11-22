@@ -44,15 +44,15 @@
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1308,
-          "end_line": 1344,
+          "line": 1310,
+          "end_line": 1346,
           "label": "attach before init",
           "anchor": "const start = (slot: Slot, o: { wake?: boolean } = {}): void => {"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1209,
-          "end_line": 1226,
+          "line": 1211,
+          "end_line": 1228,
           "label": "ready: format and version check",
           "anchor": "case 'ready': {"
         }
