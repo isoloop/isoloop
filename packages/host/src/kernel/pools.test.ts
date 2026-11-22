@@ -106,6 +106,18 @@ describe('worker pools (M2c)', () => {
       expect(crashes).toEqual([]);
     });
 
+    it('a block once the beats have been steady for 1 s is killed after killAfterMs', async () => {
+      const k = kernel({ heartbeat: quick });
+      const crashes: KernelEvents['isolate:crash'][] = [];
+      k.on('isolate:crash', (e) => crashes.push(e));
+      for (const id of ['A', 'B']) k.spawn({ id, src: counter, pool: 'p' });
+      await waitFor(() => running(k, ['A', 'B']));
+      await new Promise((r) => setTimeout(r, 1800));
+      await k.inspect().block('A', 2000);
+      await waitFor(() => crashes.length >= 2, 4000);
+      expect(crashes[0]).toMatchObject({ reason: 'unresponsive' });
+    });
+
     it("a late member's start() doesn't get a pool killed whose first window has closed", async () => {
       const k = kernel({ heartbeat: { ...quick, readyTimeoutMs: 2000 } });
       const crashes: KernelEvents['isolate:crash'][] = [];

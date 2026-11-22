@@ -51,8 +51,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 751,
-          "end_line": 757,
+          "line": 752,
+          "end_line": 758,
           "label": "unsupported_browser",
           "anchor": "export function createKernel(config: KernelConfig): Kernel {"
         },
@@ -75,15 +75,15 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 237,
-          "end_line": 363,
+          "line": 256,
+          "end_line": 382,
           "label": "state machine",
           "anchor": "export function step(s: IsolateSupervision, input: SupervisorInput, cfg: SupervisorConfig): Step {"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1051,
-          "end_line": 1072,
+          "line": 1052,
+          "end_line": 1073,
           "label": "pool fate",
           "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
           "anchor_offset": 1

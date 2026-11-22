@@ -111,6 +111,8 @@ export type IsolateSupervision = {
    * latest `ready` on its worker. Unset until then.
    */
   readyAt?: number;
+  /** The first of the run of on-time beats that will end the warm-up. */
+  steadyFrom?: number;
   lagMs: number;
   /** Crash restarts since spawn. A manual respawn doesn't count. */
   restarts: number;
@@ -220,8 +222,9 @@ const workerMessage = (pool: string | undefined, what: string, detail: string): 
 
 /**
  * The silence that kills a blocked isolate at `at`. During the start-up
- * warm-up, `readyTimeoutMs` from `readyAt`, that's `readyTimeoutMs` (ADR 0001),
- * because `ready` goes out before `start()`. It's never less than `killAfterMs`.
+ * warm-up, until the beats are steady and at most `readyTimeoutMs` from
+ * `readyAt`, that's `readyTimeoutMs` (ADR 0001), because `ready` goes out
+ * before `start()`. It's never less than `killAfterMs`.
  */
 const killAfter = (s: IsolateSupervision, at: number, cfg: SupervisorConfig): number =>
   s.readyAt !== undefined && at - s.readyAt <= cfg.readyTimeoutMs
@@ -230,8 +233,24 @@ const killAfter = (s: IsolateSupervision, at: number, cfg: SupervisorConfig): nu
 
 /** A new worker has no warm-up until its own `ready`. */
 const withoutWarmUp = (s: IsolateSupervision): IsolateSupervision => {
-  const { readyAt: _previous, ...rest } = s;
+  const { readyAt: _previous, steadyFrom: _steady, ...rest } = s;
   return rest;
+};
+
+/** The warm-up is over once beats have been on time this long (ADR 0001). */
+const STEADY_MS = 1000;
+/** A beat later than this isn't on time: something still holds the loop. */
+const STEADY_LAG_MS = 100;
+
+/** After a beat: counts the steady second, and ends the warm-up with it. */
+const settle = (s: IsolateSupervision, at: number): IsolateSupervision => {
+  if (s.readyAt === undefined) return s;
+  if (s.lagMs > STEADY_LAG_MS) {
+    const { steadyFrom: _late, ...rest } = s;
+    return rest;
+  }
+  if (s.steadyFrom === undefined) return { ...s, steadyFrom: at };
+  return at - s.steadyFrom >= STEADY_MS ? withoutWarmUp(s) : s;
 };
 
 export function step(s: IsolateSupervision, input: SupervisorInput, cfg: SupervisorConfig): Step {
@@ -259,11 +278,11 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
 
     case 'poolReady':
       if (s.state !== 'running' && s.state !== 'blocked') return same;
-      return { s: { ...s, readyAt: input.at }, effects: [] };
+      return { s: { ...withoutWarmUp(s), readyAt: input.at }, effects: [] };
 
     case 'beat': {
       if (!live(s.state)) return same;
-      const next = { ...s, lastBeatAt: input.at, lagMs: input.lagMs };
+      const next = settle({ ...s, lastBeatAt: input.at, lagMs: input.lagMs }, input.at);
       if (s.state !== 'blocked') return { s: next, effects: [] };
       return {
         s: { ...next, state: 'running' },

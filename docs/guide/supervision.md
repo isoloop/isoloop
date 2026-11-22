@@ -34,11 +34,11 @@ The runtime in each worker sends a **heartbeat** every `heartbeat.everyMs` (100 
 
 ### Start-up warm-up
 
-An isolate says `ready` before its `start()` runs, so mounting and the first replay could look like a hang. For `readyTimeoutMs` (10 000 ms) after `ready`, a kill waits until there's been no beat for `readyTimeoutMs`, or for `killAfterMs` if that's longer. Then `killAfterMs` applies again.
+An isolate says `ready` before its `start()` runs, so mounting and the first replay could look like a hang. So each start has a warm-up. While it lasts, a kill waits until there's been no beat for `readyTimeoutMs` (10 000 ms), or for `killAfterMs` if that's longer. It ends once the beats have been on time (no more than 100 ms late) for 1 s, or `readyTimeoutMs` after `ready`, whichever comes first. Then `killAfterMs` applies again.
 
 - **`blocked` isn't delayed:** the overlay shows after `blockedAfterMs` as usual.
 - **In a pool,** the warm-up starts again with each member's `ready`, for every member on that worker, since they share a loop.
-- **With a `killAfterMs` under `readyTimeoutMs`,** a block soon after a start or a restart can end without a kill, and a real hang there is killed up to `readyTimeoutMs` later. The defaults are equal, so they change nothing.
+- **With a `killAfterMs` under `readyTimeoutMs`,** a block in about the first second after a start or a restart (longer on a loop that's still busy) can end without a kill, and a real hang there is killed up to `readyTimeoutMs` later. The defaults are equal, so they change nothing.
 - **The bus worker has none:** `killAfterMs` applies to it from the start.
 
 A crash also comes from the other causes in `CrashReason`:
@@ -113,7 +113,7 @@ Every field is optional. `backoff` takes any of its three fields; the rest keep 
 | `heartbeat.everyMs` | `100` | How often a worker beats. |
 | `heartbeat.blockedAfterMs` | `400` | Silence before `blocked`. |
 | `heartbeat.killAfterMs` | `10000` | Silence before the worker is terminated, outside the [warm-up](#start-up-warm-up). |
-| `heartbeat.readyTimeoutMs` | `10000` | Time a worker gets to say `ready`, and the length of the warm-up after it. |
+| `heartbeat.readyTimeoutMs` | `10000` | Time a worker gets to say `ready`, and the most the warm-up after it lasts. |
 
 A lower `killAfterMs` frees a stuck widget sooner once it has warmed up, and kills a slow but healthy one sooner too. A worker that does heavy work in one synchronous run needs a limit longer than that run.
 

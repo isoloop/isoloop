@@ -105,11 +105,12 @@ export type KernelConfig = {
      * No beat for this long terminates the worker as `unresponsive`, in ms. Default 10 000 (10 s).
      *
      * During the start-up warm-up a kill waits for `readyTimeoutMs` without a beat, if that's longer,
-     * so a long `start()` isn't killed. The warm-up lasts `readyTimeoutMs` from `ready`; in a pool,
-     * from the latest member's `ready`.
+     * so a long `start()` isn't killed. The warm-up runs from `ready` (in a pool, from the latest
+     * member's) until beats have been on time, at most 100 ms late, for 1 s. It lasts
+     * `readyTimeoutMs` at most.
      */
     killAfterMs?: number;
-    /** No `ready` this long after the spawn crashes it as `ready_timeout`, in ms. Also the length of the start-up warm-up (`killAfterMs`). Default 10 000 (10 s). */
+    /** No `ready` this long after the spawn crashes it as `ready_timeout`, in ms. Also the most the start-up warm-up lasts (`killAfterMs`). Default 10 000 (10 s). */
     readyTimeoutMs?: number;
   };
   /** Stylesheets adopted into every surface's shadow root. Default: none. */

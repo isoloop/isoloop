@@ -10,7 +10,7 @@ Read it before deploying an app. In development, `@isoloop/vite` sends the heade
 
 1. The kernel starts a module worker from the **isolate bootstrap** (`workers.isolateBootstrap`). Browsers only start workers from the page's own origin, so the bootstrap is served by the host app.
 2. The bootstrap `import()`s the isolate module at `manifest.src`. That URL can be on another origin, such as a CDN.
-3. The isolate replies `ready` within `heartbeat.readyTimeoutMs` (10 s by default), or it crashes with reason `ready_timeout`. Its `start()` runs after `ready`, and for that long again a [warm-up](supervision.md#start-up-warm-up) keeps a low `killAfterMs` from killing it.
+3. The isolate replies `ready` within `heartbeat.readyTimeoutMs` (10 s by default), or it crashes with reason `ready_timeout`. Its `start()` runs after `ready`, and until it has settled, or that long again at most, a [warm-up](supervision.md#start-up-warm-up) keeps a low `killAfterMs` from killing it.
 
 ## The bus worker and the contracts module
 

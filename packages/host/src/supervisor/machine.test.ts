@@ -524,6 +524,14 @@ describe('wake order (ADR 0001)', () => {
   });
 });
 
+/** A beat every 100 ms from `from` to `to`, `lagMs` late. */
+const beats = (from: number, to: number, lagMs = 0): SupervisorInput[] =>
+  Array.from({ length: (to - from) / 100 + 1 }, (_, i) => ({
+    k: 'beat',
+    at: from + i * 100,
+    lagMs,
+  }));
+
 describe('start-up warm-up (ADR 0001)', () => {
   const short: SupervisorConfig = { ...cfg, killAfterMs: 2000 };
   const ready = (readyAt: number, c = short): IsolateSupervision =>
@@ -574,6 +582,37 @@ describe('start-up warm-up (ADR 0001)', () => {
     const { s } = run(ready(0), [{ k: 'poolReady', at: 15_000 }], short);
     expect(silent(s, 15_000, 24_999).s.state).toBe('blocked');
     expect(silent(s, 15_000, 25_001).s.state).toBe('restarting');
+  });
+
+  it('ends after 1 s of on-time beats', () => {
+    const { s } = run(ready(0), beats(100, 1100), short);
+    expect(silent(s, 1100, 3100).s.state).toBe('blocked');
+    expect(silent(s, 1100, 3101).s).toMatchObject({
+      state: 'restarting',
+      error: 'No heartbeat for 2000 ms',
+    });
+  });
+
+  it('goes on while the beats have been on time for less than 1 s', () => {
+    const { s } = run(ready(0), beats(100, 1000), short);
+    expect(silent(s, 1000, 9000).s.state).toBe('blocked');
+  });
+
+  it('counts the second again after a late beat', () => {
+    const inputs = [...beats(100, 900), ...beats(1000, 1000, 101), ...beats(1100, 2000)];
+    const { s } = run(ready(0), inputs, short);
+    expect(silent(s, 2000, 9000).s.state).toBe('blocked');
+  });
+
+  it('lasts readyTimeoutMs at most, however late the beats', () => {
+    const { s } = run(ready(0), beats(100, 12_000, 300), short);
+    expect(silent(s, 12_000, 14_001).s.state).toBe('restarting');
+  });
+
+  it("a later member's ready counts the second again", () => {
+    const inputs = [...beats(100, 900), { k: 'poolReady', at: 950 } as const, ...beats(1000, 1900)];
+    const { s } = run(ready(0), inputs, short);
+    expect(silent(s, 1900, 9000).s.state).toBe('blocked');
   });
 
   it('a restart closes the window until the next ready', () => {

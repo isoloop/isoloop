@@ -37,22 +37,22 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 386,
-          "end_line": 428,
+          "line": 405,
+          "end_line": 447,
           "label": "crash, backoff, spawn",
           "anchor": "function crash("
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1333,
-          "end_line": 1369,
+          "line": 1334,
+          "end_line": 1370,
           "label": "attach before init",
           "anchor": "const start = (slot: Slot, o: { wake?: boolean } = {}): void => {"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1228,
-          "end_line": 1245,
+          "line": 1229,
+          "end_line": 1246,
           "label": "ready: format and version check",
           "anchor": "case 'ready': {"
         }

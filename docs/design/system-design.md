@@ -305,6 +305,7 @@ Transitions (matching the RFC lifecycle diagram):
 | running | tick, no beat for `blockedAfterMs` | blocked | showBusy |
 | blocked | `beat` | running | hideBusy |
 | blocked | tick, no beat for `killAfterMs`; during the warm-up, for `readyTimeoutMs` if that's longer | crashed | terminate |
+| running / blocked | `beat`, the last second's beats on time (at most 100 ms late) | running | the warm-up ends (ADR 0001) |
 | running / blocked | `poolReady`: a later member's `ready` on its worker | unchanged | the warm-up starts again (ADR 0001) |
 | running / blocked | `workerError` or fatal `error` | crashed | terminate, emit `isolate:crash` |
 | loading / running / blocked | `poolCrash`: another member of its pool crashed with `unresponsive` or `worker_error` | crashed | with that member's reason; every member restarts, in a new worker |
