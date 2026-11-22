@@ -6,6 +6,8 @@
 // a stale one would let a bundler drop a script it names. The layout test
 // checks the `./src/` ones. The CLI's build copies the repo's skills/ into
 // its dist (M4a decision 17), so that copy must be there and the same.
+// Every public package has a README.md, which npm packs whatever `files`
+// says and shows as the package's page.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -31,6 +33,9 @@ for (const d of readdirSync('packages', { withFileTypes: true })) {
   const manifest: unknown = JSON.parse(readFileSync(file, 'utf8'));
   if (field(manifest, 'private') === true) continue;
   const name = String(field(manifest, 'name'));
+  const readme = join(dir, 'README.md');
+  if (!existsSync(readme) || readFileSync(readme, 'utf8').trim() === '')
+    problems.push(`${name}: README.md is missing or empty, so its npm page would be too`);
   const exportsMap =
     field(field(manifest, 'publishConfig'), 'exports') ?? field(manifest, 'exports');
   const files = targets(field(manifest, 'files'));
@@ -57,4 +62,4 @@ if (problems.length > 0) {
   console.error(problems.join('\n'));
   process.exit(1);
 }
-console.log('every published export and sideEffects path resolves');
+console.log('every published export and sideEffects path resolves, and every package has a README');
