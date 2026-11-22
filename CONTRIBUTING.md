@@ -119,7 +119,7 @@ The packages are in Changesets' pre mode `next`, so versions are `0.1.0-next.N` 
 A release (`0.1.0` and later) is the maintainer's call, and takes two steps ([ADR 0019](docs/adr/0019-versioning-and-releases.md)):
 
 1. **Version, as a PR.** Out of pre mode (`pnpm changeset pre exit`), run `pnpm release:version` and merge the PR on green. A patch during a preview cycle does this on its `release/<major>.<minor>` branch.
-2. **Tag.** Push the annotated tag `v<version>` on that commit, one tag per push. The *Release* workflow (`.github/workflows/release.yml`) then:
+2. **Tag.** First run the *Release* workflow by hand on that commit's branch: it must report no problems, and it's the only run of a release's path before the tag. Then push the annotated tag `v<version>` on that commit, one tag per push. The *Release* workflow (`.github/workflows/release.yml`) then:
    - **checks the tag:** it equals every package's version, `x.y.z` with no suffix, out of pre mode, on `main` or that line's release branch;
    - **runs the full CI;**
    - **publishes** every package through npm trusted publishing, with provenance. A patch of an older line gets the dist-tag `release-<major>.<minor>`, so `latest` never moves back;
