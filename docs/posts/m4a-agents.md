@@ -6,7 +6,7 @@ M4a's promise: **agents can learn Isoloop, see a running app, and call the tools
 
 ## What an agent gets
 
-- **To learn Isoloop:** `llms.txt` and a Markdown copy of each docs page on isoloop.dev, `AGENTS.md` in both repos, and the skill ([#374](https://github.com/isoloop/isoloop/pull/374), in review when this was written).
+- **To learn Isoloop:** `llms.txt` and a Markdown copy of each docs page on isoloop.dev, a snippet for your app's `AGENTS.md` in [getting started](../guide/getting-started.md), and the skill ([#374](https://github.com/isoloop/isoloop/pull/374), in review when this was written).
 - **To see a running app:** the dev MCP (`isoloop mcp`). It reads the page's isolates, topics, records and events. With `--allow-write` it can also restart, kill, block, publish and request.
 - **To call the app:** a topic with a `reply` schema and a `tool` description, listed in `agents.expose`. The dev MCP forwards it in development, and `connectWebMCP` lists it to a browser's agent ([Agents guide](../guide/agents.md)).
 
@@ -20,11 +20,19 @@ Markets exposes two tools: `markets.quote.v1`, which reads, and `markets.alerts.
 - **Machine:** a 16-core desktop, Linux under WSL2, headless Chromium 158, 2026-11-22.
 - **Method:** three prompts, with their pass criteria written down first. One attempt each, each with a fresh agent, CLI and page. A script held each prompt back until the page had paired, and logged the kernel's own isolate states, heartbeats, prices and rules every 500 ms. The answers were checked against that log and against what each tool returned.
 
-| Prompt | Set-up | Tool calls | Answered in | Result |
+The criteria, as written before the first prompt:
+
+1. **Nothing induced:** "says none is meaningfully lagging, or names one only with figures the ground truth has."
+2. **A blocked widget:** "names `volatility` and no other isolate as the one lagging."
+3. **The alert:** "exactly one new rule BTC-USD / price / above / X, in the panel and on alert-rules.v1, the request has via 'mcp', and no other write tool was called."
+
+| Prompt | Set-up | Tool calls | Answered in (Claude Code's clock) | Result |
 | --- | --- | --- | --- | --- |
-| "Which isolate is lagging?" | nothing induced | `isoloop_isolates` | 3.8 s | Right, with one small misstatement |
-| "Which isolate is lagging?" | one widget blocked on purpose | `isoloop_isolates` | 3.5 s | Right isolate, with two misstatements |
-| "Create an alert for BTC above 99970." | `--allow-write` | `markets.alerts.create.v1` | 1.9 s | Right rule, which then fired repeatedly because of a bug in markets |
+| "Which isolate is lagging?" | nothing induced | `isoloop_isolates` | 3.8 s | Pass, with one small misstatement |
+| "Which isolate is lagging?" | one widget blocked on purpose | `isoloop_isolates` | 3.5 s | Pass, with two misstatements |
+| "Create an alert for BTC above 99970." | `--allow-write` | `markets.alerts.create.v1` | 1.9 s | Pass. The rule then fired repeatedly, a bug in markets |
+
+Claude Code replaces the dots in tool names: the agent saw `markets_alerts_create_v1` for `markets.alerts.create.v1`, and the call arrived on the right topic.
 
 ### Nothing lagging
 
@@ -99,7 +107,7 @@ Measured on 2026-11-19 on plant, a topic with a handler that does nothing, at `0
 | Round trip, p95 (ms) | 0.3 (0.3 to 0.3) | 0.4 (0.4 to 0.4) | 1 (1 to 1) | 6 (5 to 7) |
 | Main thread per call (ms) | 0.035 (0.034 to 0.035) | 0.059 (0.050 to 0.084) | not measured | not measured |
 
-That is the cost of `kernel.request` alone. The transport's hop, the tool's own work and the agent's time come on top. The answers above took 1.9 to 3.8 s end to end. There's no native baseline, because native has no bus.
+That is the cost of `kernel.request` alone. The transport's hop, the tool's own work and the agent's time come on top. For scale, the answers above took 1.9 to 3.8 s by Claude Code's own clock, nearly all of it outside the page. There's no native baseline, because native has no bus.
 
 ### The burst it found, and the fix
 
