@@ -30,6 +30,8 @@ The runtime in each worker sends a **heartbeat** every `heartbeat.everyMs` (100 
 - **After `blockedAfterMs` (400 ms) without a beat,** the isolate is `blocked`. A beat that arrives brings it back to `running`.
 - **After `killAfterMs` (10 000 ms) without a beat,** the kernel terminates the worker and counts a crash with reason `unresponsive`.
 
+`lagMs` comes with a beat, so a block shows in it only once the block ends and the late beat arrives; while the block lasts, `lagMs` keeps the last beat's value, often 0. To see a block in progress, read `state` and the time since `lastBeatAt` (`sinceBeatMs` in the dev MCP's `isoloop_isolates`).
+
 A crash also comes from the other causes in `CrashReason`:
 
 | Reason | Cause | Restarted? |
