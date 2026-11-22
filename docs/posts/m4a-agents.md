@@ -6,7 +6,7 @@ M4a's promise: **agents can learn Isoloop, see a running app, and call the tools
 
 ## What an agent gets
 
-- **To learn Isoloop:** `llms.txt` and a Markdown copy of each docs page on isoloop.dev, a snippet for your app's `AGENTS.md` in [getting started](../guide/getting-started.md), and the skill ([#374](https://github.com/isoloop/isoloop/pull/374), in review when this was written).
+- **To learn Isoloop:** `llms.txt` and a Markdown copy of each docs page on isoloop.dev, a snippet for your app's `AGENTS.md` in [getting started](../guide/getting-started.md), and the skill ([#374](https://github.com/isoloop/isoloop/pull/374), merged 2026-11-22, not in `0.1.0-next.11`).
 - **To see a running app:** the dev MCP (`isoloop mcp`). It reads the page's isolates, topics, records and events. With `--allow-write` it can also restart, kill, block, publish and request.
 - **To call the app:** a topic with a `reply` schema and a `tool` description, listed in `agents.expose`. The dev MCP forwards it in development, and `connectWebMCP` lists it to a browser's agent ([Agents guide](../guide/agents.md)).
 
@@ -85,7 +85,7 @@ The first probe, before any prompt, didn't start: the dev server couldn't load i
 
 Each prompt asked for a small app in one framework: a widget isolate that subscribes to a topic and draws it, a button that publishes, a button that restarts the widget with its data back, and a Playwright test. Each ran in a fresh project with the packages installed from the branch and the skill installed by `isoloop skill add`. The agent (the same Claude Code and model) could read and write files in that project and had no shell, so it never ran its code. An answer passed if it type-checked, built, passed its own test and passed an independent test written before the first attempt. No answer was edited.
 
-Round 2, on the skill at [`e840935`](https://github.com/isoloop/isoloop/blob/e840935a7a5a27a63f587bfdd892c6d78009f893/skills/build-with-isoloop/SKILL.md), 2026-11-22:
+Round 2, on the skill as merged, byte for byte, at [`e840935`](https://github.com/isoloop/isoloop/blob/e840935a7a5a27a63f587bfdd892c6d78009f893/skills/build-with-isoloop/SKILL.md), 2026-11-22:
 
 | Prompt | It draws | Type check | Build | Its own test | Independent test | Time |
 | --- | --- | --- | --- | --- | --- | --- |
