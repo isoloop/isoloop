@@ -5,8 +5,8 @@
 # What runs when (decided 2026-11-07):
 # - pull requests: everything;
 # - pushes to main: `check` only, since the PR already ran the rest;
-# - release tags (`v<major>.<minor>.<patch>`, no suffix): everything (the M4 release job will follow it);
-#   prerelease tags (`v0.1.0-next.N`) are records only and run nothing (ADR 0019);
+# - dry runs and stage runs of release.yml, which call it: everything. A called
+#   workflow sees its caller's event. Tags run nothing;
 # - weekly, Monday 05:00 UTC: everything, to catch flaky tests and drift.
 name: CI
 
@@ -14,9 +14,7 @@ on:
   pull_request:
   push:
     branches: [main]
-    # Release tags only (ADR 0019, decision 6): `v0.1.0` matches, `v0.1.0-next.3`
-    # doesn't. GitHub's filter must match the whole tag, and `.` is literal.
-    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_call:
   schedule:
     - cron: '0 5 * * 1'
   workflow_dispatch:
@@ -25,7 +23,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # A run started by hand, a release's included, gets its own group, so main's
+  # CI doesn't replace it.
+  group: ci-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -60,7 +60,7 @@ jobs:
 
   browser:
     needs: check
-    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -79,7 +79,7 @@ jobs:
 
   e2e:
     needs: check
-    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -112,7 +112,7 @@ jobs:
   # the job log and in the bench-results artifact.
   bench:
     needs: check
-    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

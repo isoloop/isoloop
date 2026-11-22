@@ -4,8 +4,9 @@
 // the build; @isoloop/vite once shipped index.mjs behind an index.js export.
 // The `./dist/` paths in `sideEffects` must exist too (ADR 0021, decision 8):
 // a stale one would let a bundler drop a script it names. The layout test
-// checks the `./src/` ones.
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+// checks the `./src/` ones. The CLI's build copies the repo's skills/ into
+// its dist (M4a decision 17), so that copy must be there and the same.
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const targets = (v: unknown): string[] =>
@@ -44,6 +45,13 @@ for (const d of readdirSync('packages', { withFileTypes: true })) {
     if (typeof s === 'string' && s.startsWith('./dist/') && !existsSync(join(dir, s.slice(2))))
       problems.push(`${name}: sideEffects names ${s}, which the build didn't write`);
   }
+}
+for (const file of readdirSync('skills', { recursive: true, encoding: 'utf8' })) {
+  const source = join('skills', file);
+  if (!statSync(source).isFile()) continue;
+  const copy = join('packages/cli/dist/skills', file);
+  if (!existsSync(copy) || !readFileSync(copy).equals(readFileSync(source)))
+    problems.push(`isoloop: ${copy} isn't a copy of ${source}`);
 }
 if (problems.length > 0) {
   console.error(problems.join('\n'));

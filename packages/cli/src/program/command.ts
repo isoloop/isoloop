@@ -2,8 +2,8 @@ import type { FlagSpecs, ParsedArgs } from './args';
 import type { Io } from './io';
 
 /**
- * One CLI command. `path` is its words (`['contracts', 'export']`), so later
- * commands (`mcp`, `skill add`) are one more entry in the list in `main.ts`.
+ * One CLI command. `path` is its words (`['contracts', 'export']`), so each
+ * command is one entry in the list in `main.ts`.
  */
 export type Command = {
   readonly path: readonly string[];
