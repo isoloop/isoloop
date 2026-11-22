@@ -67,7 +67,7 @@ Other isolates are untouched. A restart starts a new worker, so the isolate's in
 
 The heartbeat belongs to the worker, so a pool's members block and are killed together ([pools guide](pools.md#what-members-share)).
 
-- **The worker fails:** when a member crashes with `unresponsive` or `worker_error`, every other member on that worker crashes with the same reason. The worker is terminated, and every member restarts in a new one. Each member's `isolate:crash` carries the `pool`, and the message names the member that caused it.
+- **The worker fails:** when a member crashes with `unresponsive` or `worker_error`, every other member on that worker crashes with the same reason. The worker is terminated, and every member restarts in a new one. Each member's `isolate:crash` carries the `pool`. The message names no member, because the worker can't tell which one caused it. A [kill](inspection.md#controls) is the exception: the others' message names the member that was killed.
 - **A member's own failure:** a fatal error, a ready timeout or a version mismatch crashes only that member. It restarts alone and rejoins the running worker.
 - **Limits are per isolate.** Each member counts the shared crash in its own window, so a pool that keeps failing usually reaches `failed` for all its members together.
 

@@ -119,9 +119,15 @@ export type SupervisorInput =
   | { k: 'spawned'; at: number }
   | { k: 'ready' }
   | { k: 'beat'; at: number; lagMs: number }
-  | { k: 'tick'; at: number }
+  /** `pool`: the pool whose worker it shares, as on `workerError`. */
+  | { k: 'tick'; at: number; pool?: string | undefined }
   | { k: 'error'; at: number; fatal: boolean; message: string }
-  | { k: 'workerError'; at: number; message: string }
+  /**
+   * With `pool`, the failure is the shared worker's, which can't say which
+   * member caused it, so the message names none. Without, it's this isolate's
+   * own: an own worker, or a kill through the inspection feed.
+   */
+  | { k: 'workerError'; at: number; message: string; pool?: string | undefined }
   | { k: 'spawnFailed'; at: number; message: string }
   | { k: 'renderFmtMismatch'; at: number; message: string }
   /** `ready.requires` outside `[FLOOR, VERSION]` (ADR 0012). */
@@ -197,6 +203,10 @@ const withoutCrash = (s: IsolateSupervision): IsolateSupervision => {
   return rest;
 };
 
+/** A worker failure's message: in a pool it's the worker's, and names no member. */
+const workerMessage = (pool: string | undefined, what: string, detail: string): string =>
+  pool === undefined ? detail : `pool "${pool}" restarted: its worker ${what} (${detail})`;
+
 export function step(s: IsolateSupervision, input: SupervisorInput, cfg: SupervisorConfig): Step {
   const same: Step = { s, effects: [] };
   switch (input.k) {
@@ -240,7 +250,13 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
           effects: [{ k: 'showBusy' }, moved('running', 'blocked')],
         };
       if (s.state === 'blocked' && input.at - s.lastBeatAt > cfg.killAfterMs)
-        return crash(s, input.at, 'unresponsive', `No heartbeat for ${cfg.killAfterMs} ms`, cfg);
+        return crash(
+          s,
+          input.at,
+          'unresponsive',
+          workerMessage(input.pool, 'stopped responding', `No heartbeat for ${cfg.killAfterMs} ms`),
+          cfg,
+        );
       return same;
 
     case 'error':
@@ -250,7 +266,15 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
       return crash(s, input.at, 'error', input.message, cfg);
 
     case 'workerError':
-      return live(s.state) ? crash(s, input.at, 'worker_error', input.message, cfg) : same;
+      return live(s.state)
+        ? crash(
+            s,
+            input.at,
+            'worker_error',
+            workerMessage(input.pool, 'failed', input.message),
+            cfg,
+          )
+        : same;
 
     case 'poolCrash':
       return live(s.state) ? crash(s, input.at, input.reason, input.message, cfg) : same;

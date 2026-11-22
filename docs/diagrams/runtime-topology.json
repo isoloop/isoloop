@@ -75,15 +75,15 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 200,
-          "end_line": 326,
+          "line": 210,
+          "end_line": 336,
           "label": "state machine",
           "anchor": "export function step(s: IsolateSupervision, input: SupervisorInput, cfg: SupervisorConfig): Step {"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1044,
-          "end_line": 1065,
+          "line": 1045,
+          "end_line": 1066,
           "label": "pool fate",
           "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
           "anchor_offset": 1

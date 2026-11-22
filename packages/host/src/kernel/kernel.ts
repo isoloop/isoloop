@@ -1038,7 +1038,8 @@ export function createKernel(config: KernelConfig): Kernel {
     run(slot, effects);
     // A member that crashed with its pool doesn't pass the crash on: poolFate
     // is already going through the others, with the message they all share.
-    if (loaded?.pool !== undefined && input.k !== 'poolCrash') poolFate(slot, loaded, effects);
+    if (loaded?.pool !== undefined && input.k !== 'poolCrash')
+      poolFate(slot, loaded, input, effects);
   };
 
   /**
@@ -1050,13 +1051,23 @@ export function createKernel(config: KernelConfig): Kernel {
    * error, ready timeout or version mismatch stays that member's: it leaves
    * the pool alone.
    */
-  const poolFate = (slot: Slot, loaded: LoadedWorker, effects: SupervisorEffect[]): void => {
+  const poolFate = (
+    slot: Slot,
+    loaded: LoadedWorker,
+    input: SupervisorInput,
+    effects: SupervisorEffect[],
+  ): void => {
     for (const fx of effects) {
       if (fx.k !== 'emit' || fx.event !== 'isolate:crash') continue;
       const { reason, message } = fx.data;
       if (reason !== 'unresponsive' && reason !== 'worker_error') return;
       const at = performance.now();
-      const why = `pool "${loaded.pool}" restarted: "${slot.manifest.id}" ${reason === 'unresponsive' ? 'stopped responding' : 'took the worker down'} (${message})`;
+      // The worker's failure already says so, and names no member: the kernel
+      // can't know which caused it. Only a kill names the one it was aimed at.
+      const killed = input.k === 'workerError' && input.pool === undefined;
+      const why = killed
+        ? `pool "${loaded.pool}" restarted: "${slot.manifest.id}" took the worker down (${message})`
+        : message;
       for (const other of slots.values())
         if (other !== slot && other.loaded?.worker === loaded.worker)
           feed(other, { k: 'poolCrash', at, reason, message: why });
@@ -1367,6 +1378,7 @@ export function createKernel(config: KernelConfig): Kernel {
         feed(slot, {
           k: 'workerError',
           at: performance.now(),
+          pool: loaded.pool,
           message: e.message || 'Unknown error',
         });
     });
@@ -1375,6 +1387,7 @@ export function createKernel(config: KernelConfig): Kernel {
         feed(slot, {
           k: 'workerError',
           at: performance.now(),
+          pool: loaded.pool,
           message: 'A message from the isolate could not be deserialised',
         });
     });
@@ -1645,7 +1658,7 @@ export function createKernel(config: KernelConfig): Kernel {
     const at = performance.now();
     controller?.feed({ k: 'tick', at });
     for (const slot of slots.values()) {
-      feed(slot, { k: 'tick', at });
+      feed(slot, { k: 'tick', at, pool: slot.loaded?.pool });
       if (isIdle(slot, at)) feed(slot, { k: 'suspend' });
     }
     if (wakeQueue.length > 0) pumpWakes();
