@@ -50,7 +50,8 @@ async function openPage(page: Page, port: number): Promise<void> {
     async ({ contracts, answerer, headless, token, url }) => {
       const kernel = await window.harness.createBusKernel(contracts, {
         agents: { expose: ['answer.v1'] },
-        heartbeat: { everyMs: 100, blockedAfterMs: 400, killAfterMs: 1_500 },
+        // A short warm-up, since these hang right after start (ADR 0001).
+        heartbeat: { everyMs: 100, blockedAfterMs: 400, killAfterMs: 1_500, readyTimeoutMs: 3_000 },
       });
       window.kernel = kernel;
       await new Promise<void>((resolve) => kernel.on('bus:ready', () => resolve()));

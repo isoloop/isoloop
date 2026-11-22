@@ -38,7 +38,8 @@ describe('I1: only the compositor writes under a surface', () => {
   it('renders, events, host calls, styles, busy, crash, restart, failure and retry all write inside compositor sections', async () => {
     const kernel = createKernel({
       workers: { isolateBootstrap: bootstrap },
-      heartbeat: { blockedAfterMs: 150, killAfterMs: 500 },
+      // These block right after `ready`, so the warm-up is short (ADR 0001).
+      heartbeat: { blockedAfterMs: 150, killAfterMs: 500, readyTimeoutMs: 2500 },
       supervisor: { maxRestarts: 1, backoff: { initialMs: 50 } },
     });
     kernels.push(kernel);

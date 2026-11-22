@@ -7,6 +7,7 @@ import { createKernel, type Kernel, type KernelConfig, type KernelEvents } from 
 
 const bootstrap = `${new URL('../../../runtime/src/bootstrap.ts', import.meta.url).href}?worker_file&type=module`;
 const counter = new URL('../__fixtures__/counter.ts', import.meta.url).href;
+const slowStart = new URL('../__fixtures__/slow-start.ts', import.meta.url).href;
 const spin = new URL('../__fixtures__/spin.ts', import.meta.url).href;
 const throws = new URL('../__fixtures__/throws.ts', import.meta.url).href;
 const timerThrows = new URL('../__fixtures__/timer-throws.ts', import.meta.url).href;
@@ -86,9 +87,47 @@ describe('worker pools (M2c)', () => {
     expect(k.debug.workers()).toEqual({ live: 2, pools: { p: ['A'], q: ['B'] } });
   });
 
+  describe('start-up warm-up (ADR 0001)', () => {
+    const quick = { everyMs: 50, blockedAfterMs: 100, killAfterMs: 300 };
+
+    it('a start() longer than killAfterMs is waited out, in an own worker and in a pool', async () => {
+      const k = kernel({ heartbeat: quick });
+      const crashes: KernelEvents['isolate:crash'][] = [];
+      k.on('isolate:crash', (e) => crashes.push(e));
+      const blocked = new Set<string>();
+      k.on('isolate:state', (e) => {
+        if (e.state === 'blocked') blocked.add(e.id);
+      });
+      const busy = { src: slowStart, config: { busyMs: 1200 } };
+      k.spawn({ id: 'own', ...busy });
+      for (const id of ['A', 'B']) k.spawn({ id, pool: 'p', ...busy });
+      await waitFor(() => blocked.has('own') && blocked.has('A'));
+      await waitFor(() => running(k, ['own', 'A', 'B']), 6000);
+      expect(crashes).toEqual([]);
+    });
+
+    it("a late member's start() doesn't get a pool killed whose first window has closed", async () => {
+      const k = kernel({ heartbeat: { ...quick, readyTimeoutMs: 2000 } });
+      const crashes: KernelEvents['isolate:crash'][] = [];
+      k.on('isolate:crash', (e) => crashes.push(e));
+      k.spawn({ id: 'A', src: counter, pool: 'p' });
+      await waitFor(() => running(k, ['A']));
+      await new Promise((r) => setTimeout(r, 2200));
+      const blocked = new Set<string>();
+      k.on('isolate:state', (e) => {
+        if (e.state === 'blocked') blocked.add(e.id);
+      });
+      k.spawn({ id: 'B', src: slowStart, pool: 'p', config: { busyMs: 1200 } });
+      await waitFor(() => blocked.has('A'));
+      await waitFor(() => running(k, ['A', 'B']), 5000);
+      expect(crashes).toEqual([]);
+    });
+  });
+
   describe('supervision as a group (M2c task 3)', () => {
     const fast = {
-      heartbeat: { everyMs: 50, blockedAfterMs: 200, killAfterMs: 600 },
+      // These block right after `ready`, so the warm-up is short (ADR 0001).
+      heartbeat: { everyMs: 50, blockedAfterMs: 200, killAfterMs: 600, readyTimeoutMs: 2500 },
       supervisor: { backoff: { baseMs: 50, maxMs: 50 } },
     };
 

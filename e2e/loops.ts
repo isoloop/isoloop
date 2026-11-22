@@ -55,18 +55,21 @@ export type LoopsOptions = {
   killAfterMs?: number;
 };
 
+/** With a low `killAfterMs`, a short warm-up: the tests hang a loop soon after start (ADR 0001). */
+const WARMUP_MS = 4000;
+
 export const pane = (page: Page, id: string) => page.locator(`section[data-isolate="${id}"]`);
 
 /** Creates the kernel and spawns every isolate on the already loaded harness page. */
 export async function mountLoops(page: Page, opts: LoopsOptions = {}): Promise<void> {
   await expect(page.locator('body[data-ready]')).toBeAttached();
   await page.evaluate(
-    async ({ base, visual, store, killAfterMs }) => {
+    async ({ base, visual, store, killAfterMs, warmUpMs }) => {
       // The real supervisor's defaults: backoff 250 ms × 2ⁿ, and the fourth
       // crash within 60 s fails the isolate, which then shows the fallback.
       const kernel = await window.harness.createBusKernel(
         `${base}loops-contracts.js`,
-        killAfterMs ? { heartbeat: { killAfterMs } } : {},
+        killAfterMs ? { heartbeat: { killAfterMs, readyTimeoutMs: warmUpMs } } : {},
       );
       window.kernel = kernel;
       window.__isoloop = kernel.debug;
@@ -82,7 +85,13 @@ export async function mountLoops(page: Page, opts: LoopsOptions = {}): Promise<v
       }
       kernel.spawn({ id: store.id, src: `${base}${store.file}`, grants: store.grants });
     },
-    { base: ISOLATES_CORS, visual: VISUAL, store: STORE, killAfterMs: opts.killAfterMs },
+    {
+      base: ISOLATES_CORS,
+      visual: VISUAL,
+      store: STORE,
+      killAfterMs: opts.killAfterMs,
+      warmUpMs: WARMUP_MS,
+    },
   );
 }
 

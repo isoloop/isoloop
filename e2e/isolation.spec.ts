@@ -187,7 +187,8 @@ test('headless: supervised like any isolate, no DOM writes, measure answers no_s
         characterData: true,
       });
       const kernel = await window.harness.createBusKernel(contracts, {
-        heartbeat: { blockedAfterMs: 200, killAfterMs: 800 },
+        // A short warm-up, since these hang right after start (ADR 0001).
+        heartbeat: { blockedAfterMs: 200, killAfterMs: 800, readyTimeoutMs: 3000 },
       });
       const states: string[] = [];
       const reports: unknown[] = [];

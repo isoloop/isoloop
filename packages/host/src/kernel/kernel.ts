@@ -101,9 +101,15 @@ export type KernelConfig = {
     everyMs?: number;
     /** No beat for this long marks the isolate `blocked`, in ms. Default 400. */
     blockedAfterMs?: number;
-    /** No beat for this long terminates the worker as `unresponsive`, in ms. Default 10 000 (10 s). */
+    /**
+     * No beat for this long terminates the worker as `unresponsive`, in ms. Default 10 000 (10 s).
+     *
+     * During the start-up warm-up a kill waits for `readyTimeoutMs` without a beat, if that's longer,
+     * so a long `start()` isn't killed. The warm-up lasts `readyTimeoutMs` from `ready`; in a pool,
+     * from the latest member's `ready`.
+     */
     killAfterMs?: number;
-    /** No `ready` this long after the spawn crashes it as `ready_timeout`, in ms. Default 10 000 (10 s). */
+    /** No `ready` this long after the spawn crashes it as `ready_timeout`, in ms. Also the length of the start-up warm-up (`killAfterMs`). Default 10 000 (10 s). */
     readyTimeoutMs?: number;
   };
   /** Stylesheets adopted into every surface's shadow root. Default: none. */
@@ -1251,7 +1257,13 @@ export function createKernel(config: KernelConfig): Kernel {
               `Isoloop: workers.isolateBootstrap ends in ${ENTRY_MARK} but doesn't start @isoloop/runtime/worker; memory per isolate is off (ADR 0020)`,
             );
           }
-          feed(slot, { k: 'ready' });
+          const at = performance.now();
+          feed(slot, { k: 'ready', at });
+          // Members share a loop, so one starting keeps the whole pool in warm-up (ADR 0001).
+          if (slot.loaded?.pool !== undefined)
+            for (const other of slots.values())
+              if (other !== slot && other.loaded?.worker === slot.loaded.worker)
+                feed(other, { k: 'poolReady', at });
           return;
         }
         case 'beat':

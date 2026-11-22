@@ -65,7 +65,12 @@ type HarnessKernel = {
 
 type HarnessConfig = {
   supervisor?: { strategy?: 'one-for-one' | 'never'; backoff?: { initialMs?: number } };
-  heartbeat?: { everyMs?: number; blockedAfterMs?: number; killAfterMs?: number };
+  heartbeat?: {
+    everyMs?: number;
+    blockedAfterMs?: number;
+    killAfterMs?: number;
+    readyTimeoutMs?: number;
+  };
   budget?: number;
   routing?: boolean;
   basePath?: string;

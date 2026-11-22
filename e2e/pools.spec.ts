@@ -32,7 +32,8 @@ const run =
     page.evaluate(
       async ({ src, contracts, which }): Promise<Out> => {
         const kernel = await window.harness.createBusKernel(contracts, {
-          heartbeat: { blockedAfterMs: 200, killAfterMs: 800 },
+          // A short warm-up, since these hang right after start (ADR 0001).
+          heartbeat: { blockedAfterMs: 200, killAfterMs: 800, readyTimeoutMs: 4000 },
           supervisor: { strategy: which === 'throw' ? 'never' : 'one-for-one' },
         });
         const crashes: Out['crashes'] = [];

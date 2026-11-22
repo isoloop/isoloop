@@ -51,7 +51,8 @@ const run = (page: import('@playwright/test').Page, faulty: string, fault: Fault
   page.evaluate(
     async ({ base, layout, faulty: who, fault: which }): Promise<Out> => {
       const kernel = await window.harness.createBusKernel(new URL('contracts.js', base).href, {
-        heartbeat: { blockedAfterMs: 200, killAfterMs: 800 },
+        // A short warm-up, since these hang right after start (ADR 0001).
+        heartbeat: { blockedAfterMs: 200, killAfterMs: 800, readyTimeoutMs: 4000 },
         supervisor: { strategy: 'one-for-one' },
       });
       const crashes: Out['crashes'] = [];

@@ -59,7 +59,10 @@ export type CrashReason =
   | 'worker_error'
   /** No `ready` within `readyTimeoutMs` of the spawn. */
   | 'ready_timeout'
-  /** Blocked for `killAfterMs` without a beat; the worker was terminated. */
+  /**
+   * Blocked for `killAfterMs` without a beat, or for longer during the start-up
+   * warm-up (`heartbeat.killAfterMs`); the worker was terminated.
+   */
   | 'unresponsive'
   /** `new Worker` threw. */
   | 'spawn_failed'
@@ -103,6 +106,11 @@ export type IsolateSupervision = {
   spawnedAt: number;
   /** `performance.now()` of the last beat, or of the spawn before the first one. */
   lastBeatAt: number;
+  /**
+   * When the start-up warm-up began (ADR 0001): its `ready`, or in a pool the
+   * latest `ready` on its worker. Unset until then.
+   */
+  readyAt?: number;
   lagMs: number;
   /** Crash restarts since spawn. A manual respawn doesn't count. */
   restarts: number;
@@ -117,7 +125,10 @@ export type IsolateSupervision = {
 
 export type SupervisorInput =
   | { k: 'spawned'; at: number }
-  | { k: 'ready' }
+  /** Without `at`, no warm-up: the bus worker, which shares this machine, has none. */
+  | { k: 'ready'; at?: number }
+  /** A later member said `ready` on its pool's worker: the warm-up begins again. */
+  | { k: 'poolReady'; at: number }
   | { k: 'beat'; at: number; lagMs: number }
   /** `pool`: the pool whose worker it shares, as on `workerError`. */
   | { k: 'tick'; at: number; pool?: string | undefined }
@@ -207,6 +218,22 @@ const withoutCrash = (s: IsolateSupervision): IsolateSupervision => {
 const workerMessage = (pool: string | undefined, what: string, detail: string): string =>
   pool === undefined ? detail : `pool "${pool}" restarted: its worker ${what} (${detail})`;
 
+/**
+ * The silence that kills a blocked isolate at `at`. During the start-up
+ * warm-up, `readyTimeoutMs` from `readyAt`, that's `readyTimeoutMs` (ADR 0001),
+ * because `ready` goes out before `start()`. It's never less than `killAfterMs`.
+ */
+const killAfter = (s: IsolateSupervision, at: number, cfg: SupervisorConfig): number =>
+  s.readyAt !== undefined && at - s.readyAt <= cfg.readyTimeoutMs
+    ? Math.max(cfg.killAfterMs, cfg.readyTimeoutMs)
+    : cfg.killAfterMs;
+
+/** A new worker has no warm-up until its own `ready`. */
+const withoutWarmUp = (s: IsolateSupervision): IsolateSupervision => {
+  const { readyAt: _previous, ...rest } = s;
+  return rest;
+};
+
 export function step(s: IsolateSupervision, input: SupervisorInput, cfg: SupervisorConfig): Step {
   const same: Step = { s, effects: [] };
   switch (input.k) {
@@ -214,7 +241,7 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
       if (s.state !== 'restarting' && s.state !== 'suspended') return same;
       return {
         s: {
-          ...withoutCrash(s),
+          ...withoutWarmUp(withoutCrash(s)),
           state: 'loading',
           spawnedAt: input.at,
           lastBeatAt: input.at,
@@ -226,9 +253,13 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
     case 'ready':
       if (s.state !== 'loading') return same;
       return {
-        s: { ...s, state: 'running' },
+        s: { ...s, state: 'running', ...(input.at === undefined ? {} : { readyAt: input.at }) },
         effects: [emit({ event: 'isolate:ready', data: {} }), moved('loading', 'running')],
       };
+
+    case 'poolReady':
+      if (s.state !== 'running' && s.state !== 'blocked') return same;
+      return { s: { ...s, readyAt: input.at }, effects: [] };
 
     case 'beat': {
       if (!live(s.state)) return same;
@@ -249,14 +280,17 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
           s: { ...s, state: 'blocked' },
           effects: [{ k: 'showBusy' }, moved('running', 'blocked')],
         };
-      if (s.state === 'blocked' && input.at - s.lastBeatAt > cfg.killAfterMs)
-        return crash(
-          s,
-          input.at,
-          'unresponsive',
-          workerMessage(input.pool, 'stopped responding', `No heartbeat for ${cfg.killAfterMs} ms`),
-          cfg,
-        );
+      if (s.state === 'blocked') {
+        const silence = killAfter(s, input.at, cfg);
+        if (input.at - s.lastBeatAt > silence)
+          return crash(
+            s,
+            input.at,
+            'unresponsive',
+            workerMessage(input.pool, 'stopped responding', `No heartbeat for ${silence} ms`),
+            cfg,
+          );
+      }
       return same;
 
     case 'error':

@@ -23,7 +23,8 @@ function kernel(): Kernel {
     workers: { isolateBootstrap: bootstrap, bus: busWorker },
     contracts: { url: contractsUrl, list },
     supervisor: { maxRestarts: 5, backoff: { initialMs: 20 } },
-    heartbeat: { everyMs: 50, blockedAfterMs: 200, killAfterMs: 600 },
+    // These block right after `ready`, so the warm-up is short (ADR 0001).
+    heartbeat: { everyMs: 50, blockedAfterMs: 200, killAfterMs: 600, readyTimeoutMs: 2500 },
   });
   kernels.push(k);
   return k;
@@ -219,7 +220,7 @@ describe('the controls over the port', () => {
     });
     k.spawn({ id: 'T', src: burn });
     await waitFor(() => k.isolates().find((i) => i.id === 'T')?.state === 'running');
-    const reports = inspectorIsolate(k, { do: 'control', action: 'block', target: 'T', ms: 2000 });
+    const reports = inspectorIsolate(k, { do: 'control', action: 'block', target: 'T', ms: 4000 });
     await waitFor(() => step(reports, 'done') !== undefined);
     await waitFor(() => states.includes('blocked'));
     await waitFor(() => got.some((e) => e.id === 'T' && e.reason === 'unresponsive'));

@@ -277,7 +277,7 @@ A pure state machine per isolate plus timers, separated so it can be unit-tested
 ```ts
 type IsolateState = 'loading' | 'running' | 'blocked' | 'stopped' | 'crashed' | 'restarting' | 'failed' | 'suspended';
 type SupervisorInput =
-  | { k: 'spawned'; at: number } | { k: 'ready' } | { k: 'beat'; at: number; lagMs: number } | { k: 'tick'; at: number; pool?: string }
+  | { k: 'spawned'; at: number } | { k: 'ready'; at?: number } | { k: 'poolReady'; at: number } | { k: 'beat'; at: number; lagMs: number } | { k: 'tick'; at: number; pool?: string }
   | { k: 'error'; at: number; fatal: boolean; message: string } | { k: 'workerError'; at: number; message: string; pool?: string }
   | { k: 'spawnFailed' | 'renderFmtMismatch' | 'busFailed'; at: number; message: string }
   | { k: 'versionMismatch'; at: number; reason: 'runtime_too_old' | 'isolate_too_old'; message: string }
@@ -304,7 +304,8 @@ Transitions (matching the RFC lifecycle diagram):
 | loading | tick past `readyTimeoutMs` | crashed | terminate |
 | running | tick, no beat for `blockedAfterMs` | blocked | showBusy |
 | blocked | `beat` | running | hideBusy |
-| blocked | tick, no beat for `killAfterMs` | crashed | terminate |
+| blocked | tick, no beat for `killAfterMs`; during the warm-up, for `readyTimeoutMs` if that's longer | crashed | terminate |
+| running / blocked | `poolReady`: a later member's `ready` on its worker | unchanged | the warm-up starts again (ADR 0001) |
 | running / blocked | `workerError` or fatal `error` | crashed | terminate, emit `isolate:crash` |
 | loading / running / blocked | `poolCrash`: another member of its pool crashed with `unresponsive` or `worker_error` | crashed | with that member's reason; every member restarts, in a new worker |
 | crashed | restarts in window < max | restarting | spawn after backoff |

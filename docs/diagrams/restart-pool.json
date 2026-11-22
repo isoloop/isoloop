@@ -44,8 +44,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1045,
-          "end_line": 1066,
+          "line": 1051,
+          "end_line": 1072,
           "label": "pool fate",
           "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
           "anchor_offset": 1

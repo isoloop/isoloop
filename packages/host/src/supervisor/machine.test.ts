@@ -51,7 +51,7 @@ describe('supervisor transition table', () => {
     [
       'loading → running on ready, emits isolate:ready',
       at('loading'),
-      { k: 'ready' },
+      { k: 'ready', at: 0 },
       { state: 'running' },
       [{ k: 'emit', event: 'isolate:ready', data: {} }, moved('loading', 'running')],
     ],
@@ -429,7 +429,7 @@ describe('supervisor edges', () => {
 const crashAt = (t: number): SupervisorInput[] => [
   { k: 'workerError', at: t, message: 'boom' },
   { k: 'spawned', at: t },
-  { k: 'ready' },
+  { k: 'ready', at: 0 },
 ];
 const spawns = (effects: SupervisorEffect[]): number[] =>
   effects.flatMap((e) => (e.k === 'spawn' ? [e.afterMs] : []));
@@ -491,7 +491,7 @@ describe('restart policy (fake clock)', () => {
     const { s, effects } = run(failed, [
       { k: 'respawn' },
       { k: 'spawned', at: 4 },
-      { k: 'ready' },
+      { k: 'ready', at: 0 },
       { k: 'workerError', at: 5, message: 'boom' },
     ]);
     expect(s.state).toBe('restarting');
@@ -521,5 +521,63 @@ describe('wake order (ADR 0001)', () => {
         { id: 'a1', rect: { top: 0, left: 10 } },
       ]),
     ).toEqual(['a1', 'a2', 'b', 'h1', 'h2']);
+  });
+});
+
+describe('start-up warm-up (ADR 0001)', () => {
+  const short: SupervisorConfig = { ...cfg, killAfterMs: 2000 };
+  const ready = (readyAt: number, c = short): IsolateSupervision =>
+    run(at('loading'), [{ k: 'ready', at: readyAt }], c).s;
+  /** Silent from `since`: blocked 401 ms later, then judged at `now`. */
+  const silent = (s: IsolateSupervision, since: number, now: number, c = short) =>
+    run(
+      { ...s, lastBeatAt: since },
+      [
+        { k: 'tick', at: since + 401 },
+        { k: 'tick', at: now },
+      ],
+      c,
+    );
+
+  it('still shows blocked after blockedAfterMs, but waits to kill', () => {
+    const { s, effects } = silent(ready(0), 0, 9999);
+    expect(s.state).toBe('blocked');
+    expect(effects).toEqual([{ k: 'showBusy' }, moved('running', 'blocked')]);
+  });
+
+  it('kills one still silent when the window closes', () => {
+    const { s } = silent(ready(0), 0, 10_001);
+    expect(s).toMatchObject({ state: 'restarting', reason: 'unresponsive' });
+  });
+
+  it('kills inside the window after readyTimeoutMs of silence', () => {
+    // Its last beat was before `ready`.
+    const { s } = silent(ready(3000), 0, 10_001);
+    expect(s).toMatchObject({ state: 'restarting', error: 'No heartbeat for 10000 ms' });
+  });
+
+  it('uses killAfterMs again once the window has closed', () => {
+    expect(silent(ready(0), 20_000, 22_000).s.state).toBe('blocked');
+    expect(silent(ready(0), 20_000, 22_001).s).toMatchObject({
+      state: 'restarting',
+      error: 'No heartbeat for 2000 ms',
+    });
+  });
+
+  it('never makes a kill earlier than killAfterMs', () => {
+    const long: SupervisorConfig = { ...cfg, killAfterMs: 20_000, readyTimeoutMs: 1000 };
+    // Still inside the window, and silent for longer than readyTimeoutMs.
+    expect(silent(ready(3000, long), 1000, 3500, long).s.state).toBe('blocked');
+  });
+
+  it("a later member's ready on the worker opens a pool member's window again", () => {
+    const { s } = run(ready(0), [{ k: 'poolReady', at: 15_000 }], short);
+    expect(silent(s, 15_000, 24_999).s.state).toBe('blocked');
+    expect(silent(s, 15_000, 25_001).s.state).toBe('restarting');
+  });
+
+  it('a restart closes the window until the next ready', () => {
+    const killed = silent(ready(0), 0, 10_001).s;
+    expect(run(killed, [{ k: 'spawned', at: 11_000 }], short).s.readyAt).toBeUndefined();
   });
 });

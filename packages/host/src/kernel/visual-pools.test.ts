@@ -27,7 +27,8 @@ function setup() {
       isolateBootstrap: worker('../../../runtime/src/bootstrap.ts'),
       bus: worker('../../../bus/src/worker.ts'),
     },
-    heartbeat: { everyMs: 50, blockedAfterMs: 200, killAfterMs: 600 },
+    // These block right after `ready`, so the warm-up is short (ADR 0001).
+    heartbeat: { everyMs: 50, blockedAfterMs: 200, killAfterMs: 600, readyTimeoutMs: 2500 },
     supervisor: { backoff: { initialMs: 50, maxMs: 50 } },
   });
   kernels.push(kernel);

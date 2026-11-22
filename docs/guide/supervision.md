@@ -28,9 +28,18 @@ Each isolate is in one state, shown by `kernel.isolates()` (`state`, `lagMs`, `r
 The runtime in each worker sends a **heartbeat** every `heartbeat.everyMs` (100 ms) with `lagMs`: how late the beat itself ran. The kernel checks every 50 ms. An isolate that runs a long synchronous task can't beat, so:
 
 - **After `blockedAfterMs` (400 ms) without a beat,** the isolate is `blocked`. A beat that arrives brings it back to `running`.
-- **After `killAfterMs` (10 000 ms) without a beat,** the kernel terminates the worker and counts a crash with reason `unresponsive`.
+- **After `killAfterMs` (10 000 ms) without a beat,** the kernel terminates the worker and counts a crash with reason `unresponsive`. During the [start-up warm-up](#start-up-warm-up) it waits longer.
 
 `lagMs` comes with a beat, so a block shows in it only once the block ends and the late beat arrives; while the block lasts, `lagMs` keeps the last beat's value, often 0. To see a block in progress, read `state` and the time since `lastBeatAt` (`sinceBeatMs` in the dev MCP's `isoloop_isolates`).
+
+### Start-up warm-up
+
+An isolate says `ready` before its `start()` runs, so mounting and the first replay could look like a hang. For `readyTimeoutMs` (10 000 ms) after `ready`, a kill waits until there's been no beat for `readyTimeoutMs`, or for `killAfterMs` if that's longer. Then `killAfterMs` applies again.
+
+- **`blocked` isn't delayed:** the overlay shows after `blockedAfterMs` as usual.
+- **In a pool,** the warm-up starts again with each member's `ready`, for every member on that worker, since they share a loop.
+- **With a `killAfterMs` under `readyTimeoutMs`,** a block soon after a start or a restart can end without a kill, and a real hang there is killed up to `readyTimeoutMs` later. The defaults are equal, so they change nothing.
+- **The bus worker has none:** `killAfterMs` applies to it from the start.
 
 A crash also comes from the other causes in `CrashReason`:
 
@@ -103,10 +112,10 @@ Every field is optional. `backoff` takes any of its three fields; the rest keep 
 | `supervisor.backoff.maxMs` | `4000` | The cap. |
 | `heartbeat.everyMs` | `100` | How often a worker beats. |
 | `heartbeat.blockedAfterMs` | `400` | Silence before `blocked`. |
-| `heartbeat.killAfterMs` | `10000` | Silence before the worker is terminated. |
-| `heartbeat.readyTimeoutMs` | `10000` | Time a worker gets to say `ready`. |
+| `heartbeat.killAfterMs` | `10000` | Silence before the worker is terminated, outside the [warm-up](#start-up-warm-up). |
+| `heartbeat.readyTimeoutMs` | `10000` | Time a worker gets to say `ready`, and the length of the warm-up after it. |
 
-A lower `killAfterMs` frees a stuck widget sooner and kills a slow but healthy one sooner too. A worker that does heavy work in one synchronous run needs a limit longer than that run.
+A lower `killAfterMs` frees a stuck widget sooner once it has warmed up, and kills a slow but healthy one sooner too. A worker that does heavy work in one synchronous run needs a limit longer than that run.
 
 The same settings apply to the bus worker ([below](#the-bus-worker)). Isolates can't set their own: supervision belongs to the host.
 
@@ -206,7 +215,7 @@ Suspension never touches the restart window. A pool suspends only as a whole, wh
 
 - **State in the isolate's memory is lost on a restart.** Keep what must survive on the bus, in a persistent topic.
 - **Delivery is at least once.** A restart can replay up to one commit interval of records that were already handled.
-- **A hang is only caught after `killAfterMs`** (10 s by default), and a hidden tab isn't judged until it's visible. Until then a stuck isolate is `blocked` and a pool's other members are blocked with it.
+- **A hang is only caught after `killAfterMs`** (10 s by default; later during a [warm-up](#start-up-warm-up) when you set it lower), and a hidden tab isn't judged until it's visible. Until then a stuck isolate is `blocked` and a pool's other members are blocked with it.
 - **A pool fails together.** One member that hangs restarts its neighbours and counts against each one's limit. Keep isolates that must not share fate in their own workers.
 - **A failed isolate isn't retried.** The window ends the automatic retries; a person or your code restarts it.
 - **Some failures skip the retries.** A render format mismatch, a version mismatch or a bus that can't load its contracts fails the isolate on the first crash.

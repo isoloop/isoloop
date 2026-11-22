@@ -61,7 +61,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 describe('supervision', () => {
   it('an isolate that loops forever goes blocked, then crashes after killAfterMs', async () => {
     const { log, spawn } = setup({
-      heartbeat: { blockedAfterMs: 200, killAfterMs: 600 },
+      // These block right after `ready`, so the warm-up is short (ADR 0001).
+      heartbeat: { blockedAfterMs: 200, killAfterMs: 600, readyTimeoutMs: 2500 },
       supervisor: { strategy: 'never' },
     });
     const a = spawn('A', fixture('spin'));
@@ -112,11 +113,15 @@ describe('supervision', () => {
 
   it('I14: hiding the page for longer than killAfterMs restarts nothing', async () => {
     const counter = fixture('counter');
-    const { log, spawn } = setup({ heartbeat: { blockedAfterMs: 100, killAfterMs: 300 } });
+    const { log, spawn } = setup({
+      heartbeat: { blockedAfterMs: 100, killAfterMs: 300, readyTimeoutMs: 2000 },
+    });
     const a = spawn('A', counter);
     const b = spawn('B', counter);
     await waitFor(() => a.handle.snapshot().state === 'running');
     await waitFor(() => b.handle.snapshot().state === 'running');
+    // Past the warm-up, which would spare the silence on its own (ADR 0001).
+    await sleep(2100);
 
     setHidden(true);
     // A goes silent for 700 ms, more than twice killAfterMs, while the page is hidden.
