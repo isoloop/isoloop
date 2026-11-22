@@ -190,7 +190,8 @@ const disconnect = connectWebMCP(kernel);
 - **Each tool** is registered with its name, title, description, input and output JSON Schemas and hints. A call runs `kernel.request(tool.topic, input, { timeoutMs: tool.timeoutMs, signal, via: 'webmcp' })` and resolves with the reply.
 - **Tools stay registered** while their isolates restart.
 - **Disconnecting** unregisters every tool and aborts the calls still in flight.
-- **Without WebMCP** it does nothing and returns a function that does nothing. There's no shim; in development the dev MCP covers other browsers.
+- **Without WebMCP** it does nothing and returns a function that does nothing. Isoloop has no shim of its own; in development the dev MCP covers other browsers.
+- **With a polyfill.** If the page imports `@w3c/webmcp-polyfill/auto` before calling `connectWebMCP`, the tools register on the `document.modelContext` it installs, in a secure context. The polyfill leaves a native `document.modelContext` alone (Chromium). Firefox 159 has WebMCP only on `navigator`, so there the polyfill still installs a `document.modelContext`, `connectWebMCP` registers on it, and the tools don't reach Firefox's own WebMCP. The polyfill keeps the tools in the page, so they reach an agent only through something that reads `document.modelContext`, such as an extension. Checked by hand with version 0.1.1 in Chrome 153, not in CI or Firefox.
 
 Both browsers that have WebMCP keep it behind a flag. It's tested under Playwright only: Chromium with `--enable-features=WebMCP`, and Firefox with `dom.modelcontext.enabled`. The two differ, and `connectWebMCP` follows the features each one has, not its name:
 

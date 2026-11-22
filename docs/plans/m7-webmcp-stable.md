@@ -22,10 +22,12 @@
 
 1. **Follow the spec until it ships:** renames, the shape of `executeTool`'s result, annotation changes. Roughly one evening per breaking change.
 2. **Use `toolchange`:** keep the registered tools in step with the kernel while the page runs, for example when exposure changes at run time. 0.1 registers once.
-3. **Reconsider a shim** for browsers without WebMCP, registering into an in-page registry the dev MCP and the Builder can read. 0.1 has none.
-4. **Other engines** as they arrive: following Firefox's prefs was decided on 2026-11-19 (ADR 0018, decision 8) and arrives with isoloop#267 and its `firefox-webmcp` project; then Safari.
-5. **How errors reach the agent:** Chromium shows only "Tool execution failed", with the `BusError` in the page's console; Firefox passes the message on. Follow it until the browsers agree.
-6. **Drop `@experimental`** in the release after WebMCP ships.
+3. **Reconsider a shim** for browsers without WebMCP, registering into an in-page registry the dev MCP and the Builder can read. 0.1 has none. *2026-11-22:* look at `@w3c/webmcp-polyfill` as that registry before writing one: it installs `document.modelContext` with `getTools()` and `executeTool()`, and `connectWebMCP` already registers on it unchanged in Chromium (checked by hand, see the [AI-enablers investigation](../investigations/ai-enablers.md)). On Firefox it would register on the polyfill's `document.modelContext` instead of Firefox's own `navigator.modelContext`; detecting a native context before a polyfill is a candidate for this item.
+4. **Check our types against `webmcp-types`.** `@isoloop/webmcp` keeps its own narrow `ModelContext` and `WebMcpTool` types, since Firefox 159's shape (on `navigator`, not an `EventTarget`, `unregisterTool`, a synchronous `registerTool`) isn't in `webmcp-types`. Add `webmcp-types` as a dev dependency (pinned in the catalog; 0.2.0 clears the 3-day release-age gate on 2026-11-23) and a type-only test that fails when the draft's `WebMCP.ModelContextTool` stops accepting our tool, or the draft's `WebMCP.ModelContext` stops fitting our `ModelContext`. Nothing in the published `.d.ts` changes, so it takes `no-changeset`.
+5. **A conformance test against the polyfill:** one browser test file, separate from the unit tests, that installs `@w3c/webmcp-polyfill` once and runs `connectWebMCP` through `getTools()` and `executeTool()`. The unit tests keep their fakes, because the polyfill can't be uninstalled between tests.
+6. **Other engines** as they arrive: following Firefox's prefs was decided on 2026-11-19 (ADR 0018, decision 8) and arrives with isoloop#267 and its `firefox-webmcp` project; then Safari.
+7. **How errors reach the agent:** Chromium shows only "Tool execution failed", with the `BusError` in the page's console; Firefox passes the message on. Follow it until the browsers agree.
+8. **Drop `@experimental`** in the release after WebMCP ships.
 
 ## Open risks
 
