@@ -2,6 +2,10 @@
   "name": "@isoloop/protocol",
   "version": "0.1.0-next.11",
   "description": "Internal: Isoloop's wire protocol types and guards. Used by the @isoloop/* packages; not for app code.",
+  "keywords": [
+    "isoloop"
+  ],
+  "homepage": "https://isoloop.dev/",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

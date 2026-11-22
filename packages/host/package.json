@@ -1,7 +1,17 @@
 {
   "name": "@isoloop/host",
   "version": "0.1.0-next.11",
-  "description": "Main-thread kernel: loads, supervises and composites isolates.",
+  "description": "The Isoloop kernel: runs the parts of a JavaScript app as isolates, on their own workers or in shared pools, and restarts what fails.",
+  "keywords": [
+    "isoloop",
+    "web-workers",
+    "event-loop",
+    "isolation",
+    "supervisor",
+    "fault-isolation",
+    "microfrontends"
+  ],
+  "homepage": "https://isoloop.dev/docs/api/host/",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

@@ -1,7 +1,18 @@
 {
   "name": "@isoloop/bus",
   "version": "0.1.0-next.11",
-  "description": "Log bus that runs in its own worker: topics, schemas, offsets, replay.",
+  "description": "The Isoloop message bus: typed topics in a worker, with retention, replay and durable history.",
+  "keywords": [
+    "isoloop",
+    "web-workers",
+    "event-loop",
+    "isolation",
+    "message-bus",
+    "pubsub",
+    "event-log",
+    "replay"
+  ],
+  "homepage": "https://isoloop.dev/docs/api/bus/",
   "license": "MIT",
   "type": "module",
   "sideEffects": [

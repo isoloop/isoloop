@@ -2,6 +2,10 @@
   "name": "@isoloop/codec",
   "version": "0.1.0-next.11",
   "description": "Internal: the binary codec for Isoloop topic records. Used by @isoloop/bus; not for app code.",
+  "keywords": [
+    "isoloop"
+  ],
+  "homepage": "https://isoloop.dev/",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

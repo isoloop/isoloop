@@ -1,7 +1,16 @@
 {
   "name": "@isoloop/react",
   "version": "0.1.0-next.11",
-  "description": "React adapter for Isoloop isolates: defineIsolate(Component) and bus and host hooks.",
+  "description": "React for Isoloop: run a component as an isolate in a worker, with hooks for the message bus and the host.",
+  "keywords": [
+    "isoloop",
+    "web-workers",
+    "event-loop",
+    "isolation",
+    "react",
+    "microfrontends"
+  ],
+  "homepage": "https://isoloop.dev/docs/api/react/",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
