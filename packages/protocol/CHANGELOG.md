@@ -1,5 +1,12 @@
 # @isoloop/protocol
 
+## 0.1.0-next.12
+
+### Patch Changes
+
+- 2788228: The docs of `lagMs` say what it measures: how late the last beat fired. A blocked worker sends no beat, so it keeps the last beat's value during the block; read `state` and the time since the last beat to see a block in progress. The `isoloop_isolates` tool description says so too.
+- 3afc5f8: Each package's homepage on npm is its page on isoloop.dev, and each has search keywords. The public packages' npm descriptions say that they're Isoloop's and what each one does.
+
 ## 0.1.0-next.11
 
 No changes in this release.

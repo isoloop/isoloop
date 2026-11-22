@@ -1,5 +1,16 @@
 # @isoloop/bus
 
+## 0.1.0-next.12
+
+### Patch Changes
+
+- 3afc5f8: Each package's homepage on npm is its page on isoloop.dev, and each has search keywords. The public packages' npm descriptions say that they're Isoloop's and what each one does.
+- 03d13ef: Each package has a README on npm: what it gives you, how to install it, a small example, and links to its guides and API reference.
+- Updated dependencies [2788228]
+- Updated dependencies [3afc5f8]
+  - @isoloop/protocol@0.1.0-next.12
+  - @isoloop/codec@0.1.0-next.12
+
 ## 0.1.0-next.11
 
 ### Patch Changes

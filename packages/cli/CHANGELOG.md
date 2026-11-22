@@ -1,5 +1,21 @@
 # isoloop
 
+## 0.1.0-next.12
+
+### Minor Changes
+
+- 0c1d9c4: The CLI ships the "build with Isoloop" agent skill, and `isoloop skill add` copies it into `.claude/skills/build-with-isoloop/`, or into the folder given with `--dir`. A copy that differs is kept unless `--force` is given. The package has a README.
+
+### Patch Changes
+
+- 2788228: The docs of `lagMs` say what it measures: how late the last beat fired. A blocked worker sends no beat, so it keeps the last beat's value during the block; read `state` and the time since the last beat to see a block in progress. The `isoloop_isolates` tool description says so too.
+- 3afc5f8: Each package's homepage on npm is its page on isoloop.dev, and each has search keywords. The public packages' npm descriptions say that they're Isoloop's and what each one does.
+- Updated dependencies [2788228]
+- Updated dependencies [3afc5f8]
+- Updated dependencies [03d13ef]
+  - @isoloop/protocol@0.1.0-next.12
+  - @isoloop/bus@0.1.0-next.12
+
 ## 0.1.0-next.11
 
 ### Patch Changes

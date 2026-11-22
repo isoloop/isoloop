@@ -1,5 +1,18 @@
 # @isoloop/host
 
+## 0.1.0-next.12
+
+### Patch Changes
+
+- 2788228: The docs of `lagMs` say what it measures: how late the last beat fired. A blocked worker sends no beat, so it keeps the last beat's value during the block; read `state` and the time since the last beat to see a block in progress. The `isoloop_isolates` tool description says so too.
+- 3afc5f8: Each package's homepage on npm is its page on isoloop.dev, and each has search keywords. The public packages' npm descriptions say that they're Isoloop's and what each one does.
+- 03d13ef: Each package has a README on npm: what it gives you, how to install it, a small example, and links to its guides and API reference.
+- cceac10: When a pool's worker stops responding or fails, every member's crash carries the same one-line message, such as `pool "widgets" restarted: its worker stopped responding (No heartbeat for 10000 ms)`. It names no member, because the kernel can't know which one caused it. It used to blame the first member it checked, and each message wrapped the one before it. A kill through the inspection feed still names the member that was killed.
+- Updated dependencies [2788228]
+- Updated dependencies [3afc5f8]
+  - @isoloop/protocol@0.1.0-next.12
+  - @isoloop/dom@0.1.0-next.12
+
 ## 0.1.0-next.11
 
 ### Patch Changes

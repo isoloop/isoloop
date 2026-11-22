@@ -1,5 +1,11 @@
 # @isoloop/codec
 
+## 0.1.0-next.12
+
+### Patch Changes
+
+- 3afc5f8: Each package's homepage on npm is its page on isoloop.dev, and each has search keywords. The public packages' npm descriptions say that they're Isoloop's and what each one does.
+
 ## 0.1.0-next.11
 
 No changes in this release.
