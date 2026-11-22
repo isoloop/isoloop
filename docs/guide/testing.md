@@ -204,6 +204,8 @@ The two helpers fake the isolate's side of a conversation, so they say nothing a
 
 Isoloop ships no helper for these. A test starts the kernel in a browser, as your app does, and drives the page. This repo does so with Vitest's browser mode for the packages' own tests (`*.browser.test.ts`, run by `pnpm test:browser`) and with Playwright for the end-to-end suites against a harness page ([`e2e/`](../../e2e/), run by `pnpm e2e`), in Chromium, Firefox and WebKit. Either runner works in your project.
 
+**On Firefox, wait with one query.** Many Playwright locators waiting at once can hold back the messages a page's workers send it, such as heartbeats and `ready`, on a page with many surfaces. Healthy isolates are then killed as `unresponsive` or crash with `ready_timeout`, only under test. Wait for many surfaces with a single `page.waitForFunction` that polls at an interval (`polling: 500`) and reads each `iso-surface`'s `shadowRoot`. If runs still fail that way, run those tests one at a time (`--workers=1`).
+
 `@isoloop/dom/testing` is a conformance kit for people who write a render adapter, not for testing an app. It's documented in the API reference only.
 
 ## Limits
