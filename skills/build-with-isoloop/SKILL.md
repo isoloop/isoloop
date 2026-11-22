@@ -101,7 +101,7 @@ await kernel.publish(cartItems, { key: 'tea', value: { sku: 'tea', qty: 4 } });
 ```
 
 - **`contracts` takes both halves:** the URL from `?isolate`, for the bus worker, and the imported list, for the host.
-- **An isolate module is spawned by URL,** always from a `?isolate` import. Don't import the module itself on the main thread.
+- **An isolate module is spawned by URL.** In a Vite app that's a `?isolate` import; for a module built apart, it's that module's URL. Don't import the module itself on the main thread.
 - **Without grants an isolate can use no app topic.** `publish` and `subscribe` take topic names or patterns: `*` matches one or more characters, dots included. A request needs a publish grant, and answering one a subscribe grant. `navigate: true` allows `ctx.host.navigate`.
 - **Without `surface` an isolate is headless:** it has no DOM.
 - **Defaults:** up to 3 restarts in 60 s (`supervisor`), "Not responding…" after 400 ms without a beat and a kill after 10 s (`heartbeat`).
@@ -202,11 +202,11 @@ Isolate code runs in a worker, so check it against this list:
 - **No synchronous layout.** `getBoundingClientRect`, `offsetWidth`, `getComputedStyle`, `animate` and the like throw `NotSupportedError`. Use `await ctx.host.measure(node)`.
 - **No `focus()`, selection or `contenteditable`.** Use `ctx.host.focus(node)` and `ctx.host.scrollIntoView(node)`.
 - **No page globals:** no page `window`, `matchMedia`, `history`, `localStorage` or `sessionStorage`. `fetch` and IndexedDB work.
-- **Only these HTML tags are created:** `div span p pre code strong em small br hr h1` to `h6`, `ul ol li`, `a img`, `table caption colgroup col thead tbody tfoot tr th td`, `form fieldset legend label input textarea select optgroup option button output progress meter`, `canvas`. Anything else, `section`, `header` and `time` included, becomes a `div`, so don't style or query it by that tag. SVG has shapes, text, gradients, clips and masks.
+- **Only these HTML tags are created:** `div span p pre code strong em small br hr h1` to `h6`, `ul ol li`, `a img`, `table caption colgroup col thead tbody tfoot tr th td`, `form fieldset legend label input textarea select optgroup option button output progress meter`, `canvas`. Anything else, `section`, `header` and `time` included, becomes a `div`, so don't style or query it by that tag. The exception is a custom element the app lists in `createKernel`'s `components`. SVG has shapes, text, gradients, clips and masks.
 - **Attributes are allow-listed.** `class`, `id`, `title`, `role`, `tabindex`, `hidden`, `style`, `aria-*` and `data-*` work on any element, with the usual form, link, image and table attributes on theirs. URLs are `http(s):`, `mailto:` or relative: no `data:` or `blob:` images.
 - **The page's CSS doesn't reach inside a surface,** which is a shadow root. Pass `styles: [sheet]` (a `CSSStyleSheet`) to `createKernel`, or call `ctx.styles(css)` in the isolate, and style by class. A `style` attribute is blocked by a Content Security Policy without `'unsafe-inline'` in `style-src`.
 - **Portals go to `ctx.portalRoot`** (`usePortalRoot()`), never to `document.body`.
-- **Events arrive a moment later.** `preventDefault()` is too late (the page prevents `submit` itself), `isTrusted` is false, and drag and drop doesn't work. Only click, double click, input, change, key up and down, submit, focus in and out, pointer down, up and move, and scroll are forwarded.
+- **Events arrive a moment later.** `preventDefault()` is too late (the page prevents `submit` itself), `isTrusted` is false, and drag and drop doesn't work. Only click, double click, input, change, key up and down, submit, focus in and out, pointer down, up and move, and scroll are forwarded, plus `resize` on a canvas from `requestCanvas`.
 - **A focused input's value belongs to the page.** Use `ctx.setValue(node, value, { force: true })` to replace what the user is typing.
 - **No server-side rendering.** What must show at first paint goes in the page's HTML.
 - **It isn't a security boundary.** Isolates run on the page's origin.
