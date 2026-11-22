@@ -1,21 +1,17 @@
 # Deploys a redirect to GitHub Pages: isoloop.github.io/isoloop/ used to serve
 # the four-loops demo, and every address there now sends the visitor to
 # isoloop.dev, where isoloop/web serves the site and the examples
-# (scripts/pages-redirect). It deploys on `v*` tags or by hand, not on every
-# push to main (decided 2026-11-07).
+# (scripts/pages-redirect). It deploys with a release (release.yml calls it)
+# or by hand, not on every push to main (decided 2026-11-07).
 name: Pages
 
 on:
-  push:
-    # Release tags only (ADR 0019, decision 6): `v0.1.0` matches, `v0.1.0-next.3`
-    # doesn't. GitHub's filter must match the whole tag, and `.` is literal.
-    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_call:
   workflow_dispatch:
 
+# Each job asks for what it needs: only deploy gets the OIDC token.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -24,6 +20,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
@@ -34,6 +33,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

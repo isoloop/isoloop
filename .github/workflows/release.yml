@@ -1,0 +1,148 @@
+# The release (M4d task 12; ADR 0019, decision 6): a pushed `v<major>.<minor>.<patch>`
+# tag runs the full CI, publishes every package to npm, then makes the GitHub
+# Release from the changelogs and deploys Pages. CONTRIBUTING.md, "Releases".
+#
+# Started by hand, it's a dry run, whatever ref it's started on. The jobs that
+# publish, release or deploy need a pushed tag, so they're skipped, and the
+# ones that run only have `contents: read`. There's no input to change that.
+#
+# npm trusts this file's name for each package (trusted publishing: no token,
+# provenance is automatic). It checks the calling workflow's file, so the
+# publish stays here, not in a called workflow.
+name: Release
+
+on:
+  push:
+    # Release tags only: `v0.1.0` matches, `v0.1.0-next.3` doesn't. GitHub's
+    # filter must match the whole tag, and `.` is literal.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Per event, so a dry run never holds up or replaces a release.
+concurrency:
+  group: release-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # First, so a tag that can't be released fails before CI's half hour.
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Every branch, to tell whether the commit is on main or a release branch.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - run: node scripts/release.ts check ${{ github.event_name != 'push' && '--dry-run' || '' }}
+
+  ci:
+    needs: verify
+    uses: ./.github/workflows/ci.yml
+
+  dry-run:
+    needs: ci
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+      - run: npm --version
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node scripts/check-exports.ts
+      - run: node scripts/release.ts publish --dry-run
+
+  publish:
+    needs: ci
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    # One release at a time reads and moves `latest`.
+    concurrency:
+      group: release-publish
+      cancel-in-progress: false
+    outputs:
+      latest: ${{ steps.publish.outputs.latest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      # No cache: what's published is built only from the lockfile and the tag.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: |
+          node -e "const [a,b,c]=process.argv[1].split('.').map(Number); if (a<11||(a===11&&(b<5||(b===5&&c<1)))) { console.error('npm '+process.argv[1]+' is older than 11.5.1'); process.exit(1) }" "$(npm --version)"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node scripts/check-exports.ts
+      - id: publish
+        run: node scripts/release.ts publish
+
+  # Its own job, so the write token never meets the install and build steps.
+  github-release:
+    needs: publish
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - run: node scripts/release.ts notes "$RUNNER_TEMP/notes.md"
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ needs.publish.outputs.latest }}
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "The Release $GITHUB_REF_NAME exists."
+            exit 0
+          fi
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/notes.md" --latest="$LATEST"
+
+  # Not for a patch of an older line, which would put an older site back.
+  # The `github-pages` environment must allow deploys from `v*` tags.
+  pages:
+    needs: publish
+    if: github.event_name == 'push' && github.ref_type == 'tag' && needs.publish.outputs.latest == 'true'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write # deploy-pages needs it; only pages.yml's deploy job gets it
+    uses: ./.github/workflows/pages.yml

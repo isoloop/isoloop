@@ -64,7 +64,7 @@ The examples (basic and the dashboards) and the website live in [isoloop/web](ht
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every PR and on `main`:
+`.github/workflows/ci.yml` runs on every PR and on `main` (`check` only there), weekly, and inside a [release](#releases) before anything is published:
 
 - **`check`:** format check, lint, typecheck, `test:node` and build, then `check-exports`, `docs:check` and the bundle guard (`pnpm bench:bundle`) on the built packages.
 - **After `check` passes, in parallel:**
@@ -115,6 +115,24 @@ The packages are in Changesets' pre mode `next`, so versions are `0.1.0-next.N` 
 2. **Publish.** Run the *Prerelease* workflow by hand on `main`. It publishes the versions in each `package.json` under the `next` dist-tag through npm trusted publishing (no token), and skips any version already on npm. It refuses to publish unless every package shares one `-next.N` version. Once every package is on npm, it tags the commit it built with an annotated `v<version>` (`v0.1.0-next.N`), so there's no tag to push by hand. A re-run passes when the tag is already on that commit, and fails when it's on another.
 
 `pnpm release:status` shows what the next version step would do.
+
+A release (`0.1.0` and later) is the maintainer's call, and takes two steps ([ADR 0019](docs/adr/0019-versioning-and-releases.md)):
+
+1. **Version, as a PR.** Out of pre mode (`pnpm changeset pre exit`), run `pnpm release:version` and merge the PR on green. A patch during a preview cycle does this on its `release/<major>.<minor>` branch.
+2. **Tag.** Push the annotated tag `v<version>` on that commit, one tag per push. The *Release* workflow (`.github/workflows/release.yml`) then:
+   - **checks the tag:** it equals every package's version, `x.y.z` with no suffix, out of pre mode, on `main` or that line's release branch;
+   - **runs the full CI;**
+   - **publishes** every package through npm trusted publishing, with provenance. A patch of an older line gets the dist-tag `release-<major>.<minor>`, so `latest` never moves back;
+   - **makes the GitHub Release** from the changelog sections, and deploys Pages when the version is the newest.
+
+   Don't use `changeset publish` or `changeset tag`: they make a git tag per package. A failed release is finished with *Re-run failed jobs*, which skips what's already on npm. Tags can't be moved or deleted.
+
+Two settings outside the repo have to be in place before a tag:
+
+- **npm:** each package trusts `release.yml` (`npm trust github <package> --file release.yml --repo isoloop/isoloop --allow-publish`, npm 11.15 or later). An entry that hasn't published within 2 days expires, so add new ones shortly before the tag.
+- **GitHub:** the `github-pages` environment allows deploys from `v*` tags.
+
+Running the *Release* workflow by hand is always a dry run: the checks (reported, not enforced), the full CI, `npm publish --dry-run` and the release notes. It doesn't exercise npm's trust entries or the Pages deploy.
 
 **No majors before 1.0.** While the packages are below 1.0.0, the changeset check fails a PR whose changesets ask for a `major` bump: on 0.x a breaking change is a minor. 1.0 starts only on a PR labelled `release-1.0`, which lets the major through.
 - **Decisions** made along the way become [ADRs](docs/adr/README.md). [Would like](docs/would-like.md) holds ideas deferred or to explore, not planned; [Should do](docs/should-do.md) holds committed work waiting on a package or milestone.

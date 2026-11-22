@@ -51,10 +51,9 @@ jobs:
   # the tag on that commit and passes; on another commit it fails.
   #
   # Pushed with this job's GITHUB_TOKEN, the tag starts no workflow: GitHub
-  # doesn't run workflows on events that token causes. M4d's release workflow
-  # must still match only `v<major>.<minor>.<patch>` with no suffix (for
-  # example `tags: ['v[0-9]+.[0-9]+.[0-9]+']`), so a `-next.N` tag never
-  # releases.
+  # doesn't run workflows on events that token causes. release.yml also
+  # matches only `v<major>.<minor>.<patch>` with no suffix, so a `-next.N` tag
+  # never releases.
   tag:
     needs: publish
     runs-on: ubuntu-latest

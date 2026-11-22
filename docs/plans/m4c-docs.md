@@ -172,7 +172,7 @@ About one evening each ([conventions](README.md#conventions)). One PR per task. 
 | 22 | (M4d task 8) The API generator: `docs/api/<package>.md` from the published `.d.ts` through `readApi`, with the drift test | library | `scripts/docs/api.ts`, `docs/api/` | unit: a fixture `.d.ts`; CI: drift fails | 21 |
 | 23 | (M4d task 9) The CLI page from `args.ts`; each symbol's links to its guides from `map.json` | library | `scripts/docs/api.ts`, `docs/api/cli.md` | unit: every command and flag listed; a symbol's guide links | 22 |
 | 24 | (M4d task 10) The API pages on the site, Experimental pills, the API in `llms-full.txt` | web | `apps/site/build/docs/`, `apps/site/content/docs.json` | unit: an `@experimental` symbol gets the pill; smoke and axe on the API pages | 11, 12, 23 |
-| 25 | Search: the index plugin and the search box | web | `apps/site/build/docs/search.ts`, `apps/site/src/search.ts` | unit: ranking; E2E: type, pick a result, land on it; axe; no-JS hides the box | 24 |
+| 25 | Search: the index plugin and the search box (done 2026-11-21, web#244, live in `site-v0.7.0`) | web | `apps/site/build/docs/search.ts`, `apps/site/src/search.ts` | unit: ranking; E2E: type, pick a result, land on it; axe; no-JS hides the box | 24 |
 | 26 | The skill link in `llms.txt` | web | `apps/site/build/docs/llms.ts` | unit | M4a task 12 |
 | 27 | The M4c write-up: what the docs pipeline checks, and what it can't | library | `docs/posts/m4c-docs.md` | — (maintainer) | 25 |
 
