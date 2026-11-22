@@ -1,15 +1,11 @@
 # Deploys a redirect to GitHub Pages: isoloop.github.io/isoloop/ used to serve
 # the four-loops demo, and every address there now sends the visitor to
 # isoloop.dev, where isoloop/web serves the site and the examples
-# (scripts/pages-redirect). It deploys on `v*` tags or by hand, not on every
-# push to main (decided 2026-11-07).
+# (scripts/pages-redirect). It deploys by hand only, on main: not on pushes,
+# and not with a release (decided 2026-11-22).
 name: Pages
 
 on:
-  push:
-    # Release tags only (ADR 0019, decision 6): `v0.1.0` matches, `v0.1.0-next.3`
-    # doesn't. GitHub's filter must match the whole tag, and `.` is literal.
-    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
 
 permissions:
