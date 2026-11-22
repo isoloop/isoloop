@@ -1,6 +1,6 @@
 # Devtools panel
 
-`@isoloop/devtools` (`@experimental`) adds a panel to the page that shows its isolates, the bus, the kernel's own events and a live log of records, read from the inspection feed.
+`@isoloop/devtools` (**experimental**) adds a panel to the page that shows its isolates, the bus, the kernel's own events and a live log of records, read from the inspection feed.
 
 ## When to use it
 
