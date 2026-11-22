@@ -1,5 +1,16 @@
 # @isoloop/webmcp
 
+## 0.1.0-next.12
+
+### Patch Changes
+
+- 3afc5f8: Each package's homepage on npm is its page on isoloop.dev, and each has search keywords. The public packages' npm descriptions say that they're Isoloop's and what each one does.
+- Updated dependencies [2788228]
+- Updated dependencies [3afc5f8]
+- Updated dependencies [03d13ef]
+- Updated dependencies [cceac10]
+  - @isoloop/host@0.1.0-next.12
+
 ## 0.1.0-next.11
 
 ### Patch Changes

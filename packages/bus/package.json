@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/bus",
-  "version": "0.1.0-next.11",
+  "version": "0.1.0-next.12",
   "description": "The Isoloop message bus: typed topics in a worker, with retention, replay and durable history.",
   "keywords": [
     "isoloop",

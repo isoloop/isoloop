@@ -1,5 +1,18 @@
 # @isoloop/preact
 
+## 0.1.0-next.12
+
+### Patch Changes
+
+- 3afc5f8: Each package's homepage on npm is its page on isoloop.dev, and each has search keywords. The public packages' npm descriptions say that they're Isoloop's and what each one does.
+- 03d13ef: Each package has a README on npm: what it gives you, how to install it, a small example, and links to its guides and API reference.
+- 57025cb: The docs for `useTopic` say that an isolate has one subscription per topic: a second `useTopic` on the same topic replaces the first with no error, so only the last one gets records. They suggest one `useTopic` per topic, with the value passed down or shared through context.
+- Updated dependencies [2788228]
+- Updated dependencies [3afc5f8]
+- Updated dependencies [03d13ef]
+  - @isoloop/protocol@0.1.0-next.12
+  - @isoloop/runtime@0.1.0-next.12
+
 ## 0.1.0-next.11
 
 ### Patch Changes
