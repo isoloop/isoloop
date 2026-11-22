@@ -316,9 +316,10 @@ export type KernelEvents = {
   /** An isolate reported an error that wasn't fatal (`ctx.reportError(e, { fatal: false })`); it keeps running. */
   'isolate:error': { id: string; message: string };
   /**
-   * One isolate's heartbeat, as it arrives: its worker's `lagMs`
-   * (how late this beat fired, so a block shows in it only when the block ends and the beat arrives) and, from runtimes that report it, its own `busyMs` for the interval the
-   * beat covers. A pool's beat gives one event per member. `at` is the host's
+   * One isolate's heartbeat, as it arrives: its worker's `lagMs` (how late this
+   * beat fired, so a block shows in it only once the block ends and the beat
+   * arrives) and, from runtimes that report it, its own `busyMs` for the interval
+   * the beat covers. A pool's beat gives one event per member. `at` is the host's
    * `performance.now()` on receipt. Emitted only while someone listens, so
    * apps without a listener pay nothing. `@isoloop/balancer` reads every beat
    * through it rather than polling `isolates()`, which keeps only the latest.

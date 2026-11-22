@@ -51,15 +51,15 @@
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1412,
-          "end_line": 1420,
+          "line": 1417,
+          "end_line": 1425,
           "label": "ready again: wake headless",
           "anchor": "ready: (first) => {"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1462,
-          "end_line": 1473,
+          "line": 1467,
+          "end_line": 1478,
           "label": "a new port per isolate",
           "anchor": "reattach: (id) => {"
         }
