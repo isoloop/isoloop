@@ -187,6 +187,32 @@ Both adapters have the same hooks, with the same signatures:
 | `useIsolate()` | The isolate's context. Throws outside a component that `defineIsolate` rendered. |
 | `usePortalRoot()` | `ctx.portalRoot`, for `createPortal` or a library's container option. Throws when headless. |
 
+**One subscription per topic.** An isolate has one subscription per topic. A second `useTopic` on the same topic, in another component or another call in the same one, replaces the first with no error: only the last one subscribed gets records, and the first stops updating. When the last one unmounts, the topic has no subscription, and the first doesn't get it back. `useRoute` reads the route topic through `useTopic`, so it follows the same rule. Call `useTopic` once per topic, and pass the value down as props or share it through context:
+
+```tsx
+import { createContext, useContext } from 'react';
+import { defineIsolate, useTopic } from '@isoloop/react';
+import { count } from './topics';
+
+const CountContext = createContext<number | undefined>(undefined);
+
+function Badge() {
+  const n = useContext(CountContext);
+  return <span>{n ?? 0}</span>;
+}
+
+function Panel() {
+  const n = useTopic(count);
+  return (
+    <CountContext.Provider value={n}>
+      <Badge />
+    </CountContext.Provider>
+  );
+}
+
+export default defineIsolate(Panel);
+```
+
 Every component also gets `config` as a prop (`IsolateProps`): `manifest.config`, as passed to `spawn`.
 
 ```tsx
