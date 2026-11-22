@@ -21,7 +21,7 @@
   <a href="https://isoloop.dev">Website</a> •
   <a href="https://isoloop.dev/features/">Features</a> •
   <a href="https://isoloop.dev/examples/">Examples</a> •
-  <a href="docs/guide">Guide</a> •
+  <a href="https://isoloop.dev/docs/">Guide</a> •
   <a href="docs/adr/README.md">ADRs</a>
 </p>
 
@@ -111,7 +111,7 @@ function Cart() {
 export default defineIsolate(Cart);
 ```
 
-What the page and its servers must send is in the [hosting guide](docs/guide/hosting.md). The [basic example](https://github.com/isoloop/web/tree/main/apps/basic) is a complete app in plain DOM.
+What the page and its servers must send is in the [hosting guide](https://isoloop.dev/docs/hosting/). The [basic example](https://github.com/isoloop/web/tree/main/apps/basic) is a complete app in plain DOM.
 
 ## How it works
 
@@ -142,7 +142,7 @@ flowchart TB
 
 Records go straight between each isolate and the bus worker, never through the main thread.
 
-- **Placement:** each isolate runs on its own worker, with its own heap and event loop, or with others in a named [pool](docs/guide/pools.md), which saves memory and start-up time and shares one loop. A pool is a unit of failure: a member that blocks restarts the whole pool. The experimental [balancer](docs/guide/balancer.md) can place isolates by measured load.
+- **Placement:** each isolate runs on its own worker, with its own heap and event loop, or with others in a named [pool](https://isoloop.dev/docs/pools/), which saves memory and start-up time and shares one loop. A pool is a unit of failure: a member that blocks restarts the whole pool. The experimental [balancer](https://isoloop.dev/docs/balancer/) can place isolates by measured load.
 - **Rendering:** isolates render into a small DOM subset of our own in their worker, and the host applies the changes to the real DOM, batched once per frame. Canvas isolates draw with `OffscreenCanvas` in their own worker.
 - **Messages are the only contract:** isolates never import each other. They depend on versioned topics, validated in the bus worker, and each isolate's grants list the topics it may publish and subscribe to.
 - **The bus is a log:** append-only topics with retention, consumer offsets, replay and backpressure. Persistent topics are kept in OPFS and survive a reload.
@@ -170,12 +170,12 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 | --- | --- | --- | --- |
 | **M0–M1** Foundations and kernel | The toolchain (pnpm, TypeScript 7, OXC, Vite, Vitest, Playwright); the loader, supervisor, heartbeats and the frame-batched compositor on our own render bridge | Done | [Crashing an isolate on purpose](docs/posts/m1-crashing-an-isolate.md) |
 | **M2, M2b** Bus and durable log | Topics, schemas, retention, offsets, replay and backpressure in a bus worker; opt-in suspension of idle isolates; persistent topics that survive a bus crash or a reload | Done | [The bus](docs/posts/m2-bus-in-a-worker.md), [the durable log](docs/posts/m2b-durable-log.md) |
-| **M2c, M2d** Worker pools | Named pools for headless and visual isolates, next to own-worker ones; a pool crash restarts only that pool | Done | [Pools guide](docs/guide/pools.md), [`plant-v0.1.0`](https://github.com/isoloop/web/tree/plant-v0.1.0) |
+| **M2c, M2d** Worker pools | Named pools for headless and visual isolates, next to own-worker ones; a pool crash restarts only that pool | Done | [Pools guide](https://isoloop.dev/docs/pools/), [`plant-v0.1.0`](https://github.com/isoloop/web/tree/plant-v0.1.0) |
 | **M3a–M3d, M3f** Adapters and dashboards | The Preact (10, 11) and React (18, 19) adapters; the markets dashboard, native or Isoloop at a toggle, in three sizes; the 72-widget plant dashboard against matched native builds; markets parity with native + workers and pooled placements | Done | [Adapters](docs/posts/m3a-preact-react-in-a-worker.md), [markets](docs/posts/m3b-markets-dashboard.md), [`markets-v0.3.0`](https://github.com/isoloop/web/tree/markets-v0.3.0) |
 | **Website** | [isoloop.dev](https://isoloop.dev): the landing page, the features, how it works and the live examples | Done | [isoloop/web](https://github.com/isoloop/web) |
-| **M3e, M3g, M3h, M3i** Live widgets and placement | Add, edit and delete widgets while the page runs, each a JSON spec in its own isolate; a federated comparison against a natively federated build; the experimental balancer, which places isolates by load, moves, packs and quarantines them | Done | [Balancer guide](docs/guide/balancer.md), [`plant-v0.2.0`](https://github.com/isoloop/web/tree/plant-v0.2.0), [`markets-v0.5.0`](https://github.com/isoloop/web/tree/markets-v0.5.0), [`processor-v0.2.0`](https://github.com/isoloop/web/tree/processor-v0.2.0) |
-| **M4b** Devtools | The inspection feed (`kernel.inspect()`, the `inspect` grant) and `@isoloop/devtools`, a panel drawn by an isolate | Done | [Write-up](docs/posts/m4b-devtools.md), [inspection](docs/guide/inspection.md), [devtools](docs/guide/devtools.md) |
-| **M4a** Agents | Built: tools on contracts, `kernel.request`, the `isoloop` CLI with a dev MCP server, `@isoloop/webmcp` (experimental). Open: the "build with Isoloop" skill and a recorded run with a real agent | In progress | [Agents guide](docs/guide/agents.md), [plan](docs/plans/m4a-agents.md) |
+| **M3e, M3g, M3h, M3i** Live widgets and placement | Add, edit and delete widgets while the page runs, each a JSON spec in its own isolate; a federated comparison against a natively federated build; the experimental balancer, which places isolates by load, moves, packs and quarantines them | Done | [Balancer guide](https://isoloop.dev/docs/balancer/), [`plant-v0.2.0`](https://github.com/isoloop/web/tree/plant-v0.2.0), [`markets-v0.5.0`](https://github.com/isoloop/web/tree/markets-v0.5.0), [`processor-v0.2.0`](https://github.com/isoloop/web/tree/processor-v0.2.0) |
+| **M4b** Devtools | The inspection feed (`kernel.inspect()`, the `inspect` grant) and `@isoloop/devtools`, a panel drawn by an isolate | Done | [Write-up](docs/posts/m4b-devtools.md), [inspection](https://isoloop.dev/docs/inspection/), [devtools](https://isoloop.dev/docs/devtools/) |
+| **M4a** Agents | Built: tools on contracts, `kernel.request`, the `isoloop` CLI with a dev MCP server, `@isoloop/webmcp` (experimental). Open: the "build with Isoloop" skill and a recorded run with a real agent | In progress | [Agents guide](https://isoloop.dev/docs/agents/), [plan](docs/plans/m4a-agents.md) |
 | **M3j** Balancer gaps | An app-reported busy time; packing and the quarantine fixed; isolates the kernel gave up on handled | Done | [Write-up](https://github.com/isoloop/web/tree/main/apps/processor/comparison/v0.3.0) |
 | **M4c** Docs | The docs on isoloop.dev: getting started, the guides, "What Isoloop can't hide", the API reference, `llms.txt` | Before 0.1 | [Plan](docs/plans/m4c-docs.md) |
 | **M4d** 0.1 release | The API freeze, the release workflow, `0.1.0` on npm and a launch post | Before 0.1 | [Plan](docs/plans/m4d-release.md) |
@@ -186,7 +186,7 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 
 ## Docs
 
-- **Guides:** [hosting](docs/guide/hosting.md), [worker pools](docs/guide/pools.md), [automatic placement (balancer)](docs/guide/balancer.md), [agents](docs/guide/agents.md), [inspection feed](docs/guide/inspection.md), [devtools panel](docs/guide/devtools.md)
+- **Guides:** [hosting](https://isoloop.dev/docs/hosting/), [worker pools](https://isoloop.dev/docs/pools/), [automatic placement (balancer)](https://isoloop.dev/docs/balancer/), [agents](https://isoloop.dev/docs/agents/), [inspection feed](https://isoloop.dev/docs/inspection/), [devtools panel](https://isoloop.dev/docs/devtools/)
 - [RFC 0001: the threaded runtime](docs/rfcs/0001-threaded-runtime.md), the motivation and public shape
 - [System design](docs/design/system-design.md): packages, interfaces, sequences and invariants
 - [Architecture decision records](docs/adr/README.md)

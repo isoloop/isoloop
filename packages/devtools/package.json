@@ -1,7 +1,15 @@
 {
   "name": "@isoloop/devtools",
   "version": "0.1.0-next.11",
-  "description": "Devtools panel for Isoloop, drawn by an isolate of its own and fed by the inspection feed.",
+  "description": "Experimental devtools panel for Isoloop: shows isolates, pools, the message bus and live records, from an isolate of its own.",
+  "keywords": [
+    "isoloop",
+    "web-workers",
+    "event-loop",
+    "isolation",
+    "devtools"
+  ],
+  "homepage": "https://isoloop.dev/docs/api/devtools/",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
