@@ -84,7 +84,7 @@ const app = createKernel({
   supervisor: {
     strategy: 'one-for-one',
     maxRestarts: 5,
-    withinMs: 30_000,
+    withinMs: 120_000,
     backoff: { initialMs: 500, factor: 2, maxMs: 8000 },
   },
   heartbeat: { blockedAfterMs: 400, killAfterMs: 5000 },
@@ -208,6 +208,7 @@ Suspension never touches the restart window. A pool suspends only as a whole, wh
 - **Delivery is at least once.** A restart can replay up to one commit interval of records that were already handled.
 - **A hang is only caught after `killAfterMs`** (10 s by default), and a hidden tab isn't judged until it's visible. Until then a stuck isolate is `blocked` and a pool's other members are blocked with it.
 - **A pool fails together.** One member that hangs restarts its neighbours and counts against each one's limit. Keep isolates that must not share fate in their own workers.
+- **A slow crash loop never reaches `failed`.** With retries on, a crash that can be restarted fails an isolate only if `maxRestarts + 1` crashes land within `withinMs`. Time spent running, waiting for a timeout and backing off all counts, so longer timeouts or more restarts need a longer window.
 - **A failed isolate isn't retried.** The window ends the automatic retries; a person or your code restarts it.
 - **Some failures skip the retries.** A render format mismatch, a version mismatch or a bus that can't load its contracts fails the isolate on the first crash.
 - **The supervisor can't see inside a worker.** A memory blow-up that the browser doesn't turn into a worker error, or an isolate that beats but does nothing useful, looks healthy.
