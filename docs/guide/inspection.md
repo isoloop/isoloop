@@ -1,6 +1,6 @@
 # The inspection feed
 
-`kernel.inspect()` (`@experimental`) gives a live view of a running page: its isolates, pools and bus, the kernel's events, and records copied from the bus as they're appended.
+`kernel.inspect()` (**experimental**) gives a live view of a running page: its isolates, pools and bus, the kernel's events, and records copied from the bus as they're appended.
 
 ## When to use it
 
