@@ -68,7 +68,15 @@ const balancer = createBalancer(kernel, options?);
 | `loads` | none | A store `{ get(id), set(id, loadPct) }` for measured loads, so a reload places from history (below). |
 | `pack.enabled` | `true` | Packing back: a quiet pool empties into another to free a worker (below). |
 
-Fixed, not options: decisions every 500 ms over a 3 s window, the full-pool threshold of 80 %, loads written back at most every 10 s and only on a change of 5 points or more, a bisect forgotten 60 s after its last trigger, the backlog's 10 s window, at most 3 moves for load per isolate in 5 minutes, and packing's 60 s steady window, 40 % bar and one pack a minute.
+These are fixed, not options:
+
+- decisions every 500 ms over a 3 s window
+- the full-pool threshold of 80 %
+- loads written back at most every 10 s, and only on a change of 5 points or more
+- a bisect forgotten 60 s after its last trigger
+- the backlog's 10 s window
+- at most 3 moves for load per isolate in 5 minutes
+- packing's 60 s steady window, 40 % bar and one pack a minute
 
 ### Pool names and one balancer per kernel at a time
 
@@ -118,7 +126,7 @@ One shared pool, `balancer-quarantine-1`, outside normal placement and outside `
 - **Offences wear off.** Back in a balancer pool, an offender loses one offence for each quiet window it completes there, so one that stays quiet is back to the 30 s window. One that offends again soon after leaving gets the next, longer window.
 - **Kept apart:** the fourth offence keeps it in quarantine for good (`state: 'kept-apart'`).
 - **Measured-only members** leave once measured, except the ones a bisect moved there, which stay until that bisect ends.
-- **A backlog outranks a second quarantine worker.** While a member that shares a pool has a rising backlog and no room, the quarantine pools beyond the first fold back into the first, one pool at a time (`room`), like with like: offenders into a first quarantine of offenders, or members that never offended, such as the other half of a bisect, into one with no offender. Anyone who hasn't offended still never joins an offender. For the next 10 s no new quarantine pool takes the worker that frees up. A bisect whose halves fold together ends. Without this, a quarantine that had split could hold the last worker under the cap for a whole quiet window while healthy members fell behind: in the File processor with faults, on `@isoloop/*@0.1.0-next.3` with `maxWorkers: 2` (a bench server at 2.0 GHz), two image processors in two quarantine pools left six others sharing one worker. On `0.1.0-next.4`, on the same server, Firefox's two pools held the two halves of a bisect instead.
+- **A backlog outranks a second quarantine worker.** While a member that shares a pool has a rising backlog and no room, the quarantine pools beyond the first fold back into the first, one pool at a time (`room`). They fold like with like: offenders into a first quarantine of offenders, or members that never offended, such as the other half of a bisect, into one with no offender. Anyone who hasn't offended still never joins an offender. For the next 10 s no new quarantine pool takes the worker that frees up. A bisect whose halves fold together ends. Without this, a quarantine that had split could hold the last worker under the cap for a whole quiet window while healthy members fell behind. That happened in the File processor with faults, on `@isoloop/*@0.1.0-next.3` with `maxWorkers: 2` (a bench server at 2.0 GHz): two image processors in two quarantine pools left six others sharing one worker. On `0.1.0-next.4`, on the same server, Firefox's two pools held the two halves of a bisect instead.
 - **A bisect needs a quarantine pool of its own.** It starts only when the quarantine is empty (or holds only that bisect's own suspects), or the cap leaves room for a new quarantine pool. Suspects never join a pool that holds offenders: when a pool's worker is killed, every member there counts a crash, so crowding suspects in with a blocker gets them all given up on. With no room, the pool stays as it is and its members are `behind`.
 
 ### Packing back
@@ -164,7 +172,7 @@ So `busyMs` is a placement guide, not a profiler.
 
 `maxWorkers` defaults to `max(2, navigator.hardwareConcurrency − 2)`. In a container or VM, `hardwareConcurrency` can report the host's threads rather than the cores the page may use. On the bench server it reported 16 in a container pinned to 4 cores, so the balancer allowed itself up to 8 pools. Set `maxWorkers` yourself there.
 
-Measured on the processor example's File processor, on 4 cores at 2.0 GHz: one pool with a balancer that watches every beat but never moves anything differs from one pool with no balancer by 0 to 1 point of CPU, a few MB and a few milliseconds of typing, within the rounds' spread. The figures, and what the balancer did with faults, are in the [File processor write-up](https://github.com/isoloop/web/tree/main/apps/processor/comparison).
+A balancer that watches every beat but never moves anything was measured on the processor example's File processor, on 4 cores at 2.0 GHz. One pool with it differs from one pool with no balancer by 0 to 1 point of CPU, a few MB and a few milliseconds of typing, within the rounds' spread. The figures, and what the balancer did with faults, are in the [File processor write-up](https://github.com/isoloop/web/tree/main/apps/processor/comparison).
 
 ## Inspecting it
 
