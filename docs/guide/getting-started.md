@@ -153,7 +153,17 @@ kernel.on('isolate:failed', (e) => console.error(`${e.id} gave up: ${e.message}`
 
 ## For agents working on your app
 
-If agents write code in your app, paste this into its `AGENTS.md`, so they follow the rules an isolate has to keep:
+The `isoloop` CLI carries a "build with Isoloop" skill, in the [Agent Skills](https://agentskills.io) format, that teaches a coding agent contracts, isolates, grants and the limits. Install the CLI (it needs Node 26 or later) and copy the skill into your project:
+
+```sh
+npm install -D isoloop@next
+npx isoloop skill add
+```
+
+- **Where it goes:** `.claude/skills/build-with-isoloop/SKILL.md`. For an agent that reads skills from another folder, pass `--dir <folder>`.
+- **After an upgrade:** the skill is the installed CLI's, so run the command again. It doesn't replace a copy that differs, such as one you edited, unless you pass `--force`.
+
+For agents without skills, paste this into your app's `AGENTS.md`, so they follow the rules an isolate has to keep:
 
 ```md
 ## Isoloop

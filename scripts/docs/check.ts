@@ -463,6 +463,15 @@ function git(root: string, args: string[]): string | undefined {
   }
 }
 
+/** The skills the CLI ships: the writing rules and the fence check apply to them too. */
+function skillFiles(root: string): { file: string; md: string }[] {
+  const dir = join(root, 'skills');
+  return readdirSync(dir).map((name) => {
+    const file = relative(root, join(dir, name, 'SKILL.md'));
+    return { file, md: readFileSync(join(root, file), 'utf8') };
+  });
+}
+
 function main(): void {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
   const guidesOnly = process.argv.includes('--guides');
@@ -486,6 +495,9 @@ function main(): void {
       ...checkWords(file, md, rules),
     );
   }
+  const skills = skillFiles(root);
+  for (const { file, md } of skills)
+    problems.push(...checkHistory(file, md), ...checkWords(file, md, rules));
   const apiDir = join(root, 'docs/api');
   if (existsSync(apiDir)) {
     const pages = readdirSync(apiDir).filter((f) => f.endsWith('.md'));
@@ -500,13 +512,13 @@ function main(): void {
     );
   }
   problems.push(
-    ...checkFences(
-      root,
-      guides.map((name) => {
+    ...checkFences(root, [
+      ...guides.map((name) => {
         const file = relative(root, join(guideDir, name));
         return { file, md: readFileSync(join(root, file), 'utf8') };
       }),
-    ),
+      ...skills,
+    ]),
   );
 
   if (!guidesOnly) {
