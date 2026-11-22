@@ -1,148 +1,311 @@
-# The release (M4d task 12; ADR 0019, decision 6): a pushed `v<major>.<minor>.<patch>`
-# tag runs the full CI, publishes every package to npm, then makes the GitHub
-# Release from the changelogs and deploys Pages. CONTRIBUTING.md, "Releases".
+# Previews and releases (CONTRIBUTING.md, "Releases"). Started by hand only:
 #
-# Started by hand, it's a dry run, whatever ref it's started on. The jobs that
-# publish, release or deploy need a pushed tag, so they're skipped, and the
-# ones that run only have `contents: read`. There's no input to change that.
+# - dry-run (the default): the checks (reported), full CI, the tarballs, their
+#   shasums and the notes. No OIDC token, no environment, nothing written.
+# - stage: the same on main, then stages the tarballs on npm. The maintainer
+#   approves them there with 2FA; nothing is published from here.
+# - finish: takes a stage run's id, checks that all of it is on npm as staged,
+#   then creates the tag and, for x.y.z, the GitHub Release.
 #
-# npm trusts this file's name for each package (trusted publishing: no token,
-# provenance is automatic). It checks the calling workflow's file, so the
-# publish stays here, not in a called workflow.
+# npm trusts this file and the environment `npm` for each package, for staging
+# only. The build job has no token and no caches, and the stage job checks out
+# and installs nothing, so no dependency's code runs next to the token.
 name: Release
+run-name: Release (${{ inputs.mode }})
 
 on:
-  push:
-    # Release tags only: `v0.1.0` matches, `v0.1.0-next.3` doesn't. GitHub's
-    # filter must match the whole tag, and `.` is literal.
-    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run, stage (main only) or finish (main only)'
+        type: choice
+        options: [dry-run, stage, finish]
+        default: dry-run
+      stage_run:
+        description: "finish only: the stage run's id"
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
-# Per event, so a dry run never holds up or replaces a release.
+# A dry run per ref; one stage or finish at a time.
 concurrency:
-  group: release-${{ github.event_name }}-${{ github.ref }}
+  group: release-${{ inputs.mode }}-${{ inputs.mode == 'dry-run' && github.ref || 'main' }}
   cancel-in-progress: false
 
 jobs:
-  # First, so a tag that can't be released fails before CI's half hour.
+  # Before CI's half hour, and before the stage job names the environment: a
+  # job that names a missing one creates it, unprotected.
   verify:
+    if: inputs.mode != 'finish'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read # the environment's policy
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
+      node: ${{ steps.check.outputs.node }}
+      packages: ${{ steps.check.outputs.packages }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Every branch, to tell whether the commit is on main or a release branch.
-          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-      - run: node scripts/release.ts check ${{ github.event_name != 'push' && '--dry-run' || '' }}
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release.ts check ${{ inputs.mode == 'stage' && '--stage' || '' }}
 
   ci:
     needs: verify
     uses: ./.github/workflows/ci.yml
 
-  dry-run:
-    needs: ci
-    if: github.event_name == 'workflow_dispatch'
+  # Shared by dry-run and stage. No caches at all: a poisoned one would reach
+  # the tarballs. No token either.
+  build:
+    needs: [verify, ci]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          package-manager-cache: false
-          registry-url: https://registry.npmjs.org
-      - run: npm --version
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: node scripts/check-exports.ts
-      - run: node scripts/release.ts publish --dry-run
-
-  publish:
-    needs: ci
-    if: github.event_name == 'push' && github.ref_type == 'tag'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      id-token: write
-    # One release at a time reads and moves `latest`.
-    concurrency:
-      group: release-publish
-      cancel-in-progress: false
     outputs:
-      latest: ${{ steps.publish.outputs.latest }}
+      sums: ${{ steps.pack.outputs.sums }}
+      artifact: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           persist-credentials: false
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-      # No cache: what's published is built only from the lockfile and the tag.
+        with:
+          cache: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-          registry-url: https://registry.npmjs.org
-      # Trusted publishing needs npm 11.5.1 or later.
-      - run: |
-          node -e "const [a,b,c]=process.argv[1].split('.').map(Number); if (a<11||(a===11&&(b<5||(b===5&&c<1)))) { console.error('npm '+process.argv[1]+' is older than 11.5.1'); process.exit(1) }" "$(npm --version)"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: node scripts/check-exports.ts
-      - id: publish
-        run: node scripts/release.ts publish
+      - id: pack
+        run: node scripts/release.ts pack "$RUNNER_TEMP/tarballs"
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tarballs-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/tarballs/*.tgz
+          if-no-files-found: error
+          # Longer than the 30 days a run can be re-run in.
+          retention-days: 90
 
-  # Its own job, so the write token never meets the install and build steps.
-  github-release:
-    needs: publish
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+  stage:
+    needs: [verify, build]
+    if: inputs.mode == 'stage' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm
+    permissions:
+      actions: read # the artifact, across attempts
+      id-token: write
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ needs.verify.outputs.node }}
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+      # By id through the API, so a re-run of this job gets the tarballs the
+      # first attempt built.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact }}
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+          path: ${{ runner.temp }}/tarballs
+          merge-multiple: true
+      # Inline, since this job has no checkout. scripts/release/workflow.test.ts
+      # runs this text against a fake npm.
+      - name: Stage the tarballs
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          TAG: ${{ needs.verify.outputs.tag }}
+          PACKAGES: ${{ needs.verify.outputs.packages }}
+          SUMS: ${{ needs.build.outputs.sums }}
+        run: |
+          set -euo pipefail
+          registry=https://registry.npmjs.org
+          dir="$RUNNER_TEMP/tarballs"
+          said() { printf '%s\n' "$*" >> "$GITHUB_STEP_SUMMARY"; }
+          refuse() {
+            echo "::error title=Stage::$*"
+            exit 1
+          }
+          complete=no
+          ended() {
+            if [ "$complete" = no ]; then
+              said ''
+              said "**Not all staged: approve nothing.** In npm's Staged Packages, reject every $VERSION there, whether it's listed above or not (a request that failed may still have staged). Then use *Re-run failed jobs*, never *Re-run all jobs*."
+            fi
+          }
+          trap ended EXIT
+          said "## Stage $VERSION as \`$TAG\` (attempt $GITHUB_RUN_ATTEMPT)"
+          said ''
+
+          groups=() names=() files=() befores=() sha1s=() sha512s=()
+          while read -r group name file before; do
+            groups+=("$group") names+=("$name") files+=("$file") befores+=("$before")
+          done <<< "$PACKAGES"
+          count=${#names[@]}
+          [ "$count" -gt 0 ] || refuse "no packages to stage"
+
+          # Everything is checked before anything is staged. The build job ran
+          # dependencies' code, so what it handed over isn't trusted.
+          [ "$(find "$dir" -mindepth 1 | wc -l)" -eq "$count" ] || refuse "the artifact doesn't hold exactly $count files"
+          [ "$(wc -l <<< "$SUMS")" -eq "$count" ] || refuse "the build didn't give exactly $count shasums"
+          for i in "${!names[@]}"; do
+            name=${names[$i]} file=${files[$i]} before=${befores[$i]}
+            tarball="$dir/$file"
+            if [ ! -f "$tarball" ] || [ -L "$tarball" ]; then refuse "$file is missing"; fi
+            sha1=$(sha1sum < "$tarball" | cut -d' ' -f1)
+            sha512=$(sha512sum < "$tarball" | cut -d' ' -f1)
+            grep -qxF "$file $sha1 $sha512" <<< "$SUMS" || refuse "$file doesn't match the build's shasums"
+            sha1s+=("$sha1") sha512s+=("$sha512")
+
+            # npm reads the manifest inside, which could redirect or rename the publish.
+            entries=$(tar -tzf "$tarball")
+            if grep -qvE '^package/' <<< "$entries" || grep -qE '(^|/)\.\.?(/|$)|//' <<< "$entries"; then
+              refuse "$file has a path outside package/"
+            fi
+            [ "$(grep -cxF 'package/package.json' <<< "$entries")" -eq 1 ] || refuse "$file needs exactly one package.json"
+            tar -xOzf "$tarball" package/package.json |
+              jq -se --arg name "$name" --arg version "$VERSION" \
+                'length == 1 and .[0].name == $name and .[0].version == $version and .[0].publishConfig == null' > /dev/null ||
+              refuse "$file isn't a plain $name@$VERSION"
+
+            packument=$(curl -fsS --retry 3 -H 'accept: application/vnd.npm.install-v1+json' "$registry/${name/\//%2f}")
+            jq -e --arg version "$VERSION" '.versions[$version] == null' <<< "$packument" > /dev/null ||
+              refuse "$name@$VERSION is already on npm"
+            jq -e --arg tag "$TAG" --arg before "$before" '(.["dist-tags"][$tag] // "-") == $before' <<< "$packument" > /dev/null ||
+              refuse "$name's dist-tag $TAG moved since this run checked it"
+          done
+
+          # An empty directory, so no .npmrc from an artifact or a checkout applies.
+          cd "$(mktemp -d)"
+          said '| Staged | Stage id |'
+          said '| --- | --- |'
+          ids=()
+          for i in "${!names[@]}"; do
+            name=${names[$i]}
+            # Every error stops the job, "already staged" too: never skip one.
+            log=$(npm stage publish "$dir/${files[$i]}" --tag "$TAG" --access public --ignore-scripts --provenance --registry "$registry/")
+            echo "$log"
+            id=$(sed -n 's/.*(staged with id \([^)]*\)).*/\1/p' <<< "$log")
+            ids+=("${id:-not shown}")
+            said "| \`$name@$VERSION\` | ${id:-not shown} |"
+          done
+
+          mkdir -p "$RUNNER_TEMP/staged"
+          for i in "${!names[@]}"; do
+            jq -n --arg name "${names[$i]}" --arg file "${files[$i]}" --arg sha1 "${sha1s[$i]}" --arg sha512 "${sha512s[$i]}" \
+              '{name: $name, file: $file, sha1: $sha1, sha512: $sha512}'
+          done | jq -s --arg run "$GITHUB_RUN_ID" --arg commit "$GITHUB_SHA" --arg version "$VERSION" --arg tag "$TAG" \
+            '{run: $run, commit: $commit, version: $version, tag: $tag, packages: .}' > "$RUNNER_TEMP/staged/staged.json"
+          complete=yes
+
+          said ''
+          said "## Approve $VERSION: all $count staged"
+          said ''
+          said "1. Before the first approval, wait for this job to be green, then check the whole list in [npm](https://www.npmjs.com/) (account settings, Staged Packages): all $count are there, each validated, with this version, the dist-tag \`$TAG\` and the shasum below. If one is wrong, reject all $count."
+          said '2. Approve group by group, 1 to 4. After the first approval there is no going back: finish the set and fix forward.'
+          said "3. Run *Release* on main with mode \`finish\` and stage_run \`$GITHUB_RUN_ID\`. Merge no workflow change before that."
+          said ''
+          said '| Approved | Group | Package | Shasum | Stage id |'
+          said '| --- | --- | --- | --- | --- |'
+          for i in "${!names[@]}"; do
+            name=${names[$i]}
+            said "| ☐ | ${groups[$i]} | [\`$name\`](https://www.npmjs.com/package/$name) | \`${sha1s[$i]}\` | ${ids[$i]} |"
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: staged-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/staged/staged.json
+          if-no-files-found: error
+          retention-days: 90
+
+  finish-check:
+    if: inputs.mode == 'finish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      commit: ${{ steps.check.outputs.commit }}
+      tag: ${{ steps.check.outputs.tag }}
+      stable: ${{ steps.check.outputs.stable }}
+      notes: ${{ steps.check.outputs.notes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The staged commit's files are read, never run.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STAGE_RUN: ${{ inputs.stage_run }}
+        run: node scripts/release.ts finish "$STAGE_RUN"
+
+  # Its own job: no checkout, so the write token meets no repo code.
+  finish:
+    needs: finish-check
+    if: inputs.mode == 'finish' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          package-manager-cache: false
-      - run: node scripts/release.ts notes "$RUNNER_TEMP/notes.md"
-      - name: GitHub Release
+      - name: Tag and Release
         env:
           GH_TOKEN: ${{ github.token }}
-          LATEST: ${{ needs.publish.outputs.latest }}
+          GH_REPO: ${{ github.repository }}
+          COMMIT: ${{ needs.finish-check.outputs.commit }}
+          TAG: ${{ needs.finish-check.outputs.tag }}
+          STABLE: ${{ needs.finish-check.outputs.stable }}
+          NOTES: ${{ needs.finish-check.outputs.notes }}
         run: |
           set -euo pipefail
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "The Release $GITHUB_REF_NAME exists."
+          found=$(gh api "repos/$GH_REPO/git/matching-refs/tags/$TAG" |
+            jq -r --arg ref "refs/tags/$TAG" '.[] | select(.ref == $ref) | .object | "\(.type) \(.sha)"')
+          if [ -n "$found" ]; then
+            read -r type sha <<< "$found"
+            if [ "$type" = tag ]; then sha=$(gh api "repos/$GH_REPO/git/tags/$sha" | jq -r .object.sha); fi
+            if [ "$sha" != "$COMMIT" ]; then
+              echo "::error title=Finish::$TAG already tags $sha, not $COMMIT."
+              exit 1
+            fi
+            echo "$TAG already tags $COMMIT."
+          else
+            object=$(gh api -X POST "repos/$GH_REPO/git/tags" -f tag="$TAG" -f message="$TAG" -f object="$COMMIT" -f type=commit \
+              -f 'tagger[name]=github-actions[bot]' \
+              -f 'tagger[email]=41898282+github-actions[bot]@users.noreply.github.com' | jq -r .sha)
+            gh api -X POST "repos/$GH_REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$object" > /dev/null
+            echo "Tagged $COMMIT $TAG."
+          fi
+
+          if [ "$STABLE" != true ]; then exit 0; fi
+          releases=$(gh api "repos/$GH_REPO/releases?per_page=100")
+          if jq -e --arg tag "$TAG" 'any(.[]; .tag_name == $tag)' <<< "$releases" > /dev/null; then
+            echo "The Release $TAG exists."
             exit 0
           fi
-          gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" \
-            --notes-file "$RUNNER_TEMP/notes.md" --latest="$LATEST"
-
-  # Not for a patch of an older line, which would put an older site back.
-  # The `github-pages` environment must allow deploys from `v*` tags.
-  pages:
-    needs: publish
-    if: github.event_name == 'push' && github.ref_type == 'tag' && needs.publish.outputs.latest == 'true'
-    permissions:
-      contents: read
-      pages: write
-      id-token: write # deploy-pages needs it; only pages.yml's deploy job gets it
-    uses: ./.github/workflows/pages.yml
+          body=$(mktemp)
+          printf '%s\n' "$NOTES" > "$body"
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$body" --latest

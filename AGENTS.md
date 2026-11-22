@@ -23,7 +23,7 @@ A change is done when all five hold:
 - **One PR per task** from a plan's task table.
 - **ADRs** record decisions; the maintainer reviews each one on its own, and it's committed once the review ends.
 - **The maintainer reviews** ADRs, docs-only PRs in this repo, and new public API. Forks merge their own code PRs on green.
-- **Tags and releases** are pushed by the maintainer, or on the maintainer's explicit word for that release.
+- **Releases:** each stage and finish run of `release.yml` needs the maintainer's explicit word for that release, and only the maintainer approves what's staged on npm. The finish run creates the tag; nobody pushes `v*` tags by hand ([`CONTRIBUTING.md`](CONTRIBUTING.md#releases)).
 
 ## Delegating work
 

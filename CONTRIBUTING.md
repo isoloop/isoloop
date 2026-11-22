@@ -64,7 +64,7 @@ The examples (basic and the dashboards) and the website live in [isoloop/web](ht
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every PR and on `main` (`check` only there), weekly, and inside a [release](#releases) before anything is published:
+`.github/workflows/ci.yml` runs on every PR and on `main` (`check` only there), weekly, and inside a [release](#releases)'s dry run and stage run:
 
 - **`check`:** format check, lint, typecheck, `test:node` and build, then `check-exports`, `docs:check` and the bundle guard (`pnpm bench:bundle`) on the built packages.
 - **After `check` passes, in parallel:**
@@ -109,30 +109,18 @@ Other editors need three things:
 
 ### Releases
 
-The packages are in Changesets' pre mode `next`, so versions are `0.1.0-next.N` until 0.1.0. A prerelease takes two steps:
+Previews (`x.y.z-next.N`, dist-tag `next`) and releases (`x.y.z`, dist-tag `latest`) go out the same way, through the *Release* workflow (`.github/workflows/release.yml`). It's started by hand, and it only ever stages: nothing is on npm until the maintainer approves it there with 2FA. Each stage and finish run needs the maintainer's word for that release.
 
-1. **Version, as a PR.** On a branch, run `pnpm release:version`. It bumps every package to the next `0.1.0-next.N`, writes each package's `CHANGELOG.md` section from the pending changesets, and records them under `.changeset/pre/` so the next run doesn't repeat them. Open a PR (`chore: version 0.1.0-next.N`) and merge it on green. It needs no `no-changeset` label: the changeset check sees from the diff that it only consumes changesets (added or deleted `.changeset/*.md`, `.changeset/pre/`, `.changeset/pre.json`, `version` in `packages/*/package.json`, `packages/*/CHANGELOG.md`). Anything else in the diff, and the normal check runs.
-2. **Publish.** Run the *Prerelease* workflow by hand on `main`. It publishes the versions in each `package.json` under the `next` dist-tag through npm trusted publishing (no token), and skips any version already on npm. It refuses to publish unless every package shares one `-next.N` version. Once every package is on npm, it tags the commit it built with an annotated `v<version>` (`v0.1.0-next.N`), so there's no tag to push by hand. A re-run passes when the tag is already on that commit, and fails when it's on another.
+1. **Version, as a PR.** On a branch, run `pnpm release:version`; for a release, `pnpm changeset pre exit` first. It bumps every package to the shared version, writes each package's `CHANGELOG.md` section and, in pre mode, records the changesets under `.changeset/pre/` so the next run doesn't repeat them. Open a PR (`chore: version <version>`) and merge it on green. It needs no `no-changeset` label: the changeset check sees from the diff that it only consumes changesets (added or deleted `.changeset/*.md`, `.changeset/pre/`, `.changeset/pre.json`, `version` in `packages/*/package.json`, `packages/*/CHANGELOG.md`). Anything else in the diff, and the normal check runs. A hand-written text for the GitHub Release goes in `.github/releases/<version>.md`, merged before the stage; without one the notes come from the changelogs.
+2. **Dry run.** Run *Release* with mode `dry-run` (the default). It reports what would stop a stage, runs the full CI, builds the tarballs, and shows their shasums and the notes. It has no npm token, so it doesn't exercise trusted publishing.
+3. **Stage.** Run it on `main` with mode `stage`. It refuses mixed versions, a preview outside pre mode, a release in pre mode, a version already on npm and anything older than npm's `latest`. It then runs the full CI, builds without caches or a token, and stages those tarballs from the GitHub environment `npm`. Note the run's id.
+   - **If it staged only some:** approve nothing, reject what was staged, then use *Re-run failed jobs*, which stages the same tarballs. Never *Re-run all jobs*, which builds new ones. Never skip an "already staged" error.
+4. **Approve, on npmjs.com.** The stage job's summary is the checklist. Nothing is approved until all of it is staged, validated and matches the version and shasums. Then approve in this order: protocol, codec, dom, vite → bus, runtime → host, react, preact → balancer, devtools, webmcp, `isoloop`. A problem before the first approval means reject all. After it, finish the set and fix forward.
+5. **Finish.** Run it on `main` with mode `finish` and the stage run's id. It checks every package on npm (version, dist-tag, that run's shasums, and provenance naming the workflow, ref, commit and run). Then it creates the annotated tag `v<version>` on that commit and, for a release, the GitHub Release. It's safe to re-run. No workflow change merges between a stage and its finish, since the tag can't be created after one.
+
+Don't push `v*` tags, and don't use `changeset publish` or `changeset tag`. A tag starts no workflow. A patch of an older line isn't supported: the stage refuses it. Pages isn't part of a release: `pages.yml` is run by hand.
 
 `pnpm release:status` shows what the next version step would do.
-
-A release (`0.1.0` and later) is the maintainer's call, and takes two steps ([ADR 0019](docs/adr/0019-versioning-and-releases.md)):
-
-1. **Version, as a PR.** Out of pre mode (`pnpm changeset pre exit`), run `pnpm release:version` and merge the PR on green. A patch during a preview cycle does this on its `release/<major>.<minor>` branch.
-2. **Tag.** First run the *Release* workflow by hand on that commit's branch: it must report no problems, and it's the only run of a release's path before the tag. Then push the annotated tag `v<version>` on that commit, one tag per push. The *Release* workflow (`.github/workflows/release.yml`) then:
-   - **checks the tag:** it equals every package's version, `x.y.z` with no suffix, out of pre mode, on `main` or that line's release branch;
-   - **runs the full CI;**
-   - **publishes** every package through npm trusted publishing, with provenance. A patch of an older line gets the dist-tag `release-<major>.<minor>`, so `latest` never moves back;
-   - **makes the GitHub Release** from the changelog sections, and deploys Pages when the version is the newest.
-
-   Don't use `changeset publish` or `changeset tag`: they make a git tag per package. A failed release is finished with *Re-run failed jobs*, which skips what's already on npm. Tags can't be moved or deleted.
-
-Two settings outside the repo have to be in place before a tag:
-
-- **npm:** each package trusts `release.yml` (`npm trust github <package> --file release.yml --repo isoloop/isoloop --allow-publish`, npm 11.15 or later). An entry that hasn't published within 2 days expires, so add new ones shortly before the tag.
-- **GitHub:** the `github-pages` environment allows deploys from `v*` tags.
-
-Running the *Release* workflow by hand is always a dry run: the checks (reported, not enforced), the full CI, `npm publish --dry-run` and the release notes. It doesn't exercise npm's trust entries or the Pages deploy.
 
 **No majors before 1.0.** While the packages are below 1.0.0, the changeset check fails a PR whose changesets ask for a `major` bump: on 0.x a breaking change is a minor. 1.0 starts only on a PR labelled `release-1.0`, which lets the major through.
 - **Decisions** made along the way become [ADRs](docs/adr/README.md). [Would like](docs/would-like.md) holds ideas deferred or to explore, not planned; [Should do](docs/should-do.md) holds committed work waiting on a package or milestone.

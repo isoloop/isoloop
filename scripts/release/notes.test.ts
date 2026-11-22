@@ -104,6 +104,13 @@ describe('releaseNotes', () => {
     expect(notes).toContain('No changes besides the version.');
   });
 
+  it('uses the hand-written text when there is one, with the changelog links', () => {
+    const notes = releaseNotes('0.1.0', logs, repo, 'The first release, marked @experimental.\n');
+    expect(notes).toContain('The first release, marked `@experimental`.');
+    expect(notes).toContain(`${repo}/blob/v0.1.0/packages/host/CHANGELOG.md`);
+    expect(notes).not.toContain('A shared change.');
+  });
+
   it("links the changelogs instead when it's too long for GitHub", () => {
     const text = `## 0.1.0\n\n### Minor Changes\n\n- ${'x'.repeat(MAX_BODY)}\n`;
     const notes = releaseNotes('0.1.0', [{ name: 'isoloop', dir: 'packages/cli', text }], repo);

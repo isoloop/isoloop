@@ -1,12 +1,15 @@
-// A GitHub Release's body, from the packages' CHANGELOG.md sections for one
-// version (ADR 0019, decision 6). The packages share a version, and a
-// changeset that names several of them is in each one's changelog, so each
-// entry is listed once with the packages it belongs to.
+// A GitHub Release's body: `.github/releases/<version>.md` when there is one,
+// otherwise the packages' CHANGELOG.md sections for that version. The packages
+// share a version, and a changeset that names several of them is in each one's
+// changelog, so each entry is listed once with the packages it belongs to.
 
 const BUMPS = ['Major', 'Minor', 'Patch'] as const;
 type Bump = (typeof BUMPS)[number];
 
-/** GitHub refuses a release body over 125,000 characters. */
+/**
+ * GitHub refuses a release body over 125,000 characters. The cap is on bytes,
+ * since the body also travels between jobs as one environment variable.
+ */
 export const MAX_BODY = 125_000;
 
 export interface Changelog {
@@ -65,8 +68,28 @@ export const quoteMentions = (text: string): string =>
     )
     .join('');
 
-/** Throws when no package's changelog has a section for `version`. */
-export function releaseNotes(version: string, changelogs: Changelog[], repo: string): string {
+/**
+ * `written` is the hand-written text, when the version has one; the changelogs
+ * are then only linked. Without it, this throws when no package's changelog
+ * has a section for `version`.
+ */
+export function releaseNotes(
+  version: string,
+  changelogs: Changelog[],
+  repo: string,
+  written?: string,
+): string {
+  const links = changelogs.map(
+    (log) => `[\`${log.name}\`](${repo}/blob/v${version}/${log.dir}/CHANGELOG.md)`,
+  );
+  const tail = `## Changelogs\n\n${links.join(' · ')}\n`;
+  if (written !== undefined) {
+    const body = `${quoteMentions(written.trim())}\n\n${tail}`;
+    if (Buffer.byteLength(body) > MAX_BODY) {
+      throw new Error(`the ${version} release text is over GitHub's limit`);
+    }
+    return body;
+  }
   if (changelogs.every((log) => section(log.text, version) === undefined)) {
     throw new Error(`no CHANGELOG.md has a "## ${version}" section`);
   }
@@ -97,12 +120,8 @@ export function releaseNotes(version: string, changelogs: Changelog[], repo: str
   });
 
   const intro = `Every \`@isoloop/*\` package and the \`isoloop\` CLI is at \`${version}\`.`;
-  const links = changelogs.map(
-    (log) => `[\`${log.name}\`](${repo}/blob/v${version}/${log.dir}/CHANGELOG.md)`,
-  );
-  const tail = `## Changelogs\n\n${links.join(' · ')}\n`;
   const changes = groups.length === 0 ? ['No changes besides the version.'] : groups;
   const body = [intro, ...changes, tail].join('\n\n');
-  if (body.length <= MAX_BODY) return body;
+  if (Buffer.byteLength(body) <= MAX_BODY) return body;
   return [intro, 'The changes are too long to list here; see the changelogs.', tail].join('\n\n');
 }

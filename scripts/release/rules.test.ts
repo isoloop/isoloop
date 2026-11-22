@@ -1,58 +1,137 @@
 import { describe, expect, it } from 'vitest';
+import { record } from './npm.ts';
+import { publicPackages, workingTree } from './packages.ts';
 import {
+  APPROVAL_ORDER,
   type Candidate,
+  compare,
   distTag,
-  isPlain,
-  releaseBranch,
-  releaseProblems,
+  isStable,
+  orderProblems,
+  type Registry,
   repositoryProblems,
+  stageProblems,
 } from './rules.ts';
 
-const ok: Candidate = { tag: 'v0.1.0', version: '0.1.0', preMode: false, branches: ['main'] };
+const pre = JSON.stringify({ mode: 'pre', tag: 'next' });
+const registry = (tags: Record<string, string>, versions: string[] = []): Map<string, Registry> =>
+  new Map([['@isoloop/host', { tags, versions }]]);
 
-describe('releaseProblems', () => {
-  it('passes a plain version, its tag, on main, out of pre mode', () => {
-    expect(releaseProblems(ok)).toEqual([]);
+const preview: Candidate = {
+  ref: 'refs/heads/main',
+  version: '0.1.0-next.12',
+  pre,
+  environment: { custom: true, policies: [{ name: 'main', type: 'branch' }] },
+  registry: registry({ latest: '0.0.0', next: '0.1.0-next.11' }),
+};
+const release: Candidate = { ...preview, version: '0.1.0', pre: undefined };
+
+const groupOf = (name: string): number => APPROVAL_ORDER.findIndex((g) => g.includes(name));
+
+describe('stageProblems', () => {
+  it('passes a preview in pre mode and a release out of it', () => {
+    expect(stageProblems(preview)).toEqual([]);
+    expect(stageProblems(release)).toEqual([]);
   });
 
-  it("passes a patch on its line's release branch", () => {
-    const patch = { tag: 'v0.1.1', version: '0.1.1', branches: ['release/0.1'] };
-    expect(releaseProblems({ ...ok, ...patch })).toEqual([]);
+  it('refuses any ref but main', () => {
+    for (const ref of ['refs/heads/release/0.1', 'refs/heads/main2', 'refs/tags/v0.1.0', '']) {
+      expect(stageProblems({ ...preview, ref })[0]).toContain('main only');
+    }
   });
 
-  it("refuses another line's release branch, and any other branch", () => {
-    expect(releaseProblems({ ...ok, branches: ['release/0.2'] })).toHaveLength(1);
-    expect(releaseProblems({ ...ok, branches: ['feature/x'] })).toHaveLength(1);
-    expect(releaseProblems({ ...ok, branches: [''] })).toHaveLength(1);
+  it('refuses a preview outside pre mode `next`', () => {
+    const outside = [
+      undefined,
+      JSON.stringify({ mode: 'exit', tag: 'next' }),
+      JSON.stringify({ mode: 'pre', tag: 'beta' }),
+    ];
+    for (const mode of outside) {
+      expect(stageProblems({ ...preview, pre: mode })[0]).toContain('pre mode');
+    }
   });
 
-  it('refuses a tag that is not the version', () => {
-    expect(releaseProblems({ ...ok, tag: 'v0.1.1' })).toHaveLength(1);
-    expect(releaseProblems({ ...ok, tag: '0.1.0' })).toHaveLength(1);
+  it('refuses a release while pre.json exists, exited or not', () => {
+    for (const mode of [pre, JSON.stringify({ mode: 'exit', tag: 'next' })]) {
+      expect(stageProblems({ ...release, pre: mode })[0]).toContain('pre exit');
+    }
   });
 
-  it('refuses a prerelease, even with its own tag', () => {
-    const next = { tag: 'v0.1.0-next.11', version: '0.1.0-next.11' };
-    expect(releaseProblems({ ...ok, ...next })[0]).toContain("isn't a release");
+  it('refuses a version already on npm', () => {
+    const on = registry({ latest: '0.0.0', next: '0.1.0-next.12' }, ['0.1.0-next.12']);
+    expect(stageProblems({ ...preview, registry: on })[0]).toContain('already on npm');
   });
 
-  it('refuses pre mode', () => {
-    expect(releaseProblems({ ...ok, preMode: true })[0]).toContain('pre exit');
+  it("refuses an older line than npm's latest", () => {
+    const newer = registry({ latest: '0.2.0' });
+    expect(stageProblems({ ...release, version: '0.1.1', registry: newer })[0]).toContain('older');
+    // A preview of a version that's out already is older than it.
+    const out = registry({ latest: '0.1.0', next: '0.1.0-next.11' });
+    expect(stageProblems({ ...preview, registry: out })[0]).toContain('older');
   });
-});
 
-describe('isPlain', () => {
-  it('takes x.y.z only', () => {
-    expect(isPlain('0.1.0')).toBe(true);
-    for (const v of ['0.1.0-next.1', '0.1', 'v0.1.0', '0.1.0+build']) {
-      expect(isPlain(v)).toBe(false);
+  it('refuses a preview behind the `next` dist-tag', () => {
+    const ahead = registry({ latest: '0.0.0', next: '0.1.0-next.13' });
+    expect(stageProblems({ ...preview, registry: ahead })[0]).toContain('older');
+  });
+
+  it('refuses a version of neither kind', () => {
+    expect(stageProblems({ ...release, version: '0.1.0-beta.1' })[0]).toContain('neither');
+  });
+
+  it('refuses without the environment, or with a wider policy', () => {
+    const main = { name: 'main', type: 'branch' };
+    const bad: Candidate['environment'][] = [
+      undefined,
+      { custom: false, policies: [] },
+      { custom: true, policies: [] },
+      { custom: true, policies: [{ name: 'release/*', type: 'branch' }] },
+      { custom: true, policies: [{ name: 'main', type: 'tag' }] },
+      { custom: true, policies: [main, { name: 'release/0.1', type: 'branch' }] },
+    ];
+    for (const environment of bad) {
+      expect(stageProblems({ ...preview, environment })[0]).toContain('`npm`');
     }
   });
 });
 
-describe('releaseBranch', () => {
-  it('names the minor line', () => {
-    expect(releaseBranch('0.10.3')).toBe('release/0.10');
+describe('versions', () => {
+  it('gives next to a preview and latest to a release, and nothing else a tag', () => {
+    expect(distTag('0.1.0-next.12')).toBe('next');
+    expect(distTag('0.1.0')).toBe('latest');
+    for (const version of ['0.1.0-beta.1', 'v0.1.0', '0.1', '0.1.0+build', '0.0.0-stage']) {
+      expect(distTag(version)).toBeUndefined();
+    }
+    expect(isStable('0.1.0')).toBe(true);
+    expect(isStable('0.1.0-next.1')).toBe(false);
+  });
+
+  it('sorts a release after its previews, and numbers as numbers', () => {
+    expect(compare('0.1.0', '0.1.0-next.11')).toBe(1);
+    expect(compare('0.1.0-next.12', '0.1.0-next.2')).toBe(1);
+    expect(compare('0.2.0-next.0', '0.1.9')).toBe(1);
+    expect(compare('0.9.4', '0.10.0')).toBe(-1);
+    expect(compare('0.1.0', '0.1.0')).toBe(0);
+  });
+});
+
+describe('the approval order', () => {
+  const packages = publicPackages(workingTree);
+
+  it('has every public package once, and no other', () => {
+    expect(orderProblems(packages.map((p) => p.manifest.name))).toEqual([]);
+    expect(new Set(APPROVAL_ORDER.flat()).size).toBe(APPROVAL_ORDER.flat().length);
+    expect(orderProblems(['@isoloop/new'])).not.toEqual([]);
+  });
+
+  it('puts what a package depends on in an earlier group', () => {
+    for (const { dir, manifest } of packages) {
+      const parsed = record(JSON.parse(workingTree.read(`${dir}/package.json`) ?? '{}'));
+      const deps = { ...record(parsed['dependencies']), ...record(parsed['peerDependencies']) };
+      for (const dep of Object.keys(deps).filter((name) => groupOf(name) !== -1)) {
+        expect(groupOf(dep), `${manifest.name} → ${dep}`).toBeLessThan(groupOf(manifest.name));
+      }
+    }
   });
 });
 
@@ -68,25 +147,5 @@ describe('repositoryProblems', () => {
     expect(problems).toHaveLength(2);
     expect(problems[0]).toContain('other');
     expect(problems[1]).toContain('none');
-  });
-});
-
-describe('distTag', () => {
-  it('moves latest forward, from the 0.0.0 placeholder too', () => {
-    expect(distTag('0.1.0', '0.0.0')).toBe('latest');
-    expect(distTag('0.1.1', '0.1.0')).toBe('latest');
-    expect(distTag('0.10.0', '0.9.4')).toBe('latest');
-    expect(distTag('1.0.0', '0.12.1')).toBe('latest');
-    expect(distTag('0.1.0', undefined)).toBe('latest');
-  });
-
-  it('keeps latest on a re-run of the same version', () => {
-    expect(distTag('0.1.0', '0.1.0')).toBe('latest');
-  });
-
-  it('never moves latest back', () => {
-    expect(distTag('0.1.2', '0.2.0')).toBe('release-0.1');
-    expect(distTag('0.2.0', '0.2.1')).toBe('release-0.2');
-    expect(distTag('0.9.5', '0.10.0')).toBe('release-0.9');
   });
 });

@@ -14,15 +14,56 @@
 // `pnpm pack` writes the tarball, so `workspace:*` and `catalog:` become real
 // versions and `publishConfig` applies; `npm publish` uploads it, because npm
 // is what speaks OIDC to the registry.
-import { appendFileSync, mkdtempSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { appendFileSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pack, publicPackages, run, sharedVersion } from './release/packages.ts';
 
 const dryRun = process.argv.includes('--dry-run');
-const packages = publicPackages();
+const run = (cmd: string, args: string[], cwd?: string, quiet = false): string =>
+  execFileSync(cmd, args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', quiet ? 'ignore' : 'inherit'],
+  }).trim();
+
+interface Manifest {
+  name: string;
+  private?: boolean;
+  version: string;
+}
+
+const isManifest = (v: unknown): v is Manifest =>
+  typeof v === 'object' &&
+  v !== null &&
+  'name' in v &&
+  typeof v.name === 'string' &&
+  'version' in v &&
+  typeof v.version === 'string';
+
+const dirs = readdirSync('packages', { withFileTypes: true })
+  .filter((d) => d.isDirectory())
+  .map((d) => join('packages', d.name));
+const packages = dirs.flatMap((dir) => {
+  const file = join(dir, 'package.json');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return [];
+  }
+  if (!isManifest(parsed)) return [];
+  const manifest = parsed;
+  return manifest.private ? [] : [{ dir, file, manifest }];
+});
+
 // One version for the whole fixed group, written by `changeset version`.
-const version = sharedVersion(packages);
+const versions = new Set(packages.map((p) => p.manifest.version));
+if (versions.size !== 1) {
+  const list = packages.map((p) => `${p.manifest.name}@${p.manifest.version}`).join(', ');
+  throw new Error(`the @isoloop/* packages disagree on their version: ${list}`);
+}
+const [version = ''] = versions;
 if (!/^\d+\.\d+\.\d+-next\.\d+$/.test(version)) {
   throw new Error(
     `version ${version} isn't a next prerelease: run \`pnpm release:version\` and merge its PR first`,
@@ -43,7 +84,7 @@ for (const p of packages) {
     console.log(`= ${name}@${version} already published`);
     continue;
   }
-  const tarball = pack(p.dir, out);
+  const tarball = run('pnpm', ['pack', '--pack-destination', out], p.dir).split('\n').pop() ?? '';
   const args = ['publish', tarball, '--tag', 'next', '--access', 'public'];
   if (dryRun) args.push('--dry-run');
   run('npm', args);

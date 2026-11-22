@@ -1,151 +1,201 @@
-// A release (x.y.z), for .github/workflows/release.yml. Prereleases are
-// scripts/prerelease.ts's.
+// The scripts behind .github/workflows/release.yml (CONTRIBUTING.md,
+// "Releases"). Only Node built-ins: the jobs that run them install nothing.
 //
-//   node scripts/release.ts check [--dry-run]    the release's rules and its notes
-//   node scripts/release.ts publish [--dry-run]  every package, to npm
-//   node scripts/release.ts notes <file>         the GitHub Release's body
+//   node scripts/release.ts check [--stage]  can this commit be staged, and its notes
+//   node scripts/release.ts pack <dir>       the tarballs and their shasums
+//   node scripts/release.ts finish <run id>  is what that run staged on npm
 //
-// `--dry-run` runs on any commit, prerelease versions included: it reports
-// what would stop a release instead of failing on it, and it passes
-// `--dry-run` to npm. Without it, `publish` runs only for a pushed tag, and
-// checks the rules again first. A version already on npm is skipped, so a
-// re-run after a partial failure finishes the release.
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+// `check` reports, and with `--stage` fails on, what would stop a stage. The
+// stage itself is inline in the workflow: that job checks out nothing.
+import { createHash } from 'node:crypto';
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { type Changelog, releaseNotes } from './release/notes.ts';
-import { pack, publicPackages, run, sharedVersion } from './release/packages.ts';
-import { distTag, isPlain, releaseProblems, repositoryProblems } from './release/rules.ts';
+import { join, resolve } from 'node:path';
+import { checkFinish, REPO, type Sources } from './release/finish.ts';
+import { releaseNotes } from './release/notes.ts';
+import { list, npm, record, registryOf, text } from './release/npm.ts';
+import {
+  publicPackages,
+  run,
+  sharedVersion,
+  tarballName,
+  treeAt,
+  type Tree,
+  workingTree,
+} from './release/packages.ts';
+import {
+  APPROVAL_ORDER,
+  distTag,
+  type Environment,
+  isStable,
+  orderProblems,
+  type Registry,
+  repositoryProblems,
+  stageProblems,
+} from './release/rules.ts';
 
-const [command, ...rest] = process.argv.slice(2);
-const dryRun = rest.includes('--dry-run');
 const env = process.env;
 
-const packages = publicPackages();
-const version = sharedVersion(packages);
-
-const notes = (): string => {
-  const changelogs: Changelog[] = packages.map(({ dir, manifest }) => {
-    const file = join(dir, 'CHANGELOG.md');
-    const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
-    return { name: manifest.name, dir, text };
-  });
-  return releaseNotes(version, changelogs, 'https://github.com/isoloop/isoloop');
-};
-
-const summary = (text: string): void => {
-  console.log(text);
+const summary = (markdown: string): void => {
+  console.log(markdown);
   const file = env['GITHUB_STEP_SUMMARY'];
-  if (file) appendFileSync(file, `${text}\n`);
+  if (file) appendFileSync(file, `${markdown}\n`);
 };
 
-function check(): void {
-  const broken = repositoryProblems(packages.map((p) => p.manifest));
-  if (broken.length > 0) throw new Error(broken.join('\n'));
-  const branches = run('git', [
-    'for-each-ref',
-    '--contains',
-    'HEAD',
-    '--format=%(refname:strip=3)',
-    'refs/remotes/origin',
-  ]).split('\n');
-  const problems = releaseProblems({
-    // A dry run has no tag: it checks the one this commit would get.
-    tag: dryRun ? `v${version}` : (env['GITHUB_REF_NAME'] ?? ''),
-    version,
-    preMode: existsSync(join('.changeset', 'pre.json')),
-    branches,
-  });
-  if (!dryRun && problems.length > 0) {
-    throw new Error(`can't release ${version}:\n${problems.join('\n')}`);
-  }
-  if (dryRun) {
-    const list = problems.map((problem) => `- ${problem}`).join('\n');
-    summary(
-      problems.length === 0
-        ? `Dry run: ${version} passes a release's checks.\n`
-        : `Dry run: pushing v${version} as a release would fail here, because:\n\n${list}\n`,
-    );
-  }
-}
+const output = (name: string, value: string): void => {
+  const file = env['GITHUB_OUTPUT'];
+  if (!file) return;
+  // A delimiter the value can't contain.
+  const end = `END_${createHash('sha256').update(value).digest('hex')}`;
+  appendFileSync(file, `${name}<<${end}\n${value}\n${end}\n`);
+};
 
-interface OnNpm {
-  latest: string | undefined;
-  published: boolean;
-}
+const github = (path: string): unknown => JSON.parse(run('gh', ['api', `repos/${REPO}/${path}`]));
 
-/**
- * What npm has of a package. Unlike the prerelease script, a failed read is an
- * error: guessing here could move `latest` back.
- */
-function onNpm(name: string): OnNpm {
-  const read: unknown = JSON.parse(
-    run('npm', ['view', name, 'dist-tags', 'versions', '--json', '--prefer-online']),
-  );
-  if (
-    typeof read !== 'object' ||
-    read === null ||
-    !('dist-tags' in read) ||
-    !('versions' in read)
-  ) {
-    throw new Error(`npm view ${name} returned no dist-tags and versions`);
-  }
-  const { 'dist-tags': tags, versions } = read;
-  const latest =
-    typeof tags === 'object' && tags !== null && 'latest' in tags ? tags.latest : undefined;
+function environment(): Environment | undefined {
+  const found = list(record(github('environments?per_page=100'))['environments'])
+    .map(record)
+    .find((e) => e['name'] === 'npm');
+  if (!found) return undefined;
+  const custom = record(found['deployment_branch_policy'])['custom_branch_policies'] === true;
+  if (!custom) return { custom, policies: [] };
+  const policies = record(github('environments/npm/deployment-branch-policies?per_page=100'));
   return {
-    latest: typeof latest === 'string' ? latest : undefined,
-    published: Array.isArray(versions) ? versions.includes(version) : versions === version,
+    custom,
+    policies: list(policies['branch_policies'])
+      .map(record)
+      .map((p) => ({ name: text(p['name']), type: text(p['type']) })),
   };
 }
 
-function publish(): void {
-  if (!dryRun && (env['GITHUB_EVENT_NAME'] !== 'push' || env['GITHUB_REF_TYPE'] !== 'tag')) {
-    throw new Error('a release publishes only from a pushed tag; use --dry-run to try it');
-  }
-  check();
-  // All of it is read before the first publish, so a failed read publishes nothing.
-  const plan = packages.map(({ dir, manifest }) => {
-    const { latest, published } = onNpm(manifest.name);
-    return { dir, manifest, published, tag: distTag(version, latest) };
-  });
-  const out = mkdtempSync(join(tmpdir(), 'isoloop-release-'));
-  for (const { dir, manifest, published, tag } of plan) {
-    const id = `${manifest.name}@${version}`;
-    if (published && !dryRun) {
-      console.log(`= ${id} already published`);
-      continue;
-    }
-    const tarball = pack(dir, out);
-    if (published && isPlain(version)) {
-      // npm refuses to dry-run over a published release, so packing is all there is to try.
-      summary(`= ${id} already published, packed only`);
-      continue;
-    }
-    // npm won't take a prerelease version without its own tag, dry run or not.
-    const npmTag = isPlain(version) ? tag : 'next';
-    const args = ['publish', tarball, '--tag', npmTag, '--access', 'public'];
-    if (dryRun) args.push('--dry-run');
-    run('npm', args);
-    const was = published ? ' (already on npm)' : '';
-    if (dryRun) summary(`- would publish ${id}${was}; a release of it would be tagged ${tag}`);
-    else console.log(`+ ${id} (${tag})`);
-  }
-  const output = env['GITHUB_OUTPUT'];
-  // Whether this release is the newest, for the GitHub Release and Pages.
-  if (output && !dryRun) {
-    appendFileSync(output, `latest=${plan.every((p) => p.tag === 'latest')}\n`);
-  }
+function notes(version: string, tree: Tree): string {
+  const changelogs = publicPackages(tree).map(({ dir, manifest }) => ({
+    name: manifest.name,
+    dir,
+    text: tree.read(`${dir}/CHANGELOG.md`) ?? '',
+  }));
+  const written = tree.read(`.github/releases/${version}.md`);
+  return releaseNotes(version, changelogs, `https://github.com/${REPO}`, written);
 }
 
-if (command === 'check') {
-  check();
-  const body = notes();
-  summary(`${dryRun ? `The release notes ${version} would get:\n\n` : ''}${body}`);
-} else if (command === 'publish') {
-  publish();
-} else if (command === 'notes' && rest[0]) {
-  writeFileSync(rest[0], notes());
+async function check(stage: boolean): Promise<void> {
+  const packages = publicPackages(workingTree);
+  const version = sharedVersion(packages);
+  const names = packages.map((p) => p.manifest.name);
+  const broken = [...orderProblems(names), ...repositoryProblems(packages.map((p) => p.manifest))];
+  if (broken.length > 0) throw new Error(broken.join('\n'));
+  const tag = distTag(version);
+  if (!tag) throw new Error(`version ${version} is neither x.y.z nor x.y.z-next.N`);
+
+  const registry = new Map<string, Registry>(
+    await Promise.all(
+      names.map(async (name): Promise<[string, Registry]> => [
+        name,
+        registryOf(await npm.packument(name), name),
+      ]),
+    ),
+  );
+  const problems = stageProblems({
+    ref: env['GITHUB_REF'] ?? '',
+    version,
+    pre: workingTree.read('.changeset/pre.json'),
+    environment: environment(),
+    registry,
+  });
+  if (stage && problems.length > 0) {
+    throw new Error(`can't stage ${version}:\n${problems.join('\n')}`);
+  }
+  const body = notes(version, workingTree);
+
+  output('version', version);
+  output('tag', tag);
+  output('node', (workingTree.read('.nvmrc') ?? '').trim());
+  // For the stage job, which has no checkout: a package a line, in approval
+  // order, as "<group> <name> <file> <the dist-tag's version now, or ->".
+  const lines = APPROVAL_ORDER.flatMap((group, at) =>
+    group.map((name) => {
+      const now = registry.get(name)?.tags[tag] ?? '-';
+      return `${at + 1} ${name} ${tarballName(name, version)} ${now}`;
+    }),
+  );
+  output('packages', lines.join('\n'));
+
+  const verdict =
+    problems.length === 0
+      ? 'A stage of this commit passes its checks.'
+      : `A stage of this commit would be refused:\n\n${problems.map((p) => `- ${p}`).join('\n')}`;
+  const release = isStable(version) ? 'and gets a GitHub Release' : 'and gets no GitHub Release';
+  summary(
+    `## ${version}\n\n${verdict}\n\nIt would be staged as \`${tag}\`, ${release}. The notes:\n\n${body}`,
+  );
+}
+
+function pack(into: string): void {
+  const packages = publicPackages(workingTree);
+  const version = sharedVersion(packages);
+  mkdirSync(into, { recursive: true });
+  const sums: string[] = [];
+  const rows: string[] = [];
+  for (const [at, group] of APPROVAL_ORDER.entries()) {
+    for (const name of group) {
+      const dir = packages.find((p) => p.manifest.name === name)?.dir;
+      if (!dir) throw new Error(`no package ${name}`);
+      // pnpm, so `workspace:*` and `catalog:` become versions and publishConfig applies.
+      run('pnpm', ['pack', '--pack-destination', resolve(into)], dir);
+      const file = tarballName(name, version);
+      const bytes = readFileSync(join(into, file));
+      const sha1 = createHash('sha1').update(bytes).digest('hex');
+      sums.push(`${file} ${sha1} ${createHash('sha512').update(bytes).digest('hex')}`);
+      const link = `[\`${name}\`](https://www.npmjs.com/package/${name})`;
+      rows.push(`| ${at + 1} | ${link} | \`${sha1}\` |`);
+    }
+  }
+  output('sums', sums.join('\n'));
+  summary(
+    [
+      `## ${version}: the tarballs, in approval order`,
+      '',
+      "Approve nothing from this table. A stage run's stage job writes the checklist once everything is staged.",
+      '',
+      '| Group | Package | Shasum |',
+      '| --- | --- | --- |',
+      ...rows,
+    ].join('\n'),
+  );
+}
+
+async function finish(id: string): Promise<void> {
+  const from: Sources = {
+    github,
+    stagedRecord: (runId, artifact) => {
+      const dir = mkdtempSync(join(tmpdir(), 'isoloop-staged-'));
+      run('gh', ['run', 'download', runId, '--repo', REPO, '--name', artifact, '--dir', dir]);
+      return readFileSync(join(dir, 'staged.json'), 'utf8');
+    },
+    tree: treeAt,
+    workflowsChanged: (commit) =>
+      run('git', ['diff', '--name-only', commit, 'HEAD', '--', '.github/workflows']) !== '',
+    npm,
+  };
+  const { commit, tag, version } = await checkFinish(env['GITHUB_REF'] ?? '', id, from);
+  const stable = isStable(version);
+  output('commit', commit);
+  output('tag', tag);
+  output('stable', String(stable));
+  // Read at the staged commit, so the text has to merge before the stage.
+  output('notes', stable ? notes(version, treeAt(commit)) : '');
+  summary(
+    `Run ${id} is on npm as ${version}, with its shasums and provenance: ${tag} on ${commit}.`,
+  );
+}
+
+const [command, argument = ''] = process.argv.slice(2);
+if (command === 'check' && (argument === '' || argument === '--stage')) {
+  await check(argument === '--stage');
+} else if (command === 'pack' && argument) {
+  pack(argument);
+} else if (command === 'finish') {
+  await finish(argument);
 } else {
-  throw new Error('usage: release.ts check [--dry-run] | publish [--dry-run] | notes <file>');
+  throw new Error('usage: release.ts check [--stage] | pack <dir> | finish <run id>');
 }
