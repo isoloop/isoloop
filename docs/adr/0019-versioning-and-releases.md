@@ -1,6 +1,6 @@
 # ADR 0019: Versioning and releases
 
-- **Status:** Accepted (2026-11-17), after grilling (Q1–Q12, yes to all)
+- **Status:** Accepted (2026-11-17), after grilling (Q1–Q12, yes to all). Amended on 2026-11-22 for releases the maintainer approves on npm (*How a version is released* in decision 6, with the version table and decisions 5 and 7 to match); grilled the same day (Q1–Q13, yes to all). Its code follows this amendment's acceptance.
 - **Date:** 2026-11-17
 - **Builds on:** [ADR 0011](0011-dom-package.md) decision 8 (one Changesets `fixed` group), [ADR 0012](0012-isolates-built-apart.md) (the isolate seam and its `[FLOOR, VERSION]` check), and the release steps of #221 (Changesets pre mode `next`, the version PR, the Prerelease workflow).
 - **Plan:** [M4d](../plans/m4d-release.md), item 2's "semver policy for the protocol version vs package versions".
@@ -28,7 +28,7 @@ This ADR records the whole scheme, so each release follows it rather than decidi
 
 | What | Scheme | Moved by |
 | --- | --- | --- |
-| **The library:** every `@isoloop/*` package, and the unscoped `isoloop` CLI once it exists | semver, one shared version for all of them (the Changesets `fixed` group) | a version PR, then the Prerelease workflow or a release tag |
+| **The library:** every `@isoloop/*` package, and the unscoped `isoloop` CLI once it exists | semver, one shared version for all of them (the Changesets `fixed` group) | a version PR, then a stage run, the maintainer's approval on npm and a `finish` run (decision 6, amended 2026-11-22) |
 | **The isolate seam** (ADR 0012) | `major.minor` only: an isolate is stamped `requires: '0.1'`, and the host runs `[FLOOR, VERSION]` | `VERSION` follows the package version; `FLOOR` moves only through an ADR (ADR 0012, decision 5) |
 | **Apps in `isoloop/web`** (`plant-v*`, `markets-v*`, `processor-v*`, `site-v*`) | each app's own version, independent of the library's | their tags, pushed by the maintainer |
 
@@ -67,22 +67,63 @@ The host ↔ worker protocol (`PROTOCOL { v, min }`) is none of these. Both ends
 
 Pre mode applies to the whole repo, so while `main` previews `0.2.0-next.N`, it can't release a `0.1.1`.
 
-- **When a fix for the current release is needed,** cut `release/0.1` from the `v0.1.0` tag, cherry-pick the fix, and release `0.1.1` from that branch. Its version PR and its release tag go through the same checks.
+- **When a fix for the current release is needed,** cut `release/0.1` from the `v0.1.0` tag, cherry-pick the fix, and release `0.1.1` from that branch. Its version PR and its release go through the same checks.
+- **Such a branch is admitted when it's cut (amended 2026-11-22).** Until then only `main` can stage (decision 6). Cutting one includes adding it to the `npm` environment by its exact name and giving it a ruleset. A pattern such as `release/*` won't do: version-PR branches have names that match it, and no ruleset protects them.
+- **A patch to an older line isn't designed yet (amended 2026-11-22).** Once `0.2.0` is `latest`, a `0.1.x` must not take that dist-tag back, so the release workflow refuses it until a patch like that is designed.
 - **The branch is created only when needed.** Most cycles won't need one.
 
 ### 6. Tags and GitHub Releases
 
 - **Every published version has a tag `v<version>`** on the commit it was built from.
-  - The Prerelease workflow pushes the prerelease tag (`v0.1.0-next.N`) after publishing. If the tag already exists on another commit, it fails.
-  - A release tag (`v0.1.0`) is pushed by the maintainer, and pushing it runs the release (M4d).
-- **Only tags without a suffix release.** M4d's release workflow matches `v<major>.<minor>.<patch>` and nothing else; a prerelease tag is a record only.
-- **GitHub Releases** exist for 0.1.0 and later, made by M4d's release workflow from the changelog sections. Prereleases get none: they're for this project and `isoloop/web`, and their tag and changelogs are enough.
+- **The tag follows the publish (amended 2026-11-22).** The `finish` run below makes it, for previews and releases alike. A tag is a record: pushing one starts no release, CI or Pages deploy. Before the amendment the Prerelease workflow tagged previews after publishing, and a release tag pushed by the maintainer was to start the release.
+- **GitHub Releases** exist for 0.1.0 and later. Prereleases get none: they're for this project and `isoloop/web`, and their tag and changelogs are enough. `finish` makes the Release. Its text is `.github/releases/<version>.md` where that file exists, as for 0.1.0, whose changelogs would repeat every preview's entries. Otherwise it's generated from the changelog sections (amended 2026-11-22).
+
+**How a version is released (amended 2026-11-22).** One workflow, `.github/workflows/release.yml`, releases previews and releases. It's started by hand, and it's a dry run unless told otherwise. The npm dist-tag comes from the version: `next` for `-next.N`, `latest` for a plain `x.y.z`.
+
+1. **Stage.** A run on `main` (or on a release branch admitted under decision 5), started on the maintainer's word for that version, runs the full CI on its commit.
+   - A build job, without `id-token`, packs the tarballs and prints their shasums.
+   - A stage job installs no dependencies and runs `npm stage publish` on those tarballs. It runs in the GitHub environment `npm`, which admits only `main` and such branches.
+   - The run's summary is the approval checklist: the packages in the order below, with version, shasum and link.
+2. **Approve.** The maintainer approves each package on npmjs.com with 2FA.
+   - None is approved until all 13 are staged, scanned by npm and match the run.
+   - The order follows the dependencies: protocol, codec, dom and vite; then bus and runtime; then host, react and preact; then balancer, devtools, webmcp and the `isoloop` CLI.
+3. **Finish.** A second run checks every package on npm: the version, the dist-tag, the provenance, and the workflow, ref and commit that provenance attests. Only then does it make the annotated tag on the staged commit and, for a release, the GitHub Release.
+
+When it goes wrong:
+
+- **Only some packages staged:** none is approved. The maintainer rejects those, and only the stage job runs again, on the same tarballs. An "already staged" error is a failure, never skipped, since the job can't see whose tarball is staged.
+- **A problem before the first approval:** all are rejected.
+- **A problem after it:** the set is finished, and the fix ships in the next version.
+- **Workflow files don't change on `main` between a stage and its `finish`:** GitHub can refuse a job's tag on a commit whose workflow files differ.
+
+Pages isn't part of a release. It serves a redirect to isoloop.dev, and `pages.yml` is run by hand when that changes.
+
+**What the gate is.** Each package trusts only `release.yml` in the environment `npm`, allowed to stage and neither to publish directly nor to change dist-tags. Tokens are disallowed. There is no fallback to a token or to a publish from someone's machine: if the gate doesn't work, the release waits.
+
+- **It stops** a publish without the maintainer's 2FA. That holds against a mistake, an agent or a job holding GitHub credentials, and a dependency that runs during the build.
+- **It doesn't stop** a bad tarball from being staged, or approved. Anyone who can change `main` or the repository's settings can change what gets staged, and what a run's summary says about it. The approval is only as good as what the maintainer checks before giving it, and `finish` checks after the publish.
+- **It doesn't protect** the maintainer's npm account or a session signed in to it. So approvals and trust changes are made in the browser, and the machines agents work on stay signed out of npm.
+- **It doesn't protect the tags.** The `tags` ruleset stops a tag moving or being deleted, not being created, so npm's provenance, not the tag, proves what was published.
+
+**Moving to it.** The gate holds only once it's the only way in, because npm accepts a publish that matches any one of a package's trust entries.
+
+1. The stage-only entries are added next to `prerelease.yml`'s.
+2. `0.1.0-next.12` rehearses the whole path.
+3. The old entries are revoked and `prerelease.yml` is deleted, all before 0.1.0. Until then nobody runs it.
+
+The rehearsal is also where these are found out, since npm's docs don't say or we haven't seen them:
+
+- whether provenance survives an approval (`finish` fails if it doesn't);
+- how long the scan takes;
+- whether a staged and approved version counts as the publish a new trust entry needs within 2 days;
+- whether a version can be staged again after a reject (if not, a failed stage means the next version);
+- whether the approval page shows the shasum to compare.
 
 ### 7. Guards in CI
 
 - **No accidental 1.0.** The changeset check fails on any changeset that asks for a `major` bump while the version is below 1.0.0, unless the PR has the `release-1.0` label. The maintainer adds that label when 1.0's previews are to start. On 0.x a breaking change is a minor (decision 3).
 - **Version PRs pass on their own.** A PR whose diff only consumes changesets (the changeset files, `.changeset/pre/`, the `version` fields and the `CHANGELOG.md`s) passes the changeset check without the `no-changeset` label. The check reads the diff, not the branch name.
-- **The Prerelease workflow refuses mixed versions.** It publishes only if every package shares one `-next.N` (#221, unchanged).
+- **The release workflow refuses mixed versions** (#221's rule for previews, extended to releases on 2026-11-22). It stages only if every package shares one version: a `-next.N` in pre mode, or a plain `x.y.z` out of it.
 
 ### 8. The versions before this ADR
 
@@ -92,10 +133,13 @@ Once `isoloop/web` has moved to `0.1.0-next.0`, every `0.0.0*` version of each `
 
 - **Every published version sorts in the order it was made.** `^0.1.0-next.0` ranges and npm's `next` behave as people expect.
 - **One version number answers "which build is this":** across packages, through the tag, and in each package's `CHANGELOG.md`.
+- **Every version costs the maintainer 13 approvals and a wait for npm's scan,** previews included (amended 2026-11-22). Previews will be fewer or slower, and a release can't go out while the maintainer is away.
+- **A release can be partly public for a while** (amended 2026-11-22). Each approval moves that package's dist-tag at once. The order means a published package never depends on one that isn't published yet.
+- **A version can be on npm without its tag** until `finish` runs (amended 2026-11-22).
 - **The isolate seam check stays sound on 0.x** at the cost of one rule: a seam addition waits for a minor.
 - **`@experimental` stays a real promise** without freezing the balancer or WebMCP at 1.0. Users of those APIs must read the changelog at each minor.
 - **A `release/0.x` branch, when there is one, is a second place to apply fixes.** Cherry-picks are by hand.
-- **One step more for the maintainer** around the first 0.1.0: `pre exit`, the version PR, the tag, then `pre enter next` for the next cycle.
+- **More steps for the maintainer** around the first 0.1.0: `pre exit`, the version PR, the stage, the approvals and `finish`, then `pre enter next` for the next cycle (amended 2026-11-22).
 - **Anyone who installs `@isoloop/<pkg>` without `@next` before 0.1.0** gets the placeholder, now with a deprecation message saying what to install instead.
 
 ## Alternatives considered
@@ -109,3 +153,11 @@ Once `isoloop/web` has moved to `0.1.0-next.0`, every `0.0.0*` version of each `
 - **Block majors outright,** with 1.0 done by hand outside the checks. A label is the same safety with the same steps as any other release.
 - **A separate tag prefix for prereleases** (`next-v0.1.0.N`). The semver suffix already says what a tag is.
 - **Unpublishing the `0.0.0*` versions.** See decision 8.
+- **Direct publishing behind a GitHub environment, with the build split off** (amendment of 2026-11-22). No approvals to give. Rejected: whoever holds the maintainer's GitHub credentials, as agents do, can change the environment and publish.
+- **Stage-only for releases, direct publishing for previews** (amendment of 2026-11-22). Previews would stay quick. Rejected: any one trust entry authorises a publish, so the direct one would be the way around the gate.
+- **Two stage-only workflows** (amendment of 2026-11-22). Rejected: two paths to audit, and previews wouldn't rehearse the path a release takes.
+- **The tag first, starting the release** (decision 6 until 2026-11-22). Rejected: the tags ruleset forbids moving or deleting a tag, so a rejected stage would leave the version's tag on the wrong commit for good.
+- **Approving with the npm CLI** (amendment of 2026-11-22). Faster for 13 packages. Rejected: agents share that shell's npm session, and npm can skip 2FA for 5 minutes after a prompt.
+- **Skipping packages that are already staged** on a re-run (amendment of 2026-11-22). Rejected: the job can't list staged versions, so it can't tell whether one is its own tarball.
+- **Deploying Pages with each release** (decided 2026-11-07, dropped 2026-11-22). The redirect doesn't change with a release, and the `github-pages` environment refuses deploys from tags.
+- **Generated notes for 0.1.0's GitHub Release** (amendment of 2026-11-22). Rejected: they'd repeat the preview cycle's changesets as the first release anyone reads.
