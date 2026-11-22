@@ -51,8 +51,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 740,
-          "end_line": 746,
+          "line": 745,
+          "end_line": 751,
           "label": "unsupported_browser",
           "anchor": "export function createKernel(config: KernelConfig): Kernel {"
         },
@@ -82,8 +82,8 @@
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1037,
-          "end_line": 1058,
+          "line": 1042,
+          "end_line": 1063,
           "label": "pool fate",
           "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
           "anchor_offset": 1

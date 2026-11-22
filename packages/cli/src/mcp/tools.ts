@@ -102,7 +102,9 @@ export const BUILTIN_TOOLS: readonly BuiltinTool[] = [
       title: 'Isolates',
       description:
         "Lists the page's isolates and pools: each isolate's state (running, blocked, crashed, restarting, failed, …), " +
-        'pool, heartbeat lag in ms, time since its last beat, restarts, crash reason, busy time and compositor figures.',
+        'pool, heartbeat lag in ms, time since its last beat, restarts, crash reason, busy time and compositor figures. ' +
+        'To see a block in progress, read the state and the time since its last beat: the heartbeat lag keeps its last ' +
+        'value while no beat arrives and shows the block only on the first beat after it ends.',
       inputSchema: schema({}),
       annotations: read,
     },

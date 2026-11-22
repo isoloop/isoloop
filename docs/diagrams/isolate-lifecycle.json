@@ -174,8 +174,8 @@
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 960,
-          "end_line": 974,
+          "line": 965,
+          "end_line": 979,
           "label": "a pool wakes as a whole",
           "anchor": "case 'wake':"
         }

@@ -245,7 +245,7 @@ type InspectBeat = {
 | --- | --- |
 | `id` | The isolate's id. |
 | `pool?` | Its pool, when it's a pool member. |
-| `lagMs` | How late its worker's beat fired, past the heartbeat interval, in ms. |
+| `lagMs` | How late its worker's beat fired, past the heartbeat interval, in ms. A block shows in it only on the first beat after the block ends; while it lasts, no beat arrives. |
 | `busyMs?` | Milliseconds its worker spent running its code during the beat's interval. |
 | `at` | `performance.now()` on the host when it arrived. |
 
@@ -340,7 +340,7 @@ type InspectIsolate = {
 | `state` | Its `IsolateState`. |
 | `pool?` | The pool it runs in; absent for a worker of its own. |
 | `lastBeatAt` | `performance.now()` on the host when its last beat arrived. |
-| `lagMs` | How late its worker's last beat fired, past the heartbeat interval, in ms. |
+| `lagMs` | How late its worker's last beat fired, past the heartbeat interval, in ms. It keeps the last beat's value while the worker is blocked and sends no beat. To see a block in progress, read `state` and the time since `lastBeatAt`. |
 | `restarts` | Restarts after a crash since it was spawned. |
 | `reason?` | The last crash's `CrashReason`, while restarting or failed. |
 | `error?` | The last crash's message, while restarting or failed. |
@@ -573,7 +573,7 @@ type IsolateSnapshot = {
 | `state` | Where it is in its life. |
 | `pool?` | The pool it runs in; absent for a worker of its own. |
 | `lastBeatAt` | `performance.now()` of the last beat. |
-| `lagMs` | How late its worker's last beat fired, past the heartbeat interval, in ms: a busy event loop shows here. |
+| `lagMs` | How late its worker's last beat fired, past the heartbeat interval, in ms. A blocked worker sends no beat, so this keeps the last beat's value (often 0) while a block lasts, and the late beat shows it only once the block ends. To see a block in progress, read `state` and the time since `lastBeatAt`. |
 | `restarts` | Restarts after a crash since it was spawned. A manual restart doesn't count. |
 | `reason?` | The last crash, while restarting or failed. |
 | `error?` | The last crash's message, while restarting or failed. |
@@ -847,7 +847,7 @@ type KernelEvents = {
 | `isolate:crash` | An isolate crashed. `pool`: its pool, when it's a pool member; a pool's members crash together. |
 | `isolate:failed` | Past the restart limit, or strategy `never`: the isolate stays down. |
 | `isolate:error` | An isolate reported an error that wasn't fatal (`ctx.reportError(e, { fatal: false })`); it keeps running. |
-| `isolate:beat` | One isolate's heartbeat, as it arrives: its worker's `lagMs` and, from runtimes that report it, its own `busyMs` for the interval the beat covers. A pool's beat gives one event per member. `at` is the host's `performance.now()` on receipt. Emitted only while someone listens, so apps without a listener pay nothing. `@isoloop/balancer` reads every beat through it rather than polling `isolates()`, which keeps only the latest. |
+| `isolate:beat` | One isolate's heartbeat, as it arrives: its worker's `lagMs` (how late this beat fired, so a block shows in it only once the block ends and the beat arrives) and, from runtimes that report it, its own `busyMs` for the interval the beat covers. A pool's beat gives one event per member. `at` is the host's `performance.now()` on receipt. Emitted only while someone listens, so apps without a listener pay nothing. `@isoloop/balancer` reads every beat through it rather than polling `isolates()`, which keeps only the latest. |
 | `workers:budget` | More live workers than `workers.budget`. Emitted once per kernel. |
 | `agents:unmatched` | **Experimental.** `agents.expose` patterns that match no topic in the contracts. Emitted once, in the microtask after `createKernel`, so a listener added right after it hears it. |
 | `bus:ready` | The bus worker loaded its contracts. `first` is false after a restart. |

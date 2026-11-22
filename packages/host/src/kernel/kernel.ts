@@ -250,7 +250,11 @@ export type IsolateSnapshot = {
   pool?: string;
   /** `performance.now()` of the last beat. */
   lastBeatAt: number;
-  /** How late its worker's last beat fired, past the heartbeat interval, in ms: a busy event loop shows here. */
+  /**
+   * How late its worker's last beat fired, past the heartbeat interval, in ms. A blocked worker sends no beat, so
+   * this keeps the last beat's value (often 0) while a block lasts, and the late beat shows it only once the block
+   * ends. To see a block in progress, read `state` and the time since `lastBeatAt`.
+   */
   lagMs: number;
   /** Restarts after a crash since it was spawned. A manual restart doesn't count. */
   restarts: number;
@@ -312,9 +316,10 @@ export type KernelEvents = {
   /** An isolate reported an error that wasn't fatal (`ctx.reportError(e, { fatal: false })`); it keeps running. */
   'isolate:error': { id: string; message: string };
   /**
-   * One isolate's heartbeat, as it arrives: its worker's `lagMs`
-   * and, from runtimes that report it, its own `busyMs` for the interval the
-   * beat covers. A pool's beat gives one event per member. `at` is the host's
+   * One isolate's heartbeat, as it arrives: its worker's `lagMs` (how late this
+   * beat fired, so a block shows in it only once the block ends and the beat
+   * arrives) and, from runtimes that report it, its own `busyMs` for the interval
+   * the beat covers. A pool's beat gives one event per member. `at` is the host's
    * `performance.now()` on receipt. Emitted only while someone listens, so
    * apps without a listener pay nothing. `@isoloop/balancer` reads every beat
    * through it rather than polling `isolates()`, which keeps only the latest.

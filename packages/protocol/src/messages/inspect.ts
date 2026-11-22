@@ -26,7 +26,10 @@ export type InspectIsolate = {
   pool?: string;
   /** `performance.now()` on the host when its last beat arrived. */
   lastBeatAt: number;
-  /** How late its worker's last beat fired, past the heartbeat interval, in ms. */
+  /**
+   * How late its worker's last beat fired, past the heartbeat interval, in ms. It keeps the last beat's value while
+   * the worker is blocked and sends no beat. To see a block in progress, read `state` and the time since `lastBeatAt`.
+   */
   lagMs: number;
   /** Restarts after a crash since it was spawned. */
   restarts: number;
@@ -107,7 +110,10 @@ export type InspectBeat = {
   id: string;
   /** Its pool, when it's a pool member. */
   pool?: string;
-  /** How late its worker's beat fired, past the heartbeat interval, in ms. */
+  /**
+   * How late its worker's beat fired, past the heartbeat interval, in ms. A block shows in it only on the first beat
+   * after the block ends; while it lasts, no beat arrives.
+   */
   lagMs: number;
   /** Milliseconds its worker spent running its code during the beat's interval. */
   busyMs?: number;
