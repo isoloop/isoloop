@@ -8,7 +8,7 @@ Short records of decisions that shape Isoloop's design. Each has a status:
 
 | ADR | Decision | Status |
 | --- | --- | --- |
-| [0001](0001-one-worker-per-isolate.md) | Own worker per isolate by default; opt-in named pools (field reserved in v1, built in M2c); opt-in suspension (`suspend`); soft worker budget. Amended 2026-11-20: a warm-up window after `ready`, killing a blocked isolate only after `readyTimeoutMs` | Accepted |
+| [0001](0001-one-worker-per-isolate.md) | Own worker per isolate by default; opt-in named pools (field reserved in v1, built in M2c); opt-in suspension (`suspend`); soft worker budget. Amended 2026-11-20 for a start-up warm-up; corrected 2026-11-22: not built, reopened in #389 | Accepted |
 | [0002](0002-host-owns-routing.md) | The host owns the URL; isolates opt in to `isoloop.route.v1` and need a grant to `navigate`; `kernel.syncRoute()`, `basePath`, routing can be turned off | Accepted |
 | [0003](0003-schema-format-standard-schema.md) | Standard Schema at runtime (required, validated in the broker, output stored), contracts URL as the single source, topics seeded from older versions, JSON Schema exported for tools | Accepted |
 | [0004](0004-npm-name.md) | Project renamed Federa → Isoloop; `@isoloop/*` packages | Accepted |
