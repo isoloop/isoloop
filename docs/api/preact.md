@@ -162,6 +162,12 @@ with routing off.
 The latest value on `topic`. It subscribes on mount and unsubscribes on unmount;
 a different `topic` or `from` subscribes again.
 
+An isolate has one subscription per topic. A second `useTopic` on the same topic, in
+another component or another call in the same one, replaces the first with no error: only
+the last one subscribed gets records, and the first stops updating. When the last one
+unmounts, the topic has no subscription, and the first doesn't get it back. Call
+`useTopic` once per topic, and pass the value down as props or share it through context.
+
 ```ts nocheck
 function useTopic<Out>(topic: TopicRef<any, Out, any, any>, opts?: UseTopicOptions): Out | undefined;
 ```

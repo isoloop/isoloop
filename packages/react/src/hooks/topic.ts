@@ -18,6 +18,12 @@ export type UseTopicOptions = {
  * never tear. The subscription lives while the component is mounted; StrictMode's extra
  * subscribe and unsubscribe leave one.
  *
+ * An isolate has one subscription per topic. A second `useTopic` on the same topic, in
+ * another component or another call in the same one, replaces the first with no error: only
+ * the last one subscribed gets records, and the first stops updating. When the last one
+ * unmounts, the topic has no subscription, and the first doesn't get it back. Call
+ * `useTopic` once per topic, and pass the value down as props or share it through context.
+ *
  * @param topic - The topic to read. The isolate needs a subscribe grant for it.
  * @param opts - Where reading starts ({@link UseTopicOptions}).
  * @returns The latest value, or `undefined` until one arrives. A bus restart that lost a
