@@ -3,7 +3,7 @@
  * input and output streams, the environment, the working directory, files
  * and module loading.
  */
-import { writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -16,6 +16,12 @@ export type Io = {
   /** Writes to stderr as is. */
   readonly err: (text: string) => void;
   readonly cwd: string;
+  /** The folder of the skills that ship with the CLI. */
+  readonly skills: string;
+  /** A file's text, or `undefined` when there's no such file. */
+  readonly readFile: (path: string) => Promise<string | undefined>;
+  /** Makes a folder and the ones above it. */
+  readonly mkdir: (path: string) => Promise<void>;
   readonly writeFile: (path: string, text: string) => Promise<void>;
   /** Imports a module by absolute path. */
   readonly load: (path: string) => Promise<unknown>;
@@ -26,13 +32,23 @@ export const resolvePath = (io: Io, path: string): string =>
   isAbsolute(path) ? path : resolve(io.cwd, path);
 
 /** The real process's streams and files. */
-export function nodeIo(): Io {
+export function nodeIo(skills: string): Io {
   return {
     stdin: process.stdin,
     env: process.env,
     out: (text) => void process.stdout.write(text),
     err: (text) => void process.stderr.write(text),
     cwd: process.cwd(),
+    skills,
+    readFile: async (path) => {
+      try {
+        return await readFile(path, 'utf8');
+      } catch (e) {
+        if (e instanceof Error && 'code' in e && e.code === 'ENOENT') return undefined;
+        throw e;
+      }
+    },
+    mkdir: async (path) => void (await mkdir(path, { recursive: true })),
     writeFile: (path, text) => writeFile(path, text, 'utf8'),
     load: (path) => import(pathToFileURL(path).href),
   };

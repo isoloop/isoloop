@@ -18,6 +18,9 @@ function memoryIo() {
     out: (t) => void (out += t),
     err: (t) => void (err += t),
     cwd: fixtures,
+    skills: '',
+    readFile: (path) => Promise.resolve(files.get(path)),
+    mkdir: () => Promise.resolve(),
     writeFile: (path, text) => {
       files.set(path, text);
       return Promise.resolve();
