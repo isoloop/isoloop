@@ -108,12 +108,51 @@ describe('worker pools (M2c)', () => {
         expect.objectContaining({ reason: 'unresponsive', pool: 'p' }),
         expect.objectContaining({ reason: 'unresponsive', pool: 'p' }),
       ]);
-      expect(crashes.find((c) => c.id === 'B')?.message).toContain('pool "p" restarted: "A"');
       // B and C come back, in a new worker for the pool.
       await waitFor(() => ready.filter((id) => id === 'B').length >= 2, 5000);
       await waitFor(() => running(k, ['B', 'C']), 5000);
       expect(crashes.some((c) => c.id === 'Q' || c.id === 'D')).toBe(false);
       expect(running(k, ['Q', 'D'])).toBe(true);
+    });
+
+    // The spinner or thrower is spawned last: the kernel used to blame the first member.
+    it('every member of a pool that stopped responding gets one message, naming none of them', async () => {
+      const k = kernel(fast);
+      const crashes: KernelEvents['isolate:crash'][] = [];
+      k.on('isolate:crash', (e) => crashes.push(e));
+      for (const id of ['A', 'B', 'C']) k.spawn({ id, src: counter, pool: 'p' });
+      await waitFor(() => running(k, ['A', 'B', 'C']));
+      k.spawn({ id: 'E', src: spin, pool: 'p' });
+      await waitFor(() => crashes.length >= 4, 5000);
+      const why = 'pool "p" restarted: its worker stopped responding (No heartbeat for 600 ms)';
+      expect(crashes.slice(0, 4).map((c) => c.message)).toEqual([why, why, why, why]);
+    });
+
+    it('every member of a pool whose worker threw gets one message, naming none of them', async () => {
+      const k = kernel(fast);
+      const crashes: KernelEvents['isolate:crash'][] = [];
+      k.on('isolate:crash', (e) => crashes.push(e));
+      for (const id of ['A', 'B', 'C']) k.spawn({ id, src: counter, pool: 'p' });
+      await waitFor(() => running(k, ['A', 'B', 'C']));
+      k.spawn({ id: 'E', src: timerThrows, pool: 'p' });
+      await waitFor(() => crashes.length >= 4, 5000);
+      const [first, ...others] = crashes.slice(0, 4).map((c) => c.message);
+      expect(first).toMatch(/^pool "p" restarted: its worker failed \(.*timer threw.*\)$/);
+      expect(others).toEqual([first, first, first]);
+    });
+
+    it('a kill through the inspection feed is one member’s, so the others name it', async () => {
+      const k = kernel(fast);
+      const crashes: KernelEvents['isolate:crash'][] = [];
+      k.on('isolate:crash', (e) => crashes.push(e));
+      for (const id of ['A', 'B', 'C']) k.spawn({ id, src: counter, pool: 'p' });
+      await waitFor(() => running(k, ['A', 'B', 'C']));
+      await k.inspect().kill('B');
+      await waitFor(() => crashes.length >= 3, 5000);
+      const message = (id: string) => crashes.find((c) => c.id === id)?.message;
+      const killed = 'killed through the inspection feed';
+      const why = `pool "p" restarted: "B" took the worker down (${killed})`;
+      expect([message('A'), message('B'), message('C')]).toEqual([why, killed, why]);
     });
 
     it('an uncaught error in a member timer takes the worker down: the pool restarts', async () => {

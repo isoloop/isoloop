@@ -277,8 +277,8 @@ A pure state machine per isolate plus timers, separated so it can be unit-tested
 ```ts
 type IsolateState = 'loading' | 'running' | 'blocked' | 'stopped' | 'crashed' | 'restarting' | 'failed' | 'suspended';
 type SupervisorInput =
-  | { k: 'spawned'; at: number } | { k: 'ready' } | { k: 'beat'; at: number; lagMs: number } | { k: 'tick'; at: number }
-  | { k: 'error'; at: number; fatal: boolean; message: string } | { k: 'workerError'; at: number; message: string }
+  | { k: 'spawned'; at: number } | { k: 'ready' } | { k: 'beat'; at: number; lagMs: number } | { k: 'tick'; at: number; pool?: string }
+  | { k: 'error'; at: number; fatal: boolean; message: string } | { k: 'workerError'; at: number; message: string; pool?: string }
   | { k: 'spawnFailed' | 'renderFmtMismatch' | 'busFailed'; at: number; message: string }
   | { k: 'versionMismatch'; at: number; reason: 'runtime_too_old' | 'isolate_too_old'; message: string }
   | { k: 'poolCrash'; at: number; reason: CrashReason; message: string }   // another member took the shared worker down (M2c)
@@ -321,7 +321,7 @@ Transitions (matching the RFC lifecycle diagram):
 
 Non-fatal `error` messages (a caught exception in a handler) are only reported (`isolate:error`). They don't change state.
 
-**Pools** (M2c, M2d). The heartbeat is the worker's, so the members of a pool block and are killed together. A crash that is the worker's (`unresponsive`, `worker_error`) crashes every other member with the same reason (`poolCrash`): the worker is terminated with its last member and they all restart in a new one, each replaying from its own committed offsets. A member's own fatal error, ready timeout or version mismatch stays its own: it restarts alone, back into the running worker. Any member's wake condition wakes the whole pool, and a pool suspends only as a whole ([ADR 0001](../adr/0001-one-worker-per-isolate.md)).
+**Pools** (M2c, M2d). The heartbeat is the worker's, so the members of a pool block and are killed together. A crash that is the worker's (`unresponsive`, `worker_error`) crashes every other member with the same reason and message (`poolCrash`; the message names no member, as the worker can't tell which caused it, except for a kill through the inspection feed): the worker is terminated with its last member and they all restart in a new one, each replaying from its own committed offsets. A member's own fatal error, ready timeout or version mismatch stays its own: it restarts alone, back into the running worker. Any member's wake condition wakes the whole pool, and a pool suspends only as a whole ([ADR 0001](../adr/0001-one-worker-per-isolate.md)).
 
 The supervisor also tracks the bus worker. A bus crash doesn't restart isolates: they get a new bus port (`reattach`) and keep running ([ADR 0007](../adr/0007-bus-worker-supervision.md), §7.7).
 
