@@ -14,7 +14,7 @@
   <a href="https://github.com/isoloop/isoloop/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/isoloop/isoloop/ci.yml?branch=main&style=for-the-badge&label=CI"></a>
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/github/license/isoloop/isoloop?style=for-the-badge&color=6e46c2"></a>
   <img alt="Written in TypeScript" src="https://img.shields.io/badge/TypeScript-strict-0b7480?style=for-the-badge">
-  <img alt="Status: pre-release" src="https://img.shields.io/badge/status-pre--release-555?style=for-the-badge">
+  <img alt="Status: early (0.x)" src="https://img.shields.io/badge/status-early%20(0.x)-b75400?style=for-the-badge">
 </p>
 
 <p align="center">
