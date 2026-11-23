@@ -14,8 +14,8 @@ The kernel of [Isoloop](https://isoloop.dev): it runs the parts of your app as i
 ## Install
 
 ```sh
-npm install @isoloop/host@next @isoloop/runtime@next @isoloop/bus@next
-npm install -D @isoloop/vite@next
+npm install @isoloop/host @isoloop/runtime @isoloop/bus
+npm install -D @isoloop/vite
 ```
 
 ## Example

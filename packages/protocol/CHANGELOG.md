@@ -1,5 +1,13 @@
 # @isoloop/protocol
 
+## 0.1.0
+
+The first release. An internal package: app code never imports it, and its API carries no semver promise of its own.
+
+- The message, event and error types that the kernel, the bus and isolates exchange.
+
+The changes made during the previews are in the `0.1.0-next.N` sections below.
+
 ## 0.1.0-next.12
 
 ### Patch Changes

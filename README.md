@@ -10,7 +10,7 @@
 <h3 align="center">Event-loop isolation for JavaScript apps</h3>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@isoloop/runtime"><img alt="npm @next" src="https://img.shields.io/npm/v/@isoloop/runtime/next?style=for-the-badge&label=npm%20%40next&color=2f57cc"></a>
+  <a href="https://www.npmjs.com/package/@isoloop/runtime"><img alt="npm" src="https://img.shields.io/npm/v/@isoloop/runtime?style=for-the-badge&label=npm&color=2f57cc"></a>
   <a href="https://github.com/isoloop/isoloop/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/isoloop/isoloop/ci.yml?branch=main&style=for-the-badge&label=CI"></a>
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/github/license/isoloop/isoloop?style=for-the-badge&color=6e46c2"></a>
   <img alt="Written in TypeScript" src="https://img.shields.io/badge/TypeScript-strict-0b7480?style=for-the-badge">
@@ -44,11 +44,11 @@ Where it fits and what it gives: [Features](https://isoloop.dev/features/).
 A minimal app needs the host, the runtime and the bus, a [Standard Schema](https://standardschema.dev) library for the topic schemas (Zod here), and, with Vite, the plugin:
 
 ```sh
-npm install @isoloop/host@next @isoloop/runtime@next @isoloop/bus@next zod
-npm install -D @isoloop/vite@next
+npm install @isoloop/host @isoloop/runtime @isoloop/bus zod
+npm install -D @isoloop/vite
 ```
 
-For a React or Preact isolate, add `@isoloop/react@next` or `@isoloop/preact@next`. pnpm and yarn work the same way (`pnpm add`, `yarn add`).
+For a React or Preact isolate, add `@isoloop/react` or `@isoloop/preact`. pnpm and yarn work the same way (`pnpm add`, `yarn add`).
 
 **1. The contracts:** one module of topics, shared by the host, the isolates and the bus worker, which validates every record against it.
 
@@ -176,10 +176,10 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 | **Website** | [isoloop.dev](https://isoloop.dev): the landing page, the features, how it works and the live examples | Done | [isoloop/web](https://github.com/isoloop/web) |
 | **M3e, M3g, M3h, M3i** Live widgets and placement | Add, edit and delete widgets while the page runs, each a JSON spec in its own isolate; a federated comparison against a natively federated build; the experimental balancer, which places isolates by load, moves, packs and quarantines them | Done | [Balancer guide](https://isoloop.dev/docs/balancer/), [`plant-v0.2.0`](https://github.com/isoloop/web/tree/plant-v0.2.0), [`markets-v0.5.0`](https://github.com/isoloop/web/tree/markets-v0.5.0), [`processor-v0.2.0`](https://github.com/isoloop/web/tree/processor-v0.2.0) |
 | **M4b** Devtools | The inspection feed (`kernel.inspect()`, the `inspect` grant) and `@isoloop/devtools`, a panel drawn by an isolate | Done | [Write-up](docs/posts/m4b-devtools.md), [inspection](https://isoloop.dev/docs/inspection/), [devtools](https://isoloop.dev/docs/devtools/) |
-| **M4a** Agents | Built: tools on contracts, `kernel.request`, the `isoloop` CLI with a dev MCP server, `@isoloop/webmcp` (experimental). Open: the "build with Isoloop" skill and a recorded run with a real agent | In progress | [Agents guide](https://isoloop.dev/docs/agents/), [plan](docs/plans/m4a-agents.md) |
+| **M4a** Agents | Tools on contracts, `kernel.request`, the `isoloop` CLI with a dev MCP server, the "build with Isoloop" skill, `@isoloop/webmcp` (experimental) | Done | [Write-up](docs/posts/m4a-agents.md), [Agents guide](https://isoloop.dev/docs/agents/), [plan](docs/plans/m4a-agents.md) |
 | **M3j** Balancer gaps | An app-reported busy time; packing and the quarantine fixed; isolates the kernel gave up on handled | Done | [Write-up](https://github.com/isoloop/web/tree/main/apps/processor/comparison/v0.3.0) |
-| **M4c** Docs | The docs on isoloop.dev: getting started, the guides, "What Isoloop can't hide", the API reference, `llms.txt` | Before 0.1 | [Plan](docs/plans/m4c-docs.md) |
-| **M4d** 0.1 release | The API freeze, the release workflow, `0.1.0` on npm and a launch post | Before 0.1 | [Plan](docs/plans/m4d-release.md) |
+| **M4c** Docs | The docs on isoloop.dev: getting started, the guides, "What Isoloop can't hide", the API reference, `llms.txt` | Done | [Write-up](docs/posts/m4c-docs.md), [plan](docs/plans/m4c-docs.md) |
+| **M4d** 0.1 release | The API freeze, the release workflow and `0.1.0` on npm; the launch post follows | Done | [Plan](docs/plans/m4d-release.md) |
 | **M6** More adapters | Vue 3, Svelte 5 and Solid 1, with no change to the render format | After 0.1 | [Plan](docs/plans/m6-adapters.md) |
 | **M7** WebMCP to stable | `@isoloop/webmcp` without `@experimental`, once WebMCP ships | After 0.1 | [Plan](docs/plans/m7-webmcp-stable.md) |
 | **M5** Shared-memory engine | An opt-in Rust/WASM log engine on `SharedArrayBuffer`, benchmarked against the TypeScript one | After 0.1 | [Plan](docs/plans/m5-shared-memory-engine.md) |

@@ -13,7 +13,7 @@ The Vite plugin for [Isoloop](https://isoloop.dev): one line in your config wire
 ## Install
 
 ```sh
-npm install -D @isoloop/vite@next vite
+npm install -D @isoloop/vite vite
 ```
 
 ## Example

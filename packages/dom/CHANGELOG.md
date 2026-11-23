@@ -1,5 +1,13 @@
 # @isoloop/dom
 
+## 0.1.0
+
+The first release. An internal package: app and adapter code never imports it.
+
+- The render bridge, format `isoloop-dom@1`: the worker DOM, the records it sends and the applier on the page.
+
+The changes made during the previews are in the `0.1.0-next.N` sections below.
+
 ## 0.1.0-next.12
 
 ### Patch Changes

@@ -1,5 +1,15 @@
 # isoloop
 
+## 0.1.0
+
+The first release of the `isoloop` command line.
+
+- **`isoloop contracts export`:** your contracts as JSON Schema.
+- **`isoloop mcp`:** the dev MCP server, so a coding agent can inspect your running app (experimental).
+- **`isoloop skill add`:** adds the "build with Isoloop" agent skill to your project.
+
+The changes made during the previews are in the `0.1.0-next.N` sections below.
+
 ## 0.1.0-next.12
 
 ### Minor Changes

@@ -14,7 +14,7 @@ The [Isoloop](https://isoloop.dev) runtime inside each worker: write a part of y
 ## Install
 
 ```sh
-npm install @isoloop/runtime@next
+npm install @isoloop/runtime
 ```
 
 ## Example

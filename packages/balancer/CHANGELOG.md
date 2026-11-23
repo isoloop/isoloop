@@ -1,5 +1,15 @@
 # @isoloop/balancer
 
+## 0.1.0
+
+The first release, experimental: every export may change in any minor.
+
+- **Placement by load:** spawn through the balancer instead of naming a pool, and it picks the worker.
+- **Moves and packing:** it moves an isolate out of a pool that can't keep up, and empties a quiet pool into another to free a worker.
+- **Quarantine:** an isolate that blocks or crashes waits in a quarantine pool until it has been quiet for a while.
+
+The changes made during the previews are in the `0.1.0-next.N` sections below.
+
 ## 0.1.0-next.12
 
 ### Patch Changes

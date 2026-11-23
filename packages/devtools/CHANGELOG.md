@@ -1,5 +1,15 @@
 # @isoloop/devtools
 
+## 0.1.0
+
+The first release, experimental: the panel and its options may change in any minor.
+
+- **A panel in its own worker:** drawn by a visual isolate, so a crash or hang in the panel never touches the app.
+- **What it shows:** isolates, topics and live records, from the inspection feed.
+- **What it does:** restart, kill and block an isolate.
+
+The changes made during the previews are in the `0.1.0-next.N` sections below.
+
 ## 0.1.0-next.12
 
 ### Patch Changes

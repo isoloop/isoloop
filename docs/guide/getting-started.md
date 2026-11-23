@@ -8,11 +8,11 @@ Read it first, before any other guide. It sets up the three parts every Isoloop 
 
 ## Install
 
-Before 0.1, the packages are published under the `next` tag, and the API may change between prereleases.
+On 0.x a minor release (0.2, 0.3) may contain breaking changes, and a patch doesn't. Only the latest release is supported: see [Limits](limits.md#only-the-latest-release-is-supported).
 
 ```sh
-npm install @isoloop/host@next @isoloop/runtime@next @isoloop/bus@next zod
-npm install -D @isoloop/vite@next
+npm install @isoloop/host @isoloop/runtime @isoloop/bus zod
+npm install -D @isoloop/vite
 ```
 
 - **`@isoloop/host`:** the kernel, on the main thread.
@@ -21,7 +21,7 @@ npm install -D @isoloop/vite@next
 - **`zod`:** any [Standard Schema](https://standardschema.dev) library works for the topic schemas. Zod is the one used here.
 - **`@isoloop/vite`:** the Vite plugin, for development and the build.
 
-For a React or Preact isolate, add `@isoloop/react@next` or `@isoloop/preact@next`. pnpm and yarn work the same way (`pnpm add`, `yarn add`).
+For a React or Preact isolate, add `@isoloop/react` or `@isoloop/preact`. pnpm and yarn work the same way (`pnpm add`, `yarn add`).
 
 ## The Vite plugin
 
@@ -156,7 +156,7 @@ kernel.on('isolate:failed', (e) => console.error(`${e.id} gave up: ${e.message}`
 The `isoloop` CLI carries a "build with Isoloop" skill, in the [Agent Skills](https://agentskills.io) format, that teaches a coding agent contracts, isolates, grants and the limits. Install the CLI (it needs Node 26 or later) and copy the skill into your project:
 
 ```sh
-npm install -D isoloop@next
+npm install -D isoloop
 npx isoloop skill add
 ```
 

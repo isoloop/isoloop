@@ -1,5 +1,19 @@
 # @isoloop/host
 
+## 0.1.0
+
+The first release of the kernel on the page.
+
+- **Contained failures:** each isolate runs on its own worker by default, so one that blocks or crashes doesn't freeze the others.
+- **Supervision:** blocked and crashed isolates restart, and one that keeps failing shows a fallback with Retry.
+- **Placement as a switch:** add `pool` to a spawn to share a worker and save memory and start-up time. The isolate's code stays the same.
+- **UI from workers:** isolates render in their workers, and the kernel applies their changes to the page once per frame.
+- **Grants:** each isolate publishes and subscribes only to the topics you allow.
+- **A view of it all:** events, state per isolate and pool, and publish and subscribe from the page.
+- **Experimental:** `kernel.inspect()`, `kernel.request`, tools for agents (`agents.expose`, `kernel.tools()`) and the dev MCP connection in `@isoloop/host/dev-mcp`.
+
+The changes made during the previews are in the `0.1.0-next.N` sections below.
+
 ## 0.1.0-next.12
 
 ### Patch Changes

@@ -1,5 +1,19 @@
 # @isoloop/bus
 
+## 0.1.0
+
+The first release of the bus.
+
+- **Contracts:** topics with schemas from any Standard Schema library, typed where you use them and checked on every publish.
+- **Retention:** keep the newest records, a span of time, or the latest record for each key.
+- **Replay:** a subscriber that starts late, or restarts, reads what it needs from the log.
+- **Backpressure:** records wait in the log for a busy subscriber, within the topic's retention.
+- **History that lasts:** a persistent topic's records and committed positions survive a reload and a restart of the bus.
+- **Contract tests:** `testContracts` from `@isoloop/bus/testing` checks your schemas against samples.
+- **Experimental:** consumer groups, request and reply, and a topic described as a tool for agents.
+
+The changes made during the previews are in the `0.1.0-next.N` sections below.
+
 ## 0.1.0-next.12
 
 ### Patch Changes
