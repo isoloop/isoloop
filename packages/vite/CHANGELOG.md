@@ -1,5 +1,17 @@
 # @isoloop/vite
 
+## 0.1.0
+
+The first release of the Vite plugin.
+
+- **The workers:** `virtual:isoloop/workers` gives `createKernel` the URLs of the isolate bootstrap and the bus worker.
+- **Isolates by import:** `import url from './cart?isolate'` gives a URL to spawn, and a build emits that module on its own.
+- **Isolates built apart:** build named isolates, or a repository of nothing else, for another team's host, with a manifest of the files.
+- **Headers in development:** dev and preview send the Content-Security-Policy Isoloop needs, and cross-origin isolation when you ask.
+- **A guard for production:** a build fails if the development-only MCP connection is still in it.
+
+The changes made during the previews are in the `0.1.0-next.N` sections below.
+
 ## 0.1.0-next.12
 
 ### Patch Changes

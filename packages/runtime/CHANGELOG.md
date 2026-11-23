@@ -1,5 +1,19 @@
 # @isoloop/runtime
 
+## 0.1.0
+
+The first release of what an isolate runs on.
+
+- **One way to write an isolate:** `defineIsolate` with a `start(ctx)`, for a widget, a feed, an engine or a request handler.
+- **Plain DOM in a worker:** create elements, listen to input and style your surface, and the host draws it.
+- **The bus:** typed publish and subscribe, straight to the bus worker, with replay after a restart.
+- **The page when you need it:** async calls to measure, focus, scroll, navigate and get a canvas to draw on.
+- **A lifecycle:** shutdown handlers, error reporting, and a hold against suspension.
+- **Unit tests without a worker:** `createTestContext` from `@isoloop/runtime/testing`.
+- **Experimental:** consumer groups and request and reply.
+
+The changes made during the previews are in the `0.1.0-next.N` sections below.
+
 ## 0.1.0-next.12
 
 ### Patch Changes

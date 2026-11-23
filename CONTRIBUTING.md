@@ -21,7 +21,7 @@ Isoloop is a pnpm monorepo. The tools, and the rules around them, are in [ADR 00
 
    Playwright may ask for system libraries the first time; `pnpm exec playwright install-deps` installs them (needs sudo).
 
-4. **Run an example:** the examples live in [isoloop/web](https://github.com/isoloop/web), which installs the `@isoloop` prereleases from npm. Here, `pnpm e2e` runs the E2E suites against the harness.
+4. **Run an example:** the examples live in [isoloop/web](https://github.com/isoloop/web), which installs the `@isoloop` packages from npm. Here, `pnpm e2e` runs the E2E suites against the harness.
 
 Nothing has to be built first. Each package's `exports` has an `@isoloop/source` condition pointing at `src`, so type checking, lint, tests and the E2E harness all read the source.
 

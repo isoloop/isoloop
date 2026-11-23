@@ -1,5 +1,13 @@
 # @isoloop/webmcp
 
+## 0.1.0
+
+The first release, experimental: it follows the WebMCP draft and may change in any minor.
+
+- **Your tools in the browser's agent:** `connectWebMCP(kernel)` registers the topics the app lists in `agents.expose` with the browser's WebMCP API.
+
+The changes made during the previews are in the `0.1.0-next.N` sections below.
+
 ## 0.1.0-next.12
 
 ### Patch Changes

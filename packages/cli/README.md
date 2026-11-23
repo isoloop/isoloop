@@ -3,7 +3,7 @@
 The Isoloop command line: export contracts as JSON Schema, run the dev MCP server for coding agents, and add the "build with Isoloop" agent skill to your project.
 
 ```sh
-npm install -D isoloop@next
+npm install -D isoloop
 ```
 
 ```sh

@@ -24,14 +24,14 @@ This skill matches the `isoloop` CLI that installed it. When it and the installe
 
 ## Set up
 
-Skip what the project already has. Before 0.1 the packages are under the `next` tag:
+Skip what the project already has:
 
 ```sh
-npm install @isoloop/host@next @isoloop/runtime@next @isoloop/bus@next zod
-npm install -D @isoloop/vite@next vite typescript
+npm install @isoloop/host @isoloop/runtime @isoloop/bus zod
+npm install -D @isoloop/vite vite typescript
 ```
 
-For React add `@isoloop/react@next react react-dom`, with `@types/react` and `@types/react-dom`. For Preact add `@isoloop/preact@next preact`.
+For React add `@isoloop/react react react-dom`, with `@types/react` and `@types/react-dom`. For Preact add `@isoloop/preact preact`.
 
 ```ts
 // vite.config.ts

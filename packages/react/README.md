@@ -14,7 +14,7 @@ React for [Isoloop](https://isoloop.dev): write an isolate as a React component,
 ## Install
 
 ```sh
-npm install @isoloop/react@next @isoloop/runtime@next react react-dom
+npm install @isoloop/react @isoloop/runtime react react-dom
 ```
 
 ## Example

@@ -14,7 +14,7 @@ Preact for [Isoloop](https://isoloop.dev): write an isolate as a Preact componen
 ## Install
 
 ```sh
-npm install @isoloop/preact@next @isoloop/runtime@next preact
+npm install @isoloop/preact @isoloop/runtime preact
 ```
 
 ## Example

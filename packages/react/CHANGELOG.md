@@ -1,5 +1,18 @@
 # @isoloop/react
 
+## 0.1.0
+
+The first release of the React adapter, for React 18 and 19.
+
+- **Your components in a worker:** `defineIsolate(Component)` turns a React component into an isolate.
+- **Topics as state:** `useTopic` follows a topic's latest value, and `usePublish` writes to a topic.
+- **The page through hooks:** `useHost` to measure, focus, scroll, navigate and get a canvas, and `useRoute` for the current location.
+- **Portals:** `usePortalRoot` gives modals, tooltips and menus a place inside the isolate.
+- **Errors reach the supervisor:** a render error restarts that isolate, and in a pool only that member.
+- **Experimental:** `useRequest`.
+
+The changes made during the previews are in the `0.1.0-next.N` sections below.
+
 ## 0.1.0-next.12
 
 ### Patch Changes

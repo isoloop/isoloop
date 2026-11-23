@@ -1,5 +1,13 @@
 # @isoloop/codec
 
+## 0.1.0
+
+The first release. An internal package: app code never imports it, and its API carries no semver promise of its own.
+
+- `encode` and `decode` for topic records in the binary format `isoloop-codec@1`, which persistent topics are stored in.
+
+The changes made during the previews are in the `0.1.0-next.N` sections below.
+
 ## 0.1.0-next.12
 
 ### Patch Changes

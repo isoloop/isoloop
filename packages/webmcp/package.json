@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/webmcp",
-  "version": "0.1.0-next.12",
+  "version": "0.1.0",
   "description": "Experimental: registers an Isoloop app's exposed tools with the browser's WebMCP API, for AI agents.",
   "keywords": [
     "isoloop",

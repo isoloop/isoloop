@@ -3,7 +3,7 @@
 **Experimental.** Automatic placement for [Isoloop](https://github.com/isoloop/isoloop) isolates: spawn through the balancer instead of naming a pool, and it places, moves and quarantines each isolate by measured load.
 
 ```sh
-npm install @isoloop/balancer@next @isoloop/host@next
+npm install @isoloop/balancer @isoloop/host
 ```
 
 ```ts

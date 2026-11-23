@@ -15,7 +15,7 @@ The [Isoloop](https://isoloop.dev) bus: a log of typed topics in its own worker,
 ## Install
 
 ```sh
-npm install @isoloop/bus@next zod
+npm install @isoloop/bus zod
 ```
 
 ## Example
