@@ -27,7 +27,7 @@
 
 Isoloop is an open-source TypeScript library. Each part of your app (a React or Preact UI tree, plain DOM, or a headless task) runs as an *isolate*, on its own worker or in a shared pool. Isolates talk only through a message bus with typed topics, retention and replay. When one blocks or crashes, the rest of the app keeps running; the supervisor restarts it, and it rebuilds its state from the bus.
 
-**Pre-release, on the way to 0.1.** Prereleases are on npm under `next`; there's no stable release yet. What's done and what's next: [Roadmap](#roadmap).
+**0.1 is the first release.** The parts marked experimental may change in any minor, and only the latest release is supported ([Limits](https://isoloop.dev/docs/limits/)). What's done and what's next: [Roadmap](#roadmap).
 
 See it run: the [basic example](https://isoloop.dev/examples/basic/), four isolates on three event loops, live.
 

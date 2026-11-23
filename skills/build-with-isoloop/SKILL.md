@@ -24,7 +24,7 @@ This skill matches the `isoloop` CLI that installed it. When it and the installe
 
 ## Set up
 
-Skip what the project already has. Before 0.1 the packages are under the `next` tag:
+Skip what the project already has:
 
 ```sh
 npm install @isoloop/host @isoloop/runtime @isoloop/bus zod
