@@ -12,7 +12,7 @@ The site doesn't read `main`. It renders the guides and the API pages at the com
 
 ## What the checks catch
 
-Five layers run on a library PR. The first three are scripts; the last two read the change.
+Five layers run on a library PR. The first four are scripts; the steward reads the change.
 
 | Check | Runs | Fails on |
 | --- | --- | --- |
