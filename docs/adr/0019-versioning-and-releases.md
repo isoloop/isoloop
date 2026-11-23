@@ -1,6 +1,6 @@
 # ADR 0019: Versioning and releases
 
-- **Status:** Accepted (2026-11-17), after grilling (Q1–Q12, yes to all). Amended on 2026-11-22 for releases the maintainer approves on npm (*How a version is released* in decision 6, with the version table and decisions 5 and 7 to match); grilled the same day (Q1–Q13, yes to all). Its code follows this amendment's acceptance.
+- **Status:** Accepted (2026-11-17), after grilling (Q1–Q12, yes to all). Amended on 2026-11-22 for releases the maintainer approves on npm (*How a version is released* in decision 6, with the version table and decisions 5 and 7 to match); grilled the same day (Q1–Q13, yes to all). Amended on 2026-11-23 for what is supported (decision 5's branch rules and the new decision 9); grilled that day (Q1–Q13, yes to all). Its code follows each amendment's acceptance; the branch release path is built after 0.1.
 - **Date:** 2026-11-17
 - **Builds on:** [ADR 0011](0011-dom-package.md) decision 8 (one Changesets `fixed` group), [ADR 0012](0012-isolates-built-apart.md) (the isolate seam and its `[FLOOR, VERSION]` check), and the release steps of #221 (Changesets pre mode `next`, the version PR, the Prerelease workflow).
 - **Plan:** [M4d](../plans/m4d-release.md), item 2's "semver policy for the protocol version vs package versions".
@@ -67,9 +67,13 @@ The host ↔ worker protocol (`PROTOCOL { v, min }`) is none of these. Both ends
 
 Pre mode applies to the whole repo, so while `main` previews `0.2.0-next.N`, it can't release a `0.1.1`.
 
-- **When a fix for the current release is needed,** cut `release/0.1` from the `v0.1.0` tag, cherry-pick the fix, and release `0.1.1` from that branch. Its version PR and its release go through the same checks.
+- **When a fix for the current release is needed,** cut `release/0.1` from the latest `v0.1.x` tag, backport the fix, and release the next patch from that branch. Its version PR and its release go through the same checks.
+- **The fix goes to `main` first (amended 2026-11-23).** The backport is its own PR into the branch, a cherry-pick or a fresh fix for the older code, with its own regression test. CI and the steward run on it like on any PR.
+- **Only a small backport is made (amended 2026-11-23).** If the fix doesn't apply as a small, reviewable change, it ships in the next minor, which is brought forward if it's urgent.
 - **Such a branch is admitted when it's cut (amended 2026-11-22).** Until then only `main` can stage (decision 6). Cutting one includes adding it to the `npm` environment by its exact name and giving it a ruleset. A pattern such as `release/*` won't do: version-PR branches have names that match it, and no ruleset protects them.
-- **A patch to an older line isn't designed yet (amended 2026-11-22).** Once `0.2.0` is `latest`, a `0.1.x` must not take that dist-tag back, so the release workflow refuses it until a patch like that is designed.
+- **Today the release workflow runs on `main` only (amended 2026-11-23).** Its stage and finish jobs and `scripts/release/rules.ts` require that ref. A task after 0.1 makes them accept `release/<major>.<minor>`, with tests and a dry run of a throwaway patch, before the first patch is needed.
+- **The branch lives until the next minor ships (amended 2026-11-23).** One such branch exists at a time. It's deleted when `0.2.0` is `latest`, and its tags stay. It is never merged back into `main`.
+- **A patch to an older line isn't made (amended 2026-11-22, restated 2026-11-23).** Once `0.2.0` is `latest`, a `0.1.x` must not take that dist-tag back, so the release workflow refuses it. Decision 9 says why.
 - **The branch is created only when needed.** Most cycles won't need one.
 
 ### 6. Tags and GitHub Releases
@@ -129,6 +133,19 @@ The rehearsal is also where these are found out, since npm's docs don't say or w
 
 Once `isoloop/web` has moved to `0.1.0-next.0`, every `0.0.0*` version of each `@isoloop/*` package is deprecated on npm: the `0.0.0-next.<sha>` builds, `0.0.0-stage`, and the `0.0.0` placeholder that `latest` points to. The message is "Pre-release builds; install @isoloop/<pkg>@next until 0.1.0". The maintainer runs `npm deprecate`, since it needs their npm login. The versions aren't unpublished: that would break old lockfiles, and npm limits it anyway.
 
+### 9. What is supported (amended 2026-11-23)
+
+Grilled 2026-11-23, Q1–Q13, yes to all.
+
+- **Only the version on npm `latest` is supported.** When `0.2.0` takes `latest`, every `0.1.x` is unsupported. `next` previews are never supported. We encourage everyone to move to `latest`.
+- **No backports to an older line.** Decision 5's branch patches the current `latest` only.
+- **A security bug in an unsupported version** is fixed in `latest` and published as a GitHub security advisory that names the affected range and the fixed version.
+- **`npm deprecate` is for a known bug.** We deprecate a range with a known security or data-loss bug, with the message "Upgrade to latest". We don't deprecate every superseded minor by default.
+- **Breaking changes are listed.** Each minor's changeset names its breaking changes and the migration. It's a convention the steward checks, with no extra tooling.
+- **Where it's said.** One sentence, "Only the latest release is supported": here, in `SECURITY.md`, in the README and in the docs.
+- **0.x only.** At 1.0 the policy is decided again, since a previous-minor window may be expected then.
+- **Apps and the site (web repo) are outside it.** They deploy from `main` on a fresh tag, with no branches and no backports.
+
 ## Consequences
 
 - **Every published version sorts in the order it was made.** `^0.1.0-next.0` ranges and npm's `next` behave as people expect.
@@ -138,12 +155,16 @@ Once `isoloop/web` has moved to `0.1.0-next.0`, every `0.0.0*` version of each `
 - **A version can be on npm without its tag** until `finish` runs (amended 2026-11-22).
 - **The isolate seam check stays sound on 0.x** at the cost of one rule: a seam addition waits for a minor.
 - **`@experimental` stays a real promise** without freezing the balancer or WebMCP at 1.0. Users of those APIs must read the changelog at each minor.
-- **A `release/0.x` branch, when there is one, is a second place to apply fixes.** Cherry-picks are by hand.
+- **A `release/0.x` branch, when there is one, is a second place to apply fixes.** Backports are by hand, and only small ones are made (decision 5).
+- **Users of an old version get no patch** (amended 2026-11-23). They upgrade to `latest`, and on 0.x that may mean taking a breaking minor.
+- **An urgent fix can wait for an unfinished minor** (amended 2026-11-23), when the fix is too large to backport.
 - **More steps for the maintainer** around the first 0.1.0: `pre exit`, the version PR, the stage, the approvals and `finish`, then `pre enter next` for the next cycle (amended 2026-11-22).
 - **Anyone who installs `@isoloop/<pkg>` without `@next` before 0.1.0** gets the placeholder, now with a deprecation message saying what to install instead.
 
 ## Alternatives considered
 
+- **A standing `release/0.x` branch for every minor** (amendment of 2026-11-23). Rejected: it costs a ruleset, CI, a Changesets state and hand cherry-picks every week, for a line we've told people to leave.
+- **Support the previous minor for a window** (amendment of 2026-11-23). Rejected for 0.x, where a minor may break anything; revisited at 1.0.
 - **Keep `0.0.0-next.<sha>`,** perhaps with a timestamp. It needs no version PR, but it never leads to a release, and only a timestamp would fix the order, which Changesets doesn't produce.
 - **Publish every merge to `main` as a snapshot** (`0.1.0-next-<date>`). Fewer steps, but changelogs would have no sections, and the web repo would chase builds nobody chose.
 - **Treat every 0.x minor as a major for the seam,** so patches may add to it. Rejected in ADR 0012: a 0.4 host would refuse 0.3 isolates that would run fine.

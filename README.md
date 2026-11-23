@@ -158,6 +158,7 @@ The diagrams on [isoloop.dev/how-it-works](https://isoloop.dev/how-it-works/) an
 - **No SSR.** Content appears once the isolates have started.
 - **A single CPU-heavy task** needs only a plain worker. Isoloop adds nothing when nothing else shares the data.
 - **Runs in browsers today.**
+- **Only the latest release is supported.** Fixes ship in `latest`; [how](docs/adr/0019-versioning-and-releases.md#9-what-is-supported-amended-2026-11-23).
 - **It costs CPU, memory and start-up time** compared with native code: [the measurements](https://isoloop.dev/#costs).
 
 More on [isoloop.dev](https://isoloop.dev/#limits).
