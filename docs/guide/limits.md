@@ -110,6 +110,10 @@ Isolates run on the page's origin. An isolate can `fetch` with the page's cookie
 
 Pooled isolates also share a worker's globals, and visual members share one document, so they can read each other's DOM and input ([pools](pools.md)).
 
+## Only the latest release is supported
+
+Only the version on npm `latest` gets fixes. When a new minor becomes `latest`, earlier versions get no patch, so upgrade instead. Preview builds (`next`) are never supported. Before 1.0, a minor may break anything outside the isolate seam, so read each minor's changelog before you upgrade. To report a vulnerability, see [`SECURITY.md`](https://github.com/isoloop/isoloop/blob/main/SECURITY.md).
+
 ## Limits
 
 This page is the list of limits for Isoloop as a whole. Each guide's own `## Limits` covers its feature, and a limit found there that applies to every isolate is added here too.
