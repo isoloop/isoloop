@@ -115,7 +115,7 @@ jobs:
           EOF
             echo 'STEWARD_PROMPT_EOF'
           } >> "$GITHUB_OUTPUT"
-      - uses: anthropics/claude-code-action@9eb012b6d0900c2b9eede65ee1758cec4d2973e9 # v1.0.270
+      - uses: anthropics/claude-code-action@acfe7992852970efb4fee683d63d628e3e52df67 # v1.0.286
         id: steward
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
