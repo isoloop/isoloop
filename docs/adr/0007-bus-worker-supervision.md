@@ -78,6 +78,10 @@ Every major browser has had sync access handles in normal browsing since 2022 or
 
 "Up to 3 times in 60 s" is the default, not a fixed limit. The bus worker is supervised with the kernel's own `supervisor` config (`maxRestarts`, `withinMs`, `backoff`; `createKernel` hands it to the bus controller in `packages/host/src/kernel.ts`), so an app that sets those sets them for the bus worker too. Found while writing the M4c supervision guide (isoloop#320), which describes the code.
 
+### Amended: short runs count (2026-11-24)
+
+The bus worker's restart limit follows [ADR 0001](0001-one-worker-per-isolate.md)'s *Restart limit: short runs*: a crash after a healthy run shorter than `withinMs` counts, measured from the bus's `ready` to its last beat, and the sliding window stays as well. The bus has no fallback: when the limit is met it fails as it does today, and isolates get `bus_unavailable` ([#390](https://github.com/isoloop/isoloop/issues/390)).
+
 ## Consequences
 
 - A bus crash is a brief pause, not a full reload, and with M2b persistent topics also survive page reloads.
