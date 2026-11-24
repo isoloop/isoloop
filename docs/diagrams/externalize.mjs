@@ -1,8 +1,7 @@
 // Moves the inline <script> and <style> blocks of each rendered diagram into
 // shared files next to it, so the pages run under `script-src 'self'` and
-// `style-src 'self'` (stricter than the hosting guide's policy for a page with
-// surfaces, which also needs `'unsafe-inline'`) and the seven pages share
-// one copy of the viewer. JSON data blocks (`type="application/json"`) stay
+// `style-src 'self'`, as the hosting guide's policy does, and the seven pages
+// share one copy of the viewer. JSON data blocks (`type="application/json"`) stay
 // inline: a CSP doesn't apply to them. Archify renders the same viewer code
 // and styles into every page, so the files are named by content hash.
 //

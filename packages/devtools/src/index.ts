@@ -75,11 +75,10 @@ const fallbackFor =
   (slot, info) => {
     const [v, h] = position.split('-');
     const box = document.createElement('div');
-    box.setAttribute(
-      'style',
+    // Through the CSSOM, so a page under `style-src 'self'` keeps it.
+    box.style.cssText =
       `position:fixed;${v}:12px;${h}:12px;pointer-events:auto;padding:8px 10px;` +
-        'border-radius:8px;font:12px/1.4 system-ui,sans-serif;color:#fff;background:#7f1d1d;',
-    );
+      'border-radius:8px;font:12px/1.4 system-ui,sans-serif;color:#fff;background:#7f1d1d;';
     box.textContent = 'Devtools stopped. ';
     const retry = document.createElement('button');
     retry.type = 'button';
@@ -119,11 +118,10 @@ export function connectDevtools(kernel: Kernel, o: DevtoolsOptions = {}): () => 
   const healthStatus = o.healthStatus ?? 'ring';
   const surface = document.createElement('div');
   surface.setAttribute('data-isoloop-devtools', '');
-  // Inline, so it wins over the shadow root's `:host` rule.
-  surface.setAttribute(
-    'style',
-    'position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:block;',
-  );
+  // Inline, so it wins over the shadow root's `:host` rule; through the
+  // CSSOM, so a page under `style-src 'self'` keeps it.
+  surface.style.cssText =
+    'position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:block;';
   document.body.append(surface);
 
   kernel.spawn({
