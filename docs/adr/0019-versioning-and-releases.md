@@ -1,6 +1,6 @@
 # ADR 0019: Versioning and releases
 
-- **Status:** Accepted (2026-11-17), after grilling (Q1–Q12, yes to all). Amended on 2026-11-22 for releases the maintainer approves on npm (*How a version is released* in decision 6, with the version table and decisions 5 and 7 to match); grilled the same day (Q1–Q13, yes to all). Amended on 2026-11-23 for what is supported (decision 5's branch rules and the new decision 9); grilled that day (Q1–Q13, yes to all). Its code follows each amendment's acceptance. The branch release path was built on 2026-11-24 for 0.1.1 (#420, with `release/0.1` cut from `v0.1.0`).
+- **Status:** Accepted (2026-11-17), after grilling (Q1–Q12, yes to all). Amended on 2026-11-22 for releases the maintainer approves on npm (*How a version is released* in decision 6, with the version table and decisions 5 and 7 to match); grilled the same day (Q1–Q13, yes to all). Amended on 2026-11-23 for what is supported (decision 5's branch rules and the new decision 9); grilled that day (Q1–Q13, yes to all). Its code follows each amendment's acceptance. The branch release path was built on 2026-11-24 for 0.1.1 (#420, with `release/0.1` cut from `v0.1.0`). Amended on 2026-11-24 for codemods (the new decision 10, #427); grilled that day (yes to all). Its tooling is built in 0.2, before the first breaking change lands on `main`.
 - **Date:** 2026-11-17
 - **Builds on:** [ADR 0011](0011-dom-package.md) decision 8 (one Changesets `fixed` group), [ADR 0012](0012-isolates-built-apart.md) (the isolate seam and its `[FLOOR, VERSION]` check), and the release steps of #221 (Changesets pre mode `next`, the version PR, the Prerelease workflow).
 - **Plan:** [M4d](../plans/m4d-release.md), item 2's "semver policy for the protocol version vs package versions".
@@ -145,6 +145,20 @@ Grilled 2026-11-23, Q1–Q13, yes to all.
 - **Where it's said.** One sentence, "Only the latest release is supported": here, in `SECURITY.md`, in the README and in the docs.
 - **0.x only.** At 1.0 the policy is decided again, since a previous-minor window may be expected then.
 - **Apps and the site (web repo) are outside it.** They deploy from `main` on a fresh tag, with no branches and no backports.
+
+### 10. A breaking change ships with a codemod (amended 2026-11-24)
+
+Decided for the 0.1.1 plan (decision 12, [#427](https://github.com/isoloop/isoloop/issues/427)), from the web repo's move to 0.1.0, where each API change meant migrating the apps by hand.
+
+- **The rule.** A breaking change to a stable API in a minor (on 0.x, decision 3), and from 1.0 in a major, ships with a codemod that migrates it, in the same release. Without one it doesn't ship. The changelog entry links the codemod.
+- **Stable API** is what the API check compares: every export in the published `.d.ts`, the isolate seam included (`IsolateContext`, `defineIsolate`, the DOM subset, the adapter hooks), except `@internal` exports, which it leaves out. The host↔worker protocol isn't covered, because both ends ship in one build (decision 1).
+- **`@experimental` APIs** (decision 4) get a codemod when the change is mechanical, and a migration note otherwise.
+- **Running it.** `npx isoloop migrate` reads the installed `@isoloop/*` version and applies each step up to the latest; `npx isoloop migrate 0.2` names the target. A dry run is the default and prints the diff; `--write` applies it. The command lives in the CLI package (`packages/cli`, published as `isoloop`).
+- **What a codemod covers.** Renames, moved imports, changed argument shapes and removed options with a replacement get a full codemod, with before/after fixtures. A behaviour change with no syntax to rewrite gets a `// isoloop-migrate:` comment where the code uses it, and a migration section in the guide.
+- **The CI gate.** A changeset whose summary starts with `breaking:` fails the changeset check unless the PR adds a codemod with fixtures under `packages/cli/src/migrate/<version>/`. The steward reports a breaking change that has no codemod.
+- **The parser.** Codemods parse TypeScript and JSX with `oxc-parser`, from the same project as the repo's oxlint and oxfmt, and rewrite by text edits at its source positions, so a user's formatting is kept and no printer is needed. It sits behind our own `parse` and `edit` interface, with conformance tests, so it can be swapped. TypeScript 7's own API is the expected replacement once it's stable; 7.0.2 exposes it only as `typescript/unstable/*`.
+- **Proved on real apps.** The web repo's plant-bench runs the codemods on every run branch that needs them. A codemod that fails there blocks the release.
+- **When.** The command, the gate and the parser interface are built in 0.2, before the first breaking change lands on `main`. Nothing changes in 0.1.x, which has no breaking changes (decision 3).
 
 ## Consequences
 

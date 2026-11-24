@@ -123,6 +123,8 @@ Don't push `v*` tags, and don't use `changeset publish` or `changeset tag`. A ta
 
 `pnpm release:status` shows what the next version step would do.
 
+**A breaking change ships with a codemod** ([ADR 0019](docs/adr/0019-versioning-and-releases.md), decision 10). A breaking change to a stable API (what the API check compares, minus `@internal`) starts its changeset summary with `breaking:`, and the same PR adds a codemod with before/after fixtures under `packages/cli/src/migrate/<version>/`, run as `npx isoloop migrate`. The changelog entry links it. A behaviour change with no syntax to rewrite gets a `// isoloop-migrate:` comment and a migration section in the guide instead. The command and its CI gate are built in 0.2, before the first breaking change.
+
 **No majors before 1.0.** While the packages are below 1.0.0, the changeset check fails a PR whose changesets ask for a `major` bump: on 0.x a breaking change is a minor. 1.0 starts only on a PR labelled `release-1.0`, which lets the major through.
 - **Decisions** made along the way become [ADRs](docs/adr/README.md). [Would like](docs/would-like.md) holds ideas deferred or to explore, not planned; [Should do](docs/should-do.md) holds committed work waiting on a package or milestone.
 
