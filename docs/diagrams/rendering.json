@@ -285,8 +285,8 @@
         },
         {
           "path": "packages/dom/src/host/applier.ts",
-          "line": 228,
-          "end_line": 241,
+          "line": 244,
+          "end_line": 257,
           "label": "only listeners the isolate registered",
           "anchor": "eventFor(e) {"
         }

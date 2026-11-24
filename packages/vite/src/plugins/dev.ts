@@ -32,8 +32,10 @@ export type WorkersOptions = {
 
 /**
  * The Content-Security-Policy `isoloop()` sends by default: the hosting
- * guide's policy, plus what Vite's dev server needs (its HMR socket and
- * injected styles).
+ * guide's policy, plus what Vite's dev server needs: its HMR socket
+ * (`ws:`, `wss:`), and `'unsafe-inline'` in `style-src`, because it injects
+ * the CSS you import as `<style>` elements. Isoloop itself doesn't need
+ * `'unsafe-inline'`: a production policy's `style-src` needs only `'self'`.
  *
  * @param origins Origins that serve isolate modules or the contracts module,
  *   added to `script-src` and `connect-src`. Default: none.

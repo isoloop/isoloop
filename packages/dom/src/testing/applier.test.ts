@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApplier, type SanitisePolicy } from '../host/applier';
 import type { DomBatch } from '../shared/records';
 import { createDom, WElement, WHTMLInputElement, type WNode } from '../worker/dom';
@@ -170,6 +170,50 @@ describe('applier', () => {
     sync();
     expect(container.innerHTML).toBe('<span ok="1"></span>');
     expect(calls).toEqual(['element blink', 'attr span.ok', 'attr span.bad']);
+  });
+
+  it('writes style through the CSSOM, never setAttribute, after the policy', () => {
+    const spy = vi.spyOn(Element.prototype, 'setAttribute');
+    try {
+      const { container, dom, doc, sync } = pair({
+        ...testPolicy,
+        attribute: (tag, ns, name, value) =>
+          name === 'style'
+            ? value.replace('red', 'blue')
+            : testPolicy.attribute(tag, ns, name, value),
+      });
+      // In an insert's subtree, on HTML and on SVG.
+      const p = doc.createElement('p');
+      p.style.setProperty('color', 'red');
+      p.setAttribute('class', 'x');
+      const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      const rect = doc.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('style', 'fill: red');
+      svg.appendChild(rect);
+      dom.root.append(p, svg);
+      sync();
+      const hp = container.querySelector('p');
+      const hrect = container.querySelector('rect');
+      if (!(hp instanceof HTMLElement) || !(hrect instanceof SVGElement))
+        throw new Error('missing');
+      // What the policy returned is what's written.
+      expect(hp.style.color).toBe('blue');
+      expect(hrect.style.fill).toBe('blue');
+
+      // As an attr record: replaced whole, then removed.
+      p.style.cssText = 'margin: 3px';
+      sync();
+      expect(hp.style.color).toBe('');
+      expect(hp.style.margin).toBe('3px');
+      p.removeAttribute('style');
+      sync();
+      expect(hp.hasAttribute('style')).toBe(false);
+      const named = spy.mock.calls.map(([name]) => name);
+      expect(named).not.toContain('style');
+      expect(named).toContain('class');
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('rejects malformed batches without touching the DOM', () => {

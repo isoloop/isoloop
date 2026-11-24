@@ -55,6 +55,10 @@ const isActive = (el: Element): boolean => {
   return (root instanceof ShadowRoot || root instanceof Document) && root.activeElement === el;
 };
 
+/** HTML and SVG elements have an inline `style` declaration. */
+const hasStyle = (el: Element): el is HTMLElement | SVGElement =>
+  el instanceof HTMLElement || el instanceof SVGElement;
+
 const nsOf = (el: Element): Namespace => (el.namespaceURI === SVG_NS ? 'svg' : 'html');
 
 const NO_MODS: DomMods = { alt: false, ctrl: false, meta: false, shift: false };
@@ -75,8 +79,20 @@ export function createApplier(container: Element, policy: SanitisePolicy): Appli
   const setAttr = (el: Element, name: string, value: string | null): void => {
     const safe = value === null ? null : policy.attribute(el.localName, nsOf(el), name, value);
     try {
-      if (safe === null) el.removeAttribute(name);
-      else el.setAttribute(name, safe);
+      if (safe === null) {
+        // Chromium writes a CSSOM change back to the attribute lazily: read
+        // it first, or the removal leaves `style=""` behind.
+        if (name === 'style') el.getAttribute(name);
+        el.removeAttribute(name);
+      } else if (name === 'style' && hasStyle(el)) {
+        // Through the CSSOM: CSP's `style-src` blocks a `style` attribute set
+        // with setAttribute unless it allows 'unsafe-inline', and doesn't
+        // govern CSSOM writes. One cssText write replaces the whole style, as
+        // the attribute does.
+        el.style.cssText = safe;
+      } else {
+        el.setAttribute(name, safe);
+      }
     } catch {
       // An attribute name the DOM refuses: drop it.
     }
