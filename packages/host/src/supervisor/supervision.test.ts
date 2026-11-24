@@ -99,6 +99,22 @@ describe('supervision', () => {
     expect(log['isolate:crash']).toHaveLength(6);
   });
 
+  it('a crash loop slower than the window still fails: short runs count (#390)', async () => {
+    // Each cycle is about 1.5 s running, 0.6 s to the kill and the backoff:
+    // never 3 crashes in 2 s, so the window alone would restart it forever.
+    const { log, spawn } = setup({
+      heartbeat: { blockedAfterMs: 200, killAfterMs: 600 },
+      supervisor: { maxRestarts: 2, withinMs: 2000, backoff: { initialMs: 10 } },
+    });
+    const a = spawn('A', fixture('spin-later'));
+    await waitFor(() => a.handle.snapshot().state === 'failed', 15_000);
+    expect(log['isolate:crash']).toHaveLength(3);
+    expect(log['isolate:failed']).toMatchObject([{ id: 'A', reason: 'unresponsive' }]);
+    expect(log['isolate:failed'][0]?.message).toContain(
+      '3 crashes, each after less than 2000 ms of healthy running',
+    );
+  }, 20_000);
+
   it('the host can render its own fallback', async () => {
     const { spawn } = setup({ supervisor: { strategy: 'never' } });
     const a = spawn('A', fixture('throws'), {

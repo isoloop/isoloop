@@ -334,7 +334,7 @@ Publishing has a second case: a persistent topic doesn't append a publish twice 
 
 ## When the bus worker crashes
 
-The kernel watches the bus worker with heartbeats, like an isolate. A worker error, or no beat for `heartbeat.killAfterMs` (10 s by default), ends it. The kernel starts a new one, up to 3 times in 60 s by default (`supervisor.maxRestarts` and `supervisor.withinMs`), and emits `bus:crash`, `bus:restart` and `bus:ready { first: false }` ([diagram: the crash and reattach](../diagrams/bus-crash-reattach.html)). Past the limit it emits `bus:failed`, isolates keep running, and every publish rejects with `bus_unavailable`.
+The kernel watches the bus worker with heartbeats, like an isolate. A worker error, or no beat for `heartbeat.killAfterMs` (10 s by default), ends it. The kernel starts a new one and emits `bus:crash`, `bus:restart` and `bus:ready { first: false }` ([diagram: the crash and reattach](../diagrams/bus-crash-reattach.html)). The bus has the same [restart limit](supervision.md#what-it-does-about-them) as an isolate, set by `supervisor.maxRestarts` and `supervisor.withinMs`. By default, its fourth crash is past the limit unless it ran 60 s or more before one of them. Past the limit the kernel emits `bus:failed`, isolates keep running, and every publish rejects with `bus_unavailable`.
 
 Isolates keep running. Each one gets a new port to the new bus as soon as it boots, and its bus client:
 
@@ -357,7 +357,7 @@ If the new bus crashes while it loads, or within 2 s of becoming ready, twice in
 - **Order is per topic.** There's no order across topics. In a group, order holds per key while membership is stable.
 - **One subscription per topic per isolate.** A second `subscribe` replaces the first; with `dev: true` the bus warns in the console.
 - **Values are structured data.** Functions, DOM nodes and class instances don't cross the bus, and the size limit is a rough estimate.
-- **A restart limit.** After 3 bus restarts in 60 s, the bus is down for good until the page reloads.
+- **A restart limit.** Past the bus's [restart limit](#when-the-bus-worker-crashes) (by default, a 4th crash unless it ran 60 s or more before one of them), the bus is down for good until the page reloads.
 - **An isolate's own request doesn't check for a responder.** With nobody answering, it waits for its timeout. Only `kernel.request` fails at once with `no_responder`.
 
 ## See also
