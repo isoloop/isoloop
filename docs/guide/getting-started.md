@@ -13,6 +13,10 @@ On 0.x a minor release (0.2, 0.3) may contain breaking changes, and a patch does
 ```sh
 npm install @isoloop/host @isoloop/runtime @isoloop/bus zod
 npm install -D @isoloop/vite
+
+# or with pnpm
+pnpm add @isoloop/host @isoloop/runtime @isoloop/bus zod
+pnpm add -D @isoloop/vite
 ```
 
 - **`@isoloop/host`:** the kernel, on the main thread.
@@ -21,7 +25,7 @@ npm install -D @isoloop/vite
 - **`zod`:** any [Standard Schema](https://standardschema.dev) library works for the topic schemas. Zod is the one used here.
 - **`@isoloop/vite`:** the Vite plugin, for development and the build.
 
-For a React or Preact isolate, add `@isoloop/react` or `@isoloop/preact`. pnpm and yarn work the same way (`pnpm add`, `yarn add`).
+For a React or Preact isolate, add `@isoloop/react` or `@isoloop/preact`. yarn works the same way (`yarn add`).
 
 ## The Vite plugin
 
@@ -168,7 +172,7 @@ For agents without skills, paste this into your app's `AGENTS.md`, so they follo
 ```md
 ## Isoloop
 
-This app runs its parts as Isoloop isolates, each on its own worker. Docs: https://github.com/isoloop/isoloop/tree/main/docs/guide
+This app runs its parts as Isoloop isolates, each on its own worker. Docs: https://isoloop.dev/llms.txt
 
 - Isolates talk only through bus topics declared in the contracts module, and only on the topics their `grants` allow. Never share state through globals or the page.
 - A topic name ends in its version (`.v1`). A schema change that old records wouldn't pass is a new topic.
