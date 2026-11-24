@@ -13,7 +13,7 @@
  * spawn, and `spawned` moves it to `loading`. It never touches the restart
  * window.
  *
- * The restart limit (ADR 0001, *Restart limit: short runs*) is two rules, and
+ * The restart limit is two rules, and
  * the first one met fails the isolate: `maxRestarts` restarts in a sliding
  * `withinMs`, and a crash after `maxRestarts` crashes in a row that each came
  * after less than `withinMs` of healthy running. A healthy run lasts from

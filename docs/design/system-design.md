@@ -246,7 +246,7 @@ interface Kernel {
 
 `IsolateManifest` is `{ id, src, surface?: Element, config?, grants?, fallback?, pool?, suspend?, bus?: { onReset? } }` (`packages/host/src/kernel/kernel.ts`).
 
-Defaults: heartbeat `100 / 400 / 10_000` ms, ready timeout `10_000` ms, frame budget `8` ms, supervisor `one-for-one`, 3 restarts in 60 s, backoff `250 ms × 2ⁿ` capped at 4 s.
+Defaults: heartbeat `100 / 400 / 10_000` ms, ready timeout `10_000` ms, frame budget `8` ms, supervisor `one-for-one`, 3 restarts in 60 s or 3 crashes in a row after runs shorter than 60 s, backoff `250 ms × 2ⁿ` capped at 4 s.
 
 `contracts` and `workers.bus` come together: giving only one throws `invalid_config`. Without both there is no bus worker: isolates get an unconnected bus port and `kernel.publish` rejects with `bus_unavailable`.
 
@@ -307,11 +307,11 @@ Transitions (matching the RFC lifecycle diagram):
 | blocked | tick, no beat for `killAfterMs` | crashed | terminate |
 | running / blocked | `workerError` or fatal `error` | crashed | terminate, emit `isolate:crash` |
 | loading / running / blocked | `poolCrash`: another member of its pool crashed with `unresponsive` or `worker_error` | crashed | with that member's reason; every member restarts, in a new worker |
-| crashed | restarts in window < max | restarting | spawn after backoff |
-| crashed | restarts in window ≥ max, or strategy `never` | failed | showFallback, emit `isolate:failed` |
+| crashed | restarts in window < max, and crashes in a row after runs shorter than `withinMs` ≤ max | restarting | spawn after backoff |
+| crashed | restarts in window ≥ max, or crashes in a row after short runs > max, or strategy `never` | failed | showFallback, emit `isolate:failed` |
 | restarting | `spawned` | loading | – |
 | any but failed | `stop` | stopped | `shutdown` with grace, then terminate |
-| failed / stopped | `respawn` | restarting, then `spawned` → loading | resets restart window |
+| failed / stopped | `respawn` | restarting, then `spawned` → loading | resets the restart window and the short-run count |
 | any but failed | `busFailed` (contracts couldn't load) | failed | reason `bus_failed`, no restart; showFallback, emit `isolate:failed` |
 | running | `suspend` set, idle for `afterMs` (no visible surface, no deliveries, no `keepAwake` hold, nothing in flight; ADR 0001) | suspended | `shutdown` with grace, `detach { keepOffsets: true, wake: true }` (leaves consumer groups), terminate, keep surface snapshot |
 | suspended | surface visible (visual), bus `wake` (headless), `resume`, or a bus restart (every suspended headless isolate, since the new bus has lost their wake subscriptions; [ADR 0001](../adr/0001-one-worker-per-isolate.md), Suspension) | loading | queued: at most `suspend.maxConcurrentWakes` (4) spawns at once, visible first; `latest` subscriptions start from `committed` (`init.wake`); restart window untouched |
