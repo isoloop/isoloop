@@ -1,0 +1,21 @@
+name: Docs problem
+description: A guide, an API page or a README is wrong or unclear.
+labels: [documentation]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page URL
+      description: The page on isoloop.dev, or the file in the repo.
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What's wrong
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: Suggested fix
