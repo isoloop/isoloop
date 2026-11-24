@@ -13,7 +13,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, release/0.1]
   workflow_call:
   schedule:
     - cron: '0 5 * * 1'

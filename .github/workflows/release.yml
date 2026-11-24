@@ -2,7 +2,8 @@
 #
 # - dry-run (the default): the checks (reported), full CI, the tarballs, their
 #   shasums and the notes. No OIDC token, no environment, nothing written.
-# - stage: the same on main, then stages the tarballs on npm. The maintainer
+# - stage: the same on main or release/0.1 (scripts/release/rules.ts,
+#   RELEASE_BRANCHES), then stages the tarballs on npm. The maintainer
 #   approves them there with 2FA; nothing is published from here.
 # - finish: takes a stage run's id, checks that all of it is on npm as staged,
 #   then creates the tag and, for x.y.z, the GitHub Release.
@@ -17,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'dry-run, stage (main only) or finish (main only)'
+        description: 'dry-run, stage or finish (stage and finish: main or release/0.1 only)'
         type: choice
         options: [dry-run, stage, finish]
         default: dry-run
@@ -104,7 +105,7 @@ jobs:
 
   stage:
     needs: [verify, build]
-    if: inputs.mode == 'stage' && github.ref == 'refs/heads/main'
+    if: inputs.mode == 'stage' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/0.1')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm
@@ -220,7 +221,7 @@ jobs:
           said ''
           said "1. Before the first approval, wait for this job to be green, then check the whole list in [npm](https://www.npmjs.com/) (account settings, Staged Packages): all $count are there, each validated, with this version, the dist-tag \`$TAG\` and the shasum below. If one is wrong, reject all $count."
           said '2. Approve group by group, 1 to 4. After the first approval there is no going back: finish the set and fix forward.'
-          said "3. Run *Release* on main with mode \`finish\` and stage_run \`$GITHUB_RUN_ID\`. Merge no workflow change before that."
+          said "3. Run *Release* on $GITHUB_REF_NAME with mode \`finish\` and stage_run \`$GITHUB_RUN_ID\`. Merge no workflow change before that."
           said ''
           said '| Approved | Group | Package | Shasum | Stage id |'
           said '| --- | --- | --- | --- | --- |'
@@ -266,7 +267,7 @@ jobs:
   # Its own job: no checkout, so the write token meets no repo code.
   finish:
     needs: finish-check
-    if: inputs.mode == 'finish' && github.ref == 'refs/heads/main'
+    if: inputs.mode == 'finish' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/0.1')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

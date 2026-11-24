@@ -18,6 +18,7 @@ const staged: Staged[] = NAMES.map((name, i) => ({
 /** What a test changes from a run that went well. */
 interface World {
   ref?: string;
+  provenanceRef?: string;
   id?: string;
   path?: string;
   branch?: string;
@@ -52,7 +53,7 @@ function finish(world: World = {}): ReturnType<typeof checkFinish> {
         return {
           path: world.path ?? WORKFLOW,
           event: 'workflow_dispatch',
-          head_branch: world.branch ?? 'main',
+          head_branch: world.branch ?? (world.ref ?? 'refs/heads/main').replace('refs/heads/', ''),
           head_sha: COMMIT,
           head_repository: { full_name: 'isoloop/isoloop' },
           status: 'completed',
@@ -107,7 +108,7 @@ function finish(world: World = {}): ReturnType<typeof checkFinish> {
                 workflow: {
                   repository: GITHUB,
                   path: world.provenancePath ?? WORKFLOW,
-                  ref: 'refs/heads/main',
+                  ref: world.provenanceRef ?? world.ref ?? 'refs/heads/main',
                 },
               },
               resolvedDependencies: [{ digest: { gitCommit: world.provenanceCommit ?? COMMIT } }],
@@ -164,11 +165,28 @@ describe('checkFinish', () => {
     ['a run with no record', { artifacts: ['tarballs-1'] }, 'no staged-<attempt> artifact'],
     ['a record of another run', { recordRun: '4499' }, 'record is of run 4499'],
     ['a record short of a package', { recordPackages: staged.slice(1) }, 'different packages'],
-    ['another ref', { ref: 'refs/heads/ci/x' }, 'main only'],
+    ['another ref', { ref: 'refs/heads/ci/x' }, 'main or release/0.1 only'],
+    ['a pattern-alike ref', { ref: 'refs/heads/release/0.1.0' }, 'main or release/0.1 only'],
+    [
+      'a stage on main finished on release/0.1',
+      { ref: 'refs/heads/release/0.1', branch: 'main' },
+      'its branch',
+    ],
+    [
+      'a provenance from another branch',
+      { provenanceRef: 'refs/heads/main', ref: 'refs/heads/release/0.1' },
+      "ref isn't refs/heads/release/0.1",
+    ],
     ['an id that is not a number', { id: '1; echo x' }, "isn't a run id"],
     ['a workflow change since the stage', { workflowsChanged: true }, 'workflows changed'],
   ])('refuses %s', async (_, world, message) => {
     await expect(finish(world)).rejects.toThrow(message);
+  });
+
+  it('passes a stage and finish on release/0.1', async () => {
+    await expect(finish({ ref: 'refs/heads/release/0.1' })).resolves.toMatchObject({
+      commit: COMMIT,
+    });
   });
 
   it('can be re-run once tagged, after a workflow change too', async () => {
