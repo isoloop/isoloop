@@ -82,7 +82,8 @@ export type BalancerOptions = {
    * quarantine worker beyond the first. The quarantine,
    * `balancer-quarantine-1`, is allowed on top, and workers the app runs
    * itself don't count; the kernel's worker budget stays the page-wide
-   * warning. Default `max(2, navigator.hardwareConcurrency - 2)`; at least 1.
+   * warning. Default `max(2, navigator.hardwareConcurrency - 2)`, taking 4 as the
+   * core count when there is no `navigator`. A value you set is raised to 1 if it's lower.
    */
   maxWorkers?: number;
   /**

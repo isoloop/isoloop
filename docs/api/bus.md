@@ -313,7 +313,7 @@ type TopicDef<In, Out = In, RIn = never, ROut = RIn> = {
   readonly name: string;
   readonly schema: StandardSchemaV1<In, Out>;
   readonly reply?: StandardSchemaV1<RIn, ROut>;
-  readonly retention: Retention$1;
+  readonly retention: Retention;
   readonly maxRecordBytes?: number;
   readonly durability?: "memory" | "persistent";
   readonly seed?: {
@@ -321,7 +321,7 @@ type TopicDef<In, Out = In, RIn = never, ROut = RIn> = {
     readonly map: (value: any, record: BusRecord) => In;
     readonly follow?: boolean;
   };
-  readonly tool?: [RIn] extends [never] ? never : ToolSpec$1;
+  readonly tool?: [RIn] extends [never] ? never : ToolSpec;
 };
 ```
 

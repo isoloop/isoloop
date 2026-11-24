@@ -187,6 +187,7 @@ const x = (name: string, kind: ExportKind, entry = 'pkg'): ApiExport => ({
   kind,
   key: `k:${name}`,
   home: entry,
+  owned: true,
   decls: [],
   tags: [],
   documented: true,
