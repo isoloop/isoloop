@@ -357,7 +357,7 @@ If the new bus crashes while it loads, or within 2 s of becoming ready, twice in
 - **Order is per topic.** There's no order across topics. In a group, order holds per key while membership is stable.
 - **One subscription per topic per isolate.** A second `subscribe` replaces the first.
 - **Values are structured data.** Functions, DOM nodes and class instances don't cross the bus, and the size limit is a rough estimate.
-- **A restart limit.** After 3 bus restarts in 60 s, the bus is down for good until the page reloads.
+- **A restart limit.** Past the bus's [restart limit](#when-the-bus-worker-crashes) (by default, a 4th crash unless it ran 60 s or more before one of them), the bus is down for good until the page reloads.
 - **An isolate's own request doesn't check for a responder.** With nobody answering, it waits for its timeout. Only `kernel.request` fails at once with `no_responder`.
 
 ## See also
