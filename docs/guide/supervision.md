@@ -224,6 +224,18 @@ Two sets of runs of the plant dashboard's Isoloop page (12 workers, one pool of 
 - At 2000 ms, a page with an isolate in `failed` had the whole pool of 72 in `failed`, 33 to 134 s after it started, on both hosts.
 - At the default 10 s, most crashes were `ready_timeout` (0.1.0: 587; 0.1.1's rule: 517). The 9 isolates that failed on 0.1.1's rule failed after `ready_timeout` crashes. On 0.1.0, 30 of the 83 did, and 53 after heartbeat kills.
 
+**2026-11-24, at a level where 0.1.0 recovers at the defaults** ([#389, the third set](https://github.com/isoloop/isoloop/issues/389#issuecomment-7132987368)). The same machine, browser and 150 s runs, with 6 pages at once pinned to one core (2 logical CPUs). The hosts are 0.1.0 and 0.1.1's restart rule, alternating run by run, 30 pages each.
+
+| Host | `killAfterMs` | Pages with a heartbeat kill | Pages with an isolate in `failed` | Isolates in `failed` | Pages without data after 150 s |
+| --- | --: | --: | --: | --: | --: |
+| 0.1.0 | 10 000 (default) | 0 of 30 | 0 of 30 | 0 | 0 |
+| 0.1.1's rule | 10 000 (default) | 0 of 30 | 0 of 30 | 0 | 0 |
+| 0.1.0 | 2000 | 30 of 30 | 11 of 30 | 792 | 1 |
+| 0.1.1's rule | 2000 | 29 of 30 | 18 of 30 | 1,296 | 0 |
+
+- At the defaults, no isolate crashed on either host.
+- At 2000 ms, every page had heartbeat kills. More pages reached `failed` under 0.1.1's rule (18 of 30) than under 0.1.0 (11 of 30): 0.1.1's rule counts heartbeat kills that 0.1.0's window let pass.
+
 ## Limits
 
 - **State in the isolate's memory is lost on a restart.** Keep what must survive on the bus, in a persistent topic.
