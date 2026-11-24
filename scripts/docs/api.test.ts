@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   anchor,
+  bundlerSuffixes,
   GENERATED,
   ordered,
   parseCli,
@@ -116,6 +117,31 @@ describe('the page', () => {
     expect(renderExport(get('extra', 'Widget'), 'extra', { ...ctx, page: 'extra.md' })).toBe(
       '### `Widget`\n\nRe-exported from `main`: see [`Widget`](main.md#widget).',
     );
+  });
+
+  it('says so when the home package only documents a type another package declares', () => {
+    expect(
+      renderExport({ ...get('extra', 'Widget'), owned: false }, 'extra', {
+        ...ctx,
+        page: 'extra.md',
+      }),
+    ).toBe(
+      '### `Widget`\n\nAlso exported by `main`, which documents it: see [`Widget`](main.md#widget).',
+    );
+  });
+
+  it("drops the bundler's name suffixes from declarations", () => {
+    const decl = get('extra', 'configure').decls[0];
+    if (!decl) throw new Error('configure has no declaration');
+    expect(decl.text).not.toMatch(/\$\d/);
+    expect(signature(decl)).toBe('function configure(o: Options): void;');
+  });
+
+  it('finds a bundler suffix left in a page', () => {
+    expect(bundlerSuffixes(new Map([['a.md', 'ok\nfunction f(): HostApi$1;']]))).toEqual([
+      'a.md:2: HostApi$1',
+    ]);
+    expect(bundlerSuffixes(new Map([['a.md', 'costs $1 and `$2`']]))).toEqual([]);
   });
 
   it('starts with the title and the lead, has a section per entry point, and ends with the notice', () => {

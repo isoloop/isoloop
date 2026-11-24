@@ -39,7 +39,7 @@ export default defineIsolate<HTMLElement>({
 
 ### `BusError`
 
-Re-exported from `@isoloop/host`: see [`BusError`](host.md#buserror).
+Also exported by `@isoloop/host`, which documents it: see [`BusError`](host.md#buserror).
 
 ### `HostCallError`
 

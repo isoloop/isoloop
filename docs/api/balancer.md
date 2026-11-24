@@ -149,7 +149,7 @@ type BalancerOptions = {
 
 | Field | Description |
 | --- | --- |
-| `maxWorkers?` | The balancer's own allowance of workers: its `balancer-N` pools, plus any quarantine worker beyond the first. The quarantine, `balancer-quarantine-1`, is allowed on top, and workers the app runs itself don't count; the kernel's worker budget stays the page-wide warning. Default `max(2, navigator.hardwareConcurrency - 2)`; at least 1. |
+| `maxWorkers?` | The balancer's own allowance of workers: its `balancer-N` pools, plus any quarantine worker beyond the first. The quarantine, `balancer-quarantine-1`, is allowed on top, and workers the app runs itself don't count; the kernel's worker budget stays the page-wide warning. Default `max(2, navigator.hardwareConcurrency - 2)`, taking 4 as the core count when there is no `navigator`. A value you set is raised to 1 if it's lower. |
 | `spike?` | When a long task is a spike. A first spike from a member is only reported (`spike`, action `noted`); a second from the same member within 60 s sends it to quarantine. |
 | `sustained?` | When a pool's lag stays high. The pool's heaviest member moves out. So does a pool whose members' busy time adds up to 80 % of a core or more over the same window, whatever its lag (a fixed threshold, above `headroom`). |
 | `headroom?` | How much room a pool keeps. |
