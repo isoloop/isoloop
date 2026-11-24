@@ -38,7 +38,7 @@ const kernel = createKernel({
 
 `isoloop()` also sends the Content-Security-Policy below on every dev and preview response, with Vite's HMR socket and injected styles allowed. Pass `isolateOrigins` for isolates on other origins, `csp` for a policy of your own (`false` for none), and `crossOriginIsolated: true` for COOP and COEP. `SharedArrayBuffer` needs those two headers, and so does the devtools' memory per isolate in Chromium: `kernel.inspect()` measures it only on a cross-origin isolated page. It also measures it only for workers started from `@isoloop/runtime/worker` as `virtual:isoloop/workers` gives it. Without Vite, pass that entry's URL with `#isoloop-entry` appended to get the figures. Production responses come from your own server, which has to send the headers itself.
 
-`headersFor({ csp?, isolateOrigins?, crossOriginIsolated? })` from `@isoloop/vite` returns the headers `isoloop()` sends, as a plain object, and `devCsp(origins?)` returns its default policy on its own. The default policy allows Vite's HMR socket (`ws:`, `wss:`) and `style-src 'unsafe-inline'`. A production server sends a policy built from [Content Security Policy](#content-security-policy) instead, or passes it as `csp`; it needs `'unsafe-inline'` in `style-src` for the same pages the development policy does.
+`headersFor({ csp?, isolateOrigins?, crossOriginIsolated? })` from `@isoloop/vite` returns the headers `isoloop()` sends, as a plain object, and `devCsp(origins?)` returns its default policy on its own. The default policy allows Vite's HMR socket (`ws:`, `wss:`) and `style-src 'unsafe-inline'`, which Vite's dev server needs because it injects the CSS you import as `<style>` elements. A production server sends a policy built from [Content Security Policy](#content-security-policy) instead, or passes it as `csp`; its `style-src` needs only `'self'`.
 
 Without Vite, `?worker&url` or your bundler's equivalent gives the two URLs.
 
@@ -59,20 +59,19 @@ Only one tab's bus owns the files. In a second tab, and where the browser has no
 | `worker-src` | `'self'` | The bootstrap and the bus worker are same-origin module workers. No `blob:` is needed. |
 | `script-src` | `'self'` plus every origin that serves isolates or the contracts module | The bootstrap `import()`s isolate modules; the bus worker `import()`s the contracts. |
 | `connect-src` | The same origins as `script-src`, plus any API the isolates call | `fetch` from inside a worker. |
-| `style-src` | `'self'` | Stylesheets are adopted as `CSSStyleSheet` objects, which `'self'` allows. |
-| `style-src` | Add `'unsafe-inline'` on a page that shows a surface | The page applies each `style` attribute an isolate renders with `setAttribute('style', …)`, and CSP treats that as an inline style. Without `'unsafe-inline'` the browser drops those styles and logs a violation for each. The `style` an isolate sets through `el.style` is one of them. |
+| `style-src` | `'self'` | Stylesheets are adopted as `CSSStyleSheet` objects, which `'self'` allows. The page writes the `style` an isolate renders through the element's `style` object, and CSP doesn't govern that, so no `'unsafe-inline'` is needed. |
 
-Only a page that shows a visual isolate needs `'unsafe-inline'`. That includes the devtools panel, which sets `style` on the page's own elements and on its own surface. A page whose isolates are all headless needs only `'self'`: headless isolates render no DOM, and the adopted stylesheets don't count as inline styles.
+That holds on a page with surfaces and with the devtools panel, which styles its own elements the same way. Styles your app's own code writes with `setAttribute('style', …)`, or in `<style>` elements, still need `'unsafe-inline'`.
 
 A worker isn't governed by the page's policy. It gets the policy sent with its own script, so the responses for the bootstrap and the bus worker must carry these directives too. Sending one policy on every response from the host app covers all of them.
 
 For example, with isolates on `https://cdn.example.com`:
 
 ```http
-Content-Security-Policy: default-src 'self'; worker-src 'self'; script-src 'self' https://cdn.example.com; connect-src 'self' https://cdn.example.com; style-src 'self' 'unsafe-inline'
+Content-Security-Policy: default-src 'self'; worker-src 'self'; script-src 'self' https://cdn.example.com; connect-src 'self' https://cdn.example.com; style-src 'self'
 ```
 
-Without the `style-src` directive, `default-src 'self'` applies to styles and blocks the `style` attributes. If every isolate on the page is headless, `style-src 'self'` is enough.
+Without a `style-src` directive, `default-src 'self'` applies to styles, which is enough as well.
 
 ## CORS for cross-origin isolates
 
