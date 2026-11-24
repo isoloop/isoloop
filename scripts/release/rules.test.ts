@@ -7,6 +7,7 @@ import {
   compare,
   distTag,
   isStable,
+  releaseBranch,
   orderProblems,
   type Registry,
   repositoryProblems,
@@ -34,10 +35,66 @@ describe('stageProblems', () => {
     expect(stageProblems(release)).toEqual([]);
   });
 
-  it('refuses any ref but main', () => {
-    for (const ref of ['refs/heads/release/0.1', 'refs/heads/main2', 'refs/tags/v0.1.0', '']) {
-      expect(stageProblems({ ...preview, ref })[0]).toContain('main only');
+  it('refuses any ref but main and release/0.1, by exact name', () => {
+    const others = [
+      'refs/heads/release/0.1.0',
+      'refs/heads/release/0.10',
+      'refs/heads/release/0.2',
+      'refs/heads/release/foo',
+      'refs/heads/release/*',
+      'release/0.1',
+      'refs/tags/release/0.1',
+      'refs/heads/main2',
+      'refs/tags/v0.1.0',
+      '',
+    ];
+    for (const ref of others) {
+      expect(releaseBranch(ref)).toBeUndefined();
+      expect(stageProblems({ ...preview, ref })[0]).toContain('main or release/0.1 only');
     }
+    expect(releaseBranch('refs/heads/main')).toBe('main');
+    expect(releaseBranch('refs/heads/release/0.1')).toBe('release/0.1');
+  });
+
+  describe('on release/0.1', () => {
+    const both = {
+      custom: true,
+      policies: [
+        { name: 'main', type: 'branch' },
+        { name: 'release/0.1', type: 'branch' },
+      ],
+    };
+    const patch: Candidate = {
+      ref: 'refs/heads/release/0.1',
+      version: '0.1.1',
+      pre: undefined,
+      environment: both,
+      registry: registry({ latest: '0.1.0', next: '0.1.0-next.12' }),
+    };
+
+    it('passes a patch of its line, and main still passes with both policies', () => {
+      expect(stageProblems(patch)).toEqual([]);
+      expect(stageProblems({ ...preview, environment: both })).toEqual([]);
+      expect(stageProblems({ ...release, environment: both })).toEqual([]);
+    });
+
+    it('refuses before the environment admits it', () => {
+      const mainOnly = { custom: true, policies: [{ name: 'main', type: 'branch' }] };
+      expect(stageProblems({ ...patch, environment: mainOnly })[0]).toContain('`npm`');
+    });
+
+    it('refuses a preview, or a version of another line', () => {
+      for (const version of ['0.1.1-next.0', '0.2.0', '1.1.0', '0.10.0']) {
+        expect(stageProblems({ ...patch, version, pre })).toEqual(
+          expect.arrayContaining([expect.stringContaining('releases 0.1.x only')]),
+        );
+      }
+    });
+
+    it('refuses a patch once a newer minor is latest', () => {
+      const newer = registry({ latest: '0.2.0' });
+      expect(stageProblems({ ...patch, registry: newer })[0]).toContain('older');
+    });
   });
 
   it('refuses a preview outside pre mode `next`', () => {
@@ -87,7 +144,10 @@ describe('stageProblems', () => {
       { custom: true, policies: [] },
       { custom: true, policies: [{ name: 'release/*', type: 'branch' }] },
       { custom: true, policies: [{ name: 'main', type: 'tag' }] },
-      { custom: true, policies: [main, { name: 'release/0.1', type: 'branch' }] },
+      { custom: true, policies: [main, { name: 'release/0.1.0', type: 'branch' }] },
+      { custom: true, policies: [main, { name: 'release/0.1', type: 'tag' }] },
+      { custom: true, policies: [main, main] },
+      { custom: true, policies: [{ name: 'release/0.1', type: 'branch' }] },
     ];
     for (const environment of bad) {
       expect(stageProblems({ ...preview, environment })[0]).toContain('`npm`');
