@@ -125,7 +125,7 @@ Tasks 4 and 5 were done on 2026-11-18 (web#155, web#158). A local smoke run of t
 
 ### Found by the bench run (2026-11-18)
 
-Task 6 ran on hauseserver from 10:13 to 13:58 UTC on web `601bfb8` (`@isoloop/*@0.1.0-next.2`, 4 cores at 2.0 GHz, `maxWorkers=2`, Chromium and Firefox). All 98 pages ran. The normal mix lost no file in any configuration. With faults, the balancer lost files in all 16 of its runs: about 480 a run, and about 4,450 in the calm runs. `own` and `one` gave up on no processor. In every balancer run the kernel gave up on both image processors, within about 10 s (in one Firefox run, on both hash processors too), and no image file got a result after that. The results weren't published.
+Task 6 ran on bench machine 1 from 10:13 to 13:58 UTC on web `601bfb8` (`@isoloop/*@0.1.0-next.2`, 4 cores at 2.0 GHz, `maxWorkers=2`, Chromium and Firefox). All 98 pages ran. The normal mix lost no file in any configuration. With faults, the balancer lost files in all 16 of its runs: about 480 a run, and about 4,450 in the calm runs. `own` and `one` gave up on no processor. In every balancer run the kernel gave up on both image processors, within about 10 s (in one Firefox run, on both hash processors too), and no image file got a result after that. The results weren't published.
 
 The diagnosis ran on the same server (`~/bench/diag-run.sh`). Without bench mode, at full clock speed, it didn't reproduce; at 2.0 GHz it did, on every run:
 - The corrupt file `1-74` crashed image-2 about 2 s in, as corrupt files do once their result is out. Then it came back, to image-1 and to image-2 in turn, 8 or 9 crashes in about 8 s, until the kernel gave up on both (4 crashes within 60 s each).
@@ -139,7 +139,7 @@ The diagnosis ran on the same server (`~/bench/diag-run.sh`). Without bench mode
 
 ### Found by the re-run (2026-11-18)
 
-Task 6b ran on hauseserver from 16:48 to 20:04 UTC on web `2b7e4d6` (`@isoloop/*@0.1.0-next.3`), set up as before. All 98 pages ran.
+Task 6b ran on bench machine 1 from 16:48 to 20:04 UTC on web `2b7e4d6` (`@isoloop/*@0.1.0-next.3`), set up as before. All 98 pages ran.
 
 - **No file was lost.** In all 16 balancer runs with faults (10 fault runs and 6 faults-then-calm runs), on both engines, every file produced got a result, and the corrupt file was reported each time. In the faults-then-calm runs the balancer did 50.1 files a second on 3 or 4 workers, against `own`'s 9, with a p95 of 66 to 124 ms against `own`'s 37 to 51 ms.
 - **The fault runs were slow:** a p95 of 8.5 to 20 s, against `own`'s 0.4 to 0.6 s, with up to 722 files queued when the generator stopped and up to 31 s to drain them. On next.2 the files behind the given-up processors never finished, so they weren't in its p95.
@@ -153,7 +153,7 @@ Task 6b ran on hauseserver from 16:48 to 20:04 UTC on web `2b7e4d6` (`@isoloop/*
 
 ### Found by the fault runs on next.4 (2026-11-19)
 
-Task 6c ran the fault mix on hauseserver from 08:37 to 09:26 UTC on web `a7c0654` (`@isoloop/*@0.1.0-next.4`), set up as before. All 40 pages ran.
+Task 6c ran the fault mix on bench machine 1 from 08:37 to 09:26 UTC on web `a7c0654` (`@isoloop/*@0.1.0-next.4`), set up as before. All 40 pages ran.
 
 - **No file was lost.**
 - **Chromium:** each of the 5 balancer runs folded once (`room`) and then made a backlog move. Files a second went from 36–59 to 53–62, the queue when the generator stops from 71–581 to 35–180, and the drain from 4.6–25 s to 1.5–6.6 s. p95 hardly moved: 11.8–16.8 s.
@@ -171,7 +171,7 @@ Task 6c ran the fault mix on hauseserver from 08:37 to 09:26 UTC on web `a7c0654
 
 ### Found by the runs on next.5 (2026-11-19)
 
-Task 6d ran the fault and faults-then-calm mixes on hauseserver on web `c4503e5` (`@isoloop/*@0.1.0-next.5`), set up as before. No file was lost, and the cap held in every run. But in 3 of the 15 balancer runs, on both engines, the kernel gave up on an image processor with `ready-timeout`: restarted into `balancer-quarantine-1`, it sent no `ready` within 10 s, until it ran out of restarts.
+Task 6d ran the fault and faults-then-calm mixes on bench machine 1 on web `c4503e5` (`@isoloop/*@0.1.0-next.5`), set up as before. No file was lost, and the cap held in every run. But in 3 of the 15 balancer runs, on both engines, the kernel gave up on an image processor with `ready-timeout`: restarted into `balancer-quarantine-1`, it sent no `ready` within 10 s, until it ran out of restarts.
 
 - **The cause is in the runtime, not the balancer.** A pool's worker closed itself when its member table emptied (`shutdownMember`, `packages/runtime/src/bootstrap.ts`). A member leaves that table when its shutdown starts, so the worker closed while other members were still shutting down. Their `bye` was lost, and each stop waited out its 1 s grace. The host's loader still counted those members, kept the closed worker, and sent the next start into it.
 - **The runs show it:** in each of the 3, the last two moves out of `balancer-quarantine-1` before the timeouts cost 1.07 to 1.10 s, against about 0.2 s for the others.
@@ -180,7 +180,7 @@ Task 6d ran the fault and faults-then-calm mixes on hauseserver on web `c4503e5`
 
 ### Found by the runs on next.6 (2026-11-19)
 
-Task 6e ran all three mixes on hauseserver from 17:38 to 20:57 UTC on web `718f2c0` (`@isoloop/*@0.1.0-next.6`), set up as before. All 98 pages ran. The write-up is web#200.
+Task 6e ran all three mixes on bench machine 1 from 17:38 to 20:57 UTC on web `718f2c0` (`@isoloop/*@0.1.0-next.6`), set up as before. All 98 pages ran. The write-up is web#200.
 
 - **No file was lost and the kernel gave up on no processor** in any of the 26 balancer runs. No `ready-timeout`.
 - **The full-pool trigger works on the reported busy time:** it moved processors in every normal run and in 8 of the 10 fault runs. On Firefox with no faults, the balancer's p95 is 94 ms (M3i: 15.5 s).
