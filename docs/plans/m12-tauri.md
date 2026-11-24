@@ -1,6 +1,6 @@
 # M12: Tauri (outline)
 
-**Goal:** a desktop app built with Tauri gets native durability and native commands through Isoloop, with isolates unchanged (the Tauri ADR, *Proposed*, drafted 2026-11-18 and still to be grilled).
+**Goal:** a desktop app built with Tauri gets native durability and native commands through Isoloop, with isolates unchanged ([ADR 0022](../adr/0022-tauri.md), *Proposed*, drafted 2026-11-18 and still to be grilled).
 
 **Done when:** an example Tauri app runs the plant dashboard on Windows, macOS and Linux, with a persistent topic on `TauriStorage` that loses no acknowledged record across an app restart, and one native command reached by an isolate through `exposeCommands`. The spike's findings and the storage latency against `OpfsStorage` are written up, whatever they show.
 
