@@ -4,7 +4,7 @@
 
 **Done when:** WebMCP has shipped in at least one engine, `@isoloop/webmcp` matches the shipped API, its tests run on the shipped browser without a flag, and its `@experimental` tag is dropped.
 
-**Depends on:** [M4a](m4a-agents.md), which ships `@isoloop/webmcp` in 0.1. No longer after [M6](m6-adapters.md): it needs nothing from the adapters.
+**Depends on:** [M4a](m4a-agents.md), which ships `@isoloop/webmcp` in 0.1. No longer after [M6](m6-adapters.md): it needs nothing from the adapters. Slotted for `0.5.0` (the [releases table](README.md#releases)) if WebMCP has shipped by then; otherwise [M6a Vue](m6-adapters.md) takes `0.5.0`, and this milestone goes in the first minor after WebMCP ships.
 
 **Changed 2026-11-17:** this was a spike asking whether isolates should expose tools to browser agents through WebMCP. The [grilling](../investigations/ai-enablers.md) moved the tool surface and a first WebMCP transport into 0.1 as M4a, which answers the spike's questions:
 - whether the contract, the opt-in and the request timeout are enough: yes, through ADR 0018;
