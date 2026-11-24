@@ -64,7 +64,9 @@ describe('release.yml', () => {
   it('gives the OIDC token and the environment to the stage job only', () => {
     expect(jobs.filter((name) => code(name).includes('id-token'))).toEqual(['stage']);
     expect(jobs.filter((name) => code(name).includes('environment: npm'))).toEqual(['stage']);
-    expect(code('stage')).toContain("inputs.mode == 'stage' && github.ref == 'refs/heads/main'");
+    const branches = "(github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/0.1')";
+    expect(code('stage')).toContain(`inputs.mode == 'stage' && ${branches}`);
+    expect(code('finish')).toContain(`inputs.mode == 'finish' && ${branches}`);
   });
 
   it('gives write access to the finish job only', () => {
@@ -193,6 +195,7 @@ fi
       SUMS: sums.join('\n'),
       PACKAGES: packages.join('\n'),
       GITHUB_RUN_ID: '4500',
+      GITHUB_REF_NAME: 'release/0.1',
       GITHUB_RUN_ATTEMPT: '1',
       GITHUB_SHA: 'a'.repeat(40),
     };
@@ -242,6 +245,7 @@ fi
     expect(ran.status, ran.log).toBe(0);
     expect(ran.calls).toHaveLength(3);
     expect(ran.summary).toContain('(attempt 2)');
+    expect(ran.summary).toContain('Run *Release* on release/0.1 with mode');
   });
 
   it('a re-run without the rejects fails on "already staged"', () => {

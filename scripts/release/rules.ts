@@ -15,6 +15,19 @@ export const APPROVAL_ORDER: readonly (readonly string[])[] = [
   ['@isoloop/balancer', '@isoloop/devtools', '@isoloop/webmcp', 'isoloop'],
 ];
 
+/**
+ * The branches a release runs from, by exact name (ADR 0019, decision 5):
+ * `main`, and the one release branch while it lives. Never a pattern:
+ * version-PR branches have names that would match one.
+ */
+export const RELEASE_BRANCHES: readonly string[] = ['main', 'release/0.1'];
+
+/** The branch of an admitted ref, or `undefined` for any other ref. */
+export function releaseBranch(ref: string): string | undefined {
+  const name = ref.startsWith('refs/heads/') ? ref.slice('refs/heads/'.length) : undefined;
+  return name !== undefined && RELEASE_BRANCHES.includes(name) ? name : undefined;
+}
+
 export type DistTag = 'next' | 'latest';
 
 /** `x.y.z`, with no suffix. */
@@ -99,17 +112,26 @@ export interface Candidate {
 export function stageProblems(candidate: Candidate): string[] {
   const { ref, version, pre, environment, registry } = candidate;
   const problems: string[] = [];
-  if (ref !== 'refs/heads/main') problems.push(`stage runs on main only, not ${ref}.`);
+  const branch = releaseBranch(ref);
+  if (!branch) {
+    problems.push(`stage runs on ${RELEASE_BRANCHES.join(' or ')} only, not ${ref}.`);
+  }
 
   // A job that names a missing environment creates it, with no protection, so
   // this has to pass before the stage job starts.
   if (!environment) {
     problems.push('the GitHub environment `npm` is missing.');
   } else {
-    const [only, ...others] = environment.policies;
-    const mainOnly = only?.name === 'main' && only.type === 'branch' && others.length === 0;
-    if (!environment.custom || !mainOnly) {
-      problems.push('the GitHub environment `npm` must allow the branch main and nothing else.');
+    const { custom, policies } = environment;
+    const admitted = policies.every(
+      (p) => p.type === 'branch' && RELEASE_BRANCHES.includes(p.name),
+    );
+    const names = policies.map((p) => p.name);
+    const covers = names.includes('main') && (!branch || names.includes(branch));
+    if (!custom || !admitted || !covers || new Set(names).size !== names.length) {
+      problems.push(
+        `the GitHub environment \`npm\` must allow main${branch && branch !== 'main' ? ` and ${branch}` : ''}, by exact name, and no branch but ${RELEASE_BRANCHES.join(', ')}.`,
+      );
     }
   }
 
@@ -117,6 +139,15 @@ export function stageProblems(candidate: Candidate): string[] {
   if (!tag) {
     problems.push(`version ${version} is neither x.y.z nor x.y.z-next.N.`);
     return problems;
+  }
+
+  // A release branch releases patches of its own line, never a preview.
+  if (branch && branch !== 'main') {
+    const line = branch.slice('release/'.length);
+    const [major, minor] = version.split('.');
+    if (tag !== 'latest' || `${major}.${minor}` !== line) {
+      problems.push(`${branch} releases ${line}.x only, not ${version}.`);
+    }
   }
 
   const mode: unknown = pre === undefined ? undefined : JSON.parse(pre);

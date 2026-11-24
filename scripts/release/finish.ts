@@ -3,7 +3,7 @@
 // isn't verified again here.
 import { list, record, text, type Npm } from './npm.ts';
 import { publicPackages, sharedVersion, tarballName, type Tree } from './packages.ts';
-import { distTag } from './rules.ts';
+import { distTag, RELEASE_BRANCHES, releaseBranch } from './rules.ts';
 
 export const REPO = 'isoloop/isoloop';
 export const WORKFLOW = '.github/workflows/release.yml';
@@ -45,8 +45,8 @@ export function parseRecord(json: string): StageRecord {
   };
 }
 
-/** Why the run `id` isn't a finished stage run of release.yml on main. */
-export function runProblems(run: unknown, jobs: unknown, id: string): string[] {
+/** Why the run `id` isn't a finished stage run of release.yml on `branch`. */
+export function runProblems(run: unknown, jobs: unknown, id: string, branch: string): string[] {
   const doc = record(run);
   const problems: string[] = [];
   const expect = (what: string, got: unknown, want: string): void => {
@@ -54,7 +54,7 @@ export function runProblems(run: unknown, jobs: unknown, id: string): string[] {
   };
   expect('its workflow', text(doc['path']).split('@')[0], WORKFLOW);
   expect('its event', doc['event'], 'workflow_dispatch');
-  expect('its branch', doc['head_branch'], 'main');
+  expect('its branch', doc['head_branch'], branch);
   expect('its repository', record(doc['head_repository'])['full_name'], REPO);
   expect('its status', doc['status'], 'completed');
   expect('its conclusion', doc['conclusion'], 'success');
@@ -131,6 +131,7 @@ export function publishedProblems(
   pkg: Staged,
   packument: unknown,
   attestations: unknown,
+  ref: string,
 ): string[] {
   const { version, tag, commit, run } = staged;
   const { name } = pkg;
@@ -160,7 +161,7 @@ export function publishedProblems(
   const facts: [string, unknown, string][] = [
     ['repository', workflow['repository'], `${SERVER}/${REPO}`],
     ['workflow', workflow['path'], WORKFLOW],
-    ['ref', workflow['ref'], 'refs/heads/main'],
+    ['ref', workflow['ref'], ref],
     [
       'commit',
       record(record(list(build['resolvedDependencies'])[0])['digest'])['gitCommit'],
@@ -203,11 +204,20 @@ const fail = (problems: string[]): void => {
 
 /** Checks a stage run against npm. Throws everything that's wrong at once. */
 export async function checkFinish(ref: string, id: string, from: Sources): Promise<Finished> {
-  if (ref !== 'refs/heads/main') fail([`finish runs on main only, not ${ref}.`]);
+  // A finish runs on the branch its stage ran on.
+  const branch = releaseBranch(ref);
+  if (!branch) fail([`finish runs on ${RELEASE_BRANCHES.join(' or ')} only, not ${ref}.`]);
   if (!/^\d+$/.test(id)) fail([`"${id}" isn't a run id.`]);
 
   const run = from.github(`actions/runs/${id}`);
-  fail(runProblems(run, from.github(`actions/runs/${id}/jobs?filter=latest&per_page=100`), id));
+  fail(
+    runProblems(
+      run,
+      from.github(`actions/runs/${id}/jobs?filter=latest&per_page=100`),
+      id,
+      branch ?? '',
+    ),
+  );
   const commit = text(record(run)['head_sha']);
 
   const artifact = recordName(from.github(`actions/runs/${id}/artifacts?per_page=100`));
@@ -222,6 +232,7 @@ export async function checkFinish(ref: string, id: string, from: Sources): Promi
         pkg,
         await from.npm.packument(pkg.name),
         await from.npm.attestations(pkg.name, staged.version),
+        ref,
       ),
     ),
   );
