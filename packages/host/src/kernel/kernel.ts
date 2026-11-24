@@ -84,13 +84,20 @@ export type KernelConfig = {
      */
     budget?: number;
   };
-  /** How crashed isolates are restarted. Defaults: one-for-one, 3 restarts in 60 s, backoff 250 ms × 2ⁿ capped at 4 s. */
+  /** How crashed isolates are restarted. Defaults: one-for-one, 3 restarts in 60 s or 3 in a row after runs shorter than 60 s, backoff 250 ms × 2ⁿ capped at 4 s. */
   supervisor?: {
     /** `one-for-one` restarts the isolate that crashed; `never` fails it on its first crash. Default `one-for-one`. */
     strategy?: 'one-for-one' | 'never';
-    /** Restarts allowed within `withinMs` before the isolate is `failed`. Default 3. */
+    /**
+     * Restarts allowed before the isolate is `failed`, counted two ways: within `withinMs`,
+     * and in a row after healthy runs (from `ready` to the last heartbeat) shorter than
+     * `withinMs`. The crash past either count fails it. Default 3.
+     */
     maxRestarts?: number;
-    /** The restart window, in ms. Default 60 000 (60 s). */
+    /**
+     * The restart window, in ms, and the healthy run that clears the count of short runs:
+     * a crash after a run this long starts a new count. Default 60 000 (60 s).
+     */
     withinMs?: number;
     /** The wait before each restart. Default `{ initialMs: 250, factor: 2, maxMs: 4000 }`. */
     backoff?: Partial<Backoff>;
@@ -1251,7 +1258,7 @@ export function createKernel(config: KernelConfig): Kernel {
               `Isoloop: workers.isolateBootstrap ends in ${ENTRY_MARK} but doesn't start @isoloop/runtime/worker; memory per isolate is off (ADR 0020)`,
             );
           }
-          feed(slot, { k: 'ready' });
+          feed(slot, { k: 'ready', at: performance.now() });
           return;
         }
         case 'beat':

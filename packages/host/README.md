@@ -5,7 +5,7 @@ The kernel of [Isoloop](https://isoloop.dev): it runs the parts of your app as i
 ## What you get
 
 - **Contained failures:** each isolate runs on its own worker by default, so one that blocks or crashes doesn't freeze the others.
-- **Supervision:** blocked and crashed isolates restart, and one that keeps failing shows a fallback with Retry.
+- **Supervision:** blocked and crashed isolates restart, and one that keeps failing (by default, a fourth crash without a minute of healthy running before one of them) shows a fallback with Retry.
 - **Placement as a switch:** add `pool` to a spawn to share a worker and save memory and start-up time. The isolate's code stays the same.
 - **UI from workers:** isolates render in their workers, and the kernel applies their changes to the page once per frame.
 - **Grants:** each isolate publishes and subscribes only to the topics you allow.

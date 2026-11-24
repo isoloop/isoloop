@@ -25,8 +25,8 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 182,
-          "end_line": 192,
+          "line": 196,
+          "end_line": 206,
           "label": "a new isolate starts here",
           "anchor": "export function initialSupervision(at: number): IsolateSupervision {"
         },
@@ -49,8 +49,8 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 213,
-          "end_line": 231,
+          "line": 234,
+          "end_line": 252,
           "label": "spawned, ready",
           "anchor": "case 'spawned':"
         }
@@ -65,8 +65,8 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 233,
-          "end_line": 260,
+          "line": 254,
+          "end_line": 281,
           "label": "beats, ticks, errors",
           "anchor": "case 'beat': {"
         }
@@ -82,8 +82,8 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 302,
-          "end_line": 311,
+          "line": 323,
+          "end_line": 332,
           "label": "stop with a grace period",
           "anchor": "case 'stop':"
         },
@@ -112,8 +112,8 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 243,
-          "end_line": 254,
+          "line": 264,
+          "end_line": 275,
           "label": "blocked and unresponsive",
           "anchor": "case 'tick':"
         }
@@ -128,8 +128,8 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 352,
-          "end_line": 394,
+          "line": 376,
+          "end_line": 418,
           "label": "crash: restart or fail",
           "anchor": "function crash("
         }
@@ -144,17 +144,17 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 55,
-          "end_line": 73,
+          "line": 61,
+          "end_line": 79,
           "label": "crash reasons, final ones",
           "anchor": "export type CrashReason ="
         },
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 370,
-          "end_line": 377,
+          "line": 396,
+          "end_line": 415,
           "label": "limit hit or final",
-          "anchor": "if (final || cfg.strategy === 'never' || window.length >= cfg.maxRestarts) {"
+          "anchor": "const healthy = s.readyAt === undefined ? 0 : Math.max(0, s.lastBeatAt - s.readyAt);"
         }
       ]
     },
@@ -167,15 +167,15 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 323,
-          "end_line": 331,
+          "line": 347,
+          "end_line": 355,
           "label": "suspend and wake",
           "anchor": "case 'suspend':"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 965,
-          "end_line": 979,
+          "line": 972,
+          "end_line": 986,
           "label": "a pool wakes as a whole",
           "anchor": "case 'wake':"
         }
@@ -291,7 +291,7 @@
         "render_format_mismatch: ready reports a render format the host doesn't speak.",
         "runtime_too_old or isolate_too_old: ready.requires is outside the host's [FLOOR, VERSION].",
         "bus_failed: the bus couldn't load its contracts.",
-        "Other crashes (error, worker_error, ready_timeout, unresponsive, spawn_failed) restart until 3 restarts within 60 s."
+        "Other crashes (error, worker_error, ready_timeout, unresponsive, spawn_failed) restart until 3 restarts within 60 s, or 3 in a row after runs shorter than 60 s."
       ]
     },
     {
