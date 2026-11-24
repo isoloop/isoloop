@@ -1,6 +1,6 @@
 # ADR 0001: Own worker by default, named pools later
 
-- **Status:** Accepted. Amended on 2026-11-20 for a warm-up window after `ready` (*Start-up warm-up*, below), from the plant dashboard's restart loop on Firefox; grilled the same day (Q1–Q4, yes to all). Corrected on 2026-11-22: the warm-up was not built and isn't in effect, and the cause it names for that loop was wrong. The question is reopened in [#389](https://github.com/isoloop/isoloop/issues/389).
+- **Status:** Accepted. Amended on 2026-11-20 for a warm-up window after `ready` (*Start-up warm-up*, below), from the plant dashboard's restart loop on Firefox; grilled the same day (Q1–Q4, yes to all). Corrected on 2026-11-22: the warm-up was not built and isn't in effect, and the cause it names for that loop was wrong. The question is reopened in [#389](https://github.com/isoloop/isoloop/issues/389). Amended on 2026-11-24 for crash loops slower than the restart window (*Restart limit: short runs*, below; [#390](https://github.com/isoloop/isoloop/issues/390)).
 - **Date:** 2026-11-03
 - **Answers:** RFC 0001 open question "Workers per isolate, or a pool?"
 - **Related:** [ADR 0005](0005-bus-topology-message-channels.md) (per-isolate channels), [ADR 0007](0007-bus-worker-supervision.md) (durable topics), [ADR 0008](0008-isolates-and-surfaces.md) (headless isolates)
@@ -82,6 +82,27 @@ For `heartbeat.readyTimeoutMs` after an isolate's `ready` (10 s by default), a b
 - **Why:** an isolate sends `ready` before its `start()` runs (`startIsolate` in `packages/runtime/src/bootstrap.ts`), so mounting, subscribing and the first replay all happen after the supervisor has moved it to `running`, where the kill check applies (the `blocked` branch of `tick` in `packages/host/src/supervisor/machine.ts`). Nothing protected that start-up work. The plant dashboard sets `killAfterMs` to 2 s so its 3 s stress block restarts a pool (M3d decision 9; `apps/dashboards/plant/src/isoloop/kernel.ts` in isoloop/web). On the 4-vCPU GitHub runner in Firefox, its `widgets` pool (72 members under the default `matched` placement) went more than 2 s without a beat while mounting and replaying, so it was killed at 6–7 s. Each restart mounted and replayed again and was killed again about 3.5 s later. In the last 200 CI runs, that broke 7 of the 69 plant Firefox PR jobs, 4 of them on both attempts. Each failing attempt logged 144–216 crash events; every passing attempt logged none. A slow real device can enter the same loop.
 - **Applies to** own workers and pools alike. The window is the supervisor's, judged per isolate like every other heartbeat rule.
 - **Open question for this review:** heartbeats are per worker, but the window above starts at each member's own `ready`. In a pool, members start one after another in the same event loop, so a member whose window has closed can be killed while a later member's `start()` holds the loop, and the pool's shared fate then restarts everyone. The same happens when one member restarts alone (its own fatal error) inside a running pool. Recommendation: a pool member's window lasts until `readyTimeoutMs` after the latest `ready` on its worker, so the whole pool stays in warm-up while any member is starting. The alternative is to keep the window per member and accept that a pool can still loop if its members start more than `readyTimeoutMs` apart.
+
+### Restart limit: short runs (amended 2026-11-24)
+
+Decided for the 0.1.1 patch ([plan](../plans/0.1.1-patch.md), decision 5; [#390](https://github.com/isoloop/isoloop/issues/390)); grilled on 2026-11-24 (yes to all).
+
+**The problem.** The limit counted restarts in a sliding window: `maxRestarts` in `withinMs`. Each crash uses up part of that window: the run before it, the time it takes to detect it (`killAfterMs`, `readyTimeoutMs`) and the backoff after it. When `maxRestarts + 1` crashes don't fit in `withinMs`, the isolate restarts without end and its fallback never shows. #390 measured it: on the defaults, an isolate that hangs 10 s after each start, or one with `killAfterMs: 30000`, didn't reach `failed` in 150 s, and neither did the supervision guide's own example.
+
+**The rule.**
+
+1. **Each crash records its healthy run:** from the isolate's `ready` to its last heartbeat before the crash. The run doesn't include the time it took to detect the crash. A worker that never sent `ready` had a run of 0.
+2. **A crash after a run shorter than `withinMs` counts.** A crash after a run of `withinMs` or longer clears the count first, so it's the first of a new one: an isolate that runs an hour and then crashes 4 times quickly fails on the 4th, as it did before.
+3. **The isolate fails when the count passes `maxRestarts`,** that is, on the crash after `maxRestarts` short runs in a row, however long they took.
+4. **The sliding window stays as well.** `maxRestarts` restarts in `withinMs` still fail the isolate, so a fast loop fails as soon as it did before. An isolate fails on whichever rule is met first.
+5. **The backoff grows with the larger of the two counts.** *Retry* clears both.
+6. **The bus worker uses the same rule,** with the bus's `ready` and its last beat ([ADR 0007](0007-bus-worker-supervision.md), *Amended: the restart limit is a default*).
+7. **A pool is judged as it is today.** Each member keeps its own count and window. A crash the pool shares counts once for each member, judged by that member's own healthy run, so a member that had run `withinMs` or longer has its count cleared. Heartbeats are the worker's, so every member's run ends at the pool's last beat.
+8. **The types don't change.** No option is added or removed, and `withinMs` keeps its name and default; its TSDoc, the supervision guide and the host README say it's both the window and the healthy run that clears the count. `isolate:failed`'s `message` names the rule that was met, for example "3 restarts in 60000 ms" or "4 crashes, each after less than 60000 ms of healthy running". An explicit `healthyAfterMs`, the run that clears the count, is for 0.2 ([#409](https://github.com/isoloop/isoloop/issues/409)).
+
+**Each row of #390's table** gets a unit test on the machine with a synthetic clock, and the rows measured in a browser get a browser test that reaches `failed`. On the defaults, an isolate that hangs 10 s after each start fails on its 4th crash, about 4 × (10 s + `killAfterMs` 10 s) plus backoff after it started.
+
+**Interaction with #389.** A Firefox worker starved by the page ([#389](https://github.com/isoloop/isoloop/issues/389)) looks like a hang. Under the window alone, pages in #389's runs recovered only because their crashes didn't fit in the window. Under this rule they count. Before this code merges, #389's starvation setup runs on it at the defaults and at `killAfterMs: 2000` (the plan's T7). If pages reach `failed` at the defaults, the rule waits for 0.2 and this amendment is marked not in effect.
 
 ### What the browser still controls
 
