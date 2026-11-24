@@ -81,7 +81,7 @@ kernel.spawn({
 
 `ctx.bus` talks to the bus worker directly, never through the main thread. Topics are the ones in the app's contracts module, and each call is checked against the isolate's grants: a publish without a grant rejects with a `BusError` whose code is `forbidden`.
 
-- **`publish(topic, { key?, value })`** resolves once the bus appended the record, and rejects with a `BusError` otherwise.
+- **`publish(topic, { key?, value })`** resolves once the bus appended the record, and rejects with a `BusError` otherwise. It takes an object with the payload under `value`; `request(topic, value)`, `reply(record, value)` and `usePublish`'s function take the payload itself.
 - **`subscribe(topic, fn, opts?)`** runs `fn` for one record at a time, in order, and returns the function that unsubscribes. By default a record is committed once `fn` returns, so delivery is at least once: a handler that throws stops the subscription's commits, and that record is delivered again after a restart.
 - **`request(topic, value, opts?)`** (`@experimental`) sends a request on a topic with a `reply` schema and resolves with the first valid reply. It rejects with `timeout` after `timeoutMs` (30 s by default), or with `dropped` when the topic's retention removed the request before any subscriber got it.
 - **`reply(record, value)`** (`@experimental`) answers a request record this isolate received. The bus checks `value` against the topic's `reply` schema.
@@ -106,6 +106,7 @@ import { quoteTool } from './contracts';
 export default defineIsolate({
   start(ctx) {
     ctx.bus.subscribe(quoteTool, async (r) => {
+      if (r.req === undefined) return; // a plain record, not a request
       await ctx.bus.reply(r, { symbol: r.value.symbol, vwap: null });
     });
     ctx.onShutdown(async (reason) => {

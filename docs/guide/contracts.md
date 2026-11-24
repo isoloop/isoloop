@@ -85,6 +85,19 @@ export const prices = topic('catalog.prices.v1', {
 });
 ```
 
+Validation needs only Standard Schema, but agent tools and `isoloop contracts export` also need [Standard JSON Schema](https://standardschema.dev/json-schema) (`~standard.jsonSchema`), which not every schema has. Zod 4.2 and later have it on `zod`'s own schemas, and Zod Mini's don't. Valibot's don't either: wrap each one with `toStandardJsonSchema()` from `@valibot/to-json-schema` (version 1.5 or later of that package, which needs Valibot 1.5 or later). Without it, `agents.expose` and `contracts export` fail with `not_exposable`.
+
+```ts nocheck
+import { topic } from '@isoloop/bus';
+import { toStandardJsonSchema } from '@valibot/to-json-schema';
+import * as v from 'valibot';
+
+export const prices = topic('catalog.prices.v1', {
+  schema: toStandardJsonSchema(v.object({ sku: v.string(), price: v.number() })),
+  retention: { kind: 'last-n', n: 1000 },
+});
+```
+
 ### What the bus checks
 
 - **Only the bus worker validates,** on every publish. Isolates and the host carry only the types, so their bundles don't include a schema library. A record the schema rejects fails the publish with `invalid`, and the error carries the schema's issues as `{ message, path }` objects.
@@ -259,7 +272,7 @@ npx isoloop contracts export src/contracts.ts --out contracts.schema.json
 - **The document** has a `target` and a `topics` map. Each topic has `schema`, or `input` and `output` when the two differ (Zod's output for an object adds `additionalProperties: false`), and likewise `reply`, or `replyInput` and `replyOutput`. A topic with a `tool` carries it too.
 - **`unchecked()` schemas** export as `{}`, are listed under the topic's `unchecked`, and print a warning.
 - **A schema that can't be converted** fails the command: every such topic is reported, nothing is written, and the exit code is 1.
-- **It needs [Standard JSON Schema](https://standardschema.dev/json-schema)** (`~standard.jsonSchema`) on each schema, so there's no converter per library. Zod 4.2 and later have it.
+- **It needs [Standard JSON Schema](https://standardschema.dev/json-schema)** (`~standard.jsonSchema`) on each schema, so there's no converter per library. Zod 4.2 and later have it; Valibot's schemas need `toStandardJsonSchema()` (see [Topics](#topics)), and Zod Mini's can't be exported.
 - **The CLI imports the module with Node** (26 or later), so the module and what it imports must load there.
 
 Commit the export and review its diff in CI: a change that isn't adding an optional field means a new topic version.
