@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/host",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The Isoloop kernel: runs the parts of a JavaScript app as isolates, on their own workers or in shared pools, and restarts what fails.",
   "keywords": [
     "isoloop",

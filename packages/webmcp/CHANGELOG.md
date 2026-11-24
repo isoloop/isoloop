@@ -1,5 +1,12 @@
 # @isoloop/webmcp
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [532c3c1]
+  - @isoloop/host@0.1.1
+
 ## 0.1.0
 
 The first release, experimental: it follows the WebMCP draft and may change in any minor.

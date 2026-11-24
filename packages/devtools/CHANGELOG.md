@@ -1,5 +1,13 @@
 # @isoloop/devtools
 
+## 0.1.1
+
+### Patch Changes
+
+- 164d266: The host writes the `style` an isolate renders through the element's CSSOM (`el.style.cssText`) instead of `setAttribute('style', …)`, and the devtools panel styles its own page elements the same way. A page with surfaces now works under `style-src 'self'`, with no `'unsafe-inline'`: before, the browser dropped those styles and logged a violation for each. `devCsp()` still allows `'unsafe-inline'` in `style-src`, for the `<style>` elements Vite's dev server injects; its TSDoc and the hosting guide say so.
+- Updated dependencies [532c3c1]
+  - @isoloop/host@0.1.1
+
 ## 0.1.0
 
 The first release, experimental: the panel and its options may change in any minor.

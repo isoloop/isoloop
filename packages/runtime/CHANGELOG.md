@@ -1,5 +1,13 @@
 # @isoloop/runtime
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [164d266]
+  - @isoloop/dom@0.1.1
+  - @isoloop/protocol@0.1.1
+
 ## 0.1.0
 
 The first release of what an isolate runs on.
