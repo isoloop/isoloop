@@ -10,7 +10,7 @@
       "url": "https://github.com/isoloop/isoloop",
       "provider": "github",
       "link_mode": "web",
-      "revision": "1b721eeb3c8f379e966018ebfdc02a5f900c58e0"
+      "revision": "df2287f1778a26a99e85af5483e66b5335d0b388"
     }
   },
   "mainPath": ["restarting", "loading", "running", "stopped"],
