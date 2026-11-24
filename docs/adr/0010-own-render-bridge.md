@@ -1,6 +1,6 @@
 # ADR 0010: Our own render bridge (`isoloop-dom@1`)
 
-- **Status:** Accepted; amended 2026-11-07 (M3a, [below](#amended-in-m3a-2026-11-07)) and 2026-11-16 (the adapters after 0.1, [below](#amended-2026-11-16-adapters-after-01))
+- **Status:** Accepted; amended 2026-11-07 (M3a, [below](#amended-in-m3a-2026-11-07)) 2026-11-16 (the adapters after 0.1, [below](#amended-2026-11-16-adapters-after-01)) and 2026-11-24 (`style` through the CSSOM, [below](#amended-2026-11-24-style-through-the-cssom))
 - **Date:** 2026-11-05
 - **Supersedes:** [ADR 0006](0006-render-bridge-over-remote-dom.md) (Remote DOM behind a `RenderBridge`)
 - **Evidence:** the M1 task 4 spike, PR #23 (closed unmerged; its files hold `spikes/remote-dom/README.md` and the usage logs)
@@ -85,6 +85,17 @@ Decided in a roadmap grilling; planned as the [M6 initiative](../plans/m6-adapte
 3. **Group 2's HTML parsing, `cloneNode` and `importNode` are built in M6** (epic M6b), because the frameworks need them, not only libraries. Point 7 still holds: each member comes with a conformance case.
 4. **No change to the `isoloop-dom@1` format.** Parsing and cloning happen in the worker and send ordinary insert records; the parser is our own, forgiving and sized for well-formed compiler output. Anything that needs a new host record goes to a new ADR.
 5. **Layout reads stay in group 3.** Vue's `<Transition>` and Svelte's transitions read layout and call `element.animate`. Missing members keep throwing `NotSupportedError`, with no fake values, and the docs list them on the "What Isoloop can't hide" page.
+
+### Amended 2026-11-24: `style` through the CSSOM
+
+Decided for the 0.1.1 patch ([plan](../plans/0.1.1-patch.md), decision 10; [#357](https://github.com/isoloop/isoloop/issues/357)); grilled on 2026-11-24 (yes to all).
+
+1. **The host applies a `style` attribute through the element's CSSOM,** `el.style.cssText = value`, never `setAttribute('style', …)`. One `cssText` write replaces the whole style, as the attribute did, so there's no per-property parsing on the host. That covers `attr` records and the attributes of an `insert`'s subtree. CSP's `style-src` governs a `style` attribute written as markup or with `setAttribute`, and doesn't govern CSSOM writes, so a page that shows a surface runs under `style-src 'self'` with no `'unsafe-inline'`.
+2. **A `null` value still removes the attribute** (`removeAttribute('style')`), which CSP allows.
+3. **The sanitising policy runs first, unchanged.** It sees the same tag, attribute name and value, and what it returns is what's written. A value the CSSOM can't parse drops those declarations, as the browser drops them from an attribute.
+4. **The protocol is unchanged.** The worker still records `style` as one attribute (decision 2), so `isoloop-dom@1` and its records stay as they are, and a worker built on 0.1.0 renders the same on a 0.1.1 host.
+5. **Host code of our own already uses the CSSOM.** The compositor sets `style.display` as a property, and the devtools panel is an isolate that renders through the same applier, so this change covers it.
+6. **Tested in all three browsers under a strict policy:** an e2e page with `style-src 'self'` renders a surface whose isolate sets `style` both through `el.style` and as an attribute, checks the computed style, and fails on any `securitypolicyviolation` event. The hosting guide's policy table drops the `'unsafe-inline'` row for surfaces. The guide's production policy is `style-src 'self'` for every page, surfaces included. `devCsp()` in `@isoloop/vite` keeps `'unsafe-inline'` in `style-src`, because Vite's dev server injects imported CSS as `<style>` elements, and its TSDoc says so. The devtools panel is on the strict e2e page, so it's covered too.
 
 ### Beyond the frameworks
 
