@@ -25,7 +25,7 @@
       "url": "https://github.com/isoloop/isoloop",
       "provider": "github",
       "link_mode": "web",
-      "revision": "9c9b9689edbbf94eede44aa908b0d07e7105fa45"
+      "revision": "1b721eeb3c8f379e966018ebfdc02a5f900c58e0"
     }
   },
   "components": [
@@ -424,7 +424,7 @@
       "dot": "cyan",
       "title": "How to read it",
       "items": [
-        "Isolate code never touches the page. It changes a document in its worker; the changes travel as isoloop-dom@1 records (ADR 0010, ADR 0011), and the compositor is the only code that writes to a surface.",
+        "Isolate code never touches the page. It changes a document in its worker; the changes travel as isoloop-dom@1 records, and the compositor is the only code that writes to a surface.",
         "The bold arrows are a frame on its way out; dashed arrows come back to the worker: an event, or a host call's result."
       ]
     },
@@ -452,7 +452,7 @@
       "items": [
         "measure, focus and scrollIntoView run after every batch sent before them, so measure sees their layout. requestCanvas hands a rendered canvas over as an OffscreenCanvas, once.",
         "Styles: KernelConfig.styles in every surface, then the isolate's own sheets; neither leaks out of the shadow root.",
-        "In a pool, the visual members share one document with a root each; each root has its own recorder, and its patches name the member (ADR 0015)."
+        "In a pool, the visual members share one document with a root each; each root has its own recorder, and its patches name the member."
       ]
     }
   ]

@@ -100,7 +100,7 @@ A subscription runs its handler for one record at a time, in order, and waits fo
 - **A handler that throws** is reported to the host as a non-fatal error, and the subscription stops committing. It's redelivered from the failed record the next time it starts with `from: 'committed'`.
 - **Credit:** the bus sends at most 1,000 records that haven't been settled. At that point it pauses the subscription, keeps only its position, and reads on from the log when settled records give credit back. A handler that never settles holds the subscription at that limit.
 
-From the host, `kernel.subscribe(topic, fn, { from })` reads a topic on the main thread and `kernel.publish(topic, { key?, value })` writes to it. They take no consumer group and no commit options.
+From the host, `kernel.subscribe(topic, fn, { from })` reads a topic on the main thread and `kernel.publish(topic, { key?, value })` writes to it. They take no consumer group and no commit options. `publish` takes an object with the payload under `value`, while `request` and `reply` (and `usePublish` in React and Preact) take the payload itself: `ctx.bus.publish(topic, { value: n })`, `ctx.bus.request(topic, n)`.
 
 ## Retention
 

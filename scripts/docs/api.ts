@@ -276,7 +276,11 @@ export function renderExport(e: ApiExport, entry: string, ctx: Context): string 
   if (e.home !== entry) {
     const page = ctx.pageOf(e.home);
     const href = `${page === ctx.page ? '' : page}#${anchor(e.name)}`;
-    out.push(`Re-exported from \`${e.home}\`: see [\`${e.name}\`](${href}).`);
+    // A type that a package nobody reads declares (`@isoloop/protocol`) isn't
+    // "re-exported from" the page that documents it: that page doesn't declare it.
+    const lead = e.owned ? 'Re-exported from' : 'Also exported by';
+    const tail = e.owned ? '' : ', which documents it';
+    out.push(`${lead} \`${e.home}\`${tail}: see [\`${e.name}\`](${href}).`);
     return out.join('\n\n');
   }
   const decl = e.decls[0];
@@ -467,6 +471,16 @@ export function renderAll(
   return pages;
 }
 
+/** Where a page still has a bundler suffix (`HostApi$1`): one `file:line: text` per hit. */
+export function bundlerSuffixes(pages: ReadonlyMap<string, string>): string[] {
+  return [...pages].flatMap(([file, md]) =>
+    md.split('\n').flatMap((line, i) => {
+      const hit = /[A-Za-z_]\w*\$\d+(?![\w$])/.exec(line);
+      return hit ? [`${file}:${i + 1}: ${hit[0]}`] : [];
+    }),
+  );
+}
+
 /** The built CLI's help, read through `--help`. */
 function cliFromHelp(root: string): Cli {
   const cli = join(root, 'packages/cli/dist/cli.js');
@@ -497,6 +511,12 @@ async function main(): Promise<void> {
   }
   const map = parseMap(readFileSync(join(root, 'docs/guide/map.json'), 'utf8'));
   const pages = renderAll(readApi(files, root), map, titleOf(root), cliFromHelp(root));
+  const leaked = bundlerSuffixes(pages);
+  if (leaked.length > 0) {
+    console.error(`docs:api: bundler name suffixes leaked into the pages:\n${leaked.join('\n')}`);
+    process.exitCode = 1;
+    return;
+  }
   const dir = join(root, API_DIR);
   if (check) {
     const onDisk = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.md')) : [];

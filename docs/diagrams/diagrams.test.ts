@@ -181,4 +181,11 @@ describe('core diagrams', () => {
       }
     }
   });
+
+  // The pages are public: they say how it works and don't cite ADRs or
+  // decision numbers. The `anchor` fields may; the pages don't carry them.
+  it.each(NAMES)('%s: the rendered page names no ADR or decision number', (name) => {
+    const html = readFileSync(new URL(`${name}.html`, dir), 'utf8');
+    expect(html).not.toMatch(/\bADR\b|decision \d/i);
+  });
 });

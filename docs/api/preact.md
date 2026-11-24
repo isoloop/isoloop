@@ -43,12 +43,12 @@ export default defineIsolate(Counter);
 
 ### `useHost`
 
-The isolate's host calls (`ctx.host`): `measure`, `focus`, `scrollIntoView` and
-`navigate`. Pass them the elements a ref holds; the host acts on what it rendered for
-them, after pending changes are applied.
+The isolate's host calls (`ctx.host`): `measure`, `focus`, `scrollIntoView`, `navigate`
+and `requestCanvas`. Pass them the elements a ref holds; the host acts on what it
+rendered for them, after pending changes are applied.
 
 ```ts nocheck
-function useHost(): HostApi$1;
+function useHost(): HostApi;
 ```
 
 **Returns:** The host API.
@@ -64,7 +64,7 @@ The isolate's context, as `start(ctx)` gets it: `ctx.bus`, `ctx.host`, `ctx.conf
 the rest.
 
 ```ts nocheck
-function useIsolate(): IsolateContext$1;
+function useIsolate(): IsolateContext;
 ```
 
 **Returns:** The context of the isolate this component runs in.
@@ -125,7 +125,7 @@ A function that sends a request on `topic` and resolves with the first valid rep
 The function is stable while `topic` is the same.
 
 ```ts nocheck
-function useRequest<In, ROut>(topic: TopicRef<In, any, any, ROut>): (value: In, opts?: RequestOptions$1) => Promise<ROut>;
+function useRequest<In, ROut>(topic: TopicRef<In, any, any, ROut>): (value: In, opts?: RequestOptions) => Promise<ROut>;
 ```
 
 | Parameter | Description |
@@ -146,7 +146,7 @@ topic without one, and the publish codes (`forbidden`, `invalid`, `too_large`,
 The host's current location. The route is read only while a component uses this hook.
 
 ```ts nocheck
-function useRoute(): RouteValue$1 | undefined;
+function useRoute(): RouteValue | undefined;
 ```
 
 **Returns:** The current route, or `undefined` until the first one arrives, and always
@@ -188,7 +188,7 @@ memory topic clears it back to `undefined`.
 
 ### `BusError`
 
-Re-exported from `@isoloop/host`: see [`BusError`](host.md#buserror).
+Also exported by `@isoloop/host`, which documents it: see [`BusError`](host.md#buserror).
 
 ### `HostCallError`
 
@@ -224,7 +224,7 @@ Re-exported from `@isoloop/runtime`: see [`RequestOptions`](runtime.md#requestop
 
 ### `RouteValue`
 
-Re-exported from `@isoloop/react`: see [`RouteValue`](react.md#routevalue).
+Also exported by `@isoloop/react`, which documents it: see [`RouteValue`](react.md#routevalue).
 
 ### `UseTopicOptions`
 

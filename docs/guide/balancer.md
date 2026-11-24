@@ -59,7 +59,7 @@ const balancer = createBalancer(kernel, options?);
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `maxWorkers` | `max(2, navigator.hardwareConcurrency − 2)`, at least 1 | The balancer's own allowance of workers: its `balancer-N` pools and any quarantine worker beyond the first, counted from the moment a move claims a pool, before its worker runs. Workers your app runs itself don't count. |
+| `maxWorkers` | `max(2, navigator.hardwareConcurrency − 2)`; a value you set is raised to 1 if lower | The balancer's own allowance of workers: its `balancer-N` pools and any quarantine worker beyond the first, counted from the moment a move claims a pool, before its worker runs. Workers your app runs itself don't count. |
 | `spike.lagMs` | 100 | One beat with the pool's lag above this is a spike, put on its busiest member. A first one is only reported; a second from the same member within 60 s sends it to quarantine. |
 | `sustained.lagMs`, `sustained.forMs` | 50 ms, 3,000 ms | The pool's median lag above `lagMs` over `forMs` moves its heaviest member out. |
 | `headroom.loadPct` | 60 | An isolate joins a pool only while the pool's load plus its own stays under this. |
@@ -89,7 +89,7 @@ The balancer listens to the kernel's `isolate:beat` event: every heartbeat of ev
 ### Placing
 
 - **By predicted load.** A new isolate joins the pool where its load plus the pool's stays under 60 % of a core. If no pool passes, it gets a new pool, within `maxWorkers`. If the cap is reached, it joins anyway and its placement reports `atCap`.
-- **Unmeasured isolates start in quarantine,** to be measured. They leave as soon as they have 3 s of beats there. Pass `loads` so they arrive measured: the interactive dashboards measure a widget's preview with `measure()` on Save and store it with `loads.set`, and the balancer writes measured loads back as it goes.
+- **Unmeasured isolates start in quarantine,** to be measured. They leave as soon as they have 3 s of beats there. While it's measured, `placements()` shows a new isolate as `quarantined`, and it leaves with a move whose `reason` is `steady`: the same state and reason as an offender, so an app that lists placements shows every new isolate as one until it's measured. Pass `loads` so they arrive measured, and skip that stay: the interactive dashboards measure a widget's preview with `measure()` on Save and store it with `loads.set`, and the balancer writes measured loads back as it goes.
 
 ### Moving
 
