@@ -19,7 +19,7 @@ What a Tauri app has that a tab doesn't:
 
 The forces:
 
-- **`LogEngine` is synchronous.** `append` returns the offset and `read` returns records, in the bus worker. An engine in the Rust core over async IPC can't implement it. `LogStorage` can: it's async, pluggable (`EngineOptions.storage`) and already has two implementations.
+- **`LogEngine` is synchronous.** `append` returns the offset and `read` returns records, in the bus worker. An engine in the Rust core over async IPC can't implement it. `LogStorage` can: it's async, pluggable (`EngineOptions.storage`) and already has two implementations. Both `LogStorage` and that option are `@internal`, so no app can pass a storage to the bus today.
 - **Tauri's `invoke` needs `window`.** Workers can't call it, so neither an isolate nor the bus worker can reach a command directly.
 - **The host can't answer a request.** `kernel.subscribe` and `kernel.request` exist, but there is no host-side responder for a requestable topic. A headless isolate can answer one, but it has no `window` either.
 - **No record crosses the main thread** (ADR 0005), except for host consumers the app chose.
@@ -82,7 +82,7 @@ If item 2 fails on any OS, `TauriStorage` is dropped and the package ships decis
 - **A Rust crate joins the release,** with its own CI (three OSes) and its own pins under [ADR 0009](0009-toolchain.md).
 - **Memory per isolate stays Windows-only** in Tauri, since only WebView2 has the API.
 - **WebKitGTK lags.** On older distros some features fail; the guide lists them, and Isoloop doesn't polyfill them.
-- **New API, all `@experimental` and all additions:** `kernel.respond`, `@isoloop/tauri` (`exposeCommands`, `TauriStorage`, the config helper), `LogStorage.kind` gains `'native'`. None touches the isolate seam, so under ADR 0019 they can land in a patch, apart from the package's first release.
+- **New API, all `@experimental` and all additions:** `kernel.respond`, `@isoloop/tauri` (`exposeCommands`, `TauriStorage`, the config helper). None touches the isolate seam, so under ADR 0019 they can land in a patch, apart from the package's first release.
 
 ## Alternatives considered
 
@@ -100,3 +100,4 @@ If item 2 fails on any OS, `TauriStorage` is dropped and the package ships decis
 3. **Many windows.** One bus shared across a Tauri app's windows, with the Rust core as broker, is the feature a browser can't match. In this ADR, or deferred to [would-like](../would-like.md)?
 4. **Rust writes.** Native code publishing to a topic, not only reading it. Deferred (it needs the broker's validation and offsets on the Rust side)?
 5. **Mobile.** Tauri also targets iOS and Android. Out of M12, to [would-like](../would-like.md)?
+6. **How `TauriStorage` reaches the bus worker.** `LogStorage` and `EngineOptions.storage` are `@internal`, so there's no public way to give the bus a storage. Make a storage seam public (new public API, under ADR 0019's rules), or let first-party packages such as `@isoloop/tauri` use an internal entry and keep the seam private?
