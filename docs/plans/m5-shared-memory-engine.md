@@ -4,7 +4,7 @@
 
 **Done when** (RFC 0001): benchmark results are published, whichever engine wins.
 
-Depends only on the `LogEngine` interface and the throughput bench, and reuses M2b's codec. Planned for after 0.1 (M4) and [M6](m6-adapters.md) (decided 2026-11-16; [M7](m7-webmcp-stable.md) left this order on 2026-11-17, when it became "WebMCP to stable" and waits only for WebMCP to ship); it gets a full task list when it's next to start.
+Depends only on the `LogEngine` interface and the throughput bench, and reuses M2b's codec. Planned for `0.4.0`, after [M5b Delivery batching](m5b-delivery-batching.md) and [M10 Bus pacing](m10-bus-pacing.md) in `0.3.0` (the [releases table](README.md#releases), decided 2026-11-24); it gets a full task list when it's next to start.
 
 ## Main work items
 
@@ -16,7 +16,9 @@ Depends only on the `LogEngine` interface and the throughput bench, and reuses M
 6. **Publish results** in the docs and a post, including the case where the TS engine wins.
 7. **Evaluate a `SharedArrayBuffer` render channel** against `postMessage` patches (it could win back about one frame per click on Chromium; needs cross-origin isolation, as the engine does). See the [click-to-paint investigation](../investigations/click-to-paint-latency.md). An ADR only if the numbers justify it.
 
-Delivery batching across tasks (the TS engine's M2 shortfall against the 50k records/s budget) is a separate spike after this milestone: [M5b](m5b-delivery-batching.md).
+Two milestones in `0.4.0` build on this one: [M8 Watchers](m8-watchers.md) W3 (shared watch slots) uses its cross-origin isolated setup, and [M12 Tauri](m12-tauri.md) reuses its Rust code for the segment format. Neither waits on the engine's verdict: W3 ships whichever engine wins, and M12 writes its own segment code if this engine doesn't ship.
+
+Delivery batching across tasks (the TS engine's M2 shortfall against the 50k records/s budget) is a separate spike that runs before this milestone: [M5b Delivery batching](m5b-delivery-batching.md).
 
 ## Open risks
 

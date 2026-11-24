@@ -4,7 +4,7 @@
 
 **Done when:** each of Vue `^3`, Svelte `^5` and Solid `^1` has an adapter that passes the [M3a](m3a-adapters.md) adapter conformance suite on its major, with a DOM usage log, a smoke test and one small example app. No benchmarks and no dashboard ports: a framework port of markets or the plant would measure the framework, not Isoloop.
 
-**Depends on:** 0.1 ([M4](m4-devtools-release.md)). The adapters only add packages and members of the DOM subset, so they don't have to land before the API freeze. Comes before [M5](m5-shared-memory-engine.md) and [M5b](m5b-delivery-batching.md).
+**Depends on:** 0.1 ([M4](m4-devtools-release.md)). The adapters only add packages and members of the DOM subset, so they don't have to land before the API freeze. Comes after [M5 Shared-memory engine](m5-shared-memory-engine.md); its versions are in the [releases table](README.md#releases).
 
 Gets a full task list per epic when it's next to start. Decided in a grilling on 2026-11-16; [ADR 0010](../adr/0010-own-render-bridge.md#amended-2026-11-16-adapters-after-01) records the order and the rules below.
 
