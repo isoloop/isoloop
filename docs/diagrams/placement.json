@@ -19,7 +19,7 @@
       "url": "https://github.com/isoloop/isoloop",
       "provider": "github",
       "link_mode": "web",
-      "revision": "f825ffbd1ac8b9c01a82a791fb01ccd62bcbbc05"
+      "revision": "1b721eeb3c8f379e966018ebfdc02a5f900c58e0"
     }
   },
   "components": [
@@ -217,15 +217,15 @@
       "title": "How to read it",
       "items": [
         "A box is a thread. The same three isolates run on the left in three own workers and on the right as members of one pool.",
-        "Placement is the host manifest's choice alone: the isolate's code is the same either way (ADR 0001, ADR 0015)."
+        "Placement is the host manifest's choice alone: the isolate's code is the same either way."
       ]
     },
     {
       "dot": "emerald",
       "title": "What a pool saves",
       "items": [
-        "20 headless isolates in one worker: 71–86% less memory and 2–3× faster start-up than 20 own workers (ADR 0001 gate).",
-        "8 React widgets in one worker: 35–64% less memory, with the same p95 from publish to applied patch (ADR 0015 gate)."
+        "20 headless isolates in one worker: 71–86% less memory and 2–3× faster start-up than 20 own workers.",
+        "8 React widgets in one worker: 35–64% less memory, with the same p95 from publish to applied patch."
       ]
     },
     {
@@ -233,8 +233,8 @@
       "title": "What members share",
       "items": [
         "One event loop and its timers: a member that blocks stalls the others.",
-        "globalThis and the built-ins, frozen before the first member loads; the properties V8 protects stay plain data (ADR 0001 amendment).",
-        "One isoloop-dom document, a root per visual member: members can read each other's DOM and input (ADR 0015).",
+        "globalThis and the built-ins, frozen before the first member loads; the properties V8 protects stay plain data.",
+        "One isoloop-dom document, a root per visual member: members can read each other's DOM and input.",
         "Fate: a worker error or a missed heartbeat restarts every member together in a new worker; a member's own fatal error restarts only that member."
       ]
     },
