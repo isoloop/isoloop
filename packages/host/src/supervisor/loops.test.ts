@@ -100,6 +100,13 @@ describe("#390's table reaches failed", () => {
     expect(result.crashes).toBe(crashes);
   });
 
+  it('fails a 10 s-per-start loop about 80 s after its first start, as the guide says', () => {
+    // Each cycle: 10 s running, 10 s without a beat to the kill, then the backoff.
+    const { failedAt } = simulate(defaults, { hangsAfterMs: 10_000 });
+    expect(failedAt).toBeGreaterThan(80_000);
+    expect(failedAt).toBeLessThan(85_000);
+  });
+
   it('names the rule it failed on', () => {
     // Fast: both rules are met, and the window is named.
     expect(simulate(defaults, hangs).error).toBe(
