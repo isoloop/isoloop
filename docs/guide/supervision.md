@@ -204,7 +204,7 @@ Suspension never touches the restart window. A pool suspends only as a whole, wh
 
 ## Measured: a CPU-starved Firefox
 
-Four sets of runs of the plant dashboard's Isoloop page (12 workers, one pool of 72 isolates), with nothing watching the page but a probe that samples it every 2 s. In all of them, the browser's workers were runnable but waiting for a CPU. Two hosts are compared: 0.1.0, which counts restarts in a sliding window only, and the host with the short-run rule, which 0.1.1 ships: it also counts crashes after short runs. Each set's issue comment names the exact build.
+Four sets of runs of the plant dashboard's Isoloop page (12 workers, one pool of 72 isolates), with nothing watching the page but a probe that samples it every 2 s. In all of them, the browser's workers were runnable but waiting for a CPU. Two hosts are compared: 0.1.0, which counts restarts in a sliding window only, and the host with the short-run rule, which also counts crashes after short runs ([What it does about them](#what-it-does-about-them)). Each set's link names the exact build.
 
 **2026-11-22, `0.1.0-next.11`, `killAfterMs` 2000** ([#389](https://github.com/isoloop/isoloop/issues/389)). A laptop-class 8-core CPU, Linux, Playwright 1.65 with Firefox 159, 4 threads limited by a CPU quota: 2 pages at once on 1 CPU (3 rounds) and 3 pages at once on 1.5 CPUs (4 rounds), 18 pages. Each run ended when all of its pages showed data.
 
