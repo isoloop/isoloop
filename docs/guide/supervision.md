@@ -143,7 +143,7 @@ declare function showToast(text: string): void;
 
 ## Failed isolates and the fallback
 
-A `failed` isolate stays down until someone restarts it: nothing retries after the window. A visual isolate shows a **fallback** in its surface: a message and a Retry button that respawns it. `kernel.restart(id)` does the same from code, and either one clears the restart window.
+A `failed` isolate stays down until someone restarts it: nothing retries after the restart limit. A visual isolate shows a **fallback** in its surface: a message and a Retry button that respawns it. `kernel.restart(id)` does the same from code, and either one clears both counts.
 
 Replace the fallback for one isolate with `fallback` in its manifest. It's a `FallbackRender`: a function that fills the `slot` element, in the surface's shadow root, from a `FallbackInfo`.
 
