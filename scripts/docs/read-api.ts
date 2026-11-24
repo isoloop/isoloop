@@ -50,6 +50,8 @@ export type ApiExport = {
   key: string;
   /** The entry point that owns the declaration (decision 33). */
   home: string;
+  /** Whether the home entry point's own package declares it, not a package that isn't read (such as `@isoloop/protocol`). */
+  owned: boolean;
   tags: readonly { name: string; text: string }[];
   /** Whether the declaration has a doc comment. */
   documented: boolean;
@@ -149,6 +151,8 @@ export function readApi(files: readonly EntryFile[], cwd: string): ApiModel {
       return by.find((e) => key.startsWith(dirOf.get(e) ?? '\0')) ?? by[0] ?? '';
     };
 
+    const ownedBy = (key: string, home: string): boolean => key.startsWith(dirOf.get(home) ?? '\0');
+
     const entries = new Map<string, ApiExport[]>(files.map((f) => [f.entry, []]));
     for (const r of raw) {
       entries.get(r.entry)?.push({
@@ -156,6 +160,7 @@ export function readApi(files: readonly EntryFile[], cwd: string): ApiModel {
         kind: kindOf(r.sym.flags),
         key: r.key,
         home: homeOf(r.key),
+        owned: ownedBy(r.key, homeOf(r.key)),
         tags: checker
           .getJsDocTagsOfSymbol(r.sym)
           .map((t) => ({ name: t.name, text: t.text ?? '' })),
@@ -208,12 +213,20 @@ const fileText = (path: string): string => {
   return t;
 };
 
+/**
+ * A declaration's text without the bundler's name suffixes: the `.d.ts` bundler
+ * writes `import { HostApi as HostApi$1 }` when two modules use one name, and
+ * the suffix has no meaning to a reader.
+ */
+export const withoutBundlerSuffixes = (text: string): string =>
+  text.replace(/(?<![\w$])([A-Za-z_]\w*)\$\d+(?![\w$])/g, '$1');
+
 /** The text and the doc comment of `n`: from after its last doc comment (or its start) to its end. */
 function span(n: Node, text: string): { text: string; doc: string } {
   const doc = n.jsDoc?.at(-1);
   const from = doc ? doc.end : n.pos;
   return {
-    text: text.slice(from, n.end).trim(),
+    text: withoutBundlerSuffixes(text.slice(from, n.end).trim()),
     doc: doc ? text.slice(text.indexOf('/**', doc.pos), doc.end).trim() : '',
   };
 }

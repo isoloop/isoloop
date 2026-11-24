@@ -59,7 +59,7 @@ const balancer = createBalancer(kernel, options?);
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `maxWorkers` | `max(2, navigator.hardwareConcurrency − 2)`, at least 1 | The balancer's own allowance of workers: its `balancer-N` pools and any quarantine worker beyond the first, counted from the moment a move claims a pool, before its worker runs. Workers your app runs itself don't count. |
+| `maxWorkers` | `max(2, navigator.hardwareConcurrency − 2)`; a value you set is raised to 1 if lower | The balancer's own allowance of workers: its `balancer-N` pools and any quarantine worker beyond the first, counted from the moment a move claims a pool, before its worker runs. Workers your app runs itself don't count. |
 | `spike.lagMs` | 100 | One beat with the pool's lag above this is a spike, put on its busiest member. A first one is only reported; a second from the same member within 60 s sends it to quarantine. |
 | `sustained.lagMs`, `sustained.forMs` | 50 ms, 3,000 ms | The pool's median lag above `lagMs` over `forMs` moves its heaviest member out. |
 | `headroom.loadPct` | 60 | An isolate joins a pool only while the pool's load plus its own stays under this. |
