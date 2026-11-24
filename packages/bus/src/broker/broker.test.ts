@@ -1,5 +1,5 @@
 import { checks, systemSchema, systemTopic, type Grants } from '@isoloop/protocol';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { FakeDisk } from '../../test/fake-disk';
 import { connect, fakeIsolate, flush } from '../../test/memory-port';
@@ -833,5 +833,83 @@ describe('a reattached subscription to a persistent topic (ADR 0007 step 3)', ()
     const fresh = connect(later, 'A', all);
     await fresh.call('subscribe', { topic: 'saved.v1', from: 'earliest' });
     expect(fresh.values('saved.v1')).toEqual([0, 1, 2]);
+  });
+});
+
+const sub = (name: string, group?: string) =>
+  ({
+    v: 1,
+    t: 'subscribe',
+    p: { topic: name, from: 'latest', ...(group ? { group } : {}) },
+  }) as const;
+const spy = () => vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+describe('a repeated subscribe in dev', () => {
+  it('warns once per topic, naming the isolate and the topic', () => {
+    const warn = spy();
+    try {
+      const { broker } = setup();
+      const a = connect(broker, 'A', all);
+      a.send(sub('notes.v1'));
+      expect(warn).not.toHaveBeenCalled();
+      a.send(sub('notes.v1'));
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toBe(
+        '[isoloop] isolate "A" subscribed to "notes.v1" again; the newer subscription replaced the older one (a second useTopic or bus.subscribe on this topic).',
+      );
+      a.send(sub('notes.v1'));
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('warns for each topic separately, and for grouped subscriptions', () => {
+    const warn = spy();
+    try {
+      const { broker } = setup();
+      const a = connect(broker, 'A', all);
+      a.send(sub('notes.v1'));
+      a.send(sub('small.v1', 'g'));
+      a.send(sub('notes.v1'));
+      a.send(sub('small.v1', 'g'));
+      expect(warn).toHaveBeenCalledTimes(2);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('does not warn without dev', () => {
+    const warn = spy();
+    try {
+      const broker = new Broker({
+        contracts: contracts(notes),
+        engine: new TsEngine(),
+        now: () => 1,
+      });
+      const a = connect(broker, 'A', all);
+      a.send(sub('notes.v1'));
+      a.send(sub('notes.v1'));
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('does not warn after an unsubscribe, or on a reattached connection', () => {
+    const warn = spy();
+    try {
+      const { broker } = setup();
+      const a = connect(broker, 'A', all);
+      a.send(sub('notes.v1'));
+      a.send({ v: 1, t: 'unsubscribe', p: { topic: 'notes.v1' } });
+      a.send(sub('notes.v1'));
+      const again = fakeIsolate('A');
+      broker.attach('A', all, again.port, { reattach: true });
+      again.send(sub('notes.v1'));
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

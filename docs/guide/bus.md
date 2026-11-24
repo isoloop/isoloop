@@ -90,7 +90,7 @@ export default defineIsolate({
 - **`earliest`:** the oldest record the topic still retains.
 - **`committed`:** the record after the last one this isolate settled on the topic. With no commit yet, it starts at `earliest`.
 
-An isolate's place is kept under its id, so it survives the isolate's restarts. Each isolate has one subscription per topic: subscribing again replaces the first.
+An isolate's place is kept under its id, so it survives the isolate's restarts. Each isolate has one subscription per topic: subscribing again replaces the first. With the kernel's `dev: true`, the bus warns in the console when that happens.
 
 ### Handlers and commits
 
@@ -355,7 +355,7 @@ If the new bus crashes while it loads, or within 2 s of becoming ready, twice in
 - **Retention drops records.** A subscription that falls behind, a request that waits too long, and a late reader all miss what retention removed. `onGap` reports it.
 - **A compacted topic keeps keyless records forever.**
 - **Order is per topic.** There's no order across topics. In a group, order holds per key while membership is stable.
-- **One subscription per topic per isolate.** A second `subscribe` replaces the first.
+- **One subscription per topic per isolate.** A second `subscribe` replaces the first; with `dev: true` the bus warns in the console.
 - **Values are structured data.** Functions, DOM nodes and class instances don't cross the bus, and the size limit is a rough estimate.
 - **A restart limit.** After 3 bus restarts in 60 s, the bus is down for good until the page reloads.
 - **An isolate's own request doesn't check for a responder.** With nobody answering, it waits for its timeout. Only `kernel.request` fails at once with `no_responder`.
