@@ -44,7 +44,7 @@ Archify isn't part of this repo's toolchain. To re-render after editing a JSON:
    ```
 
    `<type>` is the JSON's `diagram_type`. If no Chrome is found, set `ARCHIFY_CHROME` to a Chromium executable, for example Playwright's.
-3. Run `node docs/diagrams/externalize.mjs`. It moves each page's inline scripts and styles into the shared `viewer-<hash>.js` and `.css` files, so the pages run under `script-src 'self'` and `style-src 'self'` (stricter than the [hosting guide](../guide/hosting.md)'s policy for a page with surfaces, which also needs `'unsafe-inline'` in `style-src`), and deletes viewer files no page uses any more.
+3. Run `node docs/diagrams/externalize.mjs`. It moves each page's inline scripts and styles into the shared `viewer-<hash>.js` and `.css` files, so the pages run under `script-src 'self'` and `style-src 'self'`, as the [hosting guide](../guide/hosting.md)'s policy does, and deletes viewer files no page uses any more.
 4. Delete the `*.delivery.json`, `*.finalize*.json`, `*.browser-check.json` and review files Archify writes next to each page. They aren't committed.
 
 ## What the pages still need from a policy
