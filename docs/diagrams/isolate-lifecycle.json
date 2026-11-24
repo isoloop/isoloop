@@ -289,7 +289,7 @@
       "title": "Straight to Failed, no restart",
       "items": [
         "render_format_mismatch: ready reports a render format the host doesn't speak.",
-        "runtime_too_old or isolate_too_old: ready.requires is outside the host's [FLOOR, VERSION] (ADR 0012).",
+        "runtime_too_old or isolate_too_old: ready.requires is outside the host's [FLOOR, VERSION].",
         "bus_failed: the bus couldn't load its contracts.",
         "Other crashes (error, worker_error, ready_timeout, unresponsive, spawn_failed) restart until 3 restarts within 60 s, or 3 in a row after runs shorter than 60 s."
       ]
