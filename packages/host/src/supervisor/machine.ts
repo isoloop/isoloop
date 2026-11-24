@@ -396,13 +396,15 @@ function crash(
   const healthy = s.readyAt === undefined ? 0 : Math.max(0, s.lastBeatAt - s.readyAt);
   const short = healthy >= cfg.withinMs ? 1 : s.short + 1;
   const limit =
-    window.length >= cfg.maxRestarts
-      ? `${cfg.maxRestarts} restarts in ${cfg.withinMs} ms`
-      : short > cfg.maxRestarts
-        ? `${short} crashes, each after less than ${cfg.withinMs} ms of healthy running`
-        : undefined;
+    final || cfg.strategy === 'never'
+      ? undefined
+      : window.length >= cfg.maxRestarts
+        ? `${cfg.maxRestarts} restarts in ${cfg.withinMs} ms`
+        : short > cfg.maxRestarts
+          ? `${short} crashes, each after less than ${cfg.withinMs} ms of healthy running`
+          : undefined;
   if (final || cfg.strategy === 'never' || limit !== undefined) {
-    const why = final || cfg.strategy === 'never' || !limit ? message : `${message} (${limit})`;
+    const why = limit === undefined ? message : `${message} (${limit})`;
     effects.push(
       moved('crashed', 'failed'),
       { k: 'showFallback', reason, message: why },

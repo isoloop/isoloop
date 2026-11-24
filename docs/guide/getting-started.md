@@ -88,7 +88,7 @@ The options you're most likely to set first:
 | --- | --- | --- |
 | `contracts` | The contracts module's URL, which the bus worker imports, and its default export, which the host uses | none: without it there's no bus |
 | `workers` | The isolate bootstrap's URL and the bus worker's, from `virtual:isoloop/workers` | required |
-| `supervisor` | How crashed isolates restart: `strategy` (`one-for-one` or `never`), `maxRestarts` within `withinMs`, and the `backoff` between tries | one-for-one, 3 restarts in 60 s, 250 ms doubling up to 4 s |
+| `supervisor` | How crashed isolates restart: `strategy` (`one-for-one` or `never`), `maxRestarts` within `withinMs`, and the `backoff` between tries | one-for-one, 3 restarts in 60 s or 3 in a row after runs shorter than 60 s, 250 ms doubling up to 4 s |
 | `heartbeat` | When a silent isolate counts as blocked (`blockedAfterMs`) and when it's killed (`killAfterMs`) | 400 ms and 10 s |
 | `styles` | `CSSStyleSheet`s adopted into every surface | none |
 | `components` | Host custom elements isolates may render by name, each a `HostComponent`: `{ tag, attributes? }` | none |
@@ -148,7 +148,7 @@ Each isolate runs on its own event loop. When one throws or hangs, the others ke
 
 1. **A crash** (an uncaught error, or the worker dying) restarts that isolate after the backoff. Its state is gone, so it reads what it needs back from the bus: `useTopic(cartItems, { from: 'earliest' })` above gets the latest cart item again.
 2. **A hang** shows "Not responding…" over its surface once it misses beats for 400 ms, and is killed and restarted after 10 s.
-3. **Past the restart limit** (3 in 60 s by default), it stays down as `failed`, and its surface shows a fallback with a Retry button.
+3. **Past the restart limit** (by default, a 4th crash unless it ran 60 s or more before one of them), it stays down as `failed`, and its surface shows a fallback with a Retry button.
 
 ```ts
 kernel.on('isolate:crash', (e) => console.warn(`${e.id} crashed (${e.reason}): ${e.message}`));
