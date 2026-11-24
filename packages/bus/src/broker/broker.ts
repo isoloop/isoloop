@@ -228,6 +228,8 @@ type Connection = {
   grants: Grants;
   port: BusPort;
   subs: Map<string, Subscription>;
+  /** Topics already warned about in dev for a repeated subscribe, so each warns once. */
+  warned: Set<string>;
   /** Set when attached after a bus restart: memory topics not yet reset on this connection. */
   reset: Set<string> | undefined;
   /**
@@ -615,6 +617,7 @@ export class Broker {
       grants,
       port,
       subs: new Map(),
+      warned: new Set(),
       reset: opts.reattach ? new Set() : undefined,
     };
     this.#conns.set(isolateId, conn);
@@ -693,6 +696,7 @@ export class Broker {
         close: () => {},
       },
       subs: new Map(),
+      warned: new Set(),
       reset: undefined,
       host: true,
     };
@@ -773,6 +777,7 @@ export class Broker {
         this.#reply(conn, msg.p.topic, msg.p.offset, msg.p.value, reply);
         return;
       case 'subscribe': {
+        if (this.#dev) this.#warnRepeatSubscribe(conn, msg.p.topic);
         const held = this.#topics.get(msg.p.topic)?.seeding;
         if (held && (isSystemTopic(msg.p.topic) || matchAny(conn.grants.subscribe, msg.p.topic))) {
           // Answered once the seed ends, so history comes before anything new.
@@ -1181,6 +1186,18 @@ export class Broker {
   }
 
   // Subscriptions, groups and commits.
+
+  // Dev only: a second subscribe on one connection replaces the first. That is
+  // usually two useTopic calls (or bus.subscribe calls) on the same topic.
+  #warnRepeatSubscribe(conn: Connection, topic: string): void {
+    if (conn.warned.has(topic)) return;
+    const held = this.#topics.get(topic)?.seeding?.some((h) => h.conn === conn) ?? false;
+    if (!held && !conn.subs.has(topic)) return;
+    conn.warned.add(topic);
+    console.warn(
+      `[isoloop] isolate "${conn.isolateId}" subscribed to "${topic}" again; the newer subscription replaced the older one (a second useTopic or bus.subscribe on this topic).`,
+    );
+  }
 
   #subscribe(conn: Connection, name: string, from: unknown, group: unknown): CallResult {
     if (!isStartPosition(from)) {
