@@ -64,37 +64,47 @@ In an isolate with a surface, `document` is the render bridge's DOM subset and `
 - **`document.body`** is a detached element. A widget that appends a portal, a tooltip or a modal to it renders nothing on screen. Render it inside your own root instead.
 - **`localStorage` and `sessionStorage`** don't exist in workers. `IndexedDB` does. To keep state across a restart, publish it to a topic ([persistent topics](hosting.md#persistent-topics-and-a-discarded-tab) survive a reload).
 - **The page's `window`** isn't there: no `innerWidth`, `matchMedia` or `history`, and `location` is the worker script's URL. Navigation goes through `host.navigate`, with the `navigate` grant ([contracts and grants](contracts.md)).
-- **Tags the page won't create.** The page builds only allow-listed HTML and SVG tags: an unknown tag becomes a `div` (`g` inside SVG), and `script`, `iframe`, `style` and `on*` attributes are never created. URLs are limited to `http(s):`, `mailto:` and relative ones ([design §4.5](../design/system-design.md)). A widget that injects a `<script>` or an embed doesn't work in an isolate.
+- **Tags the page won't create.** The page builds only allow-listed HTML and SVG tags: an unknown tag becomes a `div` (`g` inside SVG), and `script`, `iframe`, `style` and `on*` attributes are never created. URLs are limited to `http(s):`, `mailto:` and relative ones. A widget that injects a `<script>` or an embed doesn't work in an isolate.
 
 ## Input arrives a moment later
 
-The page listens for input and forwards it to the isolate as a message ([design §4.6](../design/system-design.md)). Only these events are forwarded, and only to a node that listens for them: `click`, `dblclick`, `input`, `change`, `keydown`, `keyup`, `submit`, `focusin`, `focusout`, `pointerdown`, `pointerup`, `pointermove` (once per animation frame) and `scroll` (once per frame per node). A canvas handed over by `requestCanvas` also gets `resize`. What follows from that:
+The page listens for input and forwards it to the isolate as a message. Only these events are forwarded, and only to a node that listens for them: `click`, `dblclick`, `input`, `change`, `keydown`, `keyup`, `submit`, `focusin`, `focusout`, `pointerdown`, `pointerup`, `pointermove` (once per animation frame) and `scroll` (once per frame per node). A canvas handed over by `requestCanvas` also gets `resize`. What follows from that:
 
-- **Drag and drop doesn't work.** `dragstart`, `dragover` and `drop` are never forwarded, and a `DataTransfer` can't cross to the worker. Build drag with pointer events, or keep it on the page.
+- **Other events never arrive.** The worker's DOM accepts a listener for any event, and `onwheel` and the like exist, but a listener for an event outside the list above never runs. That includes:
+  - **drag and drop:** `dragstart`, `dragover` and `drop`, and a `DataTransfer` can't cross to the worker. Build drag with pointer events, or keep it on the page;
+  - **`wheel`:** a widget that zooms or scrolls on the wheel gets nothing; the page scrolls as usual, and `scroll` is forwarded once per frame to a node that listens for it;
+  - **`contextmenu`:** the browser's own menu opens;
+  - **`copy`, `cut` and `paste`:** the clipboard events, and so the clipboard data they carry;
+  - **IME composition:** `compositionstart`, `compositionupdate` and `compositionend`. The `input` event is forwarded, but not the stages of a composition.
+
+  Keep such a control on the page, or take what you need through the events that are forwarded.
 - **`preventDefault()` comes too late.** By the time the isolate runs its handler, the page has already done the default action. The page prevents two defaults itself: every `submit`, and, with routing on, plain clicks on same-origin links, which go to the router.
 - **Pointer timing is coarser.** Moves are coalesced to one per frame, and each reply takes a round trip. Drawing that follows the pointer (a freehand canvas, a slider dragged across a chart) lags by about a frame more than the same code on the page.
-- **Every interaction has a fixed cost.** In Chromium, a worker's reply to an input waits until after the next frame ([engine constraints §3](../investigations/engine-constraints.md#3-chromium-holds-a-workers-reply-until-after-the-next-frame-following-input)). In the markets dashboard at Heavy, that came to about 30 ms of typing latency in every Isoloop variant, against 5–10 ms for native, on Chromium and WebKit (Playwright 1.64.1 on a 32-core WSL2 machine, 2026-11-08, [§2](../investigations/engine-constraints.md#2-webkit-presents-worker-drawn-canvas-frames-through-the-main-thread)).
+- **Every interaction has a fixed cost.** In Chromium, a worker's reply to an input waits until after the next frame. In the markets dashboard at Heavy, that came to about 30 ms of typing latency in every Isoloop variant, against 5–10 ms for native, on Chromium and WebKit (Playwright 1.64.1 on a 32-core WSL2 machine, 2026-11-08).
 - **Events from the page are never trusted.** `isTrusted` is always `false` in the worker, including for forwarded input, so code that checks it treats every event as synthetic.
 
 ## What it costs
 
-An isolate's computation moves off the main thread, but showing what it computed still costs the main thread time: one thread per document applies every DOM change ([engine constraints §1](../investigations/engine-constraints.md#1-one-dom-thread-per-document)). On top of that, Isoloop costs CPU across threads, memory and start-up time.
+An isolate's computation moves off the main thread, but showing what it computed still costs the main thread time: one thread per document applies every DOM change. On top of that, Isoloop costs CPU across threads, memory and start-up time.
 
-On the plant dashboard (72 widgets), native + workers against Isoloop's `matched` placement, in Chromium at 5 kHz: the median gap over 5 interleaved rounds, measured on a dedicated machine with 4 physical cores fixed at 2.0 GHz, `@isoloop/*@0.0.0-next.b8ffdcf`, shipped as `plant-v0.1.0`, 2026-11-13 ([results](https://github.com/isoloop/web/blob/9b50967b0971871ec9671d7dce8d115eb16f6d19/apps/dashboards/plant/comparison/final/README.md)):
+On the plant dashboard (72 widgets), native + workers against Isoloop's `matched` placement, in Chromium at 5 kHz, measured on a dedicated machine with 4 physical cores fixed at 2.0 GHz, 2026-11-13 ([results](https://github.com/isoloop/web/blob/9b50967b0971871ec9671d7dce8d115eb16f6d19/apps/dashboards/plant/comparison/final/README.md)):
 
-| | Isoloop minus native + workers |
-| --- | --- |
-| Main-thread CPU | −53 percentage points |
-| Typing latency | −28 ms |
-| CPU across all threads | +19 percentage points |
-| Memory 16 s in, after GC | +51 MB |
-| Time to first data | +294 ms |
+Each row is Δ, Isoloop minus native + workers: the median of the paired differences over 5 interleaved rounds, so a negative figure is lower with Isoloop. The first two rows are gains; the other three are costs.
+
+| | Δ | |
+| --- | --- | --- |
+| Main-thread CPU | −53 percentage points | gain |
+| Typing latency | −28 ms | gain |
+| CPU across all threads | +19 percentage points | cost |
+| Memory 16 s in, after GC | +51 MB | cost |
+| Time to first data | +294 ms | cost |
 
 Other devices and engines tell a different story:
 
-- **On an older iOS phone** (Safari 16.6, 2026-11-13), the plant dashboard's native build held 60 frames a second at 1 and 5 kHz, and the Isoloop placements did worse the more workers they used: at 5 kHz, 59.5 frames a second with 1 worker and 5.6 with 105 ([engine constraints §2](../investigations/engine-constraints.md#2-webkit-presents-worker-drawn-canvas-frames-through-the-main-thread)).
-- **In Playwright's WebKit on Linux,** every frame a worker draws on a transferred canvas costs the main thread time, so pages with many canvas widgets slow down there ([§2](../investigations/engine-constraints.md#2-webkit-presents-worker-drawn-canvas-frames-through-the-main-thread)). Safari 26.5 on a recent iPadOS tablet doesn't show it.
+- **On an older iOS phone** (Safari 16.6, 2026-11-13), the plant dashboard's native build held 60 frames a second at 1 and 5 kHz, and the Isoloop placements did worse the more workers they used: at 5 kHz, 59.5 frames a second with 1 worker and 5.6 with 105.
+- **In Playwright's WebKit on Linux,** every frame a worker draws on a transferred canvas costs the main thread time, so pages with many canvas widgets slow down there. Safari 26.5 on a recent iPadOS tablet doesn't show it.
 - **Each worker has its own heap.** The kernel warns past 32 live workers (`workers.budget`, [hosting](hosting.md#placement-rules)). [Pools](pools.md) share a worker to save memory, at the cost of a shared event loop and fate.
+- **A pool freezes the built-ins.** Before its first member loads, a pool worker freezes the prototypes and constructors of the standard built-ins (`Object`, `Array`, `Promise`, `Map`, the typed arrays and the rest, plus `Math`, `JSON` and `Reflect`), so one member can't change them for the others. A library that patches one, such as a polyfill that adds a method to `Array.prototype`, throws a `TypeError` in strict code. Isolates on their own worker are not frozen.
 
 Every recorded run, in both directions, is in [`isoloop/web`'s plant comparison](https://github.com/isoloop/web/blob/9b50967b0971871ec9671d7dce8d115eb16f6d19/apps/dashboards/plant/comparison/README.md).
 

@@ -89,7 +89,7 @@ The balancer listens to the kernel's `isolate:beat` event: every heartbeat of ev
 ### Placing
 
 - **By predicted load.** A new isolate joins the pool where its load plus the pool's stays under 60 % of a core. If no pool passes, it gets a new pool, within `maxWorkers`. If the cap is reached, it joins anyway and its placement reports `atCap`.
-- **Unmeasured isolates start in quarantine,** to be measured. They leave as soon as they have 3 s of beats there. Pass `loads` so they arrive measured: the interactive dashboards measure a widget's preview with `measure()` on Save and store it with `loads.set`, and the balancer writes measured loads back as it goes.
+- **Unmeasured isolates start in quarantine,** to be measured. They leave as soon as they have 3 s of beats there. While it's measured, `placements()` shows a new isolate as `quarantined`, and it leaves with a move whose `reason` is `steady`: the same state and reason as an offender, so an app that lists placements shows every new isolate as one until it's measured. Pass `loads` so they arrive measured, and skip that stay: the interactive dashboards measure a widget's preview with `measure()` on Save and store it with `loads.set`, and the balancer writes measured loads back as it goes.
 
 ### Moving
 
