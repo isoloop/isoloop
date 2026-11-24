@@ -10,7 +10,7 @@
       "url": "https://github.com/isoloop/isoloop",
       "provider": "github",
       "link_mode": "web",
-      "revision": "f825ffbd1ac8b9c01a82a791fb01ccd62bcbbc05"
+      "revision": "df2287f1778a26a99e85af5483e66b5335d0b388"
     }
   },
   "participants": [
@@ -37,22 +37,22 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 352,
-          "end_line": 394,
+          "line": 376,
+          "end_line": 418,
           "label": "crash, backoff, spawn",
           "anchor": "function crash("
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1321,
-          "end_line": 1357,
+          "line": 1328,
+          "end_line": 1364,
           "label": "attach before init",
           "anchor": "const start = (slot: Slot, o: { wake?: boolean } = {}): void => {"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1222,
-          "end_line": 1239,
+          "line": 1229,
+          "end_line": 1246,
           "label": "ready: format and version check",
           "anchor": "case 'ready': {"
         }
@@ -196,7 +196,7 @@
       "title": "One-for-one, for an own worker",
       "items": [
         "Only isolate C restarts; every other isolate keeps running and painting.",
-        "Backoff 250 ms × 2ⁿ, at most 4 s; a 4th crash within 60 s fails it with a fallback."
+        "Backoff 250 ms × 2ⁿ, at most 4 s; a 4th crash within 60 s, or a 4th in a row after runs shorter than 60 s, fails it with a fallback."
       ]
     },
     {
