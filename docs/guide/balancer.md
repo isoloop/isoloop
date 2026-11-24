@@ -135,7 +135,7 @@ A pool whose members have all been steady for 60 s empties into another of the b
 
 ### Isolates the kernel gave up on
 
-The kernel gives up on an isolate that crashes past its restart limit (the 4th crash within 60 s by default) and emits `isolate:failed`. The balancer then marks it `failed`: it leaves its pool's load, the quarantine's count and any bisect, `on('failed')` reports it, and no move restarts it. Restarting it is the app's choice, with `kernel.restart(id)`; when it beats again, the balancer takes it as new, with no offences, from the pool it restarted in. `balancer.stop(id)` forgets it as usual.
+The kernel gives up on an isolate that crashes past its restart limit (by default, a 4th crash unless it ran 60 s or more before one of them) and emits `isolate:failed`. The balancer then marks it `failed`: it leaves its pool's load, the quarantine's count and any bisect, `on('failed')` reports it, and no move restarts it. Restarting it is the app's choice, with `kernel.restart(id)`; when it beats again, the balancer takes it as new, with no offences, from the pool it restarted in. `balancer.stop(id)` forgets it as usual.
 
 ## Moves
 

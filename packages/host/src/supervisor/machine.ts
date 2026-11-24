@@ -12,6 +12,12 @@
  * kernel judges the isolate idle; `wake` asks the kernel's wake queue for a
  * spawn, and `spawned` moves it to `loading`. It never touches the restart
  * window.
+ *
+ * The restart limit (ADR 0001, *Restart limit: short runs*) is two rules, and
+ * the first one met fails the isolate: `maxRestarts` restarts in a sliding
+ * `withinMs`, and a crash after `maxRestarts` crashes in a row that each came
+ * after less than `withinMs` of healthy running. A healthy run lasts from
+ * `ready` to the last beat; a run of `withinMs` or longer clears the count.
  */
 import { assertNever } from '@isoloop/protocol';
 import { backoffMs, DEFAULT_BACKOFF, slide, type Backoff } from './timers';
@@ -75,8 +81,12 @@ export type CrashReason =
 export type SupervisorConfig = {
   /** `never` fails on the first crash. */
   strategy: 'one-for-one' | 'never';
-  /** Restarts allowed within `withinMs`; the next crash fails the isolate. */
+  /**
+   * Restarts allowed within `withinMs`, and crashes in a row allowed after
+   * short runs; the next crash fails the isolate.
+   */
   maxRestarts: number;
+  /** The sliding window, and the healthy run that clears the count of short runs. */
   withinMs: number;
   backoff: Backoff;
   blockedAfterMs: number;
@@ -108,6 +118,10 @@ export type IsolateSupervision = {
   restarts: number;
   /** Times of the restarts in the current window, oldest first. */
   window: number[];
+  /** `performance.now()` of this worker's `ready`; unset until it's ready. */
+  readyAt?: number;
+  /** Crashes in a row, each after a healthy run shorter than `withinMs`. */
+  short: number;
   /** While the document is hidden, nothing is judged blocked or killed. */
   hidden: boolean;
   /** The last crash, while restarting or failed. */
@@ -117,7 +131,7 @@ export type IsolateSupervision = {
 
 export type SupervisorInput =
   | { k: 'spawned'; at: number }
-  | { k: 'ready' }
+  | { k: 'ready'; at: number }
   | { k: 'beat'; at: number; lagMs: number }
   /** `pool`: the pool whose worker it shares, as on `workerError`. */
   | { k: 'tick'; at: number; pool?: string | undefined }
@@ -187,6 +201,7 @@ export function initialSupervision(at: number): IsolateSupervision {
     lagMs: 0,
     restarts: 0,
     window: [],
+    short: 0,
     hidden: false,
   };
 }
@@ -203,6 +218,12 @@ const withoutCrash = (s: IsolateSupervision): IsolateSupervision => {
   return rest;
 };
 
+/** A fresh worker: not ready yet, so no healthy run. */
+const unready = (s: IsolateSupervision): IsolateSupervision => {
+  const { readyAt: _r, ...rest } = s;
+  return rest;
+};
+
 /** A worker failure's message: in a pool it's the worker's, and names no member. */
 const workerMessage = (pool: string | undefined, what: string, detail: string): string =>
   pool === undefined ? detail : `pool "${pool}" restarted: its worker ${what} (${detail})`;
@@ -214,7 +235,7 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
       if (s.state !== 'restarting' && s.state !== 'suspended') return same;
       return {
         s: {
-          ...withoutCrash(s),
+          ...unready(withoutCrash(s)),
           state: 'loading',
           spawnedAt: input.at,
           lastBeatAt: input.at,
@@ -226,7 +247,7 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
     case 'ready':
       if (s.state !== 'loading') return same;
       return {
-        s: { ...s, state: 'running' },
+        s: { ...s, state: 'running', readyAt: input.at, lastBeatAt: input.at },
         effects: [emit({ event: 'isolate:ready', data: {} }), moved('loading', 'running')],
       };
 
@@ -317,7 +338,10 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
       if (s.state === 'failed') effects.push({ k: 'hideFallback' });
       effects.push({ k: 'spawn', afterMs: 0 });
       if (s.state !== 'restarting') effects.push(moved(s.state, 'restarting'));
-      return { s: { ...withoutCrash(s), state: 'restarting', window: [] }, effects };
+      return {
+        s: { ...unready(withoutCrash(s)), state: 'restarting', window: [], short: 0 },
+        effects,
+      };
     }
 
     case 'suspend':
@@ -367,24 +391,41 @@ function crash(
   );
 
   const window = slide(s.window, at, cfg.withinMs);
-  if (final || cfg.strategy === 'never' || window.length >= cfg.maxRestarts) {
+  // From `ready` to the last beat: the time it took to notice the crash isn't
+  // healthy running. A worker that never got ready had none.
+  const healthy = s.readyAt === undefined ? 0 : Math.max(0, s.lastBeatAt - s.readyAt);
+  const short = healthy >= cfg.withinMs ? 1 : s.short + 1;
+  const limit =
+    final || cfg.strategy === 'never'
+      ? undefined
+      : window.length >= cfg.maxRestarts
+        ? `${cfg.maxRestarts} restarts in ${cfg.withinMs} ms`
+        : short > cfg.maxRestarts
+          ? `${short} crashes, each after less than ${cfg.withinMs} ms of healthy running`
+          : undefined;
+  if (final || cfg.strategy === 'never' || limit !== undefined) {
+    const why = limit === undefined ? message : `${message} (${limit})`;
     effects.push(
       moved('crashed', 'failed'),
-      { k: 'showFallback', reason, message },
-      emit({ event: 'isolate:failed', data: { reason, message } }),
+      { k: 'showFallback', reason, message: why },
+      emit({ event: 'isolate:failed', data: { reason, message: why } }),
     );
-    return { s: { ...s, state: 'failed', window, reason, error: message }, effects };
+    return {
+      s: { ...unready(s), state: 'failed', window, short, reason, error: why },
+      effects,
+    };
   }
 
   effects.push(moved('crashed', 'restarting'), {
     k: 'spawn',
-    afterMs: backoffMs(window.length, cfg.backoff),
+    afterMs: backoffMs(Math.max(window.length, short - 1), cfg.backoff),
   });
   return {
     s: {
-      ...s,
+      ...unready(s),
       state: 'restarting',
       window: [...window, at],
+      short,
       restarts: s.restarts + 1,
       reason,
       error: message,

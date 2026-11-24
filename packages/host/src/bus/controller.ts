@@ -279,7 +279,7 @@ export function createBusController(o: BusControllerOptions): BusController {
         const first = !everReady;
         everReady = true;
         readyAt = performance.now();
-        feed({ k: 'ready' });
+        feed({ k: 'ready', at: readyAt });
         o.events.ready(first);
         if (msg.p.quarantined) o.events.recovered(msg.p.quarantined);
         if (msg.p.degraded) o.events.degraded(msg.p.degraded);

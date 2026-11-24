@@ -55,11 +55,11 @@ A restart can't fix the last four, so they fail the isolate on the first crash.
 
 On a crash the kernel terminates the worker, emits `isolate:crash`, and:
 
-1. **Counts it** against the restarts in the last `withinMs`.
-2. **Restarts after a backoff** while that count is below `maxRestarts`. The delay is `initialMs × factor^n`, capped at `maxMs`, where `n` is the number of restarts already in the window. With the defaults it's 250 ms, 500 ms, then 1 s.
-3. **Gives up as `failed`** when the window is full, when `strategy` is `never`, or when the reason is one that isn't restarted. It emits `isolate:failed` and shows the fallback.
+1. **Counts it** two ways: against the restarts in the last `withinMs`, and, if the isolate's healthy run before it was shorter than `withinMs`, against the crashes in a row after short runs. A healthy run lasts from the isolate's `ready` to its last heartbeat, so the time it took to notice the crash isn't part of it. A worker that never sent `ready` had none. A run of `withinMs` or longer clears the second count, and the crash after it is the first of a new one.
+2. **Restarts after a backoff** while both counts are within `maxRestarts`. The delay is `initialMs × factor^n`, capped at `maxMs`, where `n` is the larger of the two counts before this crash. With the defaults it's 250 ms, 500 ms, then 1 s.
+3. **Gives up as `failed`** when either count is past `maxRestarts`, when `strategy` is `never`, or when the reason is one that isn't restarted. It emits `isolate:failed` and shows the fallback. The message ends with the limit that was met: `(3 restarts in 60000 ms)` or `(4 crashes, each after less than 60000 ms of healthy running)`.
 
-With the defaults, a fourth crash within 60 s fails the isolate. Old restarts leave the window as they age, so an isolate that crashes now and then keeps being restarted. A **manual restart** (`kernel.restart(id)`, the fallback's Retry) clears the window; the `restarts` count in the snapshot keeps counting crash restarts since the spawn.
+With the defaults, a fourth crash fails the isolate unless it ran for 60 s or more before one of them. That holds however long each crash takes to detect: an isolate that runs 10 s after each start and then hangs is killed 10 s later each time (`killAfterMs`), and fails on its fourth crash, about 80 s after it first started. An isolate that runs for a minute or more between crashes keeps being restarted. A **manual restart** (`kernel.restart(id)`, the fallback's Retry) clears both counts; the `restarts` count in the snapshot keeps counting crash restarts since the spawn.
 
 Other isolates are untouched. A restart starts a new worker, so the isolate's in-memory state is gone: what it rebuilds from is the bus ([below](#catching-up-after-a-restart)).
 
@@ -69,7 +69,7 @@ The heartbeat belongs to the worker, so a pool's members block and are killed to
 
 - **The worker fails:** when a member crashes with `unresponsive` or `worker_error`, every other member on that worker crashes with the same reason. The worker is terminated, and every member restarts in a new one. Each member's `isolate:crash` carries the `pool`. The message names no member, because the worker can't tell which one caused it. A [kill](inspection.md#controls) is the exception: the others' message names the member that was killed.
 - **A member's own failure:** a fatal error, a ready timeout or a version mismatch crashes only that member. It restarts alone and rejoins the running worker.
-- **Limits are per isolate.** Each member counts the shared crash in its own window, so a pool that keeps failing usually reaches `failed` for all its members together.
+- **Limits are per isolate.** Each member counts the shared crash itself, judged by its own healthy run. Heartbeats are the worker's, so every member's run ends at the worker's last beat, and a pool that keeps failing usually reaches `failed` for all its members together.
 
 [restart-own-worker](../diagrams/restart-own-worker.html) and [restart-pool](../diagrams/restart-pool.html) show both sequences end to end.
 
@@ -96,10 +96,10 @@ Every field is optional. `backoff` takes any of its three fields; the rest keep 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `supervisor.strategy` | `'one-for-one'` | `'one-for-one'` restarts only the isolate that crashed (and its pool, above). `'never'` fails on the first crash. |
-| `supervisor.maxRestarts` | `3` | Restarts allowed within `withinMs`; the next crash fails the isolate. |
-| `supervisor.withinMs` | `60000` | The window, in ms. |
-| `supervisor.backoff.initialMs` | `250` | Delay before the first restart in a window. |
-| `supervisor.backoff.factor` | `2` | Growth per restart already in the window. |
+| `supervisor.maxRestarts` | `3` | Restarts allowed within `withinMs`, and crashes in a row allowed after runs shorter than `withinMs`; the next crash fails the isolate. |
+| `supervisor.withinMs` | `60000` | The restart window, in ms, and the healthy run that clears the count of short runs. |
+| `supervisor.backoff.initialMs` | `250` | Delay before the first restart. |
+| `supervisor.backoff.factor` | `2` | Growth per crash already counted. |
 | `supervisor.backoff.maxMs` | `4000` | The cap. |
 | `heartbeat.everyMs` | `100` | How often a worker beats. |
 | `heartbeat.blockedAfterMs` | `400` | Silence before `blocked`. |
@@ -208,8 +208,8 @@ Suspension never touches the restart window. A pool suspends only as a whole, wh
 - **Delivery is at least once.** A restart can replay up to one commit interval of records that were already handled.
 - **A hang is only caught after `killAfterMs`** (10 s by default), and a hidden tab isn't judged until it's visible. Until then a stuck isolate is `blocked` and a pool's other members are blocked with it.
 - **A pool fails together.** One member that hangs restarts its neighbours and counts against each one's limit. Keep isolates that must not share fate in their own workers.
-- **A slow crash loop never reaches `failed`.** With retries on, a crash that can be restarted fails an isolate only if `maxRestarts + 1` crashes land within `withinMs`. Time spent running, waiting for a timeout and backing off all counts, so longer timeouts or more restarts need a longer window.
-- **A failed isolate isn't retried.** The window ends the automatic retries; a person or your code restarts it.
+- **A failed isolate isn't retried.** The restart limit ends the automatic retries; a person or your code restarts it.
+- **An isolate that crashes after each run of `withinMs` or longer is restarted every time.** Each long run clears the count, so it never reaches `failed`. Raise `withinMs` if crashes that far apart should still add up.
 - **Some failures skip the retries.** A render format mismatch, a version mismatch or a bus that can't load its contracts fails the isolate on the first crash.
 - **The supervisor can't see inside a worker.** A memory blow-up that the browser doesn't turn into a worker error, or an isolate that beats but does nothing useful, looks healthy.
 - **There's one `supervisor` config per kernel.** You can't give one isolate its own limits.

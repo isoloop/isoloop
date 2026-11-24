@@ -51,7 +51,7 @@ describe('supervisor transition table', () => {
     [
       'loading → running on ready, emits isolate:ready',
       at('loading'),
-      { k: 'ready' },
+      { k: 'ready', at: 0 },
       { state: 'running' },
       [{ k: 'emit', event: 'isolate:ready', data: {} }, moved('loading', 'running')],
     ],
@@ -133,11 +133,15 @@ describe('supervisor transition table', () => {
         moved('running', 'crashed'),
         crashed('worker_error', 'boom'),
         moved('crashed', 'failed'),
-        { k: 'showFallback', reason: 'worker_error', message: 'boom' },
+        {
+          k: 'showFallback',
+          reason: 'worker_error',
+          message: 'boom (3 restarts in 60000 ms)',
+        },
         {
           k: 'emit',
           event: 'isolate:failed',
-          data: { reason: 'worker_error', message: 'boom' },
+          data: { reason: 'worker_error', message: 'boom (3 restarts in 60000 ms)' },
         },
       ],
     ],
@@ -429,7 +433,7 @@ describe('supervisor edges', () => {
 const crashAt = (t: number): SupervisorInput[] => [
   { k: 'workerError', at: t, message: 'boom' },
   { k: 'spawned', at: t },
-  { k: 'ready' },
+  { k: 'ready', at: t },
 ];
 const spawns = (effects: SupervisorEffect[]): number[] =>
   effects.flatMap((e) => (e.k === 'spawn' ? [e.afterMs] : []));
@@ -458,17 +462,50 @@ describe('restart policy (fake clock)', () => {
   });
 
   it('slides the window: old restarts stop counting', () => {
+    // A higher limit, so the short-run count doesn't fail it first.
+    const { s, effects } = run(
+      at('running'),
+      [
+        ...crashAt(0),
+        ...crashAt(1000),
+        ...crashAt(2000),
+        // 60 s after the first restart, it has left the window.
+        { k: 'workerError', at: 60_000, message: 'boom' },
+      ],
+      { ...cfg, maxRestarts: 10 },
+    );
+    expect(s.state).toBe('restarting');
+    expect(s.window).toEqual([1000, 2000, 60_000]);
+    expect(s.short).toBe(4);
+    // Two restarts in the window, three short runs before this one: the
+    // backoff follows the larger count, the fourth step.
+    expect(spawns(effects).at(-1)).toBe(2000);
+  });
+
+  it('a healthy run of withinMs clears the count', () => {
     const { s, effects } = run(at('running'), [
       ...crashAt(0),
       ...crashAt(1000),
       ...crashAt(2000),
-      // 60 s after the first restart, it has left the window.
-      { k: 'workerError', at: 60_000, message: 'boom' },
+      { k: 'beat', at: 62_000, lagMs: 0 },
+      { k: 'workerError', at: 62_100, message: 'boom' },
     ]);
     expect(s.state).toBe('restarting');
-    expect(s.window).toEqual([1000, 2000, 60_000]);
-    // Two restarts still in the window → third step of the backoff.
-    expect(spawns(effects).at(-1)).toBe(1000);
+    expect(s.short).toBe(1);
+    expect(spawns(effects).at(-1)).toBe(250);
+  });
+
+  it('counts crashes after short runs, however far apart they are', () => {
+    // Out of the window each time: only the short-run count fails it.
+    const { s } = run(at('running'), [
+      ...crashAt(0),
+      ...crashAt(61_000),
+      ...crashAt(122_000),
+      { k: 'workerError', at: 183_000, message: 'boom' },
+    ]);
+    expect(s.state).toBe('failed');
+    expect(s.short).toBe(4);
+    expect(s.error).toBe('boom (4 crashes, each after less than 60000 ms of healthy running)');
   });
 
   it('strategy never fails on the first crash', () => {
@@ -491,7 +528,7 @@ describe('restart policy (fake clock)', () => {
     const { s, effects } = run(failed, [
       { k: 'respawn' },
       { k: 'spawned', at: 4 },
-      { k: 'ready' },
+      { k: 'ready', at: 4 },
       { k: 'workerError', at: 5, message: 'boom' },
     ]);
     expect(s.state).toBe('restarting');
@@ -505,7 +542,7 @@ describe('restart policy (fake clock)', () => {
     ];
     const { s } = run(at('loading'), [...loop, ...loop, ...loop, ...loop]);
     expect(s.state).toBe('failed');
-    expect(s.error).toBe('start threw');
+    expect(s.error).toBe('start threw (3 restarts in 60000 ms)');
   });
 });
 

@@ -4,9 +4,9 @@
 // time. A member that blocks stops its worker's
 // beats; after `killAfterMs` every member crashes `unresponsive` and restarts
 // in the same pool, as the real kernel does (pool fate, M2c). With
-// `maxRestarts`, a member's crash past that many restarts within 60 s fails
-// it (`isolate:failed`), as the kernel's supervisor does; it stays down until
-// `restart`.
+// `maxRestarts`, a member fails (`isolate:failed`) on a crash past that many
+// restarts within 60 s, or past that many crashes in a row after runs shorter
+// than 60 s, as the kernel's supervisor does; it stays down until `restart`.
 import type {
   BeatLike,
   CrashLike,
@@ -27,6 +27,10 @@ type Iso = {
   restartAt?: number;
   /** When it restarted after a crash, within the last `withinMs`. */
   restarts: number[];
+  /** When it last started running. */
+  readyAt: number;
+  /** Crashes in a row after runs shorter than `withinMs`. */
+  short: number;
 };
 
 const RESTART_WINDOW_MS = 60_000;
@@ -112,6 +116,8 @@ export class SimKernel implements KernelLike {
     if (!i) return;
     i.state = 'running';
     i.restarts = [];
+    i.short = 0;
+    i.readyAt = performance.now();
   }
 
   stateOf(id: string): string | undefined {
@@ -167,7 +173,15 @@ export class SimKernel implements KernelLike {
   #spawn(manifest: ManifestLike): void {
     if (this.#isos.has(manifest.id)) throw new Error(`"${manifest.id}" exists`);
     this.spawned.push(manifest);
-    const iso: Iso = { id: manifest.id, state: 'running', lagMs: 0, busyMs: 0, restarts: [] };
+    const iso: Iso = {
+      id: manifest.id,
+      state: 'running',
+      lagMs: 0,
+      busyMs: 0,
+      restarts: [],
+      readyAt: performance.now(),
+      short: 0,
+    };
     if (manifest.pool !== undefined) iso.pool = manifest.pool;
     this.#isos.set(manifest.id, iso);
     this.peakWorkers = Math.max(this.peakWorkers, this.workers());
@@ -225,6 +239,7 @@ export class SimKernel implements KernelLike {
           if (i.restartAt !== undefined && now >= i.restartAt) {
             delete i.restartAt;
             i.state = 'running';
+            i.readyAt = now;
           }
         }
         continue;
@@ -240,7 +255,9 @@ export class SimKernel implements KernelLike {
           for (const fn of this.#crash) fn(e);
           // Every member counts the kill against its own limit, as `poolFate` does.
           i.restarts = i.restarts.filter((at) => now - at < RESTART_WINDOW_MS);
-          if (i.restarts.length >= this.#maxRestarts) {
+          // Its healthy run ended at the worker's last beat, when it blocked.
+          i.short = since - i.readyAt >= RESTART_WINDOW_MS ? 1 : i.short + 1;
+          if (i.restarts.length >= this.#maxRestarts || i.short > this.#maxRestarts) {
             this.#blocking.delete(i.id);
             this.fail(i.id);
             continue;
