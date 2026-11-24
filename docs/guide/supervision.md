@@ -238,6 +238,15 @@ Two sets of runs of the plant dashboard's Isoloop page (12 workers, one pool of 
 - At 2000 ms, every page had heartbeat kills.
 - More pages reached `failed` with the short-run rule (18 of 30) than on 0.1.0 (11 of 30). The short-run rule counts heartbeat kills that 0.1.0's window let pass.
 
+**2026-11-24, at a level where 0.1.0 crashes and recovers at the defaults** ([#389, the fourth set](https://github.com/isoloop/isoloop/issues/389#issuecomment-7135514962)). The same machine, browser and 150 s runs, with 8 pages at once pinned to one core (2 logical CPUs), at the default `killAfterMs`. The hosts are 0.1.0 and the short-run rule built from `main` at `eaaa863`, alternating run by run, 30 pages each.
+
+| Host | Heartbeat kills | Ready timeouts | Pages with an isolate in `failed` | Pages without data after 150 s |
+| --- | --: | --: | --: | --: |
+| 0.1.0 | 216 | 323 | 0 of 30 | 1 |
+| short-run rule (`eaaa863`) | 144 | 499 | 0 of 30 | 2 |
+
+- Both hosts crashed and restarted isolates on these pages, and neither had an isolate in `failed`.
+
 ## Limits
 
 - **State in the isolate's memory is lost on a restart.** Keep what must survive on the bus, in a persistent topic.
