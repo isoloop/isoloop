@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/preact",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Preact for Isoloop: run a component as an isolate in a worker, with hooks for the message bus and the host.",
   "keywords": [
     "isoloop",

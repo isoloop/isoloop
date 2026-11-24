@@ -1,5 +1,13 @@
 # isoloop
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [57d4a2d]
+  - @isoloop/bus@0.1.1
+  - @isoloop/protocol@0.1.1
+
 ## 0.1.0
 
 The first release of the `isoloop` command line.

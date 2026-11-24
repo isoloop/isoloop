@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/devtools",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Experimental devtools panel for Isoloop: shows isolates, pools, the message bus and live records, from an isolate of its own.",
   "keywords": [
     "isoloop",

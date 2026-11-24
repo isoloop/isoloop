@@ -1,5 +1,13 @@
 # @isoloop/bus
 
+## 0.1.1
+
+### Patch Changes
+
+- 57d4a2d: With the kernel's `dev: true`, the bus now warns in the console, once per topic per isolate, when an isolate subscribes to a topic it already subscribes to. The newer subscription replaces the older one, as before; the warning names the isolate and the topic, since a second `useTopic` or `bus.subscribe` on the same topic is the usual cause.
+- @isoloop/codec@0.1.1
+  - @isoloop/protocol@0.1.1
+
 ## 0.1.0
 
 The first release of the bus.
