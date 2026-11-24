@@ -106,7 +106,7 @@ Other devices and engines tell a different story:
 - **Each worker has its own heap.** The kernel warns past 32 live workers (`workers.budget`, [hosting](hosting.md#placement-rules)). [Pools](pools.md) share a worker to save memory, at the cost of a shared event loop and fate.
 - **A pool freezes the built-ins.** Before its first member loads, a pool worker freezes the prototypes and constructors of the standard built-ins (`Object`, `Array`, `Promise`, `Map`, the typed arrays and the rest, plus `Math`, `JSON` and `Reflect`), so one member can't change them for the others. A library that patches one, such as a polyfill that adds a method to `Array.prototype`, throws a `TypeError` in strict code. Isolates on their own worker are not frozen.
 
-Every recorded run, in both directions, is in [`isoloop/web`'s plant comparison](https://github.com/isoloop/web/blob/9b50967b0971871ec9671d7dce8d115eb16f6d19/apps/dashboards/plant/comparison/README.md).
+The full figures, for every dashboard and placement, are on [Benchmarks](https://isoloop.dev/benchmarks/). Every recorded run, in both directions, is in [`isoloop/web`'s plant comparison](https://github.com/isoloop/web/blob/9b50967b0971871ec9671d7dce8d115eb16f6d19/apps/dashboards/plant/comparison/README.md).
 
 ## Browsers and the first paint
 
