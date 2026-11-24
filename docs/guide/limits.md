@@ -87,7 +87,7 @@ The page listens for input and forwards it to the isolate as a message. Only the
 
 An isolate's computation moves off the main thread, but showing what it computed still costs the main thread time: one thread per document applies every DOM change. On top of that, Isoloop costs CPU across threads, memory and start-up time.
 
-On the plant dashboard (72 widgets), native + workers against Isoloop's `matched` placement, in Chromium at 5 kHz, measured on a dedicated machine with 4 physical cores fixed at 2.0 GHz, 2026-11-13 ([results](https://github.com/isoloop/web/blob/9b50967b0971871ec9671d7dce8d115eb16f6d19/apps/dashboards/plant/comparison/final/README.md)):
+On the plant dashboard (72 widgets), native + workers against Isoloop's `matched` placement, in Chromium at 5 kHz, measured on a dedicated machine with 4 physical cores fixed at 2.0 GHz, Isoloop build `0.0.0-next.b8ffdcf` (the one `plant-v0.1.0` shipped), 2026-11-13 ([results](https://github.com/isoloop/web/blob/9b50967b0971871ec9671d7dce8d115eb16f6d19/apps/dashboards/plant/comparison/final/README.md)):
 
 Each row is Δ, Isoloop minus native + workers: the median of the paired differences over 5 interleaved rounds, so a negative figure is lower with Isoloop. The first two rows are gains; the other three are costs.
 
