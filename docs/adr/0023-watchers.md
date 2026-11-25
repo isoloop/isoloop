@@ -1,6 +1,6 @@
 # ADR 0023: Watchers, a second way to read a topic
 
-- **Status:** Proposed (2026-11-25), from the M8 Watchers W0 grilling (Q1–Q30, yes to all).
+- **Status:** Accepted 2026-11-25 (proposed the same day), from the M8 Watchers W0 grilling (Q1–Q30, yes to all).
 - **Date:** 2026-11-25
 - **Plan:** [M8 Watchers](../plans/m8-watchers.md). W1 ships in `0.2.0` as `@experimental`; W2 and W3 come in `0.3.0` and `0.4.0` ([releases](../plans/README.md#releases)).
 - **Touches:** [ADR 0005](0005-bus-topology-message-channels.md) (what travels on the bus port), [ADR 0007](0007-bus-worker-supervision.md) (reattach after a bus restart), [ADR 0012](0012-isolates-built-apart.md) (the seam only grows; which host runs which isolate), [ADR 0016](0016-fewer-messages-per-record.md) (the committer, which carries `seen`), [ADR 0020](0020-inspection-feed.md) (new rows in the feed).
