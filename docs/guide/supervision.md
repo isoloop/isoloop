@@ -204,7 +204,7 @@ Suspension never touches the restart window. A pool suspends only as a whole, wh
 
 ## Measured: a CPU-starved Firefox
 
-Two sets of runs of the plant dashboard's Isoloop page (12 workers, one pool of 72 isolates), with nothing watching the page but a probe that samples it every 2 s. In both, the browser's workers were runnable but waiting for a CPU.
+Four sets of runs of the plant dashboard's Isoloop page (12 workers, one pool of 72 isolates), with nothing watching the page but a probe that samples it every 2 s. In all of them, the browser's workers were runnable but waiting for a CPU. Two hosts are compared: 0.1.0, which counts restarts in a sliding window only, and the host with the short-run rule, which also counts crashes after short runs ([What it does about them](#what-it-does-about-them)). Each set's link names the exact build.
 
 **2026-11-22, `0.1.0-next.11`, `killAfterMs` 2000** ([#389](https://github.com/isoloop/isoloop/issues/389)). A laptop-class 8-core CPU, Linux, Playwright 1.65 with Firefox 159, 4 threads limited by a CPU quota: 2 pages at once on 1 CPU (3 rounds) and 3 pages at once on 1.5 CPUs (4 rounds), 18 pages. Each run ended when all of its pages showed data.
 
@@ -212,38 +212,42 @@ Two sets of runs of the plant dashboard's Isoloop page (12 workers, one pool of 
 - No isolate reached `failed`. One page had no data at the end. The median time to data was 19.4 s.
 - Chromium under the same starvation had no crash in 7 pages.
 
-**2026-11-24, 0.1.0 and the short-run rule, `killAfterMs` 2000 and 10 000** ([#389, the second set](https://github.com/isoloop/isoloop/issues/389#issuecomment-7130353263)). The short-run rule is the host built from `df2287f`, which counts crashes after short runs as well as the window. A desktop-class 16-core CPU, Linux in a virtual machine, Playwright 1.65 with Firefox 159. Every process was pinned to one logical CPU with 4 pages at once, or to one core (2 logical CPUs) with 6 pages at once. Each run lasted 150 s, whatever the page showed. 3 rounds, the four builds interleaved, 30 pages per build. On this faster machine, 2 pages on one CPU gave no kills, so the runs are more starved than the first set and the numbers don't compare one to one.
+**2026-11-24, both hosts, `killAfterMs` 2000 and 10 000** ([#389, the second set](https://github.com/isoloop/isoloop/issues/389#issuecomment-7130353263)).
+
+- **Machine:** a desktop-class 16-core CPU, Linux in a virtual machine, Playwright 1.65 with Firefox 159.
+- **Starvation:** every process pinned to one logical CPU with 4 pages at once, or to one core (2 logical CPUs) with 6 pages at once. On this faster machine, 2 pages on one CPU gave no kills, so these runs are more starved than the first set and the numbers don't compare one to one.
+- **Runs:** 150 s each, whatever the page showed; 3 rounds with the four builds interleaved, 30 pages per build.
 
 | Host | `killAfterMs` | Pages with a heartbeat kill | Pages with an isolate in `failed` | Isolates in `failed` | Pages without data after 150 s |
 | --- | --: | --: | --: | --: | --: |
 | 0.1.0 | 2000 | 24 of 30 | 17 of 30 | 1,224 | 3 |
-| short-run rule (`df2287f`) | 2000 | 28 of 30 | 21 of 30 | 1,504 | 3 |
+| short-run rule | 2000 | 28 of 30 | 21 of 30 | 1,504 | 3 |
 | 0.1.0 | 10 000 (default) | 3 of 30 | 2 of 30 | 83 | 4 |
-| short-run rule (`df2287f`) | 10 000 (default) | 3 of 30 | 1 of 30 | 9 | 2 |
+| short-run rule | 10 000 (default) | 3 of 30 | 1 of 30 | 9 | 2 |
 
 - At 2000 ms, a page with an isolate in `failed` had the whole pool of 72 in `failed`, 33 to 134 s after it started, on both hosts.
 - At the default 10 s, most crashes were `ready_timeout`: 587 on 0.1.0 and 517 with the short-run rule.
 - All 9 isolates that failed with the short-run rule failed after `ready_timeout` crashes. On 0.1.0, 30 of the 83 did, and 53 after heartbeat kills.
 
-**2026-11-24, at a level where 0.1.0 recovers at the defaults** ([#389, the third set](https://github.com/isoloop/isoloop/issues/389#issuecomment-7132987368)). The same machine, browser and 150 s runs, with 6 pages at once pinned to one core (2 logical CPUs). The hosts are 0.1.0 and the short-run rule built from `main` at `eaaa863`, alternating run by run, 30 pages each.
+**2026-11-24, at a level where 0.1.0 recovers at the defaults** ([#389, the third set](https://github.com/isoloop/isoloop/issues/389#issuecomment-7132987368)). The same machine, browser and 150 s runs, with 6 pages at once pinned to one core (2 logical CPUs). The two hosts alternate run by run, 30 pages each.
 
 | Host | `killAfterMs` | Pages with a heartbeat kill | Pages with an isolate in `failed` | Isolates in `failed` | Pages without data after 150 s |
 | --- | --: | --: | --: | --: | --: |
 | 0.1.0 | 10 000 (default) | 0 of 30 | 0 of 30 | 0 | 0 |
-| short-run rule (`eaaa863`) | 10 000 (default) | 0 of 30 | 0 of 30 | 0 | 0 |
+| short-run rule | 10 000 (default) | 0 of 30 | 0 of 30 | 0 | 0 |
 | 0.1.0 | 2000 | 30 of 30 | 11 of 30 | 792 | 1 |
-| short-run rule (`eaaa863`) | 2000 | 29 of 30 | 18 of 30 | 1,296 | 0 |
+| short-run rule | 2000 | 29 of 30 | 18 of 30 | 1,296 | 0 |
 
 - At the defaults, no isolate crashed on either host.
 - At 2000 ms, every page had heartbeat kills.
 - More pages reached `failed` with the short-run rule (18 of 30) than on 0.1.0 (11 of 30). The short-run rule counts heartbeat kills that 0.1.0's window let pass.
 
-**2026-11-24, at a level where 0.1.0 crashes and recovers at the defaults** ([#389, the fourth set](https://github.com/isoloop/isoloop/issues/389#issuecomment-7135514962)). The same machine, browser and 150 s runs, with 8 pages at once pinned to one core (2 logical CPUs), at the default `killAfterMs`. The hosts are 0.1.0 and the short-run rule built from `main` at `eaaa863`, alternating run by run, 30 pages each.
+**2026-11-24, at a level where 0.1.0 crashes and recovers at the defaults** ([#389, the fourth set](https://github.com/isoloop/isoloop/issues/389#issuecomment-7135514962)). The same machine, browser and 150 s runs, with 8 pages at once pinned to one core (2 logical CPUs), at the default `killAfterMs`. The two hosts alternate run by run, 30 pages each.
 
 | Host | Heartbeat kills | Ready timeouts | Pages with an isolate in `failed` | Pages without data after 150 s |
 | --- | --: | --: | --: | --: |
 | 0.1.0 | 216 | 323 | 0 of 30 | 1 |
-| short-run rule (`eaaa863`) | 144 | 499 | 0 of 30 | 2 |
+| short-run rule | 144 | 499 | 0 of 30 | 2 |
 
 - Both hosts crashed and restarted isolates on these pages, and neither had an isolate in `failed`.
 
@@ -257,7 +261,7 @@ Two sets of runs of the plant dashboard's Isoloop page (12 workers, one pool of 
 - **An isolate that crashes after each run of `withinMs` or longer is restarted every time.** Each long run clears the count, so it never reaches `failed`. Raise `withinMs` if crashes that far apart should still add up.
 - **Some failures skip the retries.** A render format mismatch, a version mismatch or a bus that can't load its contracts fails the isolate on the first crash.
 - **A starved browser looks like a hang.** A heartbeat's silence is measured in wall-clock time, so the supervisor can't tell a worker that waits for a CPU from one that's stuck. On a badly CPU-starved Firefox it kills workers that are only waiting. Those crashes count toward the restart limit like any other, so with a short `killAfterMs` such a page can reach `failed` ([measured above](#measured-a-cpu-starved-firefox)).
-- **A worker starved before `ready` times out.** It crashes with `ready_timeout` after `heartbeat.readyTimeoutMs`. It never ran, so each such crash counts toward the limit, and a page that stays starved can reach `failed` at the defaults too. Raising `readyTimeoutMs` and `killAfterMs` gives a slow device more room, but a real hang then takes longer to catch. Telling a starved worker from a hung one is planned ([#389](https://github.com/isoloop/isoloop/issues/389)).
+- **A worker starved before `ready` times out.** It crashes with `ready_timeout` after `heartbeat.readyTimeoutMs`. It never ran, so each such crash counts toward the limit, and a page that stays starved can reach `failed` at the defaults too. Raising `readyTimeoutMs` and `killAfterMs` gives a slow device more room, but a real hang then takes longer to catch. The supervisor can't tell such a worker from one that's stuck.
 - **The supervisor can't see inside a worker.** A memory blow-up that the browser doesn't turn into a worker error, or an isolate that beats but does nothing useful, looks healthy.
 - **There's one `supervisor` config per kernel.** You can't give one isolate its own limits.
 
