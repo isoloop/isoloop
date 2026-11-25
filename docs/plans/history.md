@@ -15,7 +15,7 @@ What was decided and shipped, by date, newest first. The order ahead is in the [
 
 ## 2026-11-23
 
-- `0.1.0` shipped, which completed M4. On the way: the API frozen in `0.1.0-next.9`, the docs live with the API reference on `0.1.0-next.10`, the source layout in `0.1.0-next.11`, and the staged release pipeline rehearsed in `0.1.0-next.12`.
+- `0.1.0` shipped, which completed M4. On the way: the docs live with the API reference on `0.1.0-next.10`, the source layout in `0.1.0-next.11`, and the staged release pipeline rehearsed in `0.1.0-next.12`.
 - M4d: the staged pipeline (`release.yml`), rehearsed in `0.1.0-next.12`, became the only way to publish, then `0.1.0` went on npm with provenance.
 - M4c: the write-up (task 27), [the post](../posts/m4c-docs.md); the skill link (task 26) done (web#285).
 
@@ -33,12 +33,12 @@ What was decided and shipped, by date, newest first. The order ahead is in the [
 
 - M3j ran alongside M4 and shipped as `processor-v0.3.0`: on `0.1.0-next.6`, the File processor lost no file in 26 balancer runs (write-up web#200, published web#201); fixes found by its runs shipped in `0.1.0-next.3` to `next.6`.
 - M4d: the API frozen in `0.1.0-next.9`.
-- Next: M4c, then M4d's API freeze, M4a's skill and real-agent run, and the release.
 
 ## 2026-11-17 to 2026-11-19
 
 - Built on `0.1.0-next.0` to `next.5`: M4a's tool surface, the `isoloop` CLI with its dev MCP, `@isoloop/webmcp` (Chromium, and Firefox since ADR 0018's amendment on 2026-11-19), markets' tools and the cost per call, and all of M4b: the inspection feed (ADR 0020) and the devtools panel, live on plant and markets behind `?devtools=1` (`plant-v0.3.0`, `markets-v0.8.0`).
 - M4a: tasks 1–11 and 13 done by 2026-11-19. M4b: tasks 1–11 done by 2026-11-19, ADR 0020 accepted and amended.
+- Next: M4c, then M4d's API freeze, M4a's skill and real-agent run, and the release.
 
 ## 2026-11-17
 
