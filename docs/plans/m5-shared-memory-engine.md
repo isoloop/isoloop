@@ -18,6 +18,8 @@ Depends only on the `LogEngine` interface and the throughput bench, and reuses M
 
 Two milestones in `0.4.0` build on this one: [M8 Watchers](m8-watchers.md) W3 (shared watch slots) uses its cross-origin isolated setup, and [M12 Tauri](m12-tauri.md) reuses its Rust code for the segment format. Neither waits on the engine's verdict: W3 ships whichever engine wins, and M12 writes its own segment code if this engine doesn't ship.
 
+Two later milestones reuse it too. [M15 Derived topics](m15-derived-topics.md)'s Rust engine uses this milestone's toolchain, binary codec and `SharedArrayBuffer` setup. [M16 Native runtimes](m16-native-runtimes.md) runs this engine in the Tauri core, so it must build natively, not only as WASM: keep the engine's core in a crate with no `wasm-bindgen` dependency, and the bindings in a crate of their own.
+
 Delivery batching across tasks (the TS engine's M2 shortfall against the 50k records/s budget) is a separate spike that runs before this milestone: [M5b Delivery batching](m5b-delivery-batching.md).
 
 ## Open risks
