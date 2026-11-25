@@ -20,8 +20,19 @@ export type HeaderOptions = {
   csp?: string | false;
   /** Origins that serve isolate modules or the contracts module, added to the default policy. Default: none. */
   isolateOrigins?: readonly string[];
-  /** Sends COOP `same-origin` and COEP `require-corp`, for `SharedArrayBuffer`. Default `false`. */
-  crossOriginIsolated?: boolean;
+  /**
+   * Makes the page cross-origin isolated, for `SharedArrayBuffer`: COOP
+   * `same-origin`, with COEP `require-corp` for `true`, or COEP
+   * `credentialless` for `'credentialless'`. Under `require-corp`, every
+   * cross-origin resource has to opt in with a CORP or CORS header. Under
+   * `credentialless`, cross-origin `no-cors` requests go without cookies
+   * instead, so third-party images and scripts without those headers still
+   * load. Chromium 96 and Firefox 119 on desktop support `credentialless`.
+   * Safari and Firefox for Android ignore it, so there the page isn't
+   * cross-origin isolated. Default `false`. The `'credentialless'` value is
+   * `@experimental`.
+   */
+  crossOriginIsolated?: boolean | 'credentialless';
 };
 
 /** What `virtual:isoloop/workers` holds. */
@@ -67,7 +78,8 @@ export function headersFor(o: HeaderOptions): Record<string, string> {
   if (csp !== false) headers['Content-Security-Policy'] = csp;
   if (o.crossOriginIsolated) {
     headers['Cross-Origin-Opener-Policy'] = 'same-origin';
-    headers['Cross-Origin-Embedder-Policy'] = 'require-corp';
+    headers['Cross-Origin-Embedder-Policy'] =
+      o.crossOriginIsolated === 'credentialless' ? 'credentialless' : 'require-corp';
   }
   return headers;
 }

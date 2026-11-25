@@ -102,7 +102,7 @@ A tool that reads only the app's own topics needs no grant: it subscribes like a
 
 ## Memory per isolate
 
-Where the page is cross-origin isolated (COOP `same-origin` and COEP `require-corp`) and the browser has `performance.measureUserAgentSpecificMemory()`, which today means Chromium, the host measures the page's memory and attributes it to each worker by its URL:
+Where the page is cross-origin isolated (COOP `same-origin`, with COEP `require-corp` or `credentialless`) and the browser has `performance.measureUserAgentSpecificMemory()`, which today means Chromium, the host measures the page's memory and attributes it to each worker by its URL:
 - **When:** only while a reader listens, at most every 5 s.
 - **Where it shows:** in the snapshot's isolates (`memory: { bytes, at, shared? }`) and as `memory` messages.
 - **For a pool member,** the figure is the whole pool's worker, marked `shared`.
@@ -110,7 +110,7 @@ Where the page is cross-origin isolated (COOP `same-origin` and COEP `require-co
 - **Only workers started from `@isoloop/runtime/worker`** are attributed, which is what `virtual:isoloop/workers` gives you with `@isoloop/vite` (see the [hosting guide](hosting.md) for the entry without Vite).
 - **Elsewhere,** there's no `memory` field: Firefox, WebKit, and any page that isn't cross-origin isolated.
 
-`@isoloop/vite`'s `crossOriginIsolated: true` sends the two headers from the dev and preview servers. In production, the host has to send them; the [hosting guide](hosting.md) lists them.
+`@isoloop/vite`'s `crossOriginIsolated` (`true` or `'credentialless'`) sends the two headers from the dev and preview servers. In production, the host has to send them; the [hosting guide](hosting.md) lists them.
 
 ## Limits
 

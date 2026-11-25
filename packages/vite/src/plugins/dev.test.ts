@@ -73,4 +73,10 @@ describe('@isoloop/vite in dev', () => {
     expect(isolated.headers.get('cross-origin-opener-policy')).toBe('same-origin');
     expect(isolated.headers.get('cross-origin-embedder-policy')).toBe('require-corp');
   });
+
+  it("crossOriginIsolated: 'credentialless' sends COEP credentialless", async () => {
+    const res = await fetch(await serve({ crossOriginIsolated: 'credentialless' }));
+    expect(res.headers.get('cross-origin-opener-policy')).toBe('same-origin');
+    expect(res.headers.get('cross-origin-embedder-policy')).toBe('credentialless');
+  });
 });

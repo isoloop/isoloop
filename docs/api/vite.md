@@ -131,7 +131,7 @@ The headers `isoloop()` sends on every dev and preview response.
 type HeaderOptions = {
   csp?: string | false;
   isolateOrigins?: readonly string[];
-  crossOriginIsolated?: boolean;
+  crossOriginIsolated?: boolean | "credentialless";
 };
 ```
 
@@ -139,7 +139,7 @@ type HeaderOptions = {
 | --- | --- |
 | `csp?` | The Content-Security-Policy to send, or `false` for none. Default: the hosting guide's policy, with `isolateOrigins` in `script-src` and `connect-src`, plus what Vite's dev server needs (its HMR socket and injected styles). |
 | `isolateOrigins?` | Origins that serve isolate modules or the contracts module, added to the default policy. Default: none. |
-| `crossOriginIsolated?` | Sends COOP `same-origin` and COEP `require-corp`, for `SharedArrayBuffer`. Default `false`. |
+| `crossOriginIsolated?` | Makes the page cross-origin isolated, for `SharedArrayBuffer`: COOP `same-origin`, with COEP `require-corp` for `true`, or COEP `credentialless` for `'credentialless'`. Under `require-corp`, every cross-origin resource has to opt in with a CORP or CORS header. Under `credentialless`, cross-origin `no-cors` requests go without cookies instead, so third-party images and scripts without those headers still load. Chromium 96 and Firefox 119 on desktop support `credentialless`. Safari and Firefox for Android ignore it, so there the page isn't cross-origin isolated. Default `false`. The `'credentialless'` value is `@experimental`. |
 
 ### `IsoloopOptions`
 
