@@ -13,7 +13,7 @@ Filters, windows, groups and aggregates over large topics are work a columnar en
 
 The forces:
 
-- **Code that shares data shouldn't share an event loop.** That's the reason Isoloop exists. A heavy derivation in the bus worker would block its loop and stall every topic.
+- **The bus worker only routes records.** Every topic depends on it, so a heavy derivation there would block its loop and stall every topic.
 - **A derived topic is a topic.** Readers subscribe, watch, replay and get grants on it as on any other.
 - **Grants guard sources.** If a derived topic could be read without the grants on its sources, it would be a way around them.
 - **The runtime never pools on its own** (ADR 0001, as amended by ADR 0017). Pools are the app's choice, or the balancer's in pools it owns.

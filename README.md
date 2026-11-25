@@ -25,7 +25,7 @@
   <a href="docs/adr/README.md">ADRs</a>
 </p>
 
-Isoloop is an open-source TypeScript library. Each part of your app (a React or Preact UI tree, plain DOM, or a headless task) runs as an *isolate*, on its own worker or in a shared pool. Isolates talk only through a message bus with typed topics, retention and replay. When one blocks or crashes, the rest of the app keeps running; the supervisor restarts it, and it rebuilds its state from the bus.
+Isoloop is an open-source TypeScript library that lets you separate your app's UI from the work behind it. Each part runs as an *isolate*, on its own worker or in a shared pool: a UI part (a React or Preact tree, or plain DOM) or a headless one. How you split your app is your call. Parts share state through a message bus with typed topics, retention and replay. When one blocks or crashes, the rest of the app keeps running; the supervisor restarts it, and it rebuilds its state from the bus.
 
 **0.1 is the first release.** The parts marked experimental may change in any minor, and only the latest release is supported ([Limits](https://isoloop.dev/docs/limits/)). What's done and what's next: [Roadmap](#roadmap).
 
@@ -33,9 +33,11 @@ See it run: the [basic example](https://isoloop.dev/examples/basic/), four isola
 
 ## Why
 
-In most apps, all the code shares one main thread, one heap and one event loop: every widget, every micro-frontend, and every headless engine such as a state store, a sync engine or a search index. One slow or broken part makes the whole app janky or blank. Sandboxes isolate globals and styles, not CPU time or crashes. A plain worker isolates CPU time, but leaves you to wire up how independent parts share data, and what happens when one of them fails.
+In most apps, the UI and everything behind it, such as state, sync, search and data processing, share one main thread, one heap and one event loop. One slow or broken part makes the whole app janky or blank. Sandboxes isolate globals and styles, not CPU time or crashes. A plain worker isolates CPU time, but leaves you to wire up how independent parts share data, and what happens when one of them fails.
 
-Isoloop is built on one principle: **code that shares data shouldn't have to share an event loop.** Parts run apart, and the only thing they share is a log of typed messages.
+Isoloop lets you separate them. Each part, UI or headless, can run on a loop of its own, and the page's main thread only applies what the UI parts draw. Parts share state through a bus that keeps its records, and the bus is optional.
+
+That keeps the UI responsive and contains a block or a crash to its part. It also lets the work run where it fits best, on its own worker or in a pool, with the same code. The [roadmap](docs/plans/roadmap.md) takes that further: [a WASM component or a native process](docs/plans/m16-native-runtimes.md), where the bus becomes the model the UI and the work share.
 
 Where it fits and what it gives: [Features](https://isoloop.dev/features/).
 
