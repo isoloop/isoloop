@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="606" viewBox="0 0 520 606" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <line x1="96" y1="27" x2="96" y2="101" stroke="#4b5563" stroke-width="2" stroke-dasharray="3 4"/>
+  <line x1="96" y1="115" x2="96" y2="169" stroke="#4b5563" stroke-width="2" stroke-dasharray="3 4"/>
+  <line x1="96" y1="183" x2="96" y2="237" stroke="#4b5563" stroke-width="2" stroke-dasharray="3 4"/>
+  <line x1="96" y1="251" x2="96" y2="325" stroke="#4b5563" stroke-width="2" stroke-dasharray="3 4"/>
+  <line x1="96" y1="339" x2="96" y2="413" stroke="#4b5563" stroke-width="2" stroke-dasharray="3 4"/>
+  <line x1="96" y1="427" x2="96" y2="481" stroke="#4b5563" stroke-width="2" stroke-dasharray="3 4"/>
+  <line x1="96" y1="495" x2="96" y2="549" stroke="#4b5563" stroke-width="2" stroke-dasharray="3 4"/>
+  <text x="76" y="25" text-anchor="end" font-size="13" fill="#9ca3af">0.1</text>
+  <circle cx="96" cy="20" r="6" fill="#f3f4f6" stroke="#f3f4f6" stroke-width="2"/>
+  <text x="120" y="25" font-size="15" font-weight="600" fill="#f3f4f6">The core (out)</text>
+  <text x="120" y="47" font-size="13.5" fill="#9ca3af">Kernel, bus and durable log; worker pools;</text>
+  <text x="120" y="67" font-size="13.5" fill="#9ca3af">devtools and agent tools.</text>
+  <text x="76" y="113" text-anchor="end" font-size="13" fill="#9ca3af">0.2</text>
+  <circle cx="96" cy="108" r="6" fill="#0d1117" stroke="#4b5563" stroke-width="2"/>
+  <text x="120" y="113" font-size="15" font-weight="600" fill="#f3f4f6">Watchers</text>
+  <text x="120" y="135" font-size="13.5" fill="#9ca3af">Current values beside streams.</text>
+  <text x="76" y="181" text-anchor="end" font-size="13" fill="#9ca3af">0.3</text>
+  <circle cx="96" cy="176" r="6" fill="#0d1117" stroke="#4b5563" stroke-width="2"/>
+  <text x="120" y="181" font-size="15" font-weight="600" fill="#f3f4f6">Bus pacing</text>
+  <text x="120" y="203" font-size="13.5" fill="#9ca3af">Fewer messages per record; watchers in pools.</text>
+  <text x="76" y="249" text-anchor="end" font-size="13" fill="#9ca3af">0.4</text>
+  <circle cx="96" cy="244" r="6" fill="#0d1117" stroke="#4b5563" stroke-width="2"/>
+  <text x="120" y="249" font-size="15" font-weight="600" fill="#f3f4f6">Shared memory and Tauri</text>
+  <text x="120" y="271" font-size="13.5" fill="#9ca3af">An opt-in shared-memory engine, and a Tauri</text>
+  <text x="120" y="291" font-size="13.5" fill="#9ca3af">package for desktop apps.</text>
+  <text x="76" y="337" text-anchor="end" font-size="13" fill="#9ca3af">0.5</text>
+  <circle cx="96" cy="332" r="6" fill="#0d1117" stroke="#4b5563" stroke-width="2"/>
+  <text x="120" y="337" font-size="15" font-weight="600" fill="#f3f4f6">WebMCP to stable</text>
+  <text x="120" y="359" font-size="13.5" fill="#9ca3af">If WebMCP has shipped by then; otherwise the</text>
+  <text x="120" y="379" font-size="13.5" fill="#9ca3af">adapters move up one.</text>
+  <text x="76" y="425" text-anchor="end" font-size="13" fill="#9ca3af">0.6 to 0.8</text>
+  <circle cx="96" cy="420" r="6" fill="#0d1117" stroke="#4b5563" stroke-width="2"/>
+  <text x="120" y="425" font-size="15" font-weight="600" fill="#f3f4f6">More adapters</text>
+  <text x="120" y="447" font-size="13.5" fill="#9ca3af">Vue, Svelte and Solid.</text>
+  <text x="76" y="493" text-anchor="end" font-size="13" fill="#9ca3af">1.0</text>
+  <circle cx="96" cy="488" r="6" fill="#0d1117" stroke="#4b5563" stroke-width="2"/>
+  <text x="120" y="493" font-size="15" font-weight="600" fill="#f3f4f6">Stable API</text>
+  <text x="120" y="515" font-size="13.5" fill="#9ca3af">Semver majors from here on.</text>
+  <text x="76" y="561" text-anchor="end" font-size="13" fill="#9ca3af">2.0</text>
+  <circle cx="96" cy="556" r="6" fill="#0d1117" stroke="#4b5563" stroke-width="2"/>
+  <text x="120" y="561" font-size="15" font-weight="600" fill="#f3f4f6">Beyond the browser</text>
+  <text x="120" y="583" font-size="13.5" fill="#9ca3af">Node, Bun and server-side rendering.</text>
+</svg>

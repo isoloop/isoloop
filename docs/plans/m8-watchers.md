@@ -4,7 +4,7 @@
 
 **Done when:** `bus.watch`, `useWatch` in both adapters and the devtools rows ship in `0.2.0` as `@experimental`; on markets, where ticks outrun painting, watchers send fewer messages than `useTopic` for the same widgets; on plant, slow topics cost no more than they do today; and the equivalence tests pass. Measured on bench machine 1 and written up, whatever it shows.
 
-**Depends on:** 0.1 ([M4](m4-devtools-release.md)). `bus.watch` and `useWatch` add to the isolate seam, which [ADR 0019](../adr/0019-versioning-and-releases.md) allows only in a minor. Its phases ship across three minors (the [releases table](README.md#releases)): W1 in `0.2.0`, W2 in `0.3.0` with the other bus work, and W3 in `0.4.0` next to [M5 Shared-memory engine](m5-shared-memory-engine.md).
+**Depends on:** 0.1 ([M4](m4-devtools-release.md)). `bus.watch` and `useWatch` add to the isolate seam, which [ADR 0019](../adr/0019-versioning-and-releases.md) allows only in a minor. Its phases ship across three minors (the [releases table](roadmap.md#releases)): W1 in `0.2.0`, W2 in `0.3.0` with the other bus work, and W3 in `0.4.0` next to [M5 Shared-memory engine](m5-shared-memory-engine.md).
 
 **Status:** proposed 2026-11-21 in a design exploration; W0 grilled 2026-11-25 (Q1–Q30, yes to all). [ADR 0023](../adr/0023-watchers.md) accepted 2026-11-25; W1 can start.
 

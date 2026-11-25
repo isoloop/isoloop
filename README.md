@@ -165,25 +165,12 @@ More on [isoloop.dev](https://isoloop.dev/#limits).
 
 ## Roadmap
 
-Details, dependencies and task lists are in the [plans index](docs/plans/README.md).
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/roadmap-dark.svg">
+  <img src="docs/assets/roadmap-light.svg" alt="Releases: 0.1, the core (out): kernel, bus and durable log, worker pools, devtools and agent tools. 0.2, watchers: current values beside streams. 0.3, bus pacing: fewer messages per record, watchers in pools. 0.4, shared memory and Tauri. 0.5, WebMCP to stable, if WebMCP has shipped by then; otherwise the adapters move up one. 0.6 to 0.8, Vue, Svelte and Solid adapters. 1.0, a stable API. 2.0, beyond the browser: Node, Bun and server-side rendering." width="520">
+</picture>
 
-| Milestone | What it delivers | Status | More |
-| --- | --- | --- | --- |
-| **M0–M1** Foundations and kernel | The toolchain (pnpm, TypeScript 7, OXC, Vite, Vitest, Playwright); the loader, supervisor, heartbeats and the frame-batched compositor on our own render bridge | Done | [Crashing an isolate on purpose](docs/posts/m1-crashing-an-isolate.md) |
-| **M2, M2b** Bus and durable log | Topics, schemas, retention, offsets, replay and backpressure in a bus worker; opt-in suspension of idle isolates; persistent topics that survive a bus crash or a reload | Done | [The bus](docs/posts/m2-bus-in-a-worker.md), [the durable log](docs/posts/m2b-durable-log.md) |
-| **M2c, M2d** Worker pools | Named pools for headless and visual isolates, next to own-worker ones; a pool crash restarts only that pool | Done | [Pools guide](https://isoloop.dev/docs/pools/), [`plant-v0.1.0`](https://github.com/isoloop/web/tree/plant-v0.1.0) |
-| **M3a–M3d, M3f** Adapters and dashboards | The Preact (10, 11) and React (18, 19) adapters; the markets dashboard, native or Isoloop at a toggle, in three sizes; the 72-widget plant dashboard against matched native builds; markets parity with native + workers and pooled placements | Done | [Adapters](docs/posts/m3a-preact-react-in-a-worker.md), [markets](docs/posts/m3b-markets-dashboard.md), [`markets-v0.3.0`](https://github.com/isoloop/web/tree/markets-v0.3.0) |
-| **Website** | [isoloop.dev](https://isoloop.dev): the landing page, the features, how it works and the live examples | Done | [isoloop/web](https://github.com/isoloop/web) |
-| **M3e, M3g, M3h, M3i** Live widgets and placement | Add, edit and delete widgets while the page runs, each a JSON spec in its own isolate; a federated comparison against a natively federated build; the experimental balancer, which places isolates by load, moves, packs and quarantines them | Done | [Balancer guide](https://isoloop.dev/docs/balancer/), [`plant-v0.2.0`](https://github.com/isoloop/web/tree/plant-v0.2.0), [`markets-v0.5.0`](https://github.com/isoloop/web/tree/markets-v0.5.0), [`processor-v0.2.0`](https://github.com/isoloop/web/tree/processor-v0.2.0) |
-| **M4b** Devtools | The inspection feed (`kernel.inspect()`, the `inspect` grant) and `@isoloop/devtools`, a panel drawn by an isolate | Done | [Write-up](docs/posts/m4b-devtools.md), [inspection](https://isoloop.dev/docs/inspection/), [devtools](https://isoloop.dev/docs/devtools/) |
-| **M4a** Agents | Tools on contracts, `kernel.request`, the `isoloop` CLI with a dev MCP server, the "build with Isoloop" skill, `@isoloop/webmcp` (experimental) | Done | [Write-up](docs/posts/m4a-agents.md), [Agents guide](https://isoloop.dev/docs/agents/), [plan](docs/plans/m4a-agents.md) |
-| **M3j** Balancer gaps | An app-reported busy time; packing and the quarantine fixed; isolates the kernel gave up on handled | Done | [Write-up](https://github.com/isoloop/web/tree/main/apps/processor/comparison/v0.3.0) |
-| **M4c** Docs | The docs on isoloop.dev: getting started, the guides, "What Isoloop can't hide", the API reference, `llms.txt` | Done | [Write-up](docs/posts/m4c-docs.md), [plan](docs/plans/m4c-docs.md) |
-| **M4d** 0.1 release | The API freeze, the release workflow and `0.1.0` on npm; the launch post follows | Done | [Plan](docs/plans/m4d-release.md) |
-| **M6** More adapters | Vue 3, Svelte 5 and Solid 1, with no change to the render format | After 0.1 | [Plan](docs/plans/m6-adapters.md) |
-| **M7** WebMCP to stable | `@isoloop/webmcp` without `@experimental`, once WebMCP ships | After 0.1 | [Plan](docs/plans/m7-webmcp-stable.md) |
-| **M5** Shared-memory engine | An opt-in Rust/WASM log engine on `SharedArrayBuffer`, benchmarked against the TypeScript one | After 0.1 | [Plan](docs/plans/m5-shared-memory-engine.md) |
-| **M5b** Delivery batching | A spike: whether batching bus traffic across tasks gets the TypeScript engine to its records-per-second budget | After 0.1 | [Plan](docs/plans/m5b-delivery-batching.md) |
+The order and the reasoning are in the [roadmap](docs/plans/roadmap.md), and each milestone's plan and status are in the [plans index](docs/plans/README.md).
 
 ## Docs
 
@@ -191,7 +178,7 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 - [RFC 0001: the threaded runtime](docs/rfcs/0001-threaded-runtime.md), the motivation and public shape
 - [System design](docs/design/system-design.md): packages, interfaces, sequences and invariants
 - [Architecture decision records](docs/adr/README.md)
-- [Implementation plans](docs/plans/README.md), one per milestone
+- [Implementation plans](docs/plans/README.md), one per milestone, with the [roadmap](docs/plans/roadmap.md) and the [history](docs/plans/history.md)
 - [Contributing](CONTRIBUTING.md): setup, scripts, repo layout and conventions
 - Prior art: [Shopify Remote DOM](https://github.com/Shopify/remote-dom), [Neo.mjs](https://github.com/neomjs/neo), [Web Fragments](https://github.com/IgorMinar/reframed), [Aiga](https://aiga.js.org/), [Garfish](https://github.com/web-infra-dev/garfish)
 

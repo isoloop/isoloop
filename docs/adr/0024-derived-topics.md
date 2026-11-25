@@ -2,7 +2,7 @@
 
 - **Status:** Proposed (2026-11-25), to grill when M15 is next to start (questions at the end). The design chat's handover called it 0023; it became 0024 because 0023 went to watchers.
 - **Date:** 2026-11-25
-- **Plan:** [M15 Derived topics](../plans/m15-derived-topics.md). Its slot in the [releases](../plans/README.md#releases) is question 2.
+- **Plan:** [M15 Derived topics](../plans/m15-derived-topics.md). Its slot in the [releases](../plans/roadmap.md#releases) is question 2.
 - **Touches:** [ADR 0001](0001-one-worker-per-isolate.md) (the runtime never pools on its own), [ADR 0003](0003-schema-format-standard-schema.md) (a topic's schema), [ADR 0007](0007-bus-worker-supervision.md) (restart and replay), [ADR 0012](0012-isolates-built-apart.md) (the seam), [ADR 0014](0014-own-codec.md) (the binary codec a WASM engine reads), [ADR 0017](0017-opt-in-balancer.md) (what the balancer places), [ADR 0020](0020-inspection-feed.md) (kill and block from the inspector).
 
 ## Context

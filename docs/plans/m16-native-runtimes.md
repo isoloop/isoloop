@@ -16,11 +16,11 @@
 - **[M5 Shared-memory engine](m5-shared-memory-engine.md),** with its engine built so it also runs natively, so the bus can live in the Tauri core.
 - **[M15 Derived topics](m15-derived-topics.md),** for its first workload.
 
-Added 2026-11-25. Not in the [releases](README.md#releases): whether it ships in `1.x` or with `2.0` is open (ADR 0025, question 1). Grilled before it gets a task list, together with its ADR.
+Added 2026-11-25. Not in the [releases](roadmap.md#releases): whether it ships in `1.x` or with `2.0` is open (ADR 0025, question 1). Grilled before it gets a task list, together with its ADR.
 
 ## Why
 
-Today a headless isolate is a Web Worker in the webview, and nothing on the roadmap runs one outside JS. M12 only lets isolates *call* native commands (`exposeCommands`). The [2.0 hosts](README.md#towards-20-node-bun-and-server-side-rendering) for Node and Bun use `worker_threads`, which are still JS threads. A Tauri app has a Rust process next to the page; this milestone lets isolates run there, under the same supervision, grants and bus.
+Today a headless isolate is a Web Worker in the webview, and nothing on the roadmap runs one outside JS. M12 only lets isolates *call* native commands (`exposeCommands`). The [2.0 hosts](roadmap.md#towards-20-node-bun-and-server-side-rendering) for Node and Bun use `worker_threads`, which are still JS threads. A Tauri app has a Rust process next to the page; this milestone lets isolates run there, under the same supervision, grants and bus.
 
 ## Main work items
 
