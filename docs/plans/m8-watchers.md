@@ -6,7 +6,7 @@
 
 **Depends on:** 0.1 ([M4](m4-devtools-release.md)). `bus.watch` and `useWatch` add to the isolate seam, which [ADR 0019](../adr/0019-versioning-and-releases.md) allows only in a minor. Its phases ship across three minors (the [releases table](README.md#releases)): W1 in `0.2.0`, W2 in `0.3.0` with the other bus work, and W3 in `0.4.0` next to [M5 Shared-memory engine](m5-shared-memory-engine.md).
 
-**Status:** proposed 2026-11-21 in a design exploration; W0 grilled 2026-11-25 (Q1–Q29, yes to all; Q29 open, see *Open*). [ADR 0023](../adr/0023-watchers.md) is Proposed. No W1 code before it's accepted.
+**Status:** proposed 2026-11-21 in a design exploration; W0 grilled 2026-11-25 (Q1–Q30, yes to all). [ADR 0023](../adr/0023-watchers.md) is Proposed. No W1 code before it's accepted.
 
 ## Phases
 
@@ -51,7 +51,8 @@ W1 carries most of the gain. W2 and W3 optimise the same API.
 26. **The bus worker points at the log's records, no copies;** dev mode warns once when an unfiltered watch holds over 1,000 keys.
 27. **No work on append:** a view is built when sent, from the log between the watch's last sent offset and the tail, newest per key. The snapshot map is for attach only.
 28. **The guide's table:** show latest → `useWatch`; react to every record → `subscribe`; one topic in one component → either. `useTopic`'s TSDoc links it.
-29. **Open:** an emulation over `subscribe` on an older host. ADR 0012 fails a `0.2` isolate on a `0.1` host at start (`runtime-too-old`), so it would never run; ADR 0023 point 26 has the facts.
+29. **No fallback over `subscribe` on an older host.** ADR 0012 stays unchanged: a `0.2` isolate fails on a `0.1` host at start with `runtime-too-old`, naming both versions, and the ADR states that as a cost.
+30. **Expired keys:** each watch keeps the last version sent per key, as pointers to log records; a key below the oldest retained offset with no newer record clears in the next view; on `time` topics the retention pass marks the affected watches. Memory per watch per key, bounded by `keys`, shown in devtools.
 
 ## Tasks (W1)
 
@@ -71,10 +72,6 @@ W1 carries most of the gain. W2 and W3 optimise the same API.
 | 12 | **`0.2.0` changesets and the done-when check:** minor changesets for runtime, react, preact, bus and protocol; the plans README row | with the release | library | `.changeset/`, `docs/plans/README.md` | CI | 2–11 |
 
 Tasks 6 and 7 run in parallel after 4. Tasks 9 and 10 need a `0.2.0-next.N` on npm with tasks 2–5 in it.
-
-## Open
-
-- **The older-host fallback (Q29).** ADR 0012 fails a `0.2` isolate on a `0.1` host at start with `runtime-too-old`, and `ctx.bus` comes from the host's bootstrap, so an emulation of `bus.watch` over `subscribe` would never run. ADR 0023 point 26 recommends dropping it. If the maintainer wants it, ADR 0012 is amended first, and a task for the fallback and its tests (same results as a watch, transport `fallback` in devtools, one dev-mode log line) joins this list.
 
 ## Open risks
 

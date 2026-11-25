@@ -1,6 +1,6 @@
 # ADR 0023: Watchers, a second way to read a topic
 
-- **Status:** Proposed (2026-11-25), from the M8 Watchers W0 grilling (Q1–Q29, yes to all; Q29 open, see point 26).
+- **Status:** Proposed (2026-11-25), from the M8 Watchers W0 grilling (Q1–Q30, yes to all).
 - **Date:** 2026-11-25
 - **Plan:** [M8 Watchers](../plans/m8-watchers.md). W1 ships in `0.2.0` as `@experimental`; W2 and W3 come in `0.3.0` and `0.4.0` ([releases](../plans/README.md#releases)).
 - **Touches:** [ADR 0005](0005-bus-topology-message-channels.md) (what travels on the bus port), [ADR 0007](0007-bus-worker-supervision.md) (reattach after a bus restart), [ADR 0012](0012-isolates-built-apart.md) (the seam only grows; which host runs which isolate), [ADR 0016](0016-fewer-messages-per-record.md) (the committer, which carries `seen`), [ADR 0020](0020-inspection-feed.md) (new rows in the feed).
@@ -63,8 +63,8 @@ The forces:
 
 14. **No work on append** (Q27). An append doesn't touch any watch's state. When a record lands on a watched topic, the bus only notes that the topic has news for the watches that have no view in flight.
 15. **A view is built when it's sent** (Q27), by reading the log from the watch's last sent offset to the tail and keeping the newest record per key it watches. Values that arrived while a view was in flight are in that range, so newest wins with nothing merged by hand.
-16. **The bus keeps, per watch, the version it last sent for each key** (Q26). These point at retained records in the log; no value is copied. They're what makes clears and reattach work:
-    - **Clears.** The retained records of a `last-n` or `time` topic are one range, from the oldest retained offset to the tail. A key whose last sent version is below the oldest retained offset, with no newer record in the range read, is cleared in the next view. For a `time` topic, whose retention pass runs once a second with or without appends, the pass marks the watches whose oldest sent version fell out of the range, so a clear goes out without a new record.
+16. **The bus keeps, per watch, the version it last sent for each key** (Q26, Q30). These point at retained records in the log; no value is copied. They're what makes clears and reattach work:
+    - **Clears.** The retained records of a `last-n` or `time` topic are one range, from the oldest retained offset to the tail. A key whose last sent version is below the oldest retained offset, with no newer record in the range read, is cleared in the next view. For a `time` topic, whose retention pass runs once a second with or without appends, the pass marks the watches whose oldest sent version fell out of the range, so a clear goes out without a new record. This costs memory per watch per key, bounded by `keys` and shown in devtools.
     - **Snapshot.** On the first watch of a topic, the bus reads the whole retained log once, newest per key, into a map that points at records the same way. Later watches of the topic within the grace (point 19) read their snapshot from it. That map exists only for snapshots: views never update it.
 17. **At most one view is in flight per watch** (Q4). After sending a view, the bus sends the next only once it has the `seen` for it. So a watcher never gets values faster than it uses them.
 18. **The snapshot isn't paced** (Q20). The first view after a `watch` carries every key the watcher asked for, split into views of at most 512 values each, sent back to back; only the last one waits for `seen`. The client calls `onView` once, after the last part.
@@ -91,20 +91,15 @@ The forces:
 
 ### Older hosts
 
-26. **Q29, an emulation of `bus.watch` over `subscribe` on a host without watch support, is not taken as asked: ADR 0012 already settles that case, and the fallback would never run.** The decision is open for the maintainer (see *Open*). The facts:
-    - `defineIsolate`, in the runtime and in every adapter, stamps an isolate with the `major.minor` it was built with. An isolate built with `0.2.0` is `requires: '0.2'`, and a `0.1.x` host fails it at start with `runtime-too-old` (ADR 0012, points 3 and 4). It never reaches `bus.watch`.
-    - `ctx.bus` is the bus client the bootstrap creates, and the bootstrap ships with the host (ADR 0016, point 6). So on an older host there is no `watch` to detect: the emulation would have to live in the adapter's `useWatch`, in the isolate's bundle, and would run only for an unstamped `{ start }` object, which can't call `useWatch`.
-    - Making the fallback reachable means changing ADR 0012: for example, a `requires` that reflects the API an isolate uses rather than the version it was built with, or a host that runs a newer isolate and reports which seam members it lacks. Either is a seam-wide change, not a watcher one.
+26. **No emulation of `bus.watch` over `subscribe` on an older host** (Q29). ADR 0012 already settles that case, and it stays unchanged:
+    - `defineIsolate`, in the runtime and in every adapter, stamps an isolate with the `major.minor` it was built with. An isolate built with `0.2.0` is `requires: '0.2'`, and a `0.1.x` host fails it at start with `runtime-too-old`, naming both versions (ADR 0012, points 3 and 4). It never reaches `bus.watch`.
+    - `ctx.bus` is the bus client the bootstrap creates, and the bootstrap ships with the host (ADR 0016, point 6). An emulation would have to live in the adapter's `useWatch` and could never detect a missing `watch`, so it would never run.
 
 ### Not in this ADR
 
 27. **`kernel.watch` on the host** (Q8) waits for a use case. The host has `kernel.subscribe`, and the devtools panel is an isolate.
 28. **W2, pools and wake:** one watch per pool worker, with values handed to its members read-only, and waking from a snapshot. In W1 each pool member watches on its own. W2 is grilled before `0.3.0`.
 29. **W3, shared slots** (Q9): one `SharedArrayBuffer` per topic written by the bus worker under a sequence lock, with a message fallback when the page isn't cross-origin isolated. How slots are sized, declared per topic in the contract or sized by the bus, is decided in an amendment to this ADR before W3.
-
-## Open
-
-- **Point 26 (Q29):** drop the older-host fallback, since ADR 0012 fails a `0.2` isolate on a `0.1` host before it runs (recommended); or amend ADR 0012 first so a newer isolate can run on an older host, and then build the fallback.
 
 ## Consequences
 
@@ -124,7 +119,7 @@ The forces:
 - **An unfiltered watch on a wide topic holds an entry for every retained key,** as version pointers in the bus worker and as values in the isolate. *Limited by* retention, which bounds it; pointers rather than copies in the bus worker (point 16); the `keys` filter; the dev warning past 1,000 keys (point 12); and the live key count in devtools.
 - **Building a view reads the log** from the last sent offset to the tail. That's the same records an append would have touched, read once per view instead of once per record, so a burst costs one read of its records. The first watch of a topic reads the whole retained log once. *Limited by* the 5 s grace (point 19), which keeps that snapshot for remounts and reattaches.
 - **Two ways to read a topic** means a choice to explain. *Limited by* the guide's table (point 9), linked from `useTopic`.
-- **The isolate seam grows** by `bus.watch` and `useWatch`, so isolates using them need a `0.2.0` host. *Limited by* ADR 0012, which fails such an isolate at start on an older host with a message naming both versions, rather than at its first `watch` (point 26).
+- **The isolate seam grows** by `bus.watch` and `useWatch`, so an isolate built with `0.2.0` needs a `0.2.0` host: a `0.1` host fails it at start with `runtime-too-old`, naming both versions, and there is no fallback over `subscribe` (point 26). *Limited by* ADR 0012: the failure comes at start, with a clear message, rather than at the isolate's first `watch`.
 
 ## Alternatives considered
 
@@ -135,5 +130,6 @@ The forces:
 - **`seen` always in `commits`** (Q25). Every burst would run at one view per commit interval, 10 a second by default, below the paint rate. Replaced by the burst rule.
 - **Slots updated on every append** (Q27, which supersedes the first draft): a slot update and a dirty mark per watching port on each append, paid by every publisher. Not taken; views are built from the log when sent.
 - **Copying values into slots** (Q26): a second copy of every watched key's value in the bus worker. Not taken; the bus points at the log's records.
+- **An emulation over `subscribe` on an older host** (Q29). ADR 0012 fails the isolate before it runs, so it would be dead code. Not taken.
 - **`kernel.watch` in W1** (Q8). No use case yet. Not taken.
 - **A key keeps its last value after retention removes it** (Q3). The watcher would then show values a replay can't, and the equivalence property would need exceptions. Not taken.
