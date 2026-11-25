@@ -15,7 +15,7 @@ A change is done when all six hold:
 
 ## Claims and wording
 
-- **Positioning:** Isoloop is a complete toolchain: containment, restart and catch-up, a bus with retention, replay and durable history, placement as a switch, with React, Preact or plain DOM. It costs CPU, memory and start-up time, and the docs say so plainly.
+- **Positioning:** Isoloop separates the UI from the work behind it: UI isolates only draw, headless isolates hold the state and do the work, and the bus is the model they share (optional in the browser). It's a complete toolchain: containment, restart and catch-up, a bus with retention, replay and durable history, placement as a switch, with React, Preact or plain DOM. It costs CPU, memory and start-up time, and the docs say so plainly.
 - **Performance is a measurement:** device, build, version, and the numbers. Compare Isoloop with native as measured results, in both directions. CI asserts Isoloop's own budgets and reports native ratios.
 - **Docs describe the code as it is.** Check a claim against the implementation before writing it; when they disagree, fix whichever is wrong in the same PR.
 
