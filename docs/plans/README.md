@@ -64,4 +64,4 @@ One plan per milestone of [RFC 0001](../rfcs/0001-threaded-runtime.md#mvp-roadma
 - **Deferred ideas** live in [`docs/would-like.md`](../would-like.md), not in a plan, until a milestone takes them on.
 - **Committed work that waits on something** (a package, a milestone) lives in [`docs/should-do.md`](../should-do.md), with what it waits on and its target milestone. It moves into a plan when that lands.
 - **Outlines:** an outline gets its full task list when it's next to start, so the list reflects what was learned.
-- **Recording a grilling:** a grilling adds a dated bullet to [history](history.md), updates the [roadmap](roadmap.md) when the order or the scope changes (and its "Last changed" line), and updates the milestone's row above.
+- **Recording a grilling:** a grilling adds a dated bullet to [history](history.md), updates the [roadmap](roadmap.md) when the order or the scope changes (its "Last changed" line, and the timeline in the [root README](../../README.md#roadmap)), and updates the milestone's row above.
