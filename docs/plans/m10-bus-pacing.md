@@ -4,7 +4,7 @@
 
 **Done when:** the candidates that [M5b Delivery batching](m5b-delivery-batching.md)'s write-up keeps ship in `0.3.0`, `@experimental` where they add API; plant and markets send fewer port messages for the same widgets, and click-to-paint doesn't change; measured on [M13 Benchmark gate](m13-benchmark-gate.md) and written up, whatever it shows.
 
-**Depends on:** [M5b Delivery batching](m5b-delivery-batching.md), in the same minor, `0.3.0` (the [releases table](README.md#releases)). This plan is written after M5b's write-up, and its findings can shrink it: a candidate the spike shows doesn't pay is dropped, and `0.3.0` ships smaller. Grilled before it gets a task list.
+**Depends on:** [M5b Delivery batching](m5b-delivery-batching.md), in the same minor, `0.3.0` (the [releases table](roadmap.md#releases)). This plan is written after M5b's write-up, and its findings can shrink it: a candidate the spike shows doesn't pay is dropped, and `0.3.0` ships smaller. Grilled before it gets a task list.
 
 ## Candidates
 

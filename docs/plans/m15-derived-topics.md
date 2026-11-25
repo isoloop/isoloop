@@ -15,7 +15,7 @@
 - **[M13 Benchmark gate](m13-benchmark-gate.md),** for the benchmark verdict.
 - **Not [M16 Native runtimes](m16-native-runtimes.md).** This milestone works in the browser on its own.
 
-Added 2026-11-25. Its slot in the [releases](README.md#releases) is open (ADR 0024, question 2). Grilled before it gets a task list, together with its ADR.
+Added 2026-11-25. Its slot in the [releases](roadmap.md#releases) is open (ADR 0024, question 2). Grilled before it gets a task list, together with its ADR.
 
 ## Why derive isolates
 

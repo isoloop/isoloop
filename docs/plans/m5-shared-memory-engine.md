@@ -4,7 +4,7 @@
 
 **Done when** (RFC 0001): benchmark results are published, whichever engine wins.
 
-Depends only on the `LogEngine` interface and the throughput bench, and reuses M2b's codec. Planned for `0.4.0`, after [M5b Delivery batching](m5b-delivery-batching.md) and [M10 Bus pacing](m10-bus-pacing.md) in `0.3.0` (the [releases table](README.md#releases), decided 2026-11-24); it gets a full task list when it's next to start.
+Depends only on the `LogEngine` interface and the throughput bench, and reuses M2b's codec. Planned for `0.4.0`, after [M5b Delivery batching](m5b-delivery-batching.md) and [M10 Bus pacing](m10-bus-pacing.md) in `0.3.0` (the [releases table](roadmap.md#releases), decided 2026-11-24); it gets a full task list when it's next to start.
 
 ## Main work items
 

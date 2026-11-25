@@ -4,7 +4,7 @@
 
 **Done when:** the broker in `@isoloop/bus`, the worker DOM in `@isoloop/dom` and the balancer in `@isoloop/balancer` are each split along their seams, and the API check reports no change, so it ships with no changeset.
 
-**Depends on:** `0.2.0`. Runs after it ships, alongside `0.3.0`, in parallel with [M11 Pure kernel core](m11-pure-kernel-core.md), which splits the fourth large file, `kernel.ts` in `@isoloop/host` (the [releases table](README.md#releases)).
+**Depends on:** `0.2.0`. Runs after it ships, alongside `0.3.0`, in parallel with [M11 Pure kernel core](m11-pure-kernel-core.md), which splits the fourth large file, `kernel.ts` in `@isoloop/host` (the [releases table](roadmap.md#releases)).
 
 Added 2026-11-21 from [ADR 0021](../adr/0021-source-layout-and-entry-points.md) as a note; given an id on 2026-11-24. Grilled before it gets a task list.
 

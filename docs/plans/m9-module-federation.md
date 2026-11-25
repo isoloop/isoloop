@@ -8,7 +8,7 @@
 
 **Depends on:** 0.1 ([M4](m4-devtools-release.md)), since the app uses the published packages. [ADR 0012](../adr/0012-isolates-built-apart.md) already covers isolates built apart from the host. Needs nothing from [M6](m6-adapters.md) or [M8 Watchers](m8-watchers.md).
 
-**Ships:** as its own app tag in `isoloop/web`, built on `0.2.0` and announced with it if it's ready (the [releases table](README.md#releases)). `0.2.0` doesn't wait for it, and it moves no library version.
+**Ships:** as its own app tag in `isoloop/web`, built on `0.2.0` and announced with it if it's ready (the [releases table](roadmap.md#releases)). `0.2.0` doesn't wait for it, and it moves no library version.
 
 Grilled before it gets a task list, and the list comes after the spike.
 

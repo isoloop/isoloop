@@ -2,7 +2,7 @@
 
 - **Status:** Proposed (2026-11-25), to grill when M16 is next to start (questions at the end). The design chat's handover called it 0024; it became 0025 because 0023 went to watchers.
 - **Date:** 2026-11-25
-- **Plan:** [M16 Native runtimes](../plans/m16-native-runtimes.md). Not in the [releases](../plans/README.md#releases): its release is question 1.
+- **Plan:** [M16 Native runtimes](../plans/m16-native-runtimes.md). Not in the [releases](../plans/roadmap.md#releases): its release is question 1.
 - **Touches:** [ADR 0001](0001-one-worker-per-isolate.md) (placement), [ADR 0005](0005-bus-topology-message-channels.md) (isolates talk to the bus worker over `MessageChannel`s), [ADR 0007](0007-bus-worker-supervision.md) (bus supervision and durability), [ADR 0008](0008-isolates-and-surfaces.md) (headless isolates), [ADR 0012](0012-isolates-built-apart.md) (the seam), [ADR 0017](0017-opt-in-balancer.md) (what the balancer moves), [ADR 0022](0022-tauri.md) (the Tauri package, which rejected the log engine in the Rust core), [ADR 0024](0024-derived-topics.md) (derive isolates, the first workload).
 
 ## Context

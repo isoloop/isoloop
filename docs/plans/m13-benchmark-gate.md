@@ -4,7 +4,7 @@
 
 **Done when:** the gate runs in CI on a machine that doesn't change, passes or fails on Isoloop's own budgets, reports the native ratios next to them, and has a recorded baseline on `0.2.0`.
 
-**Depends on:** `0.2.0`. Runs after it ships, alongside [M14 Big-file split](m14-big-file-split.md) and [M11 Pure kernel core](m11-pure-kernel-core.md), and blocks `0.3.0`: [M5b Delivery batching](m5b-delivery-batching.md)'s spike starts only once the gate runs in CI (the [releases table](README.md#releases)). Also part of the [1.0 done-when](README.md#towards-10).
+**Depends on:** `0.2.0`. Runs after it ships, alongside [M14 Big-file split](m14-big-file-split.md) and [M11 Pure kernel core](m11-pure-kernel-core.md), and blocks `0.3.0`: [M5b Delivery batching](m5b-delivery-batching.md)'s spike starts only once the gate runs in CI (the [releases table](roadmap.md#releases)). Also part of the [1.0 done-when](roadmap.md#towards-10).
 
 Added 2026-11-20 as a note; given an id on 2026-11-24. Grilled before it gets a task list.
 

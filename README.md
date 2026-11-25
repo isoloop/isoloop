@@ -165,7 +165,7 @@ More on [isoloop.dev](https://isoloop.dev/#limits).
 
 ## Roadmap
 
-Details, dependencies and task lists are in the [plans index](docs/plans/README.md).
+The order of the releases is in the [roadmap](docs/plans/roadmap.md), and details, dependencies and task lists are in the [plans index](docs/plans/README.md).
 
 | Milestone | What it delivers | Status | More |
 | --- | --- | --- | --- |
@@ -191,7 +191,7 @@ Details, dependencies and task lists are in the [plans index](docs/plans/README.
 - [RFC 0001: the threaded runtime](docs/rfcs/0001-threaded-runtime.md), the motivation and public shape
 - [System design](docs/design/system-design.md): packages, interfaces, sequences and invariants
 - [Architecture decision records](docs/adr/README.md)
-- [Implementation plans](docs/plans/README.md), one per milestone
+- [Implementation plans](docs/plans/README.md), one per milestone, with the [roadmap](docs/plans/roadmap.md) and the [history](docs/plans/history.md)
 - [Contributing](CONTRIBUTING.md): setup, scripts, repo layout and conventions
 - Prior art: [Shopify Remote DOM](https://github.com/Shopify/remote-dom), [Neo.mjs](https://github.com/neomjs/neo), [Web Fragments](https://github.com/IgorMinar/reframed), [Aiga](https://aiga.js.org/), [Garfish](https://github.com/web-infra-dev/garfish)
 

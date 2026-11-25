@@ -2,7 +2,7 @@
 
 - **Status:** Proposed (2026-11-18), to grill when M12 is next to start (questions at the end). Drafted as 0021 and renumbered on 2026-11-24, since 0021 went to the source layout; moved from M5c to M12 Tauri, in `0.4.0`, the same day.
 - **Date:** 2026-11-18
-- **Plan:** [M12 Tauri](../plans/m12-tauri.md), in `0.4.0` beside [M5 Shared-memory engine](../plans/m5-shared-memory-engine.md) ([releases](../plans/README.md#releases)).
+- **Plan:** [M12 Tauri](../plans/m12-tauri.md), in `0.4.0` beside [M5 Shared-memory engine](../plans/m5-shared-memory-engine.md) ([releases](../plans/roadmap.md#releases)).
 - **Touches:** [ADR 0005](0005-bus-topology-message-channels.md) (no record crosses the main thread), [ADR 0007](0007-bus-worker-supervision.md) (durable topics), [ADR 0014](0014-own-codec.md) (the segment bytes), [ADR 0018](0018-tools-for-agents.md) (requestable topics), [ADR 0020](0020-inspection-feed.md) (memory per isolate), [ADR 0021](0021-source-layout-and-entry-points.md) (the new package's layout).
 
 ## Context
