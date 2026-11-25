@@ -169,9 +169,9 @@ More on [isoloop.dev](https://isoloop.dev/#limits).
 | --- | --- |
 | `0.1` (out) | Kernel, bus and durable log; worker pools; devtools and agent tools |
 | `0.2` | Watchers, current values beside streams |
-| `0.3` | Bus pacing, fewer messages per record |
+| `0.3` | Bus pacing, fewer messages per record; watchers in pools |
 | `0.4` | Shared-memory engine; Tauri |
-| `0.5` | WebMCP to stable |
+| `0.5` | WebMCP to stable, if WebMCP has shipped by then (otherwise the adapters move up one) |
 | `0.6` to `0.8` | Vue, Svelte and Solid adapters |
 | `1.0` | Stable API |
 | `2.0` | Node, Bun and server-side rendering |
