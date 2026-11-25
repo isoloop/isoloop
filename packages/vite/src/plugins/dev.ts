@@ -29,8 +29,8 @@ export type HeaderOptions = {
    * instead, so third-party images and scripts without those headers still
    * load. Chromium 96 and Firefox 119 on desktop support `credentialless`.
    * Safari and Firefox for Android ignore it, so there the page isn't
-   * cross-origin isolated. Default `false`. The `'credentialless'` value is
-   * `@experimental`.
+   * cross-origin isolated. Default `false`. `'credentialless'` is experimental and
+   * may change before 1.0.
    */
   crossOriginIsolated?: boolean | 'credentialless';
 };
