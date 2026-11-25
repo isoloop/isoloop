@@ -95,7 +95,7 @@ A page is cross-origin isolated when it's served with `Cross-Origin-Opener-Polic
 | `true` | `require-corp` | Each one needs a `Cross-Origin-Resource-Policy` header, or has to load in CORS mode; others are blocked | Chromium, Firefox and Safari |
 | `'credentialless'` | `credentialless` | `no-cors` requests (images, plain `<script>` tags) load without cookies, so they need no extra headers | Chromium 96 and later, Firefox 119 and later on desktop |
 
-Safari and Firefox for Android ignore `credentialless`: the page loads, isolates run, but it isn't cross-origin isolated, so `crossOriginIsolated` is `false` there. Use `'credentialless'` when third-party assets you don't control break under `require-corp`, and check `crossOriginIsolated` at run time before you rely on `SharedArrayBuffer`. The `'credentialless'` value is `@experimental`.
+The versions come from [MDN's browser compatibility data](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy#browser_compatibility) (2026-11-19). Safari and Firefox for Android ignore `credentialless`: the page loads, isolates run, but it isn't cross-origin isolated, so `crossOriginIsolated` is `false` there. Use `'credentialless'` when third-party assets you don't control break under `require-corp`, and check `crossOriginIsolated` at run time before you rely on `SharedArrayBuffer`. The `'credentialless'` value is `@experimental`.
 
 Isolate modules on another origin load in CORS mode under either value, so the [CORS headers](#cors-for-cross-origin-isolates) above cover them.
 
