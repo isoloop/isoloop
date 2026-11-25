@@ -1,5 +1,5 @@
-# ADR 0009, rule 12: Ubuntu only. Four jobs: `browser`, `e2e` (one per engine)
-# and `bench` start after `check` passes. Actions are pinned by commit SHA
+# ADR 0009, rule 12: Ubuntu only. Five jobs: `browser`, `e2e` (one per engine)
+# and `bench` start after `check` passes; `cli-node24` runs beside `check`. Actions are pinned by commit SHA
 # (rule 9), tags in comments.
 #
 # What runs when (decided 2026-11-07):
@@ -57,6 +57,36 @@ jobs:
           DOCS_CHECK_BASE: HEAD^1
       # The API reference matches the built .d.ts and the CLI (M4c decision 27).
       - run: pnpm docs:api --check
+
+  # The workspace builds and tests on Node 26 (.nvmrc). The published `isoloop`
+  # CLI also supports Node 24 LTS (its `engines`), so run its tests and the
+  # built CLI there.
+  cli-node24:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter isoloop... build
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - run: node --version
+      - run: ./node_modules/.bin/vitest run --project cli
+      - run: |
+          cli=packages/cli/dist/cli.js
+          node $cli --version
+          node $cli --help
+          node $cli contracts export packages/cli/src/__fixtures__/contracts.ts > /dev/null 2> warnings.txt
+          cat warnings.txt
+          cd "$(mktemp -d)"
+          node "$GITHUB_WORKSPACE/$cli" skill add
+          test -f .claude/skills/build-with-isoloop/SKILL.md
 
   browser:
     needs: check
