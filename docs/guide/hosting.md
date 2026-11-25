@@ -36,7 +36,7 @@ const kernel = createKernel({
 });
 ```
 
-`isoloop()` also sends the Content-Security-Policy below on every dev and preview response, with Vite's HMR socket and injected styles allowed. Pass `isolateOrigins` for isolates on other origins, `csp` for a policy of your own (`false` for none), and `crossOriginIsolated: true` for COOP and COEP. `SharedArrayBuffer` needs those two headers, and so does the devtools' memory per isolate in Chromium: `kernel.inspect()` measures it only on a cross-origin isolated page. It also measures it only for workers started from `@isoloop/runtime/worker` as `virtual:isoloop/workers` gives it. Without Vite, pass that entry's URL with `#isoloop-entry` appended to get the figures. Production responses come from your own server, which has to send the headers itself.
+`isoloop()` also sends the Content-Security-Policy below on every dev and preview response, with Vite's HMR socket and injected styles allowed. Pass `isolateOrigins` for isolates on other origins, `csp` for a policy of your own (`false` for none), and `crossOriginIsolated` for COOP and COEP ([Cross-origin isolation](#cross-origin-isolation)). `SharedArrayBuffer` needs those two headers, and so does the devtools' memory per isolate in Chromium: `kernel.inspect()` measures it only on a cross-origin isolated page. It also measures it only for workers started from `@isoloop/runtime/worker` as `virtual:isoloop/workers` gives it. Without Vite, pass that entry's URL with `#isoloop-entry` appended to get the figures. Production responses come from your own server, which has to send the headers itself.
 
 `headersFor({ csp?, isolateOrigins?, crossOriginIsolated? })` from `@isoloop/vite` returns the headers `isoloop()` sends, as a plain object, and `devCsp(origins?)` returns its default policy on its own. The default policy allows Vite's HMR socket (`ws:`, `wss:`) and `style-src 'unsafe-inline'`, which Vite's dev server needs because it injects the CSS you import as `<style>` elements. A production server sends a policy built from [Content Security Policy](#content-security-policy) instead, or passes it as `csp`; its `style-src` needs only `'self'`.
 
@@ -86,6 +86,19 @@ Content-Type: text/javascript
 
 Without them the import fails and the isolate crashes with reason `error` and a message that starts `Could not import <src>` and points back here. The supervisor retries with backoff and then shows the fallback. Other isolates aren't affected.
 
+## Cross-origin isolation
+
+A page is cross-origin isolated when it's served with `Cross-Origin-Opener-Policy: same-origin` and a `Cross-Origin-Embedder-Policy` that makes every cross-origin resource safe to load. Isoloop runs without it. You need it for `SharedArrayBuffer` and for the devtools' memory per isolate. `@isoloop/vite`'s `crossOriginIsolated` sends both headers from the dev and preview servers, with one of two COEP values:
+
+| `crossOriginIsolated` | COEP | Cross-origin resources | Browsers that isolate the page |
+| --- | --- | --- | --- |
+| `true` | `require-corp` | Each one needs a `Cross-Origin-Resource-Policy` header, or has to load in CORS mode; others are blocked | Chromium, Firefox and Safari |
+| `'credentialless'` | `credentialless` | `no-cors` requests (images, plain `<script>` tags) load without cookies, so they need no extra headers | Chromium 96 and later, Firefox 119 and later on desktop |
+
+The versions come from [MDN's browser compatibility data](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy#browser_compatibility) (2026-11-19). Safari and Firefox for Android ignore `credentialless`: the page loads, isolates run, but it isn't cross-origin isolated, so `crossOriginIsolated` is `false` there. Use `'credentialless'` when third-party assets you don't control break under `require-corp`, and check `crossOriginIsolated` at run time before you rely on `SharedArrayBuffer`. `'credentialless'` is experimental and may change before 1.0.
+
+Isolate modules on another origin load in CORS mode under either value, so the [CORS headers](#cors-for-cross-origin-isolates) above cover them.
+
 ## Placement rules
 
 - **One worker per isolate by default.** An isolate, headless or visual, can name a pool (`manifest.pool`) and share a worker with the other isolates naming it. Pool members share an event loop, globals and fate. If one stops responding or takes the worker down, the whole pool restarts, and each member's `isolate:crash` names the `pool`. A member's own fatal error restarts only that member. Visual members also share one document, so they can read each other's DOM and input: keep widgets that handle secrets on their own worker ([pools](pools.md)). A pool suspends only as a whole, when every member is idle and opts in, and any member's wake wakes it. See [Worker pools](pools.md) for when to pool and what members share. Pool names starting with `balancer-` are reserved for the opt-in [balancer](balancer.md), which places isolates by measured load; `kernel.spawn` rejects them with `reserved_pool`.
@@ -102,6 +115,7 @@ Without them the import fails and the isolate crashes with reason `error` and a 
 - **Memory topics don't survive a discarded tab;** only persistent topics do ([above](#persistent-topics-and-a-discarded-tab)).
 - **Only one tab's bus owns the files.** In other tabs, persistent topics run in memory.
 - **A contracts module that fails to load isn't retried:** the bus fails and every isolate with it ([above](#the-bus-worker-and-the-contracts-module)).
+- **COEP `credentialless` doesn't isolate the page in Safari or Firefox for Android** ([above](#cross-origin-isolation)).
 - **The worker budget only warns.** It never blocks a spawn, and the right number depends on the device.
 
 ## See also

@@ -28,16 +28,16 @@ const TYPES: Record<string, string> = {
 
 const servers: Server[] = [];
 
-/** Serves the harness and the isolates; `isolated` adds COOP and COEP. */
-async function serve(isolated: boolean): Promise<string> {
+/** Serves the harness and the isolates; `coep` adds COOP and that COEP. */
+async function serve(coep: false | 'require-corp' | 'credentialless'): Promise<string> {
   const server = createServer((req, res) => {
     const path = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname);
     const [prefix, dir] = Object.entries(FILES).find(([p]) => path.startsWith(p)) ?? ['', ''];
     const rel = path.slice(prefix.length) || 'index.html';
     const file = normalize(join(dir, rel));
-    if (isolated) {
+    if (coep) {
       res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-      res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+      res.setHeader('Cross-Origin-Embedder-Policy', coep);
     }
     if (!file.startsWith(dir) || !existsSync(file)) {
       res.statusCode = 404;
@@ -62,8 +62,11 @@ type Seen = { id: string; state: string; bytes?: number; shared?: boolean }[];
 /** Runs in the page: two own isolates and a pool of two, then one measurement. */
 const spawnAndMeasure = async ({
   src,
+  waitMs,
 }: {
   src: string;
+  /** How long to wait for a figure; default 20 s when isolated, 2 s when not. */
+  waitMs?: number;
 }): Promise<{ isolated: boolean; seen: Seen }> => {
   const kernel = window.harness.createKernel();
   const spawns: [string, number, string | undefined][] = [
@@ -86,7 +89,7 @@ const spawnAndMeasure = async ({
   inspector.on((m) => {
     if (m.t === 'memory') got = true;
   });
-  await until(() => got, crossOriginIsolated ? 20_000 : 2_000);
+  await until(() => got, waitMs ?? (crossOriginIsolated ? 20_000 : 2_000));
   const seen: Seen = [];
   for (const i of inspector.snapshot().isolates) {
     const s: Seen[number] = { id: i.id, state: i.state };
@@ -107,7 +110,7 @@ test('gives each worker its own figure, and a pool’s to every member', async (
     args: ['--enable-blink-features=ForceEagerMeasureMemory'],
   });
   try {
-    const origin = await serve(true);
+    const origin = await serve('require-corp');
     const page = await browser.newPage();
     await page.goto(`${origin}/`);
     await expect(page.locator('body[data-ready]')).toBeAttached();
@@ -142,4 +145,23 @@ test('shows no memory where the page isn’t cross-origin isolated', async ({
   expect(isolated).toBe(false);
   expect(seen.map((x) => x.state)).toEqual(['running', 'running', 'running', 'running']);
   expect(seen.every((x) => x.bytes === undefined)).toBe(true);
+});
+
+// `@isoloop/vite`'s `crossOriginIsolated: 'credentialless'` (isoloop#412):
+// Chromium and Firefox make the page cross-origin isolated under COEP
+// `credentialless`; WebKit ignores the value, so the page isn't. Isolates run
+// either way.
+test('COEP credentialless isolates the page in Chromium and Firefox, not WebKit', async ({
+  page,
+  browserName,
+}) => {
+  const origin = await serve('credentialless');
+  await page.goto(`${origin}/`);
+  await expect(page.locator('body[data-ready]')).toBeAttached();
+  const { isolated, seen } = await page.evaluate(spawnAndMeasure, {
+    src: `${origin}/isolates/memory.js`,
+    waitMs: 0,
+  });
+  expect(isolated).toBe(browserName !== 'webkit');
+  expect(seen.map((x) => x.state)).toEqual(['running', 'running', 'running', 'running']);
 });

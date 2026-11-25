@@ -22,7 +22,8 @@ export type MeasureMemory = () => Promise<unknown>;
 
 /**
  * The browser's measurement, where there is one: Chromium, on a page that is
- * cross-origin isolated (COOP `same-origin` and COEP `require-corp`).
+ * cross-origin isolated (COOP `same-origin`, with COEP `require-corp` or
+ * `credentialless`).
  */
 export function memoryMeasure(): MeasureMemory | undefined {
   if (typeof crossOriginIsolated !== 'boolean' || !crossOriginIsolated) return undefined;
