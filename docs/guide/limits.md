@@ -105,6 +105,17 @@ Other devices and engines tell a different story:
 - **In Playwright's WebKit on Linux,** every frame a worker draws on a transferred canvas costs the main thread time, so pages with many canvas widgets slow down there. Safari 26.5 on a recent iPadOS tablet doesn't show it.
 - **Each worker has its own heap.** The kernel warns past 32 live workers (`workers.budget`, [hosting](hosting.md#placement-rules)). [Pools](pools.md) share a worker to save memory, at the cost of a shared event loop and fate.
 - **A pool freezes the built-ins.** Before its first member loads, a pool worker freezes the prototypes and constructors of the standard built-ins (`Object`, `Array`, `Promise`, `Map`, the typed arrays and the rest, plus `Math`, `JSON` and `Reflect`), so one member can't change them for the others. A library that patches one, such as a polyfill that adds a method to `Array.prototype`, throws a `TypeError` in strict code. Isolates on their own worker are not frozen.
+- **Every worker times its members' callbacks,** with or without `@isoloop/balancer`, to report `busyMs`. Before any isolate loads, the runtime wraps `setTimeout`, `setInterval`, `requestAnimationFrame`, `queueMicrotask`, `requestIdleCallback` and `MessagePort` listeners, so each callback costs two extra clock reads and a little bookkeeping. With empty callbacks in a worker, on bench machine 1 (x64 CPU, 4 cores capped at 2.0 GHz), in Playwright 1.65.1's browsers, 2026-11-25 (`pnpm bench:busy`), callbacks a second without the wrapping → with it:
+
+  | Callback | Chromium 159 | Firefox 159 | WebKit 27.2 |
+  | --- | --- | --- | --- |
+  | `setTimeout`, 100,000 at once | 241,000 → 192,000 | 227,000 → 145,000 | 246,000 → 201,000 |
+  | `setTimeout` then `clearTimeout` | 622,000 → 515,000 | 428,000 → 168,000 | 836,000 → 702,000 |
+  | `MessagePort` ping (`onmessage`) | 167,000 → 135,000 | 132,000 → 115,000 | 88,000 → 84,000 |
+  | `requestAnimationFrame`, 100,000 in one frame | 1.8 million → 608,000 | 752,000 → 272,000 | 909,000 → 532,000 |
+  | `queueMicrotask` chain | 1.5 million → 562,000 | 234,000 → 131,000 | 23.8 million → 2.3 million |
+
+  That is 0.3 to 1.5 µs more per callback in Chromium, 0.2 to 0.9 µs in WebKit, and 1.1 to 3.6 µs in Firefox. A worker that runs 10,000 callbacks a second spends up to about 15 ms of each second on it in Chromium, and up to about 36 ms in Firefox. Promise continuations (`await`, `.then`) aren't wrapped and cost nothing extra.
 
 The full figures, for every dashboard and placement, are on [Benchmarks](https://isoloop.dev/benchmarks/). Every recorded run, in both directions, is in [`isoloop/web`'s plant comparison](https://github.com/isoloop/web/blob/9b50967b0971871ec9671d7dce8d115eb16f6d19/apps/dashboards/plant/comparison/README.md).
 
