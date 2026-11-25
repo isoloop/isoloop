@@ -80,26 +80,28 @@ function escape(s: string): string {
 }
 
 function draw(theme: Theme): string {
-  const tops: number[] = [];
   let y = TOP;
+  const placed: (Entry & { top: number })[] = [];
   for (const e of ENTRIES) {
-    tops.push(y);
+    placed.push(Object.assign({ top: y }, e));
     y += TITLE_GAP + e.lines.length * LINE_HEIGHT + ENTRY_GAP;
   }
   const height = y - ENTRY_GAP + 8;
   const parts: string[] = [];
   // The line between each dot and the next: solid up to the last released
   // version, dashed after it.
-  for (let i = 0; i < ENTRIES.length - 1; i++) {
-    const from = tops[i] + 7;
-    const to = tops[i + 1] - 7;
-    const done = ENTRIES[i + 1].done === true;
-    parts.push(
-      `<line x1="${DOT_X}" y1="${from}" x2="${DOT_X}" y2="${to}" stroke="${done ? theme.done : theme.ahead}" stroke-width="2"${done ? '' : ' stroke-dasharray="3 4"'}/>`,
-    );
+  let previous: (typeof placed)[number] | undefined;
+  for (const e of placed) {
+    if (previous) {
+      const done = e.done === true;
+      parts.push(
+        `<line x1="${DOT_X}" y1="${previous.top + 7}" x2="${DOT_X}" y2="${e.top - 7}" stroke="${done ? theme.done : theme.ahead}" stroke-width="2"${done ? '' : ' stroke-dasharray="3 4"'}/>`,
+      );
+    }
+    previous = e;
   }
-  ENTRIES.forEach((e, i) => {
-    const top = tops[i];
+  for (const e of placed) {
+    const top = e.top;
     const done = e.done === true;
     parts.push(
       `<text x="${LABEL_X}" y="${top + 5}" text-anchor="end" font-size="13" fill="${theme.label}">${escape(e.version)}</text>`,
@@ -111,7 +113,7 @@ function draw(theme: Theme): string {
         `<text x="${TEXT_X}" y="${top + 5 + TITLE_GAP + j * LINE_HEIGHT}" font-size="13.5" fill="${theme.text}">${escape(line)}</text>`,
       );
     });
-  });
+  }
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${height}" viewBox="0 0 ${WIDTH} ${height}" font-family="${FONT}">`,
     ...parts.map((p) => `  ${p}`),
