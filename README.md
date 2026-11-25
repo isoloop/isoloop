@@ -35,7 +35,9 @@ See it run: the [basic example](https://isoloop.dev/examples/basic/), four isola
 
 In most apps, the UI and everything behind it, such as state, sync, search and data processing, share one main thread, one heap and one event loop. One slow or broken part makes the whole app janky or blank. Sandboxes isolate globals and styles, not CPU time or crashes. A plain worker isolates CPU time, but leaves you to wire up how independent parts share data, and what happens when one of them fails.
 
-Isoloop lets you separate them. Each part, UI or headless, can run on a loop of its own, and the page's main thread only applies what the UI parts draw. They share state through a bus that keeps its records. In the browser the bus is optional. Once the work runs outside it, as the plans have it, the bus is the model the UI and the work share. That keeps the UI responsive, contains a block or a crash to its part, and lets the work move to where it runs best: today a worker or a pool, and in the [plans](docs/plans/roadmap.md) a WASM component or a native process, with the same code.
+Isoloop lets you separate them. Each part, UI or headless, can run on a loop of its own, and the page's main thread only applies what the UI parts draw. Parts share state through a bus that keeps its records, and the bus is optional.
+
+That keeps the UI responsive and contains a block or a crash to its part. It also lets the work run where it fits best, on its own worker or in a pool, with the same code. The [roadmap](docs/plans/roadmap.md) takes that further: a WASM component or a native process, where the bus becomes the model the UI and the work share.
 
 Where it fits and what it gives: [Features](https://isoloop.dev/features/).
 
