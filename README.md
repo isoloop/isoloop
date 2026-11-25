@@ -37,7 +37,7 @@ In most apps, the UI and everything behind it, such as state, sync, search and d
 
 Isoloop lets you separate them. Each part, UI or headless, can run on a loop of its own, and the page's main thread only applies what the UI parts draw. Parts share state through a bus that keeps its records, and the bus is optional.
 
-That keeps the UI responsive and contains a block or a crash to its part. It also lets the work run where it fits best, on its own worker or in a pool, with the same code. The [roadmap](docs/plans/roadmap.md) takes that further: a WASM component or a native process, where the bus becomes the model the UI and the work share.
+That keeps the UI responsive and contains a block or a crash to its part. It also lets the work run where it fits best, on its own worker or in a pool, with the same code. The [roadmap](docs/plans/roadmap.md) takes that further: [a WASM component or a native process](docs/plans/m16-native-runtimes.md), where the bus becomes the model the UI and the work share.
 
 Where it fits and what it gives: [Features](https://isoloop.dev/features/).
 
