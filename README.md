@@ -165,16 +165,10 @@ More on [isoloop.dev](https://isoloop.dev/#limits).
 
 ## Roadmap
 
-| Version | What it brings |
-| --- | --- |
-| `0.1` (out) | Kernel, bus and durable log; worker pools; devtools and agent tools |
-| `0.2` | Watchers, current values beside streams |
-| `0.3` | Bus pacing, fewer messages per record; watchers in pools |
-| `0.4` | Shared-memory engine; Tauri |
-| `0.5` | WebMCP to stable, if WebMCP has shipped by then (otherwise the adapters move up one) |
-| `0.6` to `0.8` | Vue, Svelte and Solid adapters |
-| `1.0` | Stable API |
-| `2.0` | Node, Bun and server-side rendering |
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/roadmap-dark.svg">
+  <img src="docs/assets/roadmap-light.svg" alt="Releases: 0.1, the core (out): kernel, bus and durable log, worker pools, devtools and agent tools. 0.2, watchers: current values beside streams. 0.3, bus pacing: fewer messages per record, watchers in pools. 0.4, shared memory and Tauri. 0.5, WebMCP to stable, if WebMCP has shipped by then; otherwise the adapters move up one. 0.6 to 0.8, Vue, Svelte and Solid adapters. 1.0, a stable API. 2.0, beyond the browser: Node, Bun and server-side rendering." width="520">
+</picture>
 
 The order and the reasoning are in the [roadmap](docs/plans/roadmap.md), and each milestone's plan and status are in the [plans index](docs/plans/README.md).
 
