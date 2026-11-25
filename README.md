@@ -25,7 +25,7 @@
   <a href="docs/adr/README.md">ADRs</a>
 </p>
 
-Isoloop is an open-source TypeScript library that separates your app's UI from the work behind it. Each part runs as an *isolate*, on its own worker or in a shared pool: UI parts (a React or Preact tree, or plain DOM) only draw, and headless parts hold the state and do the work. They share state through a message bus with typed topics, retention and replay. When one blocks or crashes, the rest of the app keeps running; the supervisor restarts it, and it rebuilds its state from the bus.
+Isoloop is an open-source TypeScript library that lets you separate your app's UI from the work behind it. Each part runs as an *isolate*, on its own worker or in a shared pool: a UI part (a React or Preact tree, or plain DOM) or a headless one. How you split your app is your call. Parts share state through a message bus with typed topics, retention and replay. When one blocks or crashes, the rest of the app keeps running; the supervisor restarts it, and it rebuilds its state from the bus.
 
 **0.1 is the first release.** The parts marked experimental may change in any minor, and only the latest release is supported ([Limits](https://isoloop.dev/docs/limits/)). What's done and what's next: [Roadmap](#roadmap).
 
@@ -35,7 +35,7 @@ See it run: the [basic example](https://isoloop.dev/examples/basic/), four isola
 
 In most apps, the UI and everything behind it, such as state, sync, search and data processing, share one main thread, one heap and one event loop. One slow or broken part makes the whole app janky or blank. Sandboxes isolate globals and styles, not CPU time or crashes. A plain worker isolates CPU time, but leaves you to wire up how independent parts share data, and what happens when one of them fails.
 
-Isoloop separates them. UI parts stay on the UI's loop, and the parts that do the work run as headless isolates on their own loops. They share state through a bus that keeps its records. In the browser the bus is optional; it's the model the UI and the work share once the work runs elsewhere. That keeps the UI responsive, contains a block or a crash to its part, and lets the work move to where it runs best: today a worker or a pool, and in the [plans](docs/plans/roadmap.md) a WASM component or a native process, with the same code.
+Isoloop lets you separate them. Each part, UI or headless, can run on a loop of its own, and the page's main thread only applies what the UI parts draw. They share state through a bus that keeps its records. In the browser the bus is optional. Once the work runs outside it, as the plans have it, the bus is the model the UI and the work share. That keeps the UI responsive, contains a block or a crash to its part, and lets the work move to where it runs best: today a worker or a pool, and in the [plans](docs/plans/roadmap.md) a WASM component or a native process, with the same code.
 
 Where it fits and what it gives: [Features](https://isoloop.dev/features/).
 

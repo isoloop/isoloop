@@ -6,7 +6,7 @@
 
 ## Why keep this list
 
-Isoloop keeps the UI on its own loop and runs the work behind it on others. Browsers allow that for code, through workers, but not for rendering: a worker has no DOM, and the one thread that has it is shared by everything on the page. Isoloop's render bridge (`isoloop-dom@1`, [ADR 0010](../adr/0010-own-render-bridge.md)) works within that by sending each isolate's changes to the page, where the compositor applies them within a per-frame budget.
+Isoloop lets the parts of an app, the UI and the work behind it, run on loops of their own. Browsers allow that for code, through workers, but not for rendering: a worker has no DOM, and the one thread that has it is shared by everything on the page. Isoloop's render bridge (`isoloop-dom@1`, [ADR 0010](../adr/0010-own-render-bridge.md)) works within that by sending each isolate's changes to the page, where the compositor applies them within a per-frame budget.
 
 A longer-term question, and not a plan: what would an engine look like if each isolate could own its DOM subtree on its own thread? The isolate↔host protocol doesn't depend on how the host side is implemented, so an engine like that could implement the host side natively and run the same isolates. This list is what such an engine would have to address, gathered from measurements rather than guesses. Today the useful reading is narrower: these are the costs Isoloop's numbers carry, and where they come from.
 
