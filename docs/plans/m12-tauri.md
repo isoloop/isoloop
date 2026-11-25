@@ -9,6 +9,7 @@
 - **[M11 Pure kernel core](m11-pure-kernel-core.md),** done before this milestone starts: a Tauri host is a second shell around the same kernel decisions.
 - **[M5 Shared-memory engine](m5-shared-memory-engine.md),** in the same minor, `0.4.0` (the [releases table](README.md#releases)). `TauriStorage` reuses M5's Rust code for the segment format, and the spike reuses its cross-origin isolated test setup. That's reuse, not a block: if M5's engine doesn't ship, this milestone writes the segment code in Rust itself, on the M2b segment layout `OpfsStorage` already uses.
 - With [M8 Watchers](m8-watchers.md) W3, also in `0.4.0`, Tauri apps get shared watch slots by default through the config helper. `kernel.respond` may land earlier (an open question for the ADR).
+- **Reused later by [M16 Native runtimes](m16-native-runtimes.md),** whose isolates outside the webview reach the bus over this milestone's IPC, and whose example is this milestone's app. Nothing here waits on M16.
 
 Grilled before it gets a task list, together with its ADR.
 
