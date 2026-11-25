@@ -273,7 +273,7 @@ npx isoloop contracts export src/contracts.ts --out contracts.schema.json
 - **`unchecked()` schemas** export as `{}`, are listed under the topic's `unchecked`, and print a warning.
 - **A schema that can't be converted** fails the command: every such topic is reported, nothing is written, and the exit code is 1.
 - **It needs [Standard JSON Schema](https://standardschema.dev/json-schema)** (`~standard.jsonSchema`) on each schema, so there's no converter per library. Zod 4.2 and later have it; Valibot's schemas need `toStandardJsonSchema()` (see [Topics](#topics)), and Zod Mini's can't be exported.
-- **The CLI imports the module with Node** (26 or later), so the module and what it imports must load there.
+- **The CLI imports the module with Node** (24 or later), so the module and what it imports must load there.
 
 Commit the export and review its diff in CI: a change that isn't adding an optional field means a new topic version.
 

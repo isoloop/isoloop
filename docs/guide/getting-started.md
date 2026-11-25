@@ -157,7 +157,7 @@ kernel.on('isolate:failed', (e) => console.error(`${e.id} gave up: ${e.message}`
 
 ## For agents working on your app
 
-The `isoloop` CLI carries a "build with Isoloop" skill, in the [Agent Skills](https://agentskills.io) format, that teaches a coding agent contracts, isolates, grants and the limits. Install the CLI (it needs Node 26 or later) and copy the skill into your project:
+The `isoloop` CLI carries a "build with Isoloop" skill, in the [Agent Skills](https://agentskills.io) format, that teaches a coding agent contracts, isolates, grants and the limits. Install the CLI (it needs Node 24 or later) and copy the skill into your project:
 
 ```sh
 npm install -D isoloop

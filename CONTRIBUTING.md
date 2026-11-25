@@ -67,6 +67,7 @@ The examples (basic and the dashboards) and the website live in [isoloop/web](ht
 `.github/workflows/ci.yml` runs on every PR and on `main` (`check` only there), weekly, and inside a [release](#releases)'s dry run and stage run:
 
 - **`check`:** format check, lint, typecheck, `test:node` and build, then `check-exports`, `docs:check` and the bundle guard (`pnpm bench:bundle`) on the built packages.
+- **`cli-node24`:** the CLI's tests, then the built CLI (`--version`, `contracts export`, `skill add`) on Node 24, which the `isoloop` package supports beside Node 26.
 - **After `check` passes, in parallel:**
   - **`browser`:** `test:browser`, in Chromium, plus Firefox and WebKit for the bus.
   - **`e2e`:** `pnpm e2e` once per engine (Chromium, Firefox, WebKit).
