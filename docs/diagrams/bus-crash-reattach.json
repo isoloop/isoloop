@@ -44,22 +44,22 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 341,
-          "end_line": 383,
+          "line": 343,
+          "end_line": 385,
           "label": "new bus, safe mode, reattach",
           "anchor": "worker = w;"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1461,
-          "end_line": 1469,
+          "line": 1473,
+          "end_line": 1481,
           "label": "ready again: wake headless",
           "anchor": "ready: (first) => {"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1511,
-          "end_line": 1522,
+          "line": 1523,
+          "end_line": 1534,
           "label": "a new port per isolate",
           "anchor": "reattach: (id) => {"
         }

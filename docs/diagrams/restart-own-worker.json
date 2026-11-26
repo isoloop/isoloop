@@ -37,22 +37,22 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 380,
-          "end_line": 422,
+          "line": 438,
+          "end_line": 480,
           "label": "crash, backoff, spawn",
           "anchor": "function crash("
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1349,
-          "end_line": 1385,
+          "line": 1360,
+          "end_line": 1396,
           "label": "attach before init",
           "anchor": "const start = (slot: Slot, o: { wake?: boolean } = {}): void => {"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1250,
-          "end_line": 1267,
+          "line": 1261,
+          "end_line": 1278,
           "label": "ready: format and version check",
           "anchor": "case 'ready': {"
         }
@@ -66,15 +66,15 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 426,
-          "end_line": 440,
+          "line": 428,
+          "end_line": 442,
           "label": "attach a new port",
           "anchor": "const connect: BusController['connect'] = (isolateId, grants, opts = {}) => {"
         },
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 515,
-          "end_line": 523,
+          "line": 517,
+          "end_line": 525,
           "label": "detach keeps offsets",
           "anchor": "detach(isolateId, opts = {}) {"
         }

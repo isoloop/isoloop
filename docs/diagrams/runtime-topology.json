@@ -51,8 +51,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 763,
-          "end_line": 769,
+          "line": 772,
+          "end_line": 778,
           "label": "unsupported_browser",
           "anchor": "export function createKernel(config: KernelConfig): Kernel {"
         },
@@ -75,15 +75,15 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 235,
-          "end_line": 361,
+          "line": 259,
+          "end_line": 436,
           "label": "state machine",
-          "anchor": "export function step(s: IsolateSupervision, input: SupervisorInput, cfg: SupervisorConfig): Step {"
+          "anchor": "export function step("
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1073,
-          "end_line": 1094,
+          "line": 1084,
+          "end_line": 1105,
           "label": "pool fate",
           "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
           "anchor_offset": 1
@@ -143,8 +143,8 @@
         },
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 426,
-          "end_line": 440,
+          "line": 428,
+          "end_line": 442,
           "label": "attach: a port per isolate",
           "anchor": "const connect: BusController['connect'] = (isolateId, grants, opts = {}) => {"
         }
@@ -160,8 +160,8 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 611,
-          "end_line": 613,
+          "line": 613,
+          "end_line": 615,
           "label": "kernel.subscribe's own port",
           "anchor": "subscribe(sub) {"
         }
