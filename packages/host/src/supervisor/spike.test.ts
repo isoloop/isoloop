@@ -147,6 +147,12 @@ const scenarios: Record<string, Scenario> = {
     hostStall: Array.from({ length: 30 }, (_, i): Span => [HANG + i * 2000, HANG + i * 2000 + 1200]),
     untilMs: 70_000,
   },
+  'host late 75% (150 ms of every 200 ms), worker 0 hangs for good': {
+    workers: 12,
+    silent: (w) => (w === 0 ? [[HANG, Infinity]] : none),
+    hostStall: Array.from({ length: 1500 }, (_, i): Span => [i * 200 + 50, i * 200 + 200]),
+    untilMs: 300_000,
+  },
   '#390: worker 0 hangs 10 s after each start, 11 beat': {
     workers: 12,
     silent: (w, started) => (w === 0 ? [[started + 10_000, Infinity]] : none),
