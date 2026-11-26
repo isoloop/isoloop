@@ -7,7 +7,7 @@ type Ctx = {
   id: string;
   config: unknown;
   bus: {
-    publish(topic: unknown, rec: { value: unknown }): Promise<void>;
+    publish(topic: unknown, value: unknown): Promise<void>;
     subscribe(topic: unknown, fn: (r: Rec) => void, opts?: { from?: string }): () => void;
   };
 };
@@ -23,7 +23,11 @@ export default {
       (r) => {
         seen.push(r.value);
         void ctx.bus.publish(report, {
-          value: { id: ctx.id, resets: {}, ports: 0, seen: seen.length, values: [...seen] },
+          id: ctx.id,
+          resets: {},
+          ports: 0,
+          seen: seen.length,
+          values: [...seen],
         });
       },
       { from: 'committed' },

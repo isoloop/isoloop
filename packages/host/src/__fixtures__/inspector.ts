@@ -22,7 +22,7 @@ type Ctx = {
   id: string;
   config: unknown;
   inspector: Insp | undefined;
-  bus: { publish(topic: unknown, rec: { value: unknown }): Promise<void> };
+  bus: { publish(topic: unknown, value: unknown): Promise<void> };
 };
 type Config = { do?: string; action?: 'restart' | 'kill' | 'block'; target?: string; ms?: number };
 
@@ -35,7 +35,7 @@ export default {
     const seen: unknown[] = [];
     const say = (step: string, data: unknown = null): void => {
       seen.push({ step, data });
-      ctx.bus.publish(report, { value: { id: ctx.id, seen: [...seen] } }).catch(() => {});
+      ctx.bus.publish(report, { id: ctx.id, seen: [...seen] }).catch(() => {});
     };
     const ins = ctx.inspector;
     if (!ins) {

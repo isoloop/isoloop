@@ -29,8 +29,8 @@
         },
         {
           "path": "packages/runtime/src/bus/bus-client.ts",
-          "line": 439,
-          "end_line": 468,
+          "line": 445,
+          "end_line": 474,
           "label": "reattach in order",
           "anchor": "reattach(next) {"
         }
@@ -51,15 +51,15 @@
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1454,
-          "end_line": 1462,
+          "line": 1461,
+          "end_line": 1469,
           "label": "ready again: wake headless",
           "anchor": "ready: (first) => {"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1504,
-          "end_line": 1515,
+          "line": 1511,
+          "end_line": 1522,
           "label": "a new port per isolate",
           "anchor": "reattach: (id) => {"
         }

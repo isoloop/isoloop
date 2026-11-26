@@ -8,7 +8,7 @@ type Rec = { value: unknown };
 type Ctx = {
   id: string;
   bus: {
-    publish(topic: unknown, rec: { value: unknown }): Promise<void>;
+    publish(topic: unknown, value: unknown): Promise<void>;
     subscribe(topic: unknown, fn: (r: Rec) => void, opts?: { from?: string }): () => void;
   };
 };
@@ -21,9 +21,7 @@ export default {
     const seen: string[] = [];
     const published: Record<string, string> = {};
     const send = (): void => {
-      void ctx.bus.publish(report, {
-        value: { id: ctx.id, seen: [...seen], published: { ...published } },
-      });
+      void ctx.bus.publish(report, { id: ctx.id, seen: [...seen], published: { ...published } });
     };
     ctx.bus.subscribe(count, (r) => {
       seen.push(`count.v1:${String(r.value)}`);
@@ -34,7 +32,7 @@ export default {
       send();
     });
     const attempt = (topic: { name: string }, value: unknown): Promise<void> =>
-      ctx.bus.publish(topic, { value }).then(
+      ctx.bus.publish(topic, value).then(
         () => {
           published[topic.name] = 'ok';
         },

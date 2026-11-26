@@ -50,11 +50,11 @@ describe('isoloop migrate', () => {
     await install({ host: '0.1.1', runtime: '0.1.1' });
     const r = await migrate();
     expect(r.code).toBe(0);
-    expect(r.out).toBe('');
+    expect(r.out).toContain('-ctx.bus.publish(t, { value: 1 });\n+ctx.bus.publish(t, 1);\n');
     expect(r.err).toContain(
-      `Migrating ${cwd} from 0.1 to the newest:\n  0.2: supervisor.healthyAfterMs set beside supervisor.withinMs\n`,
+      `Migrating ${cwd} from 0.1 to the newest:\n  0.2: supervisor.healthyAfterMs set beside supervisor.withinMs; publish(topic, { value, key }) → publish(topic, value, { key })\n`,
     );
-    expect(r.err).toContain('0 files of 1 source file would change.');
+    expect(r.err).toContain('1 file of 1 source file would change.');
     expect(await readFile(join(cwd, 'src/app.ts'), 'utf8')).toBe(
       'ctx.bus.publish(t, { value: 1 });\n',
     );
@@ -84,7 +84,7 @@ describe('isoloop migrate', () => {
       err: 'Nothing to migrate from 0.2 to the newest.\n',
     });
     expect((await migrate(['0.2', '--from', '0.1.1'])).err).toContain(
-      '0.2: supervisor.healthyAfterMs set beside supervisor.withinMs',
+      '0.2: supervisor.healthyAfterMs set beside supervisor.withinMs; publish(topic, { value, key }) → publish(topic, value, { key })',
     );
   });
 

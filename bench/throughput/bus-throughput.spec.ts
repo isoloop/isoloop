@@ -54,10 +54,10 @@ export default {
       latencies.push(now - r.value.sentAt);
       lastRecv = now;
       if (latencies.length === total)
-        void ctx.bus.publish(ctl, { value: { done: ctx.id, firstSent, lastRecv, latencies } });
+        void ctx.bus.publish(ctl, { done: ctx.id, firstSent, lastRecv, latencies });
     }, { from: 'latest' });
     // Subscribed: tell the host. The subscribe is answered before any later publish is delivered.
-    setTimeout(() => void ctx.bus.publish(ctl, { value: { ready: ctx.id } }), 100);
+    setTimeout(() => void ctx.bus.publish(ctl, { ready: ctx.id }), 100);
   },
 };
 `;
@@ -82,7 +82,7 @@ export default {
           while (inFlight < window && sent < records) {
             inFlight++;
             const seq = sent++;
-            ctx.bus.publish(tp, { value: { seq, sentAt: abs(), pad } }).then(() => {
+            ctx.bus.publish(tp, { seq, sentAt: abs(), pad }).then(() => {
               inFlight--;
               if (sent === records && inFlight === 0) resolve();
               else pump();
@@ -91,7 +91,7 @@ export default {
         };
         pump();
       });
-      void ctx.bus.publish(ctl, { value: { published: records, ms: abs() - t0 } });
+      void ctx.bus.publish(ctl, { published: records, ms: abs() - t0 });
     }, { from: 'latest' });
   },
 };
@@ -148,7 +148,7 @@ for (const durability of ['memory', 'persistent'] as const) {
             if (typeof v !== 'object' || v === null) return;
             if ('ready' in v) {
               ready.add(String(v.ready));
-              if (ready.size === subscribers) void kernel.publish(ctl, { value: { go: true } });
+              if (ready.size === subscribers) void kernel.publish(ctl, { go: true });
             }
             if ('done' in v) done.push(v);
             if ('published' in v) published = v;

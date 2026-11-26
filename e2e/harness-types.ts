@@ -33,7 +33,7 @@ type HarnessKernel = {
     fn: (r: { offset: number; value: unknown; producer: string }) => void,
     opts?: { from?: 'latest' | 'earliest' | 'committed' },
   ): () => void;
-  publish(topic: { name: string }, rec: { key?: string; value: unknown }): Promise<void>;
+  publish(topic: { name: string }, value: unknown, opts?: { key?: string }): Promise<void>;
   request(topic: { name: string }, value: unknown, opts?: { timeoutMs?: number }): Promise<unknown>;
   isolates(): {
     id: string;

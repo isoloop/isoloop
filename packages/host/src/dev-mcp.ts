@@ -205,10 +205,7 @@ async function runOp(
       return { ok: true };
     case 'publish':
       if (kernel.publish === undefined) throw new Error('this page has no kernel.publish');
-      await kernel.publish(byName(op.topic), {
-        value: op.value,
-        ...(op.key === undefined ? {} : { key: op.key }),
-      });
+      await kernel.publish(byName(op.topic), op.value, op.key === undefined ? {} : { key: op.key });
       return { ok: true };
     case 'request':
       return {

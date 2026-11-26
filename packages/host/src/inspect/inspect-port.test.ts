@@ -118,10 +118,7 @@ describe('the inspect grant (ADR 0020, decision 6)', () => {
   it('reads past records and taps new ones as previews', async () => {
     const k = kernel();
     // In order, so the last three are known.
-    await [1, 2, 3, 4].reduce(
-      (prev, n) => prev.then(() => k.publish(count, { value: n })),
-      Promise.resolve(),
-    );
+    await [1, 2, 3, 4].reduce((prev, n) => prev.then(() => k.publish(count, n)), Promise.resolve());
     const read = inspectorIsolate(k, { do: 'records' });
     await waitFor(() => step(read, 'records') !== undefined);
     expect(step(read, 'records')?.data).toEqual(['2', '3', '4']);
@@ -133,7 +130,7 @@ describe('the inspect grant (ADR 0020, decision 6)', () => {
     await waitFor(() => step(reports, 'tapping') !== undefined);
     await vi.waitFor(
       async () => {
-        await k.publish(count, { value: 42 });
+        await k.publish(count, 42);
         if (!latest(reports).some((s) => s.step === 'tapped' && s.data === '42'))
           throw new Error('not yet');
       },
@@ -149,7 +146,7 @@ describe("a tap's skipped count (ADR 0020, decision 6, amended 2026-11-19)", () 
     await waitFor(() => step(reports, 'tapping') !== undefined);
     await vi.waitFor(
       async () => {
-        await Promise.all(Array.from({ length: 20 }, (_, i) => k.publish(count, { value: i })));
+        await Promise.all(Array.from({ length: 20 }, (_, i) => k.publish(count, i)));
         const s = step(reports, 'skipped');
         if (typeof s?.data !== 'number' || s.data < 1) throw new Error('not yet');
       },
@@ -178,7 +175,7 @@ describe("a tap's skipped count (ADR 0020, decision 6, amended 2026-11-19)", () 
     );
     await vi.waitFor(
       async () => {
-        await Promise.all(Array.from({ length: 20 }, (_, i) => k.publish(count, { value: i })));
+        await Promise.all(Array.from({ length: 20 }, (_, i) => k.publish(count, i)));
         if (skipped < 1) throw new Error('not yet');
       },
       { timeout: 8000, interval: 300 },
@@ -252,14 +249,14 @@ describe('the host Inspector', () => {
     k.spawn({ id: 'T', src: burn });
     await waitFor(() => k.isolates().find((i) => i.id === 'T')?.state === 'running');
     const ins = k.inspect();
-    await k.publish(count, { value: 7 });
+    await k.publish(count, 7);
     const recs = await ins.records(count.name, { last: 5 });
     expect(recs.map((r) => r.preview)).toEqual(['7']);
     const tapped: string[] = [];
     const stop = ins.tap({ topics: [count.name] }, (r) => tapped.push(r.preview));
     await vi.waitFor(
       async () => {
-        await k.publish(count, { value: 8 });
+        await k.publish(count, 8);
         if (!tapped.includes('8')) throw new Error('not yet');
       },
       { timeout: 8000, interval: 200 },

@@ -612,9 +612,8 @@ interface Kernel {
   stop(id: string): Promise<void>;
   restart(id: string): Promise<void>;
   resume(id: string): Promise<void>;
-  publish<In>(topic: TopicRef<In, any, any, any>, rec: {
+  publish<In>(topic: TopicRef<In, any, any, any>, value: In, opts?: {
     key?: string;
-    value: In;
   }): Promise<void>;
   dropTopic(name: string, opts?: {
     force?: boolean;
@@ -639,7 +638,7 @@ interface Kernel {
 | `stop()` | Stops an isolate: its `onShutdown` handlers get the stop grace (1 s), then its worker goes. The id is free at once: a `spawn` with it before then starts when the old worker is gone. |
 | `restart()` | Restarts an isolate now, whatever its state, `failed` included, and clears its restart window. |
 | `resume()` | Wakes a suspended isolate; a no-op otherwise. |
-| `publish()` | Publishes a record from the host. |
+| `publish()` | Publishes a record from the host: `kernel.publish(count, 1)`, or `kernel.publish(prices, 102, { key: 'AAPL' })` with a key. |
 | `dropTopic()` | Deletes a persistent topic the contracts no longer list (see `bus:orphaned_topics`). |
 | `request()` | **Experimental.** Requests from the host, the mirror of `bus.request`: appends a request record with `req: { from: 'host', id, via }` and resolves with the first valid reply. Works on any requestable topic, exposed to agents or not. An isolate that restarts within the timeout still gets the request and can answer it. |
 | `tools()` | **Experimental.** The tools exposed through `agents.expose`, with their JSON Schemas, made once at `createKernel`. Transports list these and call them with `kernel.request`. |

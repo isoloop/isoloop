@@ -12,7 +12,7 @@ type Ctx = {
   root?: Element;
   onShutdown(fn: () => Promise<void>): void;
   bus: {
-    publish(topic: unknown, rec: { value: unknown }): Promise<void>;
+    publish(topic: unknown, value: unknown): Promise<void>;
     subscribe(topic: unknown, fn: (r: Rec) => void, opts?: { from?: string }): () => void;
   };
 };
@@ -35,7 +35,7 @@ export default {
       ctx.root.append(out);
     }
     const send = (): void => {
-      void ctx.bus.publish(report, { value: { id: ctx.id, instance, values: [...values] } });
+      void ctx.bus.publish(report, { id: ctx.id, instance, values: [...values] });
     };
     ctx.bus.subscribe(
       count,

@@ -67,7 +67,7 @@ describe('visual pools (M2d)', () => {
         warning: "Members of this pool can read each other's DOM and input.",
       }),
     ]);
-    await kernel.publish(count, { value: 7 });
+    await kernel.publish(count, 7);
     await until(() => ['W1', 'W2', 'W3'].every((id) => value(id) === '7'));
     // Clicks reach only their own member.
     button('W1')?.click();
@@ -85,11 +85,11 @@ describe('visual pools (M2d)', () => {
     spawn('W2', { pool: 'p' });
     spawn('W3', { pool: 'q' });
     await until(() => ['W1', 'W2', 'W3'].every((id) => value(id) === '-'));
-    await kernel.publish(count, { value: 1 });
+    await kernel.publish(count, 1);
     await until(() => crashes.some((c) => c.id === 'W2'));
     expect(crashes.find((c) => c.id === 'W2')).toMatchObject({ reason: 'unresponsive', pool: 'p' });
     // The other pool kept drawing and handling clicks.
-    await kernel.publish(count, { value: 2 });
+    await kernel.publish(count, 2);
     await until(() => value('W3') === '2');
     button('W3')?.click();
     await until(() => button('W3')?.textContent === '1');
@@ -118,7 +118,7 @@ describe('visual pools (M2d)', () => {
       // oxlint-disable-next-line no-await-in-loop -- one scenario at a time
       await until(() => ready.length >= 3);
       // oxlint-disable-next-line no-await-in-loop
-      await kernel.publish(count, { value: 1 });
+      await kernel.publish(count, 1);
       // oxlint-disable-next-line no-await-in-loop
       await until(() => ['F', 'W1', 'W2'].every((id) => crashes.some((c) => c.id === id)));
       for (const id of ['F', 'W1', 'W2'])
@@ -131,7 +131,7 @@ describe('visual pools (M2d)', () => {
       // oxlint-disable-next-line no-await-in-loop
       await until(() => ready.filter((e) => e.id === 'W2').length >= 2);
       // oxlint-disable-next-line no-await-in-loop
-      await kernel.publish(count, { value: 2 });
+      await kernel.publish(count, 2);
       // oxlint-disable-next-line no-await-in-loop
       await until(() => value('W2') === '2');
       if (spinner === 'widget') {

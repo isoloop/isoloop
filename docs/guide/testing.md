@@ -32,7 +32,7 @@ const cartTotal = defineIsolate({
       cartItems,
       async (record) => {
         total += record.value.qty;
-        await ctx.bus.publish(cartItems, { key: 'total', value: { sku: 'total', qty: total } });
+        await ctx.bus.publish(cartItems, { sku: 'total', qty: total }, { key: 'total' });
       },
       { from: 'earliest', onReset: () => (total = 0) },
     );

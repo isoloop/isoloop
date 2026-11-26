@@ -41,6 +41,27 @@ const codeOf = (fn: () => unknown): string | undefined => {
   return undefined;
 };
 
+describe('init', () => {
+  it('carries KernelConfig.dev, for the runtime deprecation warnings (ADR 0012)', async () => {
+    const post = vi.spyOn(Worker.prototype, 'postMessage');
+    const inits = (): unknown[] =>
+      post.mock.calls
+        .map((c): unknown => c[0])
+        .filter((m) => typeof m === 'object' && m !== null && Reflect.get(m, 't') === 'init')
+        .map((m): unknown =>
+          typeof m === 'object' && m !== null ? Reflect.get(m, 'p') : undefined,
+        );
+    kernel({ dev: true }).spawn({ id: 'A', src: counter });
+    kernel().spawn({ id: 'B', src: counter });
+    await waitFor(() => inits().length === 2);
+    expect(
+      inits().map((p): unknown =>
+        typeof p === 'object' && p !== null ? Reflect.get(p, 'dev') : 0,
+      ),
+    ).toEqual([true, undefined]);
+  });
+});
+
 describe('placement rules (ADR 0001)', () => {
   it('accepts a pool for headless and visual isolates alike (ADR 0015)', () => {
     const k = kernel();

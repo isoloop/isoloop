@@ -15,7 +15,7 @@ export default defineIsolate<HTMLElement>({
     inc.addEventListener('click', () => {
       n++;
       big.textContent = String(n);
-      void ctx.bus.publish(count, { value: n });
+      void ctx.bus.publish(count, n);
     });
     ctx.bus.subscribe(
       count,

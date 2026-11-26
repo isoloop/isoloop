@@ -30,7 +30,7 @@ function publishAndRead(page: Page, n: number): Promise<unknown[]> {
     async ({ topic, value }) => {
       const kernel = window.durable?.kernel;
       if (!kernel) throw new Error('no kernel');
-      await kernel.publish(topic, { value });
+      await kernel.publish(topic, value);
       const got: unknown[] = [];
       const off = kernel.subscribe(topic, (r) => got.push(r.value), { from: 'earliest' });
       await new Promise((r) => setTimeout(r, 300));
@@ -74,7 +74,7 @@ function streamThroughCrash(
       const sent: Promise<void>[] = [];
       for (let i = 0; i < total; i++) {
         sent.push(
-          kernel.publish(topic, { value: i }).then(
+          kernel.publish(topic, i).then(
             () => void acked.push(i),
             (e: unknown) => void rejected.push(String(e)),
           ),
@@ -113,7 +113,7 @@ test('I12: a persistent topic loses no acknowledged record when the page is relo
   await page.evaluate(async (topic) => {
     const kernel = window.durable?.kernel;
     if (!kernel) throw new Error('no kernel');
-    await Promise.all(Array.from({ length: 500 }, (_, i) => kernel.publish(topic, { value: i })));
+    await Promise.all(Array.from({ length: 500 }, (_, i) => kernel.publish(topic, i)));
   }, saved);
   // Reloading drops the old page; its bus worker lets go of the lock a moment later.
   await expect(async () => {
@@ -157,7 +157,7 @@ test('a record published just before the page freezes and is discarded is on dis
     const kernel = window.durable?.kernel;
     if (!kernel) throw new Error('no kernel');
     // Not awaited: the page freezes right after the publish.
-    void kernel.publish(topic, { value: 42 });
+    void kernel.publish(topic, 42);
     document.dispatchEvent(new Event('freeze'));
   }, saved);
   // Give the flush a moment, then drop the page as a discard would.

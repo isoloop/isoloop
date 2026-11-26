@@ -22,8 +22,8 @@
       "sources": [
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 153,
-          "end_line": 162,
+          "line": 154,
+          "end_line": 163,
           "label": "init, protocol check, heartbeat",
           "anchor": "async function boot(m: Member, init: InitPayload): Promise<void> {"
         }
@@ -44,15 +44,15 @@
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1343,
-          "end_line": 1379,
+          "line": 1349,
+          "end_line": 1385,
           "label": "attach before init",
           "anchor": "const start = (slot: Slot, o: { wake?: boolean } = {}): void => {"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1244,
-          "end_line": 1261,
+          "line": 1250,
+          "end_line": 1267,
           "label": "ready: format and version check",
           "anchor": "case 'ready': {"
         }

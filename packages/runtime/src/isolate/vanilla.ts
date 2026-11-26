@@ -138,7 +138,7 @@ export const REQUIRES: string = majorMinor(version) ?? '0.0';
  *   start(ctx) {
  *     const button = document.createElement('button');
  *     button.textContent = 'Add one';
- *     button.addEventListener('click', () => void ctx.bus.publish(count, { value: 1 }));
+ *     button.addEventListener('click', () => void ctx.bus.publish(count, 1));
  *     ctx.root?.append(button);
  *   },
  * });

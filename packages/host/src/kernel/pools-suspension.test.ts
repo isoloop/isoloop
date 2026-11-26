@@ -64,7 +64,7 @@ describe('pool suspension (M2c)', () => {
     await until(() => state('A') === 'suspended' && state('B') === 'suspended');
     expect(kernel.debug.workers()).toEqual({ live: 0, pools: {} });
     // A record for A only: A wakes and replays it, and B wakes with it.
-    void kernel.publish(count, { value: 7 });
+    void kernel.publish(count, 7);
     await until(() => latest('A')?.values.length === 1);
     expect(latest('A')?.values).toEqual([7]);
     await until(() => latest('B')?.instance !== firstB.instance);

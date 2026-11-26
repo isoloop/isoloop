@@ -45,7 +45,7 @@ describe('BusClient', () => {
     kernel.spawn({ id: 'F', src, grants: ALL, config: { mode: 'flaky' } });
     await vi.waitUntil(() => ready.length === 1);
     // oxlint-disable-next-line no-await-in-loop -- in order on purpose
-    for (const value of [1, 2, 3]) await kernel.publish(count, { value });
+    for (const value of [1, 2, 3]) await kernel.publish(count, value);
     await vi.waitUntil(() => reports.some((r) => r.values?.length === 3));
     expect(errors.map((e) => e.message)).toEqual(['flaky handler']);
 
@@ -67,7 +67,7 @@ describe('BusClient', () => {
     kernel.spawn({ id: 'F', src, grants: ALL, config: { mode: 'flaky' } });
     await vi.waitUntil(() => ready.length === 1);
     // oxlint-disable-next-line no-await-in-loop -- in order on purpose
-    for (const value of [1, 2, 3]) await kernel.publish(count, { value });
+    for (const value of [1, 2, 3]) await kernel.publish(count, value);
     await vi.waitUntil(() => reports.some((r) => r.values?.length === 3));
     reports.length = 0;
     await kernel.restart('F');

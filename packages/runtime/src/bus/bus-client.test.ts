@@ -29,14 +29,14 @@ describe('createBusClient', () => {
   it('publish resolves on ok and rejects with a BusError on failure', async () => {
     const bus = fakeBus();
     const { client } = createBusClient(bus.port, { epoch: 7 });
-    const ok = client.publish(nums, { key: 'k', value: 1 });
+    const ok = client.publish(nums, 1, { key: 'k' });
     const sent = await bus.next('publish');
     expect(sent.p).toEqual({ topic: 'nums.v1', key: 'k', value: 1, epoch: 7, seq: 1 });
     bus.send({ v: 1, t: 'result', re: sent.id ?? '', p: { ok: true, value: { offset: 0 } } });
     await expect(ok).resolves.toBeUndefined();
 
     bus.got.length = 0;
-    const bad = client.publish(nums, { value: 2 });
+    const bad = client.publish(nums, 2);
     const sent2 = await bus.next('publish');
     bus.send({
       v: 1,
@@ -160,9 +160,9 @@ describe('createBusClient', () => {
   it('rejects with bus_unavailable past the inbox limit', async () => {
     const bus = fakeBus();
     const { client } = createBusClient(bus.port, { inboxLimit: 2 });
-    void client.publish(nums, { value: 1 });
-    void client.publish(nums, { value: 2 });
-    await expect(client.publish(nums, { value: 3 })).rejects.toMatchObject({
+    void client.publish(nums, 1);
+    void client.publish(nums, 2);
+    await expect(client.publish(nums, 3)).rejects.toMatchObject({
       code: 'bus_unavailable',
     });
   });
@@ -171,8 +171,8 @@ describe('createBusClient', () => {
     const old = fakeBus();
     const handle = createBusClient(old.port, { epoch: 3 });
     handle.client.subscribe(nums, () => {}, { from: 'earliest' });
-    const a = handle.client.publish(nums, { value: 1 });
-    const b = handle.client.publish(nums, { value: 2 });
+    const a = handle.client.publish(nums, 1);
+    const b = handle.client.publish(nums, 2);
     await vi.waitUntil(() => old.got.length === 3);
 
     const fresh = fakeBus();
@@ -193,9 +193,9 @@ describe('createBusClient', () => {
   it('numbers publishes and requests in one sequence, under an epoch new per client', async () => {
     const bus = fakeBus();
     const { client } = createBusClient(bus.port);
-    void client.publish(nums, { value: 1 });
+    void client.publish(nums, 1);
     void client.request(nums, 2).catch(() => {});
-    void client.publish(nums, { value: 3 });
+    void client.publish(nums, 3);
     await vi.waitUntil(() => bus.got.length === 3);
     const ids = bus.got.map((m) => ('seq' in m.p ? [m.p.epoch, m.p.seq] : []));
     const epoch = ids[0]?.[0];
@@ -208,7 +208,7 @@ describe('createBusClient', () => {
 
     const other = fakeBus();
     const second = createBusClient(other.port);
-    void second.client.publish(nums, { value: 1 });
+    void second.client.publish(nums, 1);
     const sent = await other.next('publish');
     expect(sent.p.epoch).not.toBe(epoch);
   });

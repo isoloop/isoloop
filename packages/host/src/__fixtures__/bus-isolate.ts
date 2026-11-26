@@ -7,7 +7,7 @@ type Ctx = {
   id: string;
   config: unknown;
   bus: {
-    publish(topic: unknown, rec: { value: unknown }): Promise<void>;
+    publish(topic: unknown, value: unknown): Promise<void>;
     subscribe(topic: unknown, fn: (r: Rec) => void, opts?: { from?: string }): () => void;
   };
 };
@@ -20,7 +20,12 @@ export default {
     const seen: unknown[] = [];
     const send = (extra: Record<string, unknown> = {}): void => {
       void ctx.bus.publish(report, {
-        value: { id: ctx.id, resets: {}, ports: 0, seen: seen.length, values: [...seen], ...extra },
+        id: ctx.id,
+        resets: {},
+        ports: 0,
+        seen: seen.length,
+        values: [...seen],
+        ...extra,
       });
     };
     if (mode(ctx.config) === 'flaky') {
@@ -42,7 +47,7 @@ export default {
       let n = 0;
       let failed = 0;
       setInterval(() => {
-        ctx.bus.publish(count, { value: n++ }).catch(() => {
+        ctx.bus.publish(count, n++).catch(() => {
           failed++;
           send({ failed });
         });

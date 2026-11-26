@@ -34,6 +34,8 @@ export type InitPayload = {
   wake?: boolean;
   /** `KernelConfig.bus.commitIntervalMs` (ADR 0016, decision 1). Default 100. */
   commitIntervalMs?: number;
+  /** `KernelConfig.dev`: the runtime warns when the isolate uses a deprecated shape (ADR 0012). Default `false`. */
+  dev?: boolean;
 };
 
 /** What a beat says about whether the isolate could be suspended (ADR 0001). */

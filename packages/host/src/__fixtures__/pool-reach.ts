@@ -11,7 +11,7 @@ type Ctx = {
   config: unknown;
   root?: Element;
   host: { measure(node: unknown): Promise<unknown>; focus(node: unknown): Promise<void> };
-  bus: { publish(topic: unknown, rec: { value: unknown }): Promise<void> };
+  bus: { publish(topic: unknown, value: unknown): Promise<void> };
 };
 
 const role = (config: unknown): string =>
@@ -71,7 +71,7 @@ export default {
           otherFocus: await outcome(ctx.host.focus(other)),
           forged: await forged,
         };
-        await ctx.bus.publish(report, { value });
+        await ctx.bus.publish(report, value);
       })();
     }, 200);
   },
