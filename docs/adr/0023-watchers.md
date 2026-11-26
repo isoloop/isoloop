@@ -89,17 +89,6 @@ The forces:
 
 25. **The inspection feed gains watcher rows** (Q10, Q24), an addition to ADR 0020 under its decision 7 (the format only grows), with the existing `inspect` grant. Per topic, `BusMetrics` gains: the number of watches, the number of live keys, the transport (`'messages'` until W3), and the records appended and values delivered to watchers that the conflation ratio is computed from. The devtools panel shows the ratio in plain words: "showed 1 of every 40 values".
 
-### The host's watch (amended 2026-11-26, Proposed)
-
-30. **`kernel.watch(topic, onView, opts?)`** in `@isoloop/host`, `@experimental` with the rest of W1:
-    - The same signature as `ctx.bus.watch` (point 7): `onView(view, changed)`, `opts.keys`, and `unwatch()` returned. No `from`, `group` or `onGap`.
-    - It sits beside `kernel.subscribe`, as `ctx.bus.watch` sits beside `ctx.bus.subscribe`. It throws without contracts, as `kernel.subscribe` does.
-    - The host needs no grant, as for `kernel.subscribe`.
-31. **It runs as a host connection to the bus,** as `kernel.subscribe` does. The host's watches on one topic share one bus watch, with the union of their keys, as an isolate's do (point 11). Everything in the bus worker (points 13 to 20) is unchanged: the bus doesn't tell a host watch from an isolate's.
-32. **A host view is settled when `onView` returns,** or when its promise settles (point 21). There's no adapter on the host, so no layout effect. The burst rule (point 22) applies on the host connection's committer.
-33. **After a bus restart,** the host connection sends `watch` again with `have`, as an isolate's client does (point 23), and a lost memory topic resets the view to empty. The host never suspends, so point 24 doesn't apply.
-34. **Devtools count host watches** in the per-topic watcher rows (point 25), as they count host subscriptions today.
-
 ### Older hosts
 
 26. **No emulation of `bus.watch` over `subscribe` on an older host** (Q29). ADR 0012 already settles that case, and it stays unchanged:
@@ -111,6 +100,17 @@ The forces:
 27. **`kernel.watch` on the host** (Q8) waits for a use case. The host has `kernel.subscribe`, and the devtools panel is an isolate. *(Amended 2026-11-26, Proposed: the use case is the M9 shop, whose header on the main thread shows the cart count from the `cart` topic. `kernel.watch` ships in W1, and is described under "The host's watch" below.)*
 28. **W2, pools and wake:** one watch per pool worker, with values handed to its members read-only, and waking from a snapshot. In W1 each pool member watches on its own. W2 is grilled before `0.3.0`.
 29. **W3, shared slots** (Q9): one `SharedArrayBuffer` per topic written by the bus worker under a sequence lock, with a message fallback when the page isn't cross-origin isolated. How slots are sized, declared per topic in the contract or sized by the bus, is decided in an amendment to this ADR before W3.
+
+### The host's watch (amended 2026-11-26, Proposed)
+
+30. **`kernel.watch(topic, onView, opts?)`** in `@isoloop/host`, `@experimental` with the rest of W1:
+    - The same signature as `ctx.bus.watch` (point 7): `onView(view, changed)`, `opts.keys`, and `unwatch()` returned. No `from`, `group` or `onGap`.
+    - It sits beside `kernel.subscribe`, as `ctx.bus.watch` sits beside `ctx.bus.subscribe`. It throws without contracts, as `kernel.subscribe` does.
+    - The host needs no grant, as for `kernel.subscribe`.
+31. **It runs as a host connection to the bus,** as `kernel.subscribe` does. The host's watches on one topic share one bus watch, with the union of their keys, as an isolate's do (point 11). Everything in the bus worker (points 13 to 20) is unchanged: the bus doesn't tell a host watch from an isolate's.
+32. **A host view is settled when `onView` returns,** or when its promise settles (point 21). There's no adapter on the host, so no layout effect. The burst rule (point 22) applies on the host connection's committer.
+33. **After a bus restart,** the host connection sends `watch` again with `have`, as an isolate's client does (point 23), and a lost memory topic resets the view to empty. The host never suspends, so point 24 doesn't apply.
+34. **Devtools count host watches** in the per-topic watcher rows (point 25), as they count host subscriptions today.
 
 ## Consequences
 
