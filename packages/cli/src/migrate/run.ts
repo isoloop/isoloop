@@ -8,6 +8,7 @@ import type { Io } from '../program/io';
 import { applyEdits, flagEdits, mapOffset, type Edit } from './edit';
 import { EXTENSIONS, type Parser } from './parser';
 import type { Step } from './step';
+import { styleFor, type Style } from './style';
 
 /** A flagged place in a migrated file: the line of the code under the comment, 1-based. */
 export type Flagged = { readonly line: number; readonly message: string };
@@ -71,6 +72,7 @@ export async function migrateFolder(input: {
   const changed: FileResult[] = [];
   const failed: { path: string; message: string }[] = [];
   const files = await sources(io, root);
+  const styles = new Map<string, Style>();
   for (const abs of files) {
     const path = relative(root, abs).split(sep).join('/');
     // oxlint-disable-next-line no-await-in-loop -- one file at a time keeps memory flat
@@ -78,6 +80,7 @@ export async function migrateFolder(input: {
     let text = before;
     let flags: { at: number; message: string }[] = [];
     let error: string | undefined;
+    let style: Style | undefined;
     for (const step of steps) {
       if (!step.mayChange(text)) continue;
       // oxlint-disable-next-line no-await-in-loop -- loaded once, on the first file that needs it
@@ -88,7 +91,9 @@ export async function migrateFolder(input: {
         error = `line ${lineOf(text, e?.start ?? 0)}: ${e?.message ?? 'syntax error'}`;
         break;
       }
-      const change = step.transform(parsed.file);
+      // oxlint-disable-next-line no-await-in-loop -- read once per folder, on the first file that needs it
+      style ??= await styleFor(io, root, abs, styles);
+      const change = step.transform(parsed.file, style);
       const edits: Edit[] = [...change.edits, ...flagEdits(text, change.flags)];
       // Earlier steps' flags move with this step's edits.
       flags = [...flags, ...change.flags].map((f) => ({

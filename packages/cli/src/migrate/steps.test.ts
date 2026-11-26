@@ -1,6 +1,8 @@
 // Every step against its fixtures: each `<case>.before.<ext>` becomes
 // `<case>.after.<ext>`, and the after file is left alone (a second run
 // changes nothing). Every version folder has a step and at least one pair.
+// Fixtures are laid out as oxfmt lays them out by default (100 columns, two
+// spaces), so a formatted before file gives a formatted after file.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,10 +10,14 @@ import { describe, expect, it } from 'vitest';
 import { applyChange } from './edit';
 import { loadParser } from './parser';
 import type { Step } from './step';
+import type { Style } from './style';
 import { latest, needs, parseVersion, STEPS, stepsBetween, type Version } from './steps';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const parser = await loadParser();
+
+/** oxfmt's defaults. */
+const FIXTURE_STYLE: Style = { printWidth: 100, indent: '  ', tabWidth: 2, trailingComma: true };
 
 /** The version folders next to this file (`0.2`, …). */
 const folders = readdirSync(here).filter(
@@ -23,7 +29,7 @@ function run(step: Step, path: string, text: string): string {
   if (!step.mayChange(text)) return text;
   const r = parser.parse(path, text);
   if (!r.ok) throw new Error(`${path} doesn't parse: ${r.errors[0]?.message}`);
-  return applyChange(text, step.transform(r.file));
+  return applyChange(text, step.transform(r.file, FIXTURE_STYLE));
 }
 
 describe('the steps', () => {
