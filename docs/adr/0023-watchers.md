@@ -1,6 +1,6 @@
 # ADR 0023: Watchers, a second way to read a topic
 
-- **Status:** Accepted 2026-11-25 (proposed the same day), from the M8 Watchers W0 grilling (Q1–Q30, yes to all). Amendment of 2026-11-26 Proposed: `kernel.watch` in W1 (point 27), from the [M9 Module Federation example](../plans/m9-module-federation.md) grilling (Q17, Q20).
+- **Status:** Accepted 2026-11-25 (proposed the same day), from the M8 Watchers W0 grilling (Q1–Q30, yes to all). Amended 2026-11-26 (accepted the same day): `kernel.watch` in W1 (point 27), from the [M9 Module Federation example](../plans/m9-module-federation.md) grilling (Q17, Q20).
 - **Date:** 2026-11-25
 - **Plan:** [M8 Watchers](../plans/m8-watchers.md). W1 ships in `0.2.0` as `@experimental`; W2 and W3 come in `0.3.0` and `0.4.0` ([releases](../plans/roadmap.md#releases)).
 - **Touches:** [ADR 0005](0005-bus-topology-message-channels.md) (what travels on the bus port), [ADR 0007](0007-bus-worker-supervision.md) (reattach after a bus restart), [ADR 0012](0012-isolates-built-apart.md) (the seam only grows; which host runs which isolate), [ADR 0016](0016-fewer-messages-per-record.md) (the committer, which carries `seen`), [ADR 0020](0020-inspection-feed.md) (new rows in the feed).
@@ -97,11 +97,11 @@ The forces:
 
 ### Not in this ADR
 
-27. **`kernel.watch` on the host** (Q8) waits for a use case. The host has `kernel.subscribe`, and the devtools panel is an isolate. *(Amended 2026-11-26, Proposed: the use case is the M9 shop, whose header on the main thread shows the cart count from the `cart` topic. `kernel.watch` ships in W1, and is described under "The host's watch" below.)*
+27. **`kernel.watch` on the host** (Q8) waits for a use case. The host has `kernel.subscribe`, and the devtools panel is an isolate. *(Amended 2026-11-26: the use case is the M9 shop, whose header on the main thread shows the cart count from the `cart` topic. `kernel.watch` ships in W1, and is described under "The host's watch" below.)*
 28. **W2, pools and wake:** one watch per pool worker, with values handed to its members read-only, and waking from a snapshot. In W1 each pool member watches on its own. W2 is grilled before `0.3.0`.
 29. **W3, shared slots** (Q9): one `SharedArrayBuffer` per topic written by the bus worker under a sequence lock, with a message fallback when the page isn't cross-origin isolated. How slots are sized, declared per topic in the contract or sized by the bus, is decided in an amendment to this ADR before W3.
 
-### The host's watch (amended 2026-11-26, Proposed)
+### The host's watch (amended 2026-11-26)
 
 30. **`kernel.watch(topic, onView, opts?)`** in `@isoloop/host`, `@experimental` with the rest of W1:
     - The same signature as `ctx.bus.watch` (point 7): `onView(view, changed)`, `opts.keys`, and `unwatch()` returned. No `from`, `group` or `onGap`.
