@@ -10,7 +10,7 @@ The order from `0.1` to `2.0`, decided in a grilling on 2026-11-24. No dates: a 
 
 | Version | Milestones |
 | --- | --- |
-| `0.2.0` | [M8 Watchers](m8-watchers.md) W1, after its ADR; the issues labelled `0.2` (#409 to #414, #389, #346), with #411's break shipping with a codemod. [M9 Module Federation example](m9-module-federation.md) ships as an app tag on `0.2.0` and doesn't hold it |
+| `0.2.0` | [M8 Watchers](m8-watchers.md) W1, after its ADR; the issues labelled `0.2` (#409 to #414, #389, #346), with #411's break shipping with a codemod. [M9 Module Federation example](m9-module-federation.md) ships as an app tag on `0.2.0`, after W1, and doesn't hold it; its `resolveRemote` hook and `@isoloop/federation` ship here if their ADR is accepted in time, otherwise in `0.3.0` |
 | No version change, after `0.2.0` | [M13 Benchmark gate](m13-benchmark-gate.md), which blocks `0.3.0`; [M14 Big-file split](m14-big-file-split.md) and [M11 Pure kernel core](m11-pure-kernel-core.md) in parallel, M11 done before M12 |
 | `0.3.0` | [M5b Delivery batching](m5b-delivery-batching.md) (spike), then [M10 Bus pacing](m10-bus-pacing.md); [M8 Watchers](m8-watchers.md) W2 |
 | `0.4.0` | [M5 Shared-memory engine](m5-shared-memory-engine.md); [M8 Watchers](m8-watchers.md) W3, whichever engine wins; [M12 Tauri](m12-tauri.md) |
@@ -27,7 +27,8 @@ The order from `0.1` to `2.0`, decided in a grilling on 2026-11-24. No dates: a 
 ```mermaid
 flowchart LR
   V01["0.1.0 (done)"] --> M8["M8 W1 (0.2)"]
-  V01 -. "0.2.0 published" .-> M9
+  V01 -. "spike on 0.1.x" .-> M9
+  M8 -. "watchers, kernel.watch" .-> M9
   M8 --> M13 & M14 & M11
   M13 --> M5b --> M10
   M10 --> M5
