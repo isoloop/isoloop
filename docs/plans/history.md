@@ -2,6 +2,15 @@
 
 What was decided and shipped, by date, newest first. The order ahead is in the [roadmap](roadmap.md), and each milestone's status in the [plans index](README.md#milestones). Until 2026-11-25 this was one paragraph in the plans index; it was split into dates with its wording kept.
 
+## 2026-11-26
+
+- The remaining `0.2` issues were grilled (Q1–Q19, yes to all):
+  - #346: a `measuring` state and a `measured` move reason for isolates in quarantine only to be measured, bisect moves included; `quarantined` and `steady` stay for offenders.
+  - #409: `supervisor.healthyAfterMs` (default 60 000) is the healthy run that clears the count of short runs, and `withinMs` is the restart window only; ADRs 0001 and 0007 are amended before the code.
+  - #410: the React and Preact adapters share one bus subscription per topic across every `useTopic`; the first caller's `from` wins, with a dev warning; M8 Watchers W1's `useWatch` reuses the module.
+  - #411: `ctx.bus.publish` and `kernel.publish` become `(topic, value, { key? })`, like `request`, `reply` and `usePublish`, as a hard break in `0.2` with an `isoloop migrate` codemod; the codemod tooling and the `breaking:` changeset check land first ([ADR 0019](../adr/0019-versioning-and-releases.md), decision 10).
+  - #389: detectors that tell a starved page from a hung worker are measured first, then the design is grilled and goes into an ADR; nothing from #384 is reused, and its regression becomes a test.
+
 ## 2026-11-25
 
 - The plans index was split in three: the [roadmap](roadmap.md) (releases, the order and what 1.0 and 2.0 need), the [plans index](README.md) (the milestones and conventions) and this history. Finished milestones' rows were cut to their date and tag, and their detail moved here.
