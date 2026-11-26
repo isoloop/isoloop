@@ -88,7 +88,7 @@ The options you're most likely to set first:
 | --- | --- | --- |
 | `contracts` | The contracts module's URL, which the bus worker imports, and its default export, which the host uses | none: without it there's no bus |
 | `workers` | The isolate bootstrap's URL and the bus worker's, from `virtual:isoloop/workers` | required |
-| `supervisor` | How crashed isolates restart: `strategy` (`one-for-one` or `never`), `maxRestarts` within `withinMs`, and the `backoff` between tries | one-for-one, 3 restarts in 60 s or 3 in a row after runs shorter than 60 s, 250 ms doubling up to 4 s |
+| `supervisor` | How crashed isolates restart: `strategy` (`one-for-one` or `never`), `maxRestarts` within `withinMs` or in a row after runs shorter than `healthyAfterMs`, and the `backoff` between tries | one-for-one, 3 restarts in 60 s or 3 in a row after runs shorter than 60 s, 250 ms doubling up to 4 s |
 | `heartbeat` | When a silent isolate counts as blocked (`blockedAfterMs`) and when it's killed (`killAfterMs`) | 400 ms and 10 s |
 | `styles` | `CSSStyleSheet`s adopted into every surface | none |
 | `components` | Host custom elements isolates may render by name, each a `HostComponent`: `{ tag, attributes? }` | none |

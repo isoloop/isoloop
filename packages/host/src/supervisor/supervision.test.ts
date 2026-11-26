@@ -102,9 +102,15 @@ describe('supervision', () => {
   it('a crash loop slower than the window still fails: short runs count (#390)', async () => {
     // Each cycle is about 1.5 s running, 0.6 s to the kill and the backoff:
     // never 3 crashes in 2 s, so the window alone would restart it forever.
+    // Each run is shorter than the 2 s healthy run, so it counts.
     const { log, spawn } = setup({
       heartbeat: { blockedAfterMs: 200, killAfterMs: 600 },
-      supervisor: { maxRestarts: 2, withinMs: 2000, backoff: { initialMs: 10 } },
+      supervisor: {
+        maxRestarts: 2,
+        withinMs: 2000,
+        healthyAfterMs: 2000,
+        backoff: { initialMs: 10 },
+      },
     });
     const a = spawn('A', fixture('spin-later'));
     await waitFor(() => a.handle.snapshot().state === 'failed', 15_000);

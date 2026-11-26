@@ -670,6 +670,7 @@ type KernelConfig = {
     strategy?: "one-for-one" | "never";
     maxRestarts?: number;
     withinMs?: number;
+    healthyAfterMs?: number;
     backoff?: Partial<Backoff>;
   };
   heartbeat?: {
@@ -701,7 +702,7 @@ type KernelConfig = {
 | --- | --- |
 | `contracts?` | The topics: `url` is the ES module the bus worker imports, `list` its default export, imported by the host. Needs `workers.bus`. Without both there is no bus worker: isolates get an unconnected port, and `kernel.publish` rejects with `bus_unavailable`. Default: none. |
 | `workers` | The worker scripts' URLs, and the worker budget. |
-| `supervisor?` | How crashed isolates are restarted. Defaults: one-for-one, 3 restarts in 60 s or 3 in a row after runs shorter than 60 s, backoff 250 ms × 2ⁿ capped at 4 s. |
+| `supervisor?` | How crashed isolates and the bus worker are restarted. Defaults: one-for-one, 3 restarts in 60 s or 3 in a row after runs shorter than 60 s, backoff 250 ms × 2ⁿ capped at 4 s. |
 | `heartbeat?` | How the host tells a busy or hung isolate from a working one. Defaults: 100 / 400 / 10 000 ms, ready timeout 10 000 ms. |
 | `styles?` | Stylesheets adopted into every surface's shadow root. Default: none. |
 | `compositor?` | `frameBudgetMs`: DOM work per frame, in ms. Default 8. The first batch of a frame always applies, so a frame does at most the budget plus one batch. |

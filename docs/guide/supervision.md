@@ -55,7 +55,7 @@ A restart can't fix the last four, so they fail the isolate on the first crash.
 
 On a crash the kernel terminates the worker, emits `isolate:crash`, and:
 
-1. **Counts it** two ways: against the restarts in the last `withinMs`, and, if the isolate's healthy run before it was shorter than `withinMs`, against the crashes in a row after short runs. A healthy run lasts from the isolate's `ready` to its last heartbeat, so the time it took to notice the crash isn't part of it. A worker that never sent `ready` had none. A run of `withinMs` or longer clears the second count, and the crash after it is the first of a new one.
+1. **Counts it** two ways: against the restarts in the last `withinMs`, and, if the isolate's healthy run before it was shorter than `healthyAfterMs`, against the crashes in a row after short runs. A healthy run lasts from the isolate's `ready` to its last heartbeat, so the time it took to notice the crash isn't part of it. A worker that never sent `ready` had none. A run of `healthyAfterMs` or longer clears the second count, and the crash after it is the first of a new one. The two options are independent: either can be the larger.
 2. **Restarts after a backoff** while both counts are within `maxRestarts`. The delay is `initialMs × factor^n`, capped at `maxMs`, where `n` is the larger of the two counts before this crash. With the defaults it's 250 ms, 500 ms, then 1 s.
 3. **Gives up as `failed`** when either count is past `maxRestarts`, when `strategy` is `never`, or when the reason is one that isn't restarted. It emits `isolate:failed` and shows the fallback. The message ends with the limit that was met: `(3 restarts in 60000 ms)` or `(4 crashes, each after less than 60000 ms of healthy running)`.
 
@@ -85,6 +85,7 @@ const app = createKernel({
     strategy: 'one-for-one',
     maxRestarts: 5,
     withinMs: 120_000,
+    healthyAfterMs: 30_000,
     backoff: { initialMs: 500, factor: 2, maxMs: 8000 },
   },
   heartbeat: { blockedAfterMs: 400, killAfterMs: 5000 },
@@ -96,8 +97,9 @@ Every field is optional. `backoff` takes any of its three fields; the rest keep 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `supervisor.strategy` | `'one-for-one'` | `'one-for-one'` restarts only the isolate that crashed (and its pool, above). `'never'` fails on the first crash. |
-| `supervisor.maxRestarts` | `3` | Restarts allowed within `withinMs`, and crashes in a row allowed after runs shorter than `withinMs`; the next crash fails the isolate. |
-| `supervisor.withinMs` | `60000` | The restart window, in ms, and the healthy run that clears the count of short runs. |
+| `supervisor.maxRestarts` | `3` | Restarts allowed within `withinMs`, and crashes in a row allowed after runs shorter than `healthyAfterMs`; the next crash fails the isolate. |
+| `supervisor.withinMs` | `60000` | The sliding window, in ms, that counts restarts. |
+| `supervisor.healthyAfterMs` | `60000` | The healthy run, in ms from `ready` to the last heartbeat, that clears the count of short runs. A positive integer; any other value makes `createKernel` throw `invalid_config`. |
 | `supervisor.backoff.initialMs` | `250` | Delay before the first restart. |
 | `supervisor.backoff.factor` | `2` | Growth per crash already counted. |
 | `supervisor.backoff.maxMs` | `4000` | The cap. |
@@ -254,7 +256,7 @@ Two sets of runs of the plant dashboard's Isoloop page (12 workers, one pool of 
 - **A hang is only caught after `killAfterMs`** (10 s by default), and a hidden tab isn't judged until it's visible. Until then a stuck isolate is `blocked` and a pool's other members are blocked with it.
 - **A pool fails together.** One member that hangs restarts its neighbours and counts against each one's limit. Keep isolates that must not share fate in their own workers.
 - **A failed isolate isn't retried.** The restart limit ends the automatic retries; a person or your code restarts it.
-- **An isolate that crashes after each run of `withinMs` or longer is restarted every time.** Each long run clears the count, so it never reaches `failed`. Raise `withinMs` if crashes that far apart should still add up.
+- **An isolate that crashes after each run of `healthyAfterMs` or longer is restarted every time.** Each long run clears the count, so it never reaches `failed`. Raise `healthyAfterMs` if crashes that far apart should still add up.
 - **Some failures skip the retries.** A render format mismatch, a version mismatch or a bus that can't load its contracts fails the isolate on the first crash.
 - **A starved browser looks like a hang.** A heartbeat's silence is measured in wall-clock time, so the supervisor can't tell a worker that waits for a CPU from one that's stuck. On a badly CPU-starved Firefox it kills workers that are only waiting. Those crashes count toward the restart limit like any other, so with a short `killAfterMs` such a page can reach `failed` ([measured above](#measured-a-cpu-starved-firefox)).
 - **A worker starved before `ready` times out.** It crashes with `ready_timeout` after `heartbeat.readyTimeoutMs`. It never ran, so each such crash counts toward the limit, and a page that stays starved can reach `failed` at the defaults too. Raising `readyTimeoutMs` and `killAfterMs` gives a slow device more room, but a real hang then takes longer to catch. Telling a starved worker from a hung one is planned ([#389](https://github.com/isoloop/isoloop/issues/389)).

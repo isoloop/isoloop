@@ -66,6 +66,27 @@ const waitFor = (ok: () => boolean, timeout = 3000) =>
   );
 
 describe('kernel', () => {
+  it("rejects a supervisor.healthyAfterMs that isn't a positive integer (ADR 0001)", () => {
+    for (const healthyAfterMs of [0, -1, 2.5, Number.NaN, Infinity, '60000'])
+      expect(() =>
+        createKernel({
+          workers: { isolateBootstrap: bootstrap },
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a malformed value, as plain JS could pass
+          supervisor: { healthyAfterMs: healthyAfterMs as number },
+        }),
+      ).toThrow(expect.objectContaining({ code: 'invalid_config' }));
+  });
+
+  it('accepts any positive integer supervisor.healthyAfterMs, larger or smaller than withinMs', () => {
+    for (const healthyAfterMs of [1, 5000, 120_000, 3_600_000]) {
+      const kernel = createKernel({
+        workers: { isolateBootstrap: bootstrap },
+        supervisor: { withinMs: 60_000, healthyAfterMs },
+      });
+      kernels.push(kernel);
+    }
+  });
+
   it('spawns an isolate into a shadow surface with the kernel styles', async () => {
     const { spawn } = setup();
     const a = spawn('A');
