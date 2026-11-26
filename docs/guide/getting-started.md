@@ -181,10 +181,31 @@ This app runs its parts as Isoloop isolates, each on its own worker. Docs: https
 - An isolate can crash and restart at any time. Keep what must survive in the bus, and read it back on start.
 ```
 
+## Upgrading
+
+On 0.x a minor release can change an API. When one does, the `isoloop` CLI rewrites your code for it. Run it from the newest CLI before you upgrade the packages, because the CLI installed in your project is the old one:
+
+```sh
+# Show the changes as a diff, and change nothing
+npx isoloop@latest migrate
+
+# Make the changes
+npx isoloop@latest migrate --write
+```
+
+- **Where it starts:** the `@isoloop/*` version installed in your project, found in the nearest `node_modules`. If you've already upgraded, pass the version you came from: `npx isoloop@latest migrate --from 0.1`.
+- **Where it stops:** the newest release it knows, or the one you name: `npx isoloop@latest migrate 0.2`.
+- **What it reads:** the `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` files under the working directory, or under `--dir <folder>`, outside `node_modules` and folders whose names start with a dot. It changes only the code it rewrites, so your formatting and comments stay.
+- **What it can't rewrite safely** gets a `// isoloop-migrate:` comment on the line above, and the run lists each one with its file and line. Fix those by hand and delete the comments.
+- **A file that doesn't parse** is left as it is and listed, and the command exits 1.
+
+The diff goes to stdout and everything else to stderr, so `npx isoloop@latest migrate > migrate.patch` saves a patch that `git apply` reads.
+
 ## Limits
 
 - **No server-side rendering.** An isolate's content appears once its worker has started and rendered, so anything that must be there at first paint goes in the page's own HTML ([What Isoloop can't hide](limits.md#browsers-and-the-first-paint)).
 - **The cost:** every isolate on its own worker adds CPU, memory and start-up time. Pools trade some of that for shared failure ([Pools](pools.md)).
+- **`isoloop migrate` reads script files only:** code inside `.vue`, `.svelte`, `.html` or Markdown files isn't rewritten.
 
 ## See also
 

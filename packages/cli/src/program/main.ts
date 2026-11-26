@@ -7,6 +7,7 @@ import { flagsHelp, parseArgs, UsageError } from './args';
 import { EXIT, type Command } from './command';
 import { contractsExport } from '../commands/contracts-export';
 import { mcp } from '../commands/mcp';
+import { migrate } from '../commands/migrate';
 import { skillAdd } from '../commands/skill-add';
 import type { Io } from './io';
 import { version } from './version';
@@ -14,7 +15,7 @@ import { version } from './version';
 export { version };
 
 /** Every command. */
-export const COMMANDS: readonly Command[] = [contractsExport, mcp, skillAdd];
+export const COMMANDS: readonly Command[] = [contractsExport, mcp, migrate, skillAdd];
 
 function topHelp(): string {
   const width = Math.max(...COMMANDS.map((c) => c.path.join(' ').length));

@@ -109,6 +109,27 @@ describe('the layout check', () => {
     ]);
   });
 
+  it("rule 3 lets the CLI's codemod steps nest under migrate/<version>/, and nothing else", () => {
+    const out = messages({
+      ...good,
+      'packages/cli/package.json': JSON.stringify({
+        name: 'isoloop',
+        bin: { isoloop: './dist/cli.js' },
+      }),
+      'packages/cli/src/migrate/steps.ts': 'export {};\n',
+      'packages/cli/src/migrate/0.2/step.ts': 'export {};\n',
+      'packages/cli/src/migrate/0.2/fixtures/a.before.ts': 'export {};\n',
+      'packages/cli/src/migrate/next/step.ts': 'export {};\n',
+      'packages/a/src/migrate/0.2/step.ts': 'export {};\n',
+    });
+    expect(out).toEqual([
+      expect.stringContaining('packages/a/src/migrate/0.2/: folders under src/ are one level deep'),
+      expect.stringContaining(
+        'packages/cli/src/migrate/next/: folders under src/ are one level deep',
+      ),
+    ]);
+  });
+
   it('rule 4: fixtures only at src/__fixtures__, and no tests in test/', () => {
     const out = messages({
       ...good,

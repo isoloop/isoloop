@@ -17,6 +17,7 @@ catalog:
   cbor-x: 1.6.9
   fast-check: 4.10.3
   msgpackr: 2.1.4
+  oxc-parser: 0.159.0
   oxfmt: 0.79.0
   oxlint: 1.94.0
   oxlint-tsgolint: 7.0.2007

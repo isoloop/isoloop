@@ -9,5 +9,8 @@
     "declaration": false,
     "isolatedDeclarations": false
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Codemod fixtures are users' code before and after a step, old APIs
+  // included, so they aren't compiled.
+  "exclude": ["src/migrate/*/fixtures"]
 }

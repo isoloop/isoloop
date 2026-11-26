@@ -4,6 +4,10 @@
 //   edits can't ask for `major`. On 0.x a breaking change is a minor; 1.0
 //   starts only on a PR labelled `release-1.0`. It runs on every PR, labelled
 //   `no-changeset` or not.
+// - Codemod gate (ADR 0019, decision 10): a changeset whose summary starts
+//   with `breaking:` fails unless the PR adds before/after fixtures under
+//   `packages/cli/src/migrate/<version>/fixtures/`, for the release it ships
+//   in. It runs on every PR too.
 // - Then `changeset status` runs (the normal check), unless the PR has the
 //   `no-changeset` label or is a version PR: one whose diff only consumes
 //   changesets, as `pnpm release:version` writes it. That's told from the diff
@@ -84,6 +88,56 @@ export function majorProblem(
   );
 }
 
+/** Where the CLI's codemod steps live, one folder per release. */
+export const MIGRATE_DIR = 'packages/cli/src/migrate';
+
+/** A changeset's summary: its text after the front matter, trimmed. */
+export function summaryOf(text: string): string {
+  const front = /^\s*---\r?\n[\s\S]*?\r?\n---[^\n]*\n?/.exec(text);
+  return (front ? text.slice(front[0].length) : text).trim();
+}
+
+/** A changeset for a breaking change: its summary starts with `breaking:`. */
+export const isBreaking = (text: string): boolean => summaryOf(text).startsWith('breaking:');
+
+/**
+ * The release a breaking change on this branch ships in, as `major.minor`:
+ * the release a prerelease leads to (`0.2.0-next.3` → `0.2`), otherwise the
+ * next minor below 1.0 (a breaking change is a minor on 0.x), `1.0` on a PR
+ * labelled `release-1.0`, and the next major from 1.0.
+ */
+export function migrationTarget(version: string, labels: string[]): string {
+  const m = /^(\d+)\.(\d+)\.(\d+)(-.+)?$/.exec(version);
+  if (!m) throw new Error(`can't read the packages' version ${version}`);
+  const [major, minor, patch] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (labels.includes(RELEASE_LABEL) && major === 0) return '1.0';
+  if (m[4] !== undefined && patch === 0) return `${major}.${minor}`;
+  return major === 0 ? `0.${minor + 1}` : `${major + 1}.0`;
+}
+
+/** An error when a pending changeset is `breaking:` and the PR adds no codemod fixtures for it. */
+export function codemodProblem(
+  version: string,
+  changesets: { path: string; text: string }[],
+  changes: Change[],
+  labels: string[],
+): string | undefined {
+  const breaking = changesets.filter((c) => isBreaking(c.text)).map((c) => c.path);
+  if (breaking.length === 0) return undefined;
+  const target = migrationTarget(version, labels);
+  const fixtures = `${MIGRATE_DIR}/${target}/fixtures/`;
+  const has = changes.some(
+    (c) => c.status !== 'D' && c.path.startsWith(fixtures) && /\.before\.[^/]+$/.test(c.path),
+  );
+  if (has) return undefined;
+  return (
+    `${breaking.join(', ')} ${breaking.length === 1 ? 'is a' : 'are'} \`breaking:\` changeset${breaking.length === 1 ? '' : 's'}, ` +
+    `but the PR adds no codemod fixtures for ${target}. A breaking change ships with a codemod: ` +
+    `add its step to ${MIGRATE_DIR}/${target}/step.ts and a before/after pair under ${fixtures} ` +
+    `(CONTRIBUTING.md, "Releases").`
+  );
+}
+
 /** A manifest's text without its `version`, or undefined when it isn't a JSON object. */
 function withoutVersion(text: string): string | undefined {
   try {
@@ -133,7 +187,9 @@ export function decide(input: {
   read: ReadPair;
 }): Decision {
   const { version, labels, changes, read } = input;
-  const problem = majorProblem(version, pendingChangesets(changes, read), labels);
+  const pending = pendingChangesets(changes, read);
+  const problem =
+    majorProblem(version, pending, labels) ?? codemodProblem(version, pending, changes, labels);
   if (problem) return { ok: false, error: problem };
   if (labels.includes(SKIP_LABEL)) {
     return { ok: true, run: false, reason: `Internal-only change, labelled ${SKIP_LABEL}.` };

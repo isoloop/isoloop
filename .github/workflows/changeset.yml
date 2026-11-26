@@ -7,6 +7,9 @@
 # - a changeset asking for `major` fails while the packages are below 1.0.0,
 #   unless the PR is labelled `release-1.0` (on 0.x a breaking change is a
 #   minor);
+# - a changeset whose summary starts with `breaking:` fails unless the PR adds
+#   codemod fixtures under packages/cli/src/migrate/<version>/fixtures/
+#   (ADR 0019, decision 10);
 # - `changeset status` is skipped for an internal-only change (tests, CI,
 #   refactors that leave the published .d.ts alone), labelled `no-changeset`,
 #   and for a version PR, told from its diff: it only consumes changesets.
@@ -38,7 +41,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       # No install: the script runs on the runner's Node.
-      - name: Major guard, version PR or no-changeset label
+      - name: Major guard, codemod gate, version PR or no-changeset label
         id: decide
         run: node scripts/ci/changeset-check.ts
         env:

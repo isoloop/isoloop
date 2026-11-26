@@ -1,7 +1,7 @@
 {
   "name": "isoloop",
   "version": "0.1.0",
-  "description": "The Isoloop command line: export contracts as JSON Schema, run the dev MCP server for coding agents, and add the agent skill.",
+  "description": "The Isoloop command line: export contracts as JSON Schema, run the dev MCP server for coding agents, add the agent skill, and migrate code between releases.",
   "keywords": [
     "isoloop",
     "web-workers",
@@ -9,7 +9,8 @@
     "isolation",
     "cli",
     "mcp",
-    "json-schema"
+    "json-schema",
+    "codemod"
   ],
   "homepage": "https://isoloop.dev/docs/api/cli/",
   "license": "MIT",
@@ -34,7 +35,8 @@
   },
   "dependencies": {
     "@isoloop/bus": "workspace:*",
-    "@isoloop/protocol": "workspace:*"
+    "@isoloop/protocol": "workspace:*",
+    "oxc-parser": "catalog:"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "catalog:",

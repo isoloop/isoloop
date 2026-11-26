@@ -87,6 +87,7 @@ async function startMcp(
     readFile: () => Promise.resolve(undefined),
     mkdir: () => Promise.resolve(),
     writeFile: () => Promise.resolve(),
+    list: () => Promise.resolve(undefined),
     load: () => Promise.reject(new Error('no modules')),
   };
   const exit = main(['mcp', '--port', '0', ...flags], io);
@@ -543,6 +544,7 @@ describe('isoloop mcp', () => {
       readFile: () => Promise.resolve(undefined),
       mkdir: () => Promise.resolve(),
       writeFile: () => Promise.resolve(),
+      list: () => Promise.resolve(undefined),
       load: () => Promise.reject(new Error('no')),
     });
     expect(code).toBe(2);
