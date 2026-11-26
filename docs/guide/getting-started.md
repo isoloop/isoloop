@@ -195,7 +195,7 @@ npx isoloop@latest migrate --write
 
 - **Where it starts:** the `@isoloop/*` version installed in your project, found in the nearest `node_modules`. If you've already upgraded, pass the version you came from: `npx isoloop@latest migrate --from 0.1`.
 - **Where it stops:** the newest release it knows, or the one you name: `npx isoloop@latest migrate 0.2`.
-- **What it reads:** the `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` files under the working directory, or under `--dir <folder>`, outside `node_modules` and folders whose names start with a dot. It changes only the code it rewrites, so your formatting and comments stay.
+- **What it reads:** the `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` files under the working directory, or under `--dir <folder>`, outside `node_modules` and folders whose names start with a dot. It changes only the code it rewrites, so your formatting and comments stay, except comments inside an object it takes apart.
 - **What it can't rewrite safely** gets a `// isoloop-migrate:` comment on the line above, and the run lists each one with its file and line. Fix those by hand and delete the comments.
 - **A file that doesn't parse** is left as it is and listed, and the command exits 1.
 
