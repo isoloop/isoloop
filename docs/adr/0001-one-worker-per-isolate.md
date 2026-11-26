@@ -114,10 +114,10 @@ Decided for 0.2 ([#409](https://github.com/isoloop/isoloop/issues/409)); grilled
 
 1. **`supervisor.healthyAfterMs`** is the healthy run, from `ready` to the last heartbeat, that clears the count of short runs. A crash after a run shorter than `healthyAfterMs` counts; a crash after a run of `healthyAfterMs` or longer clears the count first, so it's the first of a new one. Points 1 and 3–7 of the short-run rule stand as written.
 2. **`withinMs` is the sliding window only:** `maxRestarts` restarts in `withinMs` fail the isolate, as before.
-3. **Default 60 000 ms,** `withinMs`'s default, so an app that sets neither behaves as it does on 0.1.1. An app that sets only `withinMs` gets a healthy run of 60 000 ms, not its `withinMs`: the two are independent.
+3. **Default 60 000 ms,** `withinMs`'s default, so an app that sets neither behaves as it does on 0.1.1. An app that sets only `withinMs` gets a healthy run of 60 000 ms, not its `withinMs`: the two are independent. That changes its restart limit, so the change ships as `breaking:` with a codemod step that sets `healthyAfterMs` to the same expression beside `withinMs`, which keeps such apps on their 0.1 behaviour (decided 2026-11-26, Q31).
 4. **A positive integer, with no upper cap.** Any other value (0, negative, not an integer, not a number) makes `createKernel` throw `invalid_config`, as other malformed options do. It may be larger or smaller than `withinMs`.
 5. **The bus worker follows it too.** It's supervised with the kernel's `supervisor` config ([ADR 0007](0007-bus-worker-supervision.md)), so `healthyAfterMs` applies to it with no separate option.
-6. **New public API on `@isoloop/host`, in a minor.** It's an added optional field, so nothing breaks. `isolate:failed`'s `message` names the number that was met: "4 crashes, each after less than 60000 ms of healthy running" now quotes `healthyAfterMs`.
+6. **New public API on `@isoloop/host`, in a minor.** It's an added optional field; the one behaviour change is point 3's, which the codemod covers. `isolate:failed`'s `message` names the number that was met: "4 crashes, each after less than 60000 ms of healthy running" now quotes `healthyAfterMs`.
 
 **Tests.** The #390 slow-crash-loop cases pass on the default unchanged, and again with a `healthyAfterMs` shorter and longer than `withinMs`, each reaching `failed` (or not) by the count it sets. `invalid_config` gets a case per malformed value.
 

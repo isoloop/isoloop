@@ -1,12 +1,8 @@
 /*
- * The `0.2` step. It rewrites nothing: it gives the codemod gate and the
- * fixture runner a step to check.
+ * The `0.2` step: one transform per change, each in its own file beside this
+ * one, with its fixtures named after it in `fixtures/`.
  */
-import type { Step } from '../step';
+import { combine } from '../step';
+import { healthyAfterMs } from './healthy-after-ms';
 
-export const step: Step = {
-  version: '0.2',
-  summary: 'no source changes',
-  mayChange: () => false,
-  transform: () => ({ edits: [], flags: [] }),
-};
+export const step = combine('0.2', [healthyAfterMs]);

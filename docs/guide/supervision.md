@@ -94,6 +94,8 @@ const app = createKernel({
 
 Every field is optional. `backoff` takes any of its three fields; the rest keep their defaults.
 
+On 0.1, `withinMs` was also the healthy run. Coming from 0.1, `npx isoloop@latest migrate 0.2 --from 0.1 --write` sets `healthyAfterMs` to your `withinMs` wherever a `createKernel` config sets only `withinMs`, so the restart limit stays as it was.
+
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `supervisor.strategy` | `'one-for-one'` | `'one-for-one'` restarts only the isolate that crashed (and its pool, above). `'never'` fails on the first crash. |
