@@ -334,7 +334,7 @@ Publishing has a second case: a persistent topic doesn't append a publish twice 
 
 ## When the bus worker crashes
 
-The kernel watches the bus worker with heartbeats, like an isolate. A worker error, or no beat for `heartbeat.killAfterMs` (10 s by default), ends it. The kernel starts a new one and emits `bus:crash`, `bus:restart` and `bus:ready { first: false }` ([diagram: the crash and reattach](../diagrams/bus-crash-reattach.html)). The bus has the same [restart limit](supervision.md#what-it-does-about-them) as an isolate, set by `supervisor.maxRestarts` and `supervisor.withinMs`. By default, its fourth crash is past the limit unless it ran 60 s or more before one of them. Past the limit the kernel emits `bus:failed`, isolates keep running, and every publish rejects with `bus_unavailable`.
+The kernel watches the bus worker with heartbeats, like an isolate. A worker error, or no beat for `heartbeat.killAfterMs` (10 s by default), ends it. The kernel starts a new one and emits `bus:crash`, `bus:restart` and `bus:ready { first: false }` ([diagram: the crash and reattach](../diagrams/bus-crash-reattach.html)). The bus has the same [restart limit](supervision.md#what-it-does-about-them) as an isolate, set by `supervisor.maxRestarts`, `supervisor.withinMs` and `supervisor.healthyAfterMs`. By default, its fourth crash is past the limit unless it ran 60 s (`healthyAfterMs`) or more before one of them. Past the limit the kernel emits `bus:failed`, isolates keep running, and every publish rejects with `bus_unavailable`.
 
 Isolates keep running. Each one gets a new port to the new bus as soon as it boots, and its bus client:
 

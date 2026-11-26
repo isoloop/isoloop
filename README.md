@@ -80,7 +80,7 @@ import cart from './cart?isolate';
 const kernel = createKernel({
   contracts: { url: contractsUrl, list },
   workers,
-  supervisor: { strategy: 'one-for-one', maxRestarts: 3, withinMs: 60_000 },
+  supervisor: { strategy: 'one-for-one', maxRestarts: 3, withinMs: 60_000, healthyAfterMs: 60_000 },
 });
 
 kernel.spawn({
