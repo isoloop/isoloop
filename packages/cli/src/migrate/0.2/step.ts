@@ -4,5 +4,6 @@
  */
 import { combine } from '../step';
 import { healthyAfterMs } from './healthy-after-ms';
+import { publish } from './publish';
 
-export const step = combine('0.2', [healthyAfterMs]);
+export const step = combine('0.2', [healthyAfterMs, publish]);

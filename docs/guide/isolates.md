@@ -238,6 +238,8 @@ A render error is caught at the isolate's root and reported with `ctx.reportErro
 
 An isolate module can come from another build, another repository or a CDN: the host's bootstrap holds the runtime and the DOM subset, and the module is loaded by URL. It depends only on the topics in the contracts module, never on another isolate's code. What it needs is the `requires` stamp from `defineIsolate`, a version the host runs, and, when it's cross-origin, the headers in the [hosting guide](hosting.md#cors-for-cross-origin-isolates).
 
+The stamp also decides which shape of a changed `ctx` member an isolate gets while the old shape is deprecated. An isolate stamped below 0.2 gets 0.1's `ctx.bus.publish(topic, { value, key? })` from a 0.2 host, so it keeps working until its own project upgrades. With the kernel's `dev: true`, its first call logs a deprecation warning in the console. 0.3 removes the old shape, and a 0.3 host then refuses isolates built before 0.2 with `isolate_too_old`. An isolate without a stamp (a plain `{ start }` object) gets the current shape.
+
 ## Limits
 
 - **No synchronous layout, no `localStorage`, no drag and drop:** see [What Isoloop can't hide](limits.md).

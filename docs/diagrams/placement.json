@@ -33,8 +33,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/loader.ts",
-          "line": 203,
-          "end_line": 208,
+          "line": 206,
+          "end_line": 211,
           "label": "own worker or pool member",
           "anchor": "load: (o) => (o.pool === undefined ? loadOwn(o) : loadMember(o, o.pool)),",
           "anchor_offset": 1
@@ -59,8 +59,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/loader.ts",
-          "line": 132,
-          "end_line": 153,
+          "line": 135,
+          "end_line": 156,
           "label": "one worker per isolate",
           "anchor": "const loadOwn = (o: LoadOptions): LoadedWorker => {"
         }
@@ -76,8 +76,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/loader.ts",
-          "line": 132,
-          "end_line": 153,
+          "line": 135,
+          "end_line": 156,
           "label": "one worker per isolate",
           "anchor": "const loadOwn = (o: LoadOptions): LoadedWorker => {"
         }
@@ -93,8 +93,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/loader.ts",
-          "line": 132,
-          "end_line": 153,
+          "line": 135,
+          "end_line": 156,
           "label": "one worker per isolate",
           "anchor": "const loadOwn = (o: LoadOptions): LoadedWorker => {"
         }
@@ -144,8 +144,8 @@
       "sources": [
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 253,
-          "end_line": 277,
+          "line": 259,
+          "end_line": 283,
           "label": "a pool takes one init per member",
           "anchor": "const name = msg.isolate;"
         },

@@ -210,6 +210,8 @@ The diff goes to stdout and everything else to stderr, so `npx isoloop@latest mi
 + ctx.bus.publish(prices, 102, { key: 'AAPL' });
 ```
 
+An isolate built in a separate project on 0.1 keeps the old `ctx.bus.publish` in a 0.2 host until that project upgrades ([isolates built apart](isolates.md#isolates-built-apart)); `kernel.publish` changes at once.
+
 - **What it rewrites:** a `.publish(topic, { value, key })` call whose second argument is an object literal holding `value` and at most `key`, on a receiver named `bus` or `kernel` (`ctx.bus`, a destructured `bus`, `this.kernel`), or on a variable the same file sets from `createKernel(…)`.
 - **What it marks:** a record that spreads (`{ ...rec, value }`), an object with `value` and other fields, a variable the file sets to an object with `value`, a value that is itself such an object, and spread arguments.
 - **What it can't see:** a record passed in a variable from elsewhere, such as a function parameter, looks the same as a 0.2 value, so the call is left as it is. TypeScript reports those calls when the topic has a type, and at run time a topic whose schema doesn't accept `{ value }` rejects them with `invalid`. A kernel under another name (`app.publish` with `app` passed in) and code inside strings aren't rewritten either.

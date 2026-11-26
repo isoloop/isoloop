@@ -51,8 +51,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 757,
-          "end_line": 763,
+          "line": 763,
+          "end_line": 769,
           "label": "unsupported_browser",
           "anchor": "export function createKernel(config: KernelConfig): Kernel {"
         },
@@ -82,8 +82,8 @@
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1067,
-          "end_line": 1088,
+          "line": 1073,
+          "end_line": 1094,
           "label": "pool fate",
           "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
           "anchor_offset": 1
@@ -177,8 +177,8 @@
       "sources": [
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 187,
-          "end_line": 193,
+          "line": 188,
+          "end_line": 194,
           "label": "imports the isolate module",
           "anchor": "mod = await import(/* @vite-ignore */ init.src);"
         }
@@ -194,8 +194,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/loader.ts",
-          "line": 132,
-          "end_line": 153,
+          "line": 135,
+          "end_line": 156,
           "label": "own worker",
           "anchor": "const loadOwn = (o: LoadOptions): LoadedWorker => {"
         },
@@ -219,8 +219,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/loader.ts",
-          "line": 155,
-          "end_line": 201,
+          "line": 158,
+          "end_line": 204,
           "label": "members join one worker",
           "anchor": "const loadMember = (o: LoadOptions, name: string): LoadedWorker => {"
         },
@@ -243,8 +243,8 @@
       "sources": [
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 253,
-          "end_line": 277,
+          "line": 259,
+          "end_line": 283,
           "label": "pool init, built-ins frozen first",
           "anchor": "const name = msg.isolate;"
         },

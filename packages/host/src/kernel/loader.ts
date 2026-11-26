@@ -53,6 +53,8 @@ export type LoadOptions = {
   wake?: boolean;
   /** Named pool to join (ADR 0001, ADR 0015). */
   pool?: string;
+  /** `KernelConfig.dev`, for the runtime's deprecation warnings (ADR 0012). */
+  dev?: boolean;
 };
 
 const initOf = (o: LoadOptions): HostToIsolate => ({
@@ -70,6 +72,7 @@ const initOf = (o: LoadOptions): HostToIsolate => ({
     ...(o.commitIntervalMs === undefined ? {} : { commitIntervalMs: o.commitIntervalMs }),
     src: new URL(o.src, document.baseURI).href,
     ...(o.wake ? { wake: true } : {}),
+    ...(o.dev ? { dev: true } : {}),
   },
 });
 

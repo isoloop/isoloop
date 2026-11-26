@@ -22,15 +22,15 @@
       "sources": [
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 110,
-          "end_line": 133,
+          "line": 111,
+          "end_line": 134,
           "label": "a member leaves, the worker stays",
           "anchor": "/** `shutdown` for a member: `bye` once its handlers settle or the grace runs out. */"
         },
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 88,
-          "end_line": 108,
+          "line": 89,
+          "end_line": 109,
           "label": "one beat per worker",
           "anchor": "function startHeartbeat(everyMs: number): void {"
         }
@@ -44,16 +44,16 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1067,
-          "end_line": 1088,
+          "line": 1073,
+          "end_line": 1094,
           "label": "pool fate",
           "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
           "anchor_offset": 1
         },
         {
           "path": "packages/host/src/kernel/loader.ts",
-          "line": 155,
-          "end_line": 201,
+          "line": 158,
+          "end_line": 204,
           "label": "join the pool, leave it",
           "anchor": "const loadMember = (o: LoadOptions, name: string): LoadedWorker => {"
         }
@@ -89,8 +89,8 @@
       "sources": [
         {
           "path": "packages/runtime/src/bootstrap.ts",
-          "line": 253,
-          "end_line": 277,
+          "line": 259,
+          "end_line": 283,
           "label": "built-ins frozen before the first member",
           "anchor": "const name = msg.isolate;"
         }

@@ -1382,6 +1382,7 @@ export function createKernel(config: KernelConfig): Kernel {
         busPort,
         ...(o.wake ? { wake: true } : {}),
         ...(manifest.pool === undefined ? {} : { pool: manifest.pool }),
+        ...(config.dev ? { dev: true } : {}),
       });
     } catch (err) {
       controller?.detach(manifest.id);

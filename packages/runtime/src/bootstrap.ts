@@ -21,6 +21,7 @@ import {
   type IsolateToHost,
   type ShutdownReason,
 } from '@isoloop/protocol';
+import { applyStamp } from './bus/stamped';
 import { busy, installBusy, type Life } from './pools/busy';
 import { freezeBuiltins } from './pools/freeze';
 import type { VanillaRuntime } from './isolate/vanilla';
@@ -205,6 +206,7 @@ async function boot(m: Member, init: InitPayload): Promise<void> {
         runtime,
         (ctx) => Reflect.apply(start, main, [ctx]),
         typeof requires === 'string' ? requires : undefined,
+        init.dev === true,
       );
       return;
     }
@@ -218,7 +220,11 @@ async function startIsolate(
   start: (ctx: unknown) => unknown,
   /** The definition's `requires` stamp (ADR 0012), reported in `ready` for the host to check. */
   requires: string | undefined,
+  /** `KernelConfig.dev`: warn when the isolate uses a deprecated shape. */
+  dev: boolean,
 ): Promise<void> {
+  // Built before 0.2: its `ctx.bus.publish` keeps 0.1's shape until 0.3 (ADR 0012).
+  applyStamp(runtime.ctx, requires, dev);
   m.receive = (msg) => {
     runtime.receive(msg);
   };
