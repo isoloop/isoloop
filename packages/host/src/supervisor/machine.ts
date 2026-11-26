@@ -13,11 +13,12 @@
  * spawn, and `spawned` moves it to `loading`. It never touches the restart
  * window.
  *
- * The restart limit (ADR 0001, *Restart limit: short runs*) is two rules, and
- * the first one met fails the isolate: `maxRestarts` restarts in a sliding
- * `withinMs`, and a crash after `maxRestarts` crashes in a row that each came
- * after less than `withinMs` of healthy running. A healthy run lasts from
- * `ready` to the last beat; a run of `withinMs` or longer clears the count.
+ * The restart limit (ADR 0001, *Restart limit: short runs* and *Restart limit:
+ * `healthyAfterMs`*) is two rules, and the first one met fails the isolate:
+ * `maxRestarts` restarts in a sliding `withinMs`, and a crash after
+ * `maxRestarts` crashes in a row that each came after less than
+ * `healthyAfterMs` of healthy running. A healthy run lasts from `ready` to the
+ * last beat; a run of `healthyAfterMs` or longer clears the count.
  */
 import { assertNever } from '@isoloop/protocol';
 import { backoffMs, DEFAULT_BACKOFF, slide, type Backoff } from './timers';
@@ -86,8 +87,10 @@ export type SupervisorConfig = {
    * short runs; the next crash fails the isolate.
    */
   maxRestarts: number;
-  /** The sliding window, and the healthy run that clears the count of short runs. */
+  /** The sliding window that counts restarts. */
   withinMs: number;
+  /** The healthy run, from `ready` to the last beat, that clears the count of short runs. */
+  healthyAfterMs: number;
   backoff: Backoff;
   blockedAfterMs: number;
   killAfterMs: number;
@@ -100,6 +103,7 @@ export const DEFAULT_SUPERVISOR_CONFIG: SupervisorConfig = {
   strategy: 'one-for-one',
   maxRestarts: 3,
   withinMs: 60_000,
+  healthyAfterMs: 60_000,
   backoff: DEFAULT_BACKOFF,
   blockedAfterMs: 400,
   killAfterMs: 10_000,
@@ -120,7 +124,7 @@ export type IsolateSupervision = {
   window: number[];
   /** `performance.now()` of this worker's `ready`; unset until it's ready. */
   readyAt?: number;
-  /** Crashes in a row, each after a healthy run shorter than `withinMs`. */
+  /** Crashes in a row, each after a healthy run shorter than `healthyAfterMs`. */
   short: number;
   /** While the document is hidden, nothing is judged blocked or killed. */
   hidden: boolean;
@@ -394,14 +398,14 @@ function crash(
   // From `ready` to the last beat: the time it took to notice the crash isn't
   // healthy running. A worker that never got ready had none.
   const healthy = s.readyAt === undefined ? 0 : Math.max(0, s.lastBeatAt - s.readyAt);
-  const short = healthy >= cfg.withinMs ? 1 : s.short + 1;
+  const short = healthy >= cfg.healthyAfterMs ? 1 : s.short + 1;
   const limit =
     final || cfg.strategy === 'never'
       ? undefined
       : window.length >= cfg.maxRestarts
         ? `${cfg.maxRestarts} restarts in ${cfg.withinMs} ms`
         : short > cfg.maxRestarts
-          ? `${short} crashes, each after less than ${cfg.withinMs} ms of healthy running`
+          ? `${short} crashes, each after less than ${cfg.healthyAfterMs} ms of healthy running`
           : undefined;
   if (final || cfg.strategy === 'never' || limit !== undefined) {
     const why = limit === undefined ? message : `${message} (${limit})`;

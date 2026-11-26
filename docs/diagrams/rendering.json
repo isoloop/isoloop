@@ -121,8 +121,8 @@
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1294,
-          "end_line": 1297,
+          "line": 1309,
+          "end_line": 1312,
           "label": "a patch joins its surface's queue",
           "anchor": "case 'patch':"
         }
@@ -221,16 +221,16 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1085,
-          "end_line": 1132,
+          "line": 1100,
+          "end_line": 1147,
           "label": "measure, focus, scrollIntoView",
           "anchor": "* Host calls (design §4.7). DOM calls run after every patch the isolate",
           "anchor_offset": 1
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1163,
-          "end_line": 1187,
+          "line": 1178,
+          "end_line": 1202,
           "label": "requestCanvas",
           "anchor": "case 'requestCanvas': {"
         }
@@ -310,8 +310,8 @@
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1533,
-          "end_line": 1542,
+          "line": 1548,
+          "end_line": 1557,
           "label": "links go through the router",
           "anchor": "/** A render bridge for one isolate: links go through the router when routing is on. */"
         }

@@ -482,7 +482,7 @@ describe('restart policy (fake clock)', () => {
     expect(spawns(effects).at(-1)).toBe(2000);
   });
 
-  it('a healthy run of withinMs clears the count', () => {
+  it('a healthy run of healthyAfterMs clears the count', () => {
     const { s, effects } = run(at('running'), [
       ...crashAt(0),
       ...crashAt(1000),

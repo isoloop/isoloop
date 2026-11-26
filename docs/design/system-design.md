@@ -212,7 +212,7 @@ type KernelConfig = {
   workers: { isolateBootstrap: string; bus?: string; budget?: number };   // bundle URLs (§2); budget = soft worker-count warning, default 32 (ADR 0001)
   contracts?: { url: string; list: ContractsList };   // url: ES module the bus worker imports; list: its default export, imported by the host (ADR 0003)
   components?: Record<string, HostComponent>;   // HostComponent = { tag: string; attributes?: string[] }: isolate tag → host custom element (§4.5)
-  supervisor?: { strategy?: 'one-for-one' | 'never'; maxRestarts?: number; withinMs?: number; backoff?: Partial<Backoff> };
+  supervisor?: { strategy?: 'one-for-one' | 'never'; maxRestarts?: number; withinMs?: number; healthyAfterMs?: number; backoff?: Partial<Backoff> };
   heartbeat?: { everyMs?: number; blockedAfterMs?: number; killAfterMs?: number; readyTimeoutMs?: number };
   compositor?: { frameBudgetMs: number };
   styles?: readonly CSSStyleSheet[];        // adopted into every surface's shadow root (§4.8)
@@ -307,7 +307,7 @@ Transitions (matching the RFC lifecycle diagram):
 | blocked | tick, no beat for `killAfterMs` | crashed | terminate |
 | running / blocked | `workerError` or fatal `error` | crashed | terminate, emit `isolate:crash` |
 | loading / running / blocked | `poolCrash`: another member of its pool crashed with `unresponsive` or `worker_error` | crashed | with that member's reason; every member restarts, in a new worker |
-| crashed | restarts in window < max, and crashes in a row after runs shorter than `withinMs` ≤ max | restarting | spawn after backoff |
+| crashed | restarts in window < max, and crashes in a row after runs shorter than `healthyAfterMs` ≤ max | restarting | spawn after backoff |
 | crashed | restarts in window ≥ max, or crashes in a row after short runs > max, or strategy `never` | failed | showFallback, emit `isolate:failed` |
 | restarting | `spawned` | loading | – |
 | any but failed | `stop` | stopped | `shutdown` with grace, then terminate |

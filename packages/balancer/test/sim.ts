@@ -25,15 +25,17 @@ type Iso = {
   lagMs: number;
   busyMs: number;
   restartAt?: number;
-  /** When it restarted after a crash, within the last `withinMs`. */
+  /** When it restarted after a crash, within the last `withinMs` (60 s). */
   restarts: number[];
   /** When it last started running. */
   readyAt: number;
-  /** Crashes in a row after runs shorter than `withinMs`. */
+  /** Crashes in a row after runs shorter than `healthyAfterMs` (60 s). */
   short: number;
 };
 
+/** The supervisor's defaults: `withinMs` and `healthyAfterMs`. */
 const RESTART_WINDOW_MS = 60_000;
+const HEALTHY_AFTER_MS = 60_000;
 
 export type SimOptions = {
   killAfterMs?: number;
@@ -256,7 +258,7 @@ export class SimKernel implements KernelLike {
           // Every member counts the kill against its own limit, as `poolFate` does.
           i.restarts = i.restarts.filter((at) => now - at < RESTART_WINDOW_MS);
           // Its healthy run ended at the worker's last beat, when it blocked.
-          i.short = since - i.readyAt >= RESTART_WINDOW_MS ? 1 : i.short + 1;
+          i.short = since - i.readyAt >= HEALTHY_AFTER_MS ? 1 : i.short + 1;
           if (i.restarts.length >= this.#maxRestarts || i.short > this.#maxRestarts) {
             this.#blocking.delete(i.id);
             this.fail(i.id);

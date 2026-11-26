@@ -88,6 +88,12 @@ describe("#390's table reaches failed", () => {
       6,
     ],
     [
+      "the guide's example with withinMs: 120_000 and healthyAfterMs: 30_000, hangs 10 s after each start",
+      { ...guide, withinMs: 120_000, healthyAfterMs: 30_000 },
+      { hangsAfterMs: 10_000 },
+      6,
+    ],
+    [
       'readyTimeoutMs: 20000, never ready',
       { ...defaults, readyTimeoutMs: 20_000 },
       'never ready',
@@ -118,9 +124,61 @@ describe("#390's table reaches failed", () => {
     );
   });
 
-  it('still restarts without end an isolate whose runs are each withinMs or longer', () => {
+  it('still restarts without end an isolate whose runs are each healthyAfterMs or longer', () => {
     const result = simulate(defaults, { hangsAfterMs: 61_000 }, 600_000);
     expect(result.failedAt).toBeUndefined();
     expect(result.crashes).toBeGreaterThan(4);
+  });
+});
+
+// ADR 0001, *Restart limit: `healthyAfterMs`*: the healthy run has its own
+// option, apart from the window.
+describe('healthyAfterMs', () => {
+  const tenSeconds = { hangsAfterMs: 10_000 };
+
+  it('defaults to 60 000, apart from withinMs', () => {
+    expect(DEFAULT_SUPERVISOR_CONFIG.healthyAfterMs).toBe(60_000);
+    // Setting only withinMs leaves the healthy run at 60 s: a 30 s run still counts.
+    const result = simulate({ ...defaults, withinMs: 10_000 }, { hangsAfterMs: 30_000 });
+    expect(result.failedAt).toBeDefined();
+    expect(result.crashes).toBe(4);
+    expect(result.error).toBe(
+      'No heartbeat for 10000 ms (4 crashes, each after less than 60000 ms of healthy running)',
+    );
+  });
+
+  it('shorter than withinMs: runs that long clear the count', () => {
+    // 10 s runs are healthy at 5 s, and too slow for the 60 s window.
+    const result = simulate({ ...defaults, healthyAfterMs: 5000 }, tenSeconds, 600_000);
+    expect(result.failedAt).toBeUndefined();
+    expect(result.crashes).toBeGreaterThan(4);
+  });
+
+  it('shorter than withinMs: shorter runs still fail', () => {
+    // A 10 s window, so 13 s cycles never fill it: only the short runs fail it.
+    const result = simulate(
+      { ...defaults, withinMs: 10_000, healthyAfterMs: 5000 },
+      { hangsAfterMs: 3000 },
+    );
+    expect(result.crashes).toBe(4);
+    expect(result.error).toBe(
+      'No heartbeat for 10000 ms (4 crashes, each after less than 5000 ms of healthy running)',
+    );
+  });
+
+  it('longer than withinMs: runs past the window still count', () => {
+    // 61 s runs clear the count on the defaults; at 120 s they don't.
+    const result = simulate({ ...defaults, healthyAfterMs: 120_000 }, { hangsAfterMs: 61_000 });
+    expect(result.failedAt).toBeDefined();
+    expect(result.crashes).toBe(4);
+    expect(result.error).toBe(
+      'No heartbeat for 10000 ms (4 crashes, each after less than 120000 ms of healthy running)',
+    );
+  });
+
+  it('leaves the window alone: fast crashes fail on it', () => {
+    expect(simulate({ ...defaults, healthyAfterMs: 5000 }, hangs).error).toBe(
+      'No heartbeat for 10000 ms (3 restarts in 60000 ms)',
+    );
   });
 });
