@@ -205,11 +205,9 @@ The diff goes to stdout and everything else to stderr, so `npx isoloop@latest mi
 
 `ctx.bus.publish` and `kernel.publish` take the value first and the key in an options object, like `request`, `reply` and `usePublish`:
 
-```ts
-// 0.1
-ctx.bus.publish(prices, { value: 102, key: 'AAPL' });
-// 0.2
-ctx.bus.publish(prices, 102, { key: 'AAPL' });
+```diff
+- ctx.bus.publish(prices, { value: 102, key: 'AAPL' });
++ ctx.bus.publish(prices, 102, { key: 'AAPL' });
 ```
 
 - **What it rewrites:** a `.publish(topic, { value, key })` call whose second argument is an object literal holding `value` and at most `key`, on a receiver named `bus` or `kernel` (`ctx.bus`, a destructured `bus`, `this.kernel`), or on a variable the same file sets from `createKernel(…)`.
