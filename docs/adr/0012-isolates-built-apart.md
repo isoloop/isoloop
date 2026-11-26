@@ -1,6 +1,6 @@
 # ADR 0012: Isolates built apart from the host
 
-- **Status:** Accepted
+- **Status:** Accepted. Amended on 2026-11-26: a seam member may change shape by the isolate's stamp during its minor of deprecation (*Changing a member by stamp*, below), first for `ctx.bus.publish` ([#411](https://github.com/isoloop/isoloop/issues/411)).
 - **Date:** 2026-11-06
 - **Builds on:** [ADR 0010](0010-own-render-bridge.md) and [ADR 0011](0011-dom-package.md) (the render bridge and its package)
 
@@ -37,6 +37,21 @@ An isolate built against 0.4 under a 0.3 host would fail with `ctx.foo is not a 
    - **From 1.0:** semver applies, so a removal is a major release and `FLOOR` is the current major's `x.0`. The check then amounts to comparing majors.
 6. **Built in M3,** with the adapters, because the markets dashboard in `isoloop/examples` is the first set of isolates built apart from the host.
 
+### Changing a member by stamp (amended 2026-11-26)
+
+Grilled on 2026-11-26 (Q26–Q30, yes to all), after the first change to the seam was found to break isolates built apart ([#411](https://github.com/isoloop/isoloop/issues/411)).
+
+**The problem.** 0.2 changes `ctx.bus.publish(topic, { value, key? })` to `ctx.bus.publish(topic, value, { key? })`. An isolate built apart gets its `ctx` from the host's bootstrap, so a 0.1 isolate's old-shape call would reach the 0.2 `publish` and send the whole `{ value }` object as the value. Point 5 asks for a minor in which the old member keeps working, but the two shapes can't be told apart by looking at the arguments: a value can itself be an object with `value`.
+
+**The rule.**
+
+1. **During its minor of deprecation, a seam member may take a different shape depending on the isolate's stamp** (point 3). The bootstrap reads `requires` before it calls `start`, so it can give an isolate the member as it was in the version the isolate was built for. The stamp decides, never the arguments.
+2. **An isolate without a stamp gets the current shape.** A hand-written `{ start }` isolate already skips the version check (point 3), and new code is the more likely author.
+3. **The old shape warns once.** With `KernelConfig.dev` set, the first call to the old shape in an isolate logs a deprecation warning that names the member and the new shape.
+4. **The removal follows point 5.** In the next minor the old shape goes and `FLOOR` moves to the version that changed it, so older isolates fail at start with `isolate-too-old` instead of calling a member that no longer works.
+5. **Each use needs its own ADR amendment or ADR,** as point 5 asks for any change to the seam. This one is `ctx.bus.publish`: isolates stamped below `0.2` get `publish(topic, { value, key? })` in 0.2, and in 0.3 that shape is removed and `FLOOR` moves to `0.2` ([#467](https://github.com/isoloop/isoloop/issues/467)). The adapters' `usePublish` keeps its shape, and a 0.1 adapter bundled into an isolate calls the 0.1 `publish`, which its stamp keeps working.
+6. **The host API isn't in the seam** (point 2), so `kernel.publish` changes in 0.2 with no deprecation, like any host API change, with its codemod.
+
 ## Consequences
 
 - An isolate from another build either runs or fails at start with both versions in the message, never with a `TypeError` halfway through.
@@ -44,6 +59,7 @@ An isolate built against 0.4 under a 0.3 host would fail with `ctx.foo is not a 
 - Removing something from the seam is deliberate and slow: an ADR, a minor of deprecation, then a floor change that every older isolate notices.
 - `defineIsolate` is no longer a pure identity function: it adds `requires`.
 - Hand-written `{ start }` isolates skip the check. That's the cost of keeping plain JS isolates free of any import.
+- A seam member can change shape without an unreadable overload: during its minor of deprecation the stamp picks the shape. An unstamped isolate on the old shape breaks at that minor, not at the floor move.
 
 ## Alternatives considered
 
