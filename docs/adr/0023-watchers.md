@@ -110,7 +110,7 @@ The forces:
 31. **It runs as a host connection to the bus,** as `kernel.subscribe` does. The host's watches on one topic share one bus watch, with the union of their keys, as an isolate's do (point 11). Everything in the bus worker (points 13 to 20) is unchanged: the bus doesn't tell a host watch from an isolate's.
 32. **A host view is settled when `onView` returns,** or when its promise settles (point 21). There's no adapter on the host, so no layout effect. The burst rule (point 22) applies on the host connection's committer.
 33. **After a bus restart,** the host connection sends `watch` again with `have`, as an isolate's client does (point 23), and a lost memory topic resets the view to empty. The host never suspends, so point 24 doesn't apply.
-34. **Devtools count host watches** in the per-topic watcher rows (point 25), as they count host subscriptions today.
+34. **Devtools count host watches** in the per-topic watcher rows (point 25), with an isolate's.
 
 ## Consequences
 
