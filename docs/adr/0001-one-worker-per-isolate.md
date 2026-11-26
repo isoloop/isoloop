@@ -144,7 +144,7 @@ Decided for 0.2 ([#389](https://github.com/isoloop/isoloop/issues/389)); grilled
    - the restart window (`withinMs`);
    - the healthy run (`healthyAfterMs`);
    - the backoff.
-3. **A wall-clock cap of 3 × the limit.** A worker silent for `3 × killAfterMs` of wall-clock time is killed whatever the lag clock says, so a hung worker on a starved page is still killed, at most 3 times later than on a page that isn't starved. The ready timeout gets the same cap, `3 × readyTimeoutMs` (see the open question below). The factor is fixed, not an option. The build measures it against the spike's figures and comes back here if 3 doesn't hold.
+3. **A wall-clock cap of 3 × the limit.** A worker silent for `3 × killAfterMs` of wall-clock time is killed whatever the lag clock says, so a hung worker on a starved page is still killed, at most 3 times later than on a page that isn't starved. The ready timeout gets the same cap on its own limit, `3 × readyTimeoutMs` (30 s by default; decided in this review, 2026-11-26, rather than `3 × killAfterMs` for both, which at plant's 2 s would time out a slow start sooner than today). The factor is fixed, not an option. The build measures it against the spike's figures and comes back here if 3 doesn't hold.
 4. **On a page that isn't starved, nothing changes.** The host's tick was late by about 0.3 s per 150 s there, so a hung worker is killed at `killAfterMs` as before (spike: 1996 ms at 2000, 10009 ms at 10000, Firefox).
 5. **The bus worker uses it too.** Its kill and ready timers use the same lag clock and cap. The rest of its supervision is unchanged ([ADR 0007](0007-bus-worker-supervision.md)).
 6. **No new public API.** No option, no event and no type changes. It's a behaviour change: fewer `unresponsive` and `ready_timeout` crashes on a starved page, and a later kill of a hung worker only while the host itself is late.
@@ -178,8 +178,6 @@ Decided for 0.2 ([#389](https://github.com/isoloop/isoloop/issues/389)); grilled
 - A raised `readyTimeoutMs` doesn't slow kills after `ready`.
 - The bus worker's kill uses the lag clock and the cap.
 - **Measurement:** the starvation matrix is re-run locally at the defaults and at 2 s, against 0.1.0, before the build merges. Bench machine 1 figures follow for the supervision guide.
-
-**Open question for this review.** Q33 set the cap as `3 × killAfterMs`. The ready timeout needs a cap too, or a worker that never sends `ready` on a starved page has no bound in wall-clock time. Recommendation: the same factor on its own limit, `3 × readyTimeoutMs` (30 s by default), as written in point 3. The alternative is `3 × killAfterMs` for both, which at plant's 2 s would time out a slow start after 6 s of wall-clock time, shorter than today's 10 s.
 
 **Not decided here.**
 
