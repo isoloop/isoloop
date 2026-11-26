@@ -1,6 +1,6 @@
 # ADR 0023: Watchers, a second way to read a topic
 
-- **Status:** Accepted 2026-11-25 (proposed the same day), from the M8 Watchers W0 grilling (Q1–Q30, yes to all).
+- **Status:** Accepted 2026-11-25 (proposed the same day), from the M8 Watchers W0 grilling (Q1–Q30, yes to all). Amendment of 2026-11-26 Proposed: `kernel.watch` in W1 (point 27), from the [M9 Module Federation example](../plans/m9-module-federation.md) grilling (Q17, Q20).
 - **Date:** 2026-11-25
 - **Plan:** [M8 Watchers](../plans/m8-watchers.md). W1 ships in `0.2.0` as `@experimental`; W2 and W3 come in `0.3.0` and `0.4.0` ([releases](../plans/roadmap.md#releases)).
 - **Touches:** [ADR 0005](0005-bus-topology-message-channels.md) (what travels on the bus port), [ADR 0007](0007-bus-worker-supervision.md) (reattach after a bus restart), [ADR 0012](0012-isolates-built-apart.md) (the seam only grows; which host runs which isolate), [ADR 0016](0016-fewer-messages-per-record.md) (the committer, which carries `seen`), [ADR 0020](0020-inspection-feed.md) (new rows in the feed).
@@ -89,6 +89,17 @@ The forces:
 
 25. **The inspection feed gains watcher rows** (Q10, Q24), an addition to ADR 0020 under its decision 7 (the format only grows), with the existing `inspect` grant. Per topic, `BusMetrics` gains: the number of watches, the number of live keys, the transport (`'messages'` until W3), and the records appended and values delivered to watchers that the conflation ratio is computed from. The devtools panel shows the ratio in plain words: "showed 1 of every 40 values".
 
+### The host's watch (amended 2026-11-26, Proposed)
+
+30. **`kernel.watch(topic, onView, opts?)`** in `@isoloop/host`, `@experimental` with the rest of W1:
+    - The same signature as `ctx.bus.watch` (point 7): `onView(view, changed)`, `opts.keys`, and `unwatch()` returned. No `from`, `group` or `onGap`.
+    - It sits beside `kernel.subscribe`, as `ctx.bus.watch` sits beside `ctx.bus.subscribe`. It throws without contracts, as `kernel.subscribe` does.
+    - The host needs no grant, as for `kernel.subscribe`.
+31. **It runs as a host connection to the bus,** as `kernel.subscribe` does. The host's watches on one topic share one bus watch, with the union of their keys, as an isolate's do (point 11). Everything in the bus worker (points 13 to 20) is unchanged: the bus doesn't tell a host watch from an isolate's.
+32. **A host view is settled when `onView` returns,** or when its promise settles (point 21). There's no adapter on the host, so no layout effect. The burst rule (point 22) applies on the host connection's committer.
+33. **After a bus restart,** the host connection sends `watch` again with `have`, as an isolate's client does (point 23), and a lost memory topic resets the view to empty. The host never suspends, so point 24 doesn't apply.
+34. **Devtools count host watches** in the per-topic watcher rows (point 25), as they count host subscriptions today.
+
 ### Older hosts
 
 26. **No emulation of `bus.watch` over `subscribe` on an older host** (Q29). ADR 0012 already settles that case, and it stays unchanged:
@@ -97,7 +108,7 @@ The forces:
 
 ### Not in this ADR
 
-27. **`kernel.watch` on the host** (Q8) waits for a use case. The host has `kernel.subscribe`, and the devtools panel is an isolate.
+27. **`kernel.watch` on the host** (Q8) waits for a use case. The host has `kernel.subscribe`, and the devtools panel is an isolate. *(Amended 2026-11-26, Proposed: the use case is the M9 shop, whose header on the main thread shows the cart count from the `cart` topic. `kernel.watch` ships in W1, and is described under "The host's watch" below.)*
 28. **W2, pools and wake:** one watch per pool worker, with values handed to its members read-only, and waking from a snapshot. In W1 each pool member watches on its own. W2 is grilled before `0.3.0`.
 29. **W3, shared slots** (Q9): one `SharedArrayBuffer` per topic written by the bus worker under a sequence lock, with a message fallback when the page isn't cross-origin isolated. How slots are sized, declared per topic in the contract or sized by the bus, is decided in an amendment to this ADR before W3.
 
@@ -119,6 +130,7 @@ The forces:
 - **An unfiltered watch on a wide topic holds an entry for every retained key,** as version pointers in the bus worker and as values in the isolate. *Limited by* retention, which bounds it; pointers rather than copies in the bus worker (point 16); the `keys` filter; the dev warning past 1,000 keys (point 12); and the live key count in devtools.
 - **Building a view reads the log** from the last sent offset to the tail. That's the same records an append would have touched, read once per view instead of once per record, so a burst costs one read of its records. The first watch of a topic reads the whole retained log once. *Limited by* the 5 s grace (point 19), which keeps that snapshot for remounts and reattaches.
 - **Two ways to read a topic** means a choice to explain. *Limited by* the guide's table (point 9), linked from `useTopic`.
+- **The host API grows** by `kernel.watch` (points 30 to 34), `@experimental`. *Limited by* reusing the isolate client's watch logic over the host connection, so the bus worker gains nothing.
 - **The isolate seam grows** by `bus.watch` and `useWatch`, so an isolate built with `0.2.0` needs a `0.2.0` host: a `0.1` host fails it at start with `runtime-too-old`, naming both versions, and there is no fallback over `subscribe` (point 26). *Limited by* ADR 0012: the failure comes at start, with a clear message, rather than at the isolate's first `watch`.
 
 ## Alternatives considered
@@ -131,5 +143,7 @@ The forces:
 - **Slots updated on every append** (Q27, which supersedes the first draft): a slot update and a dirty mark per watching port on each append, paid by every publisher. Not taken; views are built from the log when sent.
 - **Copying values into slots** (Q26): a second copy of every watched key's value in the bus worker. Not taken; the bus points at the log's records.
 - **An emulation over `subscribe` on an older host** (Q29). ADR 0012 fails the isolate before it runs, so it would be dead code. Not taken.
-- **`kernel.watch` in W1** (Q8). No use case yet. Not taken.
+- **`kernel.watch` in W1** (Q8). No use case yet. Not taken on 2026-11-25; taken by the 2026-11-26 amendment (points 30 to 34), with the M9 shop as the use case.
+- **The M9 shop's badge as a small isolate from the cart team** instead of `kernel.watch` (M9 grilling, Q17). It works without the amendment, but it puts the header's count in another team's remote only because the host can't watch. Not taken.
+- **The badge reading `cart` with `kernel.subscribe`.** It gets every record of the cart on the main thread to show one number. Not taken.
 - **A key keeps its last value after retention removes it** (Q3). The watcher would then show values a replay can't, and the equivalence property would need exceptions. Not taken.
