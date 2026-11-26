@@ -210,14 +210,14 @@ Suspension never touches the restart window. A pool suspends only as a whole, wh
 
 ## Measured: a CPU-starved Firefox
 
-**2026-11-26, 0.1.0 and the lag clock, `killAfterMs` 2000 and 10 000** ([#389, the build's runs](https://github.com/isoloop/isoloop/issues/389#issuecomment-7199189452)). The lag clock is the host built from `16a48d5`, which leaves the main thread's lateness out of the kill and ready timers, with the 3 × cap. These are local runs: a desktop-class 16-core CPU, Linux in a virtual machine, Playwright 1.65 with Firefox 159 and Chromium 158. Every process was pinned to one core (2 logical CPUs) with 8 pages of plant at once, each run 150 s. Other work was running on the same machine, so the starvation is heavier than the sets below and the numbers don't compare one to one. The two hosts alternated run by run, 24 pages each on Firefox and 16 on Chromium. Figures from the bench machine follow.
+**2026-11-26, 0.1.0 and the lag clock, `killAfterMs` 2000 and 10 000** ([#389, the build's runs](https://github.com/isoloop/isoloop/issues/389#issuecomment-7199189452)). The lag clock is the host built from `880795a`, which leaves the main thread's lateness out of the kill and ready timers, with the 3 × cap. These are local runs: a desktop-class 16-core CPU, Linux in a virtual machine, Playwright 1.65 with Firefox 159 and Chromium 158. Every process was pinned to one core (2 logical CPUs) with 8 pages of plant at once, each run 150 s. Other work was running on the same machine, so the starvation is heavier than the sets below and the numbers don't compare one to one. The two hosts alternated run by run, 24 pages each on Firefox and 16 on Chromium. Figures from the bench machine follow.
 
 | Host | `killAfterMs` | Pages with a heartbeat kill | Heartbeat kills | Ready timeouts | Pages with an isolate in `failed` | Pages without data after 150 s |
 | --- | --: | --: | --: | --: | --: | --: |
 | 0.1.0 | 10 000 (default) | 7 of 24 | 720 | 1,167 | 0 of 24 | 3 |
-| lag clock (`16a48d5`) | 10 000 (default) | 0 of 24 | 0 | 0 | 0 of 24 | 0 |
+| lag clock (`880795a`) | 10 000 (default) | 0 of 24 | 0 | 0 | 0 of 24 | 0 |
 | 0.1.0 | 2000 | 24 of 24 | 7,150 | 919 | 22 of 24 | 8 |
-| lag clock (`16a48d5`) | 2000 | 20 of 24 | 3,672 | 0 | 4 of 24 | 0 |
+| lag clock (`880795a`) | 2000 | 20 of 24 | 3,672 | 0 | 4 of 24 | 0 |
 
 - At the defaults, the lag clock had no crash on any page.
 - At 2000 ms, half as many heartbeat kills, no ready timeout, and 4 pages of 24 with the pool of 72 in `failed`, against 22. On this machine a starved page went quiet for longer than the 6 s cap.
