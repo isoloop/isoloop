@@ -12,10 +12,9 @@ export default defineIsolate((ctx) => {
         count: n,
         note: `first
     second`,
-        parts: [
-          1,
-          2,
-        ],
+        parts: {
+          first: 1,
+        },
       },
     });
     void ctx.bus.publish(totals, {

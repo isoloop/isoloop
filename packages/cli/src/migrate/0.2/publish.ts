@@ -19,10 +19,17 @@
  *
  * Which calls it rewrites: two arguments, the second an object literal
  * holding `value` and at most `key`, or a conditional whose two branches are
- * such object literals with the same `value` text. A multi-line value moves
- * out by the indentation its `value:` line had, except for lines that start
- * inside a string or template literal; comments inside the value stay, and
- * comments elsewhere in the removed object go with it. It flags, without
+ * such object literals with the same `value` text. The new arguments are laid
+ * out as oxfmt and Prettier lay them out, at the width the nearest config
+ * sets: a call on one line stays on one line, and so does one that now fits;
+ * arguments already one per line stay one per line; otherwise the value hugs
+ * the call when there are no options, the options hug it after a value that
+ * isn't an object, and the arguments go one per line when neither fits. A
+ * member chain with at most two calls that now fits goes back on one line.
+ * Lines that start inside a string or template literal never move. The
+ * removed object's comments are kept: the key's go into the options, the
+ * value's beside the value, and any after the last field above the call; a
+ * conditional with a comment in a branch is flagged. It flags, without
  * rewriting: a second argument that spreads (`{ ...rec }`), an object with
  * `value` and other fields, a variable the file sets to an object with
  * `value`, a value that is itself such an object, a conditional (or `??`,
@@ -34,6 +41,7 @@
 import type { Edit, Flag } from '../edit';
 import { child, children, type Node, type SourceFile, walk } from '../parser';
 import type { Transform } from '../step';
+import { DEFAULT_STYLE, type Style } from '../style';
 
 const FLAG = 'publish takes (topic, value, { key }) since 0.2; check this call by hand';
 
@@ -103,15 +111,95 @@ function branches(n: Node): Node[] {
   return [b];
 }
 
-/** A 0.1 record's parts: its `value` and its `key`, if any. */
-type Rec = { readonly value: Node; readonly key: Node | undefined; readonly keyShorthand: boolean };
+/** A 0.1 record's parts: its `value` and its `key`, if any, with their properties. */
+type Rec = {
+  readonly value: Node;
+  readonly valueProp: Node;
+  readonly key: Node | undefined;
+  readonly keyProp: Node | undefined;
+  readonly keyShorthand: boolean;
+};
+
+/** A comment in the text, with whether it's a `//` comment. */
+type Comment = { readonly start: number; readonly end: number; readonly text: string };
+
+const isLine = (c: Comment): boolean => c.text.startsWith('//');
+
+/** A removed object's comments, by where they go: beside the value, beside the key, or before the call. */
+type Notes = {
+  readonly valueLead: Comment[];
+  readonly valueTrail: Comment[];
+  readonly keyLead: Comment[];
+  readonly keyTrail: Comment[];
+  readonly other: Comment[];
+};
 
 /** The start of the line `at` is on. */
 const lineStart = (text: string, at: number): number => text.lastIndexOf('\n', at - 1) + 1;
 
+/** Where the line `at` is on ends, before its line break. */
+function lineEnd(text: string, at: number): number {
+  const nl = text.indexOf('\n', at);
+  const end = nl === -1 ? text.length : nl;
+  return text[end - 1] === '\r' ? end - 1 : end;
+}
+
 /** The whitespace that starts the line `at` is on. */
 const indentAt = (text: string, at: number): string =>
   /^[ \t]*/.exec(text.slice(lineStart(text, at)))?.[0] ?? '';
+
+/** The comments in `text` from `from` to `to`, outside the `skip` nodes and outside strings. */
+function commentsIn(text: string, from: number, to: number, skip: readonly Node[]): Comment[] {
+  const out: Comment[] = [];
+  let i = from;
+  while (i < to) {
+    const over = skip.find((n) => n.start <= i && i < n.end);
+    const ch = text[i];
+    if (over !== undefined) i = over.end;
+    else if (ch === '"' || ch === "'" || ch === '`') {
+      let j = i + 1;
+      while (j < to && text[j] !== ch) j += text[j] === '\\' ? 2 : 1;
+      i = j + 1;
+    } else if (text.startsWith('//', i)) {
+      const end = Math.min(lineEnd(text, i), to);
+      out.push({ start: i, end, text: text.slice(i, end).trimEnd() });
+      i = end;
+    } else if (text.startsWith('/*', i)) {
+      const close = text.indexOf('*/', i + 2);
+      const end = close === -1 ? to : close + 2;
+      out.push({ start: i, end, text: text.slice(i, end) });
+      i = end;
+    } else i++;
+  }
+  return out;
+}
+
+/** Comments as lines of their own, each at `indent`. */
+const lines = (cs: readonly Comment[], indent: string): string =>
+  cs.map((c) => `${indent}${c.text}\n`).join('');
+/** Comments after the code they follow, on its line. */
+const after = (cs: readonly Comment[]): string => cs.map((c) => ` ${c.text}`).join('');
+/** Comments before the code they precede, on its line. */
+const before = (cs: readonly Comment[]): string => cs.map((c) => `${c.text} `).join('');
+
+/** What a rewrite puts in place of `{ value, key }`: the value, the options and their comments. */
+type Parts = {
+  readonly value: Node;
+  /** The `key: …` text, `key` for shorthand; `undefined` when there's no key. */
+  readonly key: string | undefined;
+  /** The options as written when they aren't `{ key }`, such as a conditional. */
+  readonly opts: string | undefined;
+  readonly notes: Notes;
+};
+
+/** Notes with no comments. */
+const noNotes = (): Notes => ({
+  valueLead: [],
+  valueTrail: [],
+  keyLead: [],
+  keyTrail: [],
+  other: [],
+});
 
 /** What a call's receiver is: Isoloop's, another library's, or not known. */
 type Whose = 'ours' | 'foreign' | 'unknown';
@@ -119,7 +207,7 @@ type Whose = 'ours' | 'foreign' | 'unknown';
 export const publish: Transform = {
   summary: 'publish(topic, { value, key }) → publish(topic, value, { key })',
   mayChange: (text) => text.includes('publish'),
-  transform(file: SourceFile) {
+  transform(file: SourceFile, style: Style = DEFAULT_STYLE) {
     const { text } = file;
     const slice = (n: Node): string => text.slice(n.start, n.end);
 
@@ -180,7 +268,9 @@ export const publish: Transform = {
       const props = children(obj, 'properties');
       if (!props.some((p) => keyName(p) === 'value')) return undefined; // already a 0.2 value
       let value: Node | undefined;
+      let valueProp: Node | undefined;
       let key: Node | undefined;
+      let keyProp: Node | undefined;
       let keyShorthand = false;
       for (const p of props) {
         const name =
@@ -188,63 +278,220 @@ export const publish: Transform = {
             ? keyName(p)
             : undefined;
         const v = child(p, 'value');
-        if (name === 'value' && v !== undefined) value = v;
-        else if (name === 'key' && v !== undefined) {
+        if (name === 'value' && v !== undefined) {
+          value = v;
+          valueProp = p;
+        } else if (name === 'key' && v !== undefined) {
           key = v;
+          keyProp = p;
           keyShorthand = p['shorthand'] === true;
         } else return 'flag';
       }
-      if (value === undefined || recordLike(value)) return 'flag';
-      return { value, key, keyShorthand };
+      if (value === undefined || valueProp === undefined || recordLike(value)) return 'flag';
+      return { value, valueProp, key, keyProp, keyShorthand };
     };
 
-    /** The options a record's key becomes: `{ key }`, `{ key: k }`, or `undefined` for none. */
-    const optsOf = (r: Rec): string | undefined =>
-      r.key === undefined ? undefined : r.keyShorthand ? '{ key }' : `{ key: ${slice(r.key)} }`;
+    /** The comments of `obj`, the object `r` came from, sorted by where each goes. */
+    const notesOf = (obj: Node, r: Rec): Notes => {
+      const notes: Notes = { valueLead: [], valueTrail: [], keyLead: [], keyTrail: [], other: [] };
+      const props = [r.valueProp, r.keyProp]
+        .filter((p) => p !== undefined)
+        .toSorted((x, y) => x.start - y.start);
+      const skip = [r.value, ...(r.key === undefined || r.keyShorthand ? [] : [r.key])];
+      const lead = (p: Node): Comment[] => (p === r.valueProp ? notes.valueLead : notes.keyLead);
+      const trail = (p: Node): Comment[] => (p === r.valueProp ? notes.valueTrail : notes.keyTrail);
+      for (const c of commentsIn(text, obj.start + 1, obj.end - 1, skip)) {
+        const inside = props.find((p) => p.start <= c.start && c.start < p.end);
+        const prev = props.findLast((p) => p.end <= c.start);
+        const next = props.find((p) => p.start >= c.end);
+        if (inside !== undefined) lead(inside).push(c);
+        else if (prev !== undefined && !text.slice(prev.end, c.start).includes('\n')) {
+          trail(prev).push(c);
+        } else if (next !== undefined) lead(next).push(c);
+        else notes.other.push(c);
+      }
+      return notes;
+    };
 
     /**
-     * The value's text, with the lines after its first moved out by the
-     * indentation the removed `value:` line had over `anchor`'s line. Lines
-     * that start inside a string or template literal stay as they are.
+     * `n`'s text placed so its first line's indentation is `target`: the
+     * lines after its first move by the difference. Lines that start inside
+     * a string or template literal stay as they are.
      */
-    const moved = (value: Node, anchor: Node): string => {
-      const own = slice(value);
-      if (!own.includes('\n')) return own;
-      if (lineStart(text, value.start) === lineStart(text, anchor.start)) return own;
-      const from = indentAt(text, value.start);
-      const to = indentAt(text, anchor.start);
-      if (from.length <= to.length || !from.startsWith(to)) return own;
-      const drop = from.slice(to.length);
+    const placed = (n: Node, target: string): string => {
+      const own = slice(n);
+      const home = indentAt(text, n.start);
+      if (!own.includes('\n') || home === target) return own;
+      let drop = '';
+      let add = '';
+      if (home.startsWith(target)) drop = home.slice(target.length);
+      else if (target.startsWith(home)) add = target.slice(home.length);
+      else return own;
       const strings: Node[] = [];
-      walk(value, (n) => {
+      walk(n, (m) => {
         if (
-          n.type === 'TemplateLiteral' ||
-          (n.type === 'Literal' && typeof n['value'] === 'string')
+          m.type === 'TemplateLiteral' ||
+          (m.type === 'Literal' && typeof m['value'] === 'string')
         )
-          strings.push(n);
+          strings.push(m);
       });
       let out = '';
-      let at = value.start;
-      for (let nl = text.indexOf('\n', value.start); nl !== -1 && nl < value.end;) {
+      let at = n.start;
+      for (let nl = text.indexOf('\n', n.start); nl !== -1 && nl < n.end;) {
         const line = nl + 1;
-        const inString = strings.some((s) => s.start < line && line < s.end);
-        if (!inString && text.startsWith(drop, line)) {
+        nl = text.indexOf('\n', line);
+        if (strings.some((s) => s.start < line && line < s.end)) continue;
+        if (drop !== '' && text.startsWith(drop, line)) {
           out += text.slice(at, line);
           at = line + drop.length;
+        } else if (add !== '' && !/^\r?\n/.test(text.slice(line, line + 2))) {
+          out += text.slice(at, line) + add;
+          at = line;
         }
-        nl = text.indexOf('\n', line);
       }
-      return out + text.slice(at, value.end);
+      return out + text.slice(at, n.end);
     };
 
-    /** What to do with a two-argument call's second argument: its new text, a flag, or nothing. */
-    const rewrite = (second: Node): { readonly text: string } | 'flag' | undefined => {
+    /** A line's width, with tabs counted as the formatter counts them. */
+    const width = (line: string): number =>
+      line.replaceAll('\t', ' '.repeat(style.tabWidth)).length;
+
+    /** The options' text, on one line or, with `indent`, over several. */
+    const optsText = (p: Parts, indent?: string): string | undefined => {
+      if (p.opts !== undefined) return p.opts;
+      if (p.key === undefined) return undefined;
+      const { keyLead, keyTrail } = p.notes;
+      if (indent === undefined) return `{ ${before(keyLead)}${p.key}${after(keyTrail)} }`;
+      const inner = indent + style.indent;
+      return `{\n${lines(keyLead, inner)}${inner}${p.key},${after(keyTrail)}\n${indent}}`;
+    };
+
+    /** The edits that rewrite `call`'s second argument `second` to `parts`, laid out as a formatter would. */
+    const layout = (call: Node, topic: Node, second: Node, p: Parts): Edit[] => {
+      const { notes } = p;
+      const edits: Edit[] = [];
+      if (notes.other.length > 0) {
+        const at = lineStart(text, call.start);
+        edits.push({ start: at, end: at, text: lines(notes.other, indentAt(text, call.start)) });
+      }
+      const all = [notes.valueLead, notes.valueTrail, notes.keyLead, notes.keyTrail].flat();
+      const anyLine = all.some(isLine);
+      const keyLine = [...notes.keyLead, ...notes.keyTrail].some(isLine);
+      const valueNotes = notes.valueLead.length + notes.valueTrail.length > 0;
+      const v = bare(p.value);
+
+      // The call's parentheses, and what lies between the arguments.
+      const typeArgs = child(call, 'typeArguments');
+      const calleeEnd = typeArgs?.end ?? child(call, 'callee')?.end ?? call.start;
+      const open = text.indexOf('(', calleeEnd);
+      const close = call.end - 1;
+      const clean =
+        open !== -1 &&
+        /^\s*(\?\.)?\s*$/.test(text.slice(calleeEnd, open)) &&
+        text[close] === ')' &&
+        /^\s*,?\s*$/.test(text.slice(second.end, close));
+      const between = text.slice(open + 1, topic.start) + text.slice(topic.end, second.start);
+      const plain = clean && commentsIn(between, 0, between.length, []).length === 0;
+
+      const valueOne = !slice(p.value).includes('\n');
+      const flatOpts = optsText(p);
+      const flatArgs = `${slice(topic)}, ${before(notes.valueLead)}${slice(p.value)}${after(notes.valueTrail)}${flatOpts === undefined ? '' : `, ${flatOpts}`}`;
+      const flat = (): Edit => ({ start: open + 1, end: close, text: flatArgs });
+      const flatFits =
+        plain &&
+        !anyLine &&
+        valueOne &&
+        !slice(topic).includes('\n') &&
+        width(
+          text.slice(lineStart(text, open), open + 1) +
+            flatArgs +
+            text.slice(close, lineEnd(text, close)),
+        ) <= style.printWidth;
+
+      // A call on one line stays on one line.
+      const oneLine = !text.slice(call.start, call.end).includes('\n');
+      if (plain && !anyLine && (oneLine || (flatFits && all.length === 0))) {
+        edits.push(flat());
+        return edits;
+      }
+
+      const own = /^[ \t]*$/.test(text.slice(lineStart(text, second.start), second.start));
+      const ind = indentAt(text, open);
+      if (own) {
+        // One argument per line already: the options get a line of their own.
+        const at = indentAt(text, second.start);
+        const opts = optsText(p, keyLine ? at : undefined);
+        const lead = notes.valueLead.map((c) => `${c.text}\n${at}`).join('');
+        const valueText = placed(p.value, at);
+        const out =
+          opts === undefined
+            ? `${notes.valueTrail.map((c) => `${c.text}\n${at}`).join('')}${lead}${valueText}`
+            : `${lead}${valueText},${after(notes.valueTrail)}\n${at}${opts}`;
+        edits.push({ start: second.start, end: second.end, text: out });
+        return edits;
+      }
+
+      if (clean) {
+        const prefix = text.slice(lineStart(text, second.start), second.start);
+        const huggable =
+          v.type === 'ObjectExpression' ||
+          v.type === 'ArrayExpression' ||
+          v.type === 'ArrowFunctionExpression' ||
+          v.type === 'FunctionExpression';
+        // No options: an object or function value hugs the call as the record did.
+        if (flatOpts === undefined && !valueNotes && huggable) {
+          edits.push({ start: second.start, end: second.end, text: placed(p.value, ind) });
+          return edits;
+        }
+        // `{ key }` last, after a value that isn't an object: the options hug the call.
+        if (
+          p.opts === undefined &&
+          p.key !== undefined &&
+          !valueNotes &&
+          valueOne &&
+          p.value.type !== 'ObjectExpression' &&
+          width(`${prefix}${slice(p.value)}, {`) <= style.printWidth
+        ) {
+          edits.push({
+            start: second.start,
+            end: second.end,
+            text: `${slice(p.value)}, ${optsText(p, ind) ?? ''}`,
+          });
+          return edits;
+        }
+        // Otherwise one argument per line.
+        const at = ind + style.indent;
+        const pre = text.slice(open + 1, topic.start).trim();
+        const opts = optsText(p, keyLine ? at : undefined);
+        const comma = style.trailingComma ? ',' : '';
+        const head = `${pre === '' ? '' : `${at}${pre}\n`}${at}${placed(topic, at)}`;
+        const value = `${lines(notes.valueLead, at)}${at}${placed(p.value, at)}`;
+        const tail =
+          opts === undefined
+            ? `${comma}${after(notes.valueTrail)}`
+            : `,${after(notes.valueTrail)}\n${at}${opts}${comma}`;
+        edits.push({ start: open + 1, end: close, text: `\n${head},\n${value}${tail}\n${ind}` });
+        return edits;
+      }
+
+      // An unusual call (comments around the parentheses): the old in-place rewrite.
+      edits.push({
+        start: second.start,
+        end: second.end,
+        text: `${lines(notes.valueLead, '')}${slice(p.value)}${flatOpts === undefined ? '' : `, ${flatOpts}`}`,
+      });
+      return edits;
+    };
+
+    /** The parts for a two-argument call's second argument, a flag, or nothing to do. */
+    const partsOf = (second: Node): Parts | 'flag' | undefined => {
       const arg = bare(second);
       if (arg.type === 'ObjectExpression') {
         const r = recordOf(arg);
         if (r === undefined || r === 'flag') return r;
-        const opts = optsOf(r);
-        return { text: `${moved(r.value, second)}${opts === undefined ? '' : `, ${opts}`}` };
+        const key =
+          r.key === undefined ? undefined : r.keyShorthand ? 'key' : `key: ${slice(r.key)}`;
+        return { value: r.value, key, opts: undefined, notes: notesOf(arg, r) };
       }
       if (arg.type === 'ConditionalExpression') {
         const test = child(arg, 'test');
@@ -260,12 +507,63 @@ export const publish: Transform = {
           if (a === undefined && b === undefined) return undefined;
           if (typeof a !== 'object' || typeof b !== 'object') return 'flag';
           if (slice(a.value) !== slice(b.value)) return 'flag';
-          const [oa, ob] = [optsOf(a), optsOf(b)];
-          if (oa === undefined && ob === undefined) return { text: slice(a.value) };
-          return { text: `${slice(a.value)}, ${slice(test)} ? ${oa ?? '{}'} : ${ob ?? '{}'}` };
+          // A comment in either branch has nowhere clear to go.
+          const commented = (o: Node, r: Rec): boolean => {
+            const n = notesOf(o, r);
+            return Object.values(n).some((cs: Comment[]) => cs.length > 0);
+          };
+          if (commented(yes, a) || commented(no, b)) return 'flag';
+          const opt = (r: Rec): string =>
+            r.key === undefined ? '{}' : r.keyShorthand ? '{ key }' : `{ key: ${slice(r.key)} }`;
+          const opts =
+            a.key === undefined && b.key === undefined
+              ? undefined
+              : `${slice(test)} ? ${opt(a)} : ${opt(b)}`;
+          return { value: a.value, key: undefined, opts, notes: noNotes() };
         }
       }
       return recordLike(arg) ? 'flag' : undefined;
+    };
+
+    // Parents, for the member chain a rewritten call sits in.
+    const parents = new Map<Node, Node>();
+    walk(file.program, (node, parent) => {
+      if (parent !== undefined) parents.set(node, parent);
+    });
+
+    /**
+     * A member chain the rewrite made short enough for one line
+     * (`k\n  .publish(…)\n  .then(…)`): the edit that joins it, when it has at
+     * most two calls, breaks only before its `.`s and fits.
+     */
+    const joined = (call: Node, edit: Edit): Edit | undefined => {
+      let top = call;
+      for (;;) {
+        const up = parents.get(top);
+        if (up?.type === 'MemberExpression' && child(up, 'object') === top) top = up;
+        else if (up?.type === 'CallExpression' && child(up, 'callee') === top) top = up;
+        else break;
+      }
+      let calls = 0;
+      for (let n: Node | undefined = top; n !== undefined;) {
+        if (n.type === 'CallExpression') {
+          calls++;
+          n = child(n, 'callee');
+        } else if (n.type === 'MemberExpression') n = child(n, 'object');
+        else n = undefined;
+      }
+      const rest = text.slice(top.start, edit.start) + text.slice(edit.end, top.end);
+      // Another `publish` in the chain may get its own edit, which would overlap.
+      if (calls > 2 || rest.split('publish').length > 2) return undefined;
+      const chain = text.slice(top.start, edit.start) + edit.text + text.slice(edit.end, top.end);
+      if (!chain.includes('\n') || !/^(?:[^\n]*\n\s*\??\.)*[^\n]*$/.test(chain)) return undefined;
+      const one = chain.replace(/\s*\n\s*(?=\??\.)/g, '');
+      const line =
+        text.slice(lineStart(text, top.start), top.start) +
+        one +
+        text.slice(top.end, lineEnd(text, top.end));
+      if (width(line) > style.printWidth) return undefined;
+      return { start: top.start, end: top.end, text: one };
     };
 
     const edits: Edit[] = [];
@@ -280,13 +578,20 @@ export const publish: Transform = {
         flags.push({ at: node.start, message: FLAG });
         return;
       }
-      const [, second] = args;
-      if (args.length !== 2 || second === undefined) return;
-      const out = rewrite(second);
-      if (out === undefined) return;
+      const [topic, second] = args;
+      if (args.length !== 2 || topic === undefined || second === undefined) return;
+      const parts = partsOf(second);
+      if (parts === undefined) return;
       // A receiver it can't name gets the flag where Isoloop's would be rewritten.
-      if (out === 'flag' || who === 'unknown') flags.push({ at: node.start, message: FLAG });
-      else edits.push({ start: second.start, end: second.end, text: out.text });
+      if (parts === 'flag' || who === 'unknown') {
+        flags.push({ at: node.start, message: FLAG });
+        return;
+      }
+      const out = layout(node, topic, second, parts);
+      const last = out.at(-1);
+      const chain =
+        last !== undefined && !last.text.includes('\n') ? joined(node, last) : undefined;
+      edits.push(...(chain === undefined ? out : [...out.slice(0, -1), chain]));
     });
     return { edits, flags };
   },

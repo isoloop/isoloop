@@ -1,5 +1,6 @@
 import type { Change } from './edit';
 import type { SourceFile } from './parser';
+import type { Style } from './style';
 
 /**
  * One release's codemod. It lives in `migrate/<version>/step.ts`, with
@@ -13,8 +14,11 @@ export type Step = {
   readonly summary: string;
   /** A cheap test on the text: files it returns `false` for aren't parsed. */
   readonly mayChange: (text: string) => boolean;
-  /** The edits and flags for one file. */
-  readonly transform: (file: SourceFile) => Change;
+  /**
+   * The edits and flags for one file. `style` is the layout the file's
+   * formatter uses, for code the step writes; without it, Prettier's defaults.
+   */
+  readonly transform: (file: SourceFile, style?: Style) => Change;
 };
 
 /**
@@ -34,10 +38,10 @@ export function combine(version: string, transforms: readonly Transform[]): Step
     version,
     summary: transforms.map((t) => t.summary).join('; '),
     mayChange: (text) => transforms.some((t) => t.mayChange(text)),
-    transform: (file) => {
+    transform: (file, style) => {
       const changes = transforms
         .filter((t) => t.mayChange(file.text))
-        .map((t) => t.transform(file));
+        .map((t) => t.transform(file, style));
       return {
         edits: changes.flatMap((c) => c.edits),
         flags: changes.flatMap((c) => c.flags),

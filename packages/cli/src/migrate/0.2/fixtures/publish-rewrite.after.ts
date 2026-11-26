@@ -10,7 +10,9 @@ export default defineIsolate((ctx) => {
   const key = 'MSFT';
   const value = 250;
   void bus.publish(prices, value, { key });
-  void ctx.bus.publish(prices, { symbol: 'X', price: 1 } satisfies Quote, { key: 'X' });
+  void ctx.bus.publish(prices, { symbol: 'X', price: 1 } satisfies Quote, {
+    key: 'X', // the symbol
+  });
 });
 
 type Quote = { symbol: string; price: number };
