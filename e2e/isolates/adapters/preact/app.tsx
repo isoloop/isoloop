@@ -3,7 +3,8 @@
  * major by e2e/build-adapters.ts. Same behaviour as ../react/app.tsx:
  *
  * - `.count` is the last value on `notes.v1`, read from `earliest`, so a
- *   restarted isolate replays it; `.inc` publishes the next one.
+ *   restarted isolate replays it; `.inc` publishes the next one. `.mirror`
+ *   reads the same topic in a second component until `.unmirror` unmounts it.
  * - `.field` is a controlled input; `.echo` shows it upper-cased.
  * - `.crash` throws from a handler; `.go` navigates to `/next`; `.path` shows the route.
  */
@@ -14,12 +15,20 @@ import pkg from 'preact/package.json';
 
 const notes: TopicRef<string> = { name: 'notes.v1', schema: { '~standard': {} } };
 
+// A second reader of the same topic (#410): both update, and `.unmirror`
+// unmounts it while `.count` keeps updating.
+function Mirror() {
+  const last = useTopic(notes, { from: 'earliest' });
+  return <p class="mirror">{last ?? '0'}</p>;
+}
+
 function App() {
   const last = useTopic(notes, { from: 'earliest' });
   const publish = usePublish(notes);
   const route = useRoute();
   const host = useHost();
   const [text, setText] = useState('');
+  const [mirror, setMirror] = useState(true);
   const count = Number(last ?? '0');
   // The next value counts from what this isolate already sent, not only from
   // what it has rendered: two clicks before the first record comes back from
@@ -33,6 +42,10 @@ function App() {
     <div>
       <p class="fw">{`preact ${pkg.version}`}</p>
       <p class="count">{count}</p>
+      {mirror ? <Mirror /> : null}
+      <button class="unmirror" onClick={() => setMirror(false)}>
+        unmirror
+      </button>
       <button class="inc" onClick={inc}>
         +1
       </button>

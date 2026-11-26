@@ -1,10 +1,12 @@
 /*
- * Bus hooks (design §5): `useTopic` subscribes for the component's lifetime
- * and keeps the latest value; `usePublish` returns a publish function.
+ * Bus hooks (design §5): `useTopic` reads for the component's lifetime and
+ * keeps the latest value, sharing one subscription per topic
+ * (`./shared-topic`); `usePublish` returns a publish function.
  */
 import type { StartPosition, TopicRef } from '@isoloop/protocol';
 import { useCallback, useLayoutEffect, useState } from 'preact/hooks';
 import { useIsolate } from '../isolate/context';
+import { addReader, latest, type Latest } from './shared-topic';
 
 /** Options for {@link useTopic}. */
 export type UseTopicOptions = {
@@ -13,15 +15,14 @@ export type UseTopicOptions = {
 };
 
 /**
- * The latest value on `topic`. It subscribes on mount and unsubscribes on unmount;
- * a different `topic` or `from` subscribes again.
+ * The latest value on `topic`. It reads on mount and stops on unmount; a different `topic`
+ * or `from` reads again.
  *
- * An isolate has one subscription per topic. A second `useTopic` on the same topic, in
- * another component or another call in the same one, replaces the first with no error: only
- * the last one subscribed gets records, and the first stops updating. When the last one
- * unmounts, the topic has no subscription, and the first doesn't get it back. Call
- * `useTopic` once per topic, and pass the value down as props or share it through context.
- * With the kernel's `dev: true`, the bus warns in the console when this happens.
+ * Any number of components can read the same topic. Every `useTopic` on a topic in one
+ * isolate shares one bus subscription: the first to mount subscribes, the last to unmount
+ * unsubscribes, and each gets the same latest value, so one that mounts later sees the
+ * current value at once. The first one's `from` sets where the shared subscription starts; a
+ * later `useTopic` with a different `from` gets the shared value and a console warning.
  *
  * @param topic - The topic to read. The isolate needs a subscribe grant for it.
  * @param opts - Where reading starts ({@link UseTopicOptions}).
@@ -34,17 +35,15 @@ export function useTopic<Out>(
   opts: UseTopicOptions = {},
 ): Out | undefined {
   const { bus } = useIsolate();
-  const [value, setValue] = useState<{ v: Out } | undefined>(undefined);
+  const [value, setValue] = useState<Latest<Out>>(() => latest(bus, topic));
   const from = opts.from ?? 'latest';
   // A layout effect: it subscribes before paint, so no record is missed, and
   // Preact 11 runs its cleanup during unmount, where it defers passive ones
   // past paint, so shutdown has unsubscribed by the time it's done.
   useLayoutEffect(() => {
-    setValue(undefined);
-    return bus.subscribe(topic, (r) => setValue({ v: r.value }), {
-      from,
-      onReset: () => setValue(undefined),
-    });
+    const off = addReader(bus, topic, from, () => setValue(latest(bus, topic)));
+    setValue(latest(bus, topic));
+    return off;
   }, [bus, topic.name, from]);
   return value?.v;
 }

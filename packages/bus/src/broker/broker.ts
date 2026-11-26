@@ -1187,15 +1187,15 @@ export class Broker {
 
   // Subscriptions, groups and commits.
 
-  // Dev only: a second subscribe on one connection replaces the first. That is
-  // usually two useTopic calls (or bus.subscribe calls) on the same topic.
+  // Dev only: a second subscribe on one connection replaces the first: two
+  // bus.subscribe calls on one topic, or one beside the adapters' useTopic.
   #warnRepeatSubscribe(conn: Connection, topic: string): void {
     if (conn.warned.has(topic)) return;
     const held = this.#topics.get(topic)?.seeding?.some((h) => h.conn === conn) ?? false;
     if (!held && !conn.subs.has(topic)) return;
     conn.warned.add(topic);
     console.warn(
-      `[isoloop] isolate "${conn.isolateId}" subscribed to "${topic}" again; the newer subscription replaced the older one (a second useTopic or bus.subscribe on this topic).`,
+      `[isoloop] isolate "${conn.isolateId}" subscribed to "${topic}" again; the newer subscription replaced the older one (a second bus.subscribe on this topic, or one beside a useTopic).`,
     );
   }
 

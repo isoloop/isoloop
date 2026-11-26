@@ -60,6 +60,18 @@ for (const [fw, major] of MAJORS)
         await expect(el(page, 'count')).toHaveText('2');
       });
 
+      test('two components read one topic; one unmounting leaves the other updating', async ({
+        page,
+      }) => {
+        await el(page, 'inc').click();
+        await expect(el(page, 'count')).toHaveText('1');
+        await expect(el(page, 'mirror')).toHaveText('1');
+        await el(page, 'unmirror').click();
+        await expect(el(page, 'mirror')).toHaveCount(0);
+        await el(page, 'inc').click();
+        await expect(el(page, 'count')).toHaveText('2');
+      });
+
       test('host-owned inputs keep what the user types', async ({ page }) => {
         const text = 'typed fast';
         await el(page, 'field').pressSequentially(text, { delay: 10 });

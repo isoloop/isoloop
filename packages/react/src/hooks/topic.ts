@@ -1,11 +1,13 @@
 /*
  * Bus hooks (design §5): `useTopic` reads a topic through
- * `useSyncExternalStore`, so concurrent renders never tear; `usePublish`
- * returns a publish function.
+ * `useSyncExternalStore`, so concurrent renders never tear, and shares one
+ * subscription per topic (`./shared-topic`); `usePublish` returns a publish
+ * function.
  */
 import type { StartPosition, TopicRef } from '@isoloop/protocol';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useIsolate } from '../isolate/context';
+import { addReader, latest } from './shared-topic';
 
 /** Options for {@link useTopic}. */
 export type UseTopicOptions = {
@@ -18,12 +20,11 @@ export type UseTopicOptions = {
  * never tear. The subscription lives while the component is mounted; StrictMode's extra
  * subscribe and unsubscribe leave one.
  *
- * An isolate has one subscription per topic. A second `useTopic` on the same topic, in
- * another component or another call in the same one, replaces the first with no error: only
- * the last one subscribed gets records, and the first stops updating. When the last one
- * unmounts, the topic has no subscription, and the first doesn't get it back. Call
- * `useTopic` once per topic, and pass the value down as props or share it through context.
- * With the kernel's `dev: true`, the bus warns in the console when this happens.
+ * Any number of components can read the same topic. Every `useTopic` on a topic in one
+ * isolate shares one bus subscription: the first to mount subscribes, the last to unmount
+ * unsubscribes, and each gets the same latest value, so one that mounts later sees the
+ * current value at once. The first one's `from` sets where the shared subscription starts; a
+ * later `useTopic` with a different `from` gets the shared value and a console warning.
  *
  * @param topic - The topic to read. The isolate needs a subscribe grant for it.
  * @param opts - Where reading starts ({@link UseTopicOptions}).
@@ -37,27 +38,13 @@ export function useTopic<Out>(
 ): Out | undefined {
   const { bus } = useIsolate();
   const from = opts.from ?? 'latest';
-  const store = useMemo(() => {
-    let latest: { v: Out } | undefined;
-    return {
-      subscribe: (notify: () => void): (() => void) =>
-        bus.subscribe(
-          topic,
-          (r) => {
-            latest = { v: r.value };
-            notify();
-          },
-          {
-            from,
-            onReset: () => {
-              latest = undefined;
-              notify();
-            },
-          },
-        ),
-      get: () => latest,
-    };
-  }, [bus, topic.name, from]);
+  const store = useMemo(
+    () => ({
+      subscribe: (notify: () => void): (() => void) => addReader(bus, topic, from, notify),
+      get: () => latest(bus, topic),
+    }),
+    [bus, topic.name, from],
+  );
   return useSyncExternalStore(store.subscribe, store.get)?.v;
 }
 

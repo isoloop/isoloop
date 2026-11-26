@@ -855,7 +855,7 @@ describe('a repeated subscribe in dev', () => {
       a.send(sub('notes.v1'));
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn.mock.calls[0]?.[0]).toBe(
-        '[isoloop] isolate "A" subscribed to "notes.v1" again; the newer subscription replaced the older one (a second useTopic or bus.subscribe on this topic).',
+        '[isoloop] isolate "A" subscribed to "notes.v1" again; the newer subscription replaced the older one (a second bus.subscribe on this topic, or one beside a useTopic).',
       );
       a.send(sub('notes.v1'));
       expect(warn).toHaveBeenCalledTimes(1);
