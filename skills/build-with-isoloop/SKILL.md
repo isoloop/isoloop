@@ -188,7 +188,7 @@ export default defineIsolate(CartList);
 
 ## Rules for records
 
-- **One subscription per topic in each isolate.** A second `subscribe`, or a second `useTopic`, on the same topic replaces the first, with no error. Subscribe once at the top and pass the value down.
+- **One `ctx.bus.subscribe` per topic in each isolate.** A second `subscribe` on the same topic replaces the first, with no error, and so does a `subscribe` beside a `useTopic` on that topic. Any number of components can `useTopic` the same topic: they share one subscription.
 - **The default start is `latest`,** which is new records only. A widget that shows current state uses `from: 'earliest'`, so it also has it after a restart. A handler with side effects uses `from: 'committed'`.
 - **Delivery is at least once.** Make handlers idempotent.
 - **A restart loses the isolate's own state.** Keep what must survive in a topic and read it back on start.

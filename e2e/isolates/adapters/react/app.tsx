@@ -8,12 +8,20 @@ import { useRef, useState, version } from 'react';
 
 const notes: TopicRef<string> = { name: 'notes.v1', schema: { '~standard': {} } };
 
+// A second reader of the same topic (#410): both update, and `.unmirror`
+// unmounts it while `.count` keeps updating.
+function Mirror() {
+  const last = useTopic(notes, { from: 'earliest' });
+  return <p className="mirror">{last ?? '0'}</p>;
+}
+
 function App() {
   const last = useTopic(notes, { from: 'earliest' });
   const publish = usePublish(notes);
   const route = useRoute();
   const host = useHost();
   const [text, setText] = useState('');
+  const [mirror, setMirror] = useState(true);
   const count = Number(last ?? '0');
   // The next value counts from what this isolate already sent, not only from
   // what it has rendered: two clicks before the first record comes back from
@@ -27,6 +35,10 @@ function App() {
     <div>
       <p className="fw">{`react ${version}`}</p>
       <p className="count">{count}</p>
+      {mirror ? <Mirror /> : null}
+      <button className="unmirror" onClick={() => setMirror(false)}>
+        unmirror
+      </button>
       <button className="inc" onClick={inc}>
         +1
       </button>

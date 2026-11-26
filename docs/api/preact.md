@@ -159,15 +159,14 @@ with routing off.
 
 ### `useTopic`
 
-The latest value on `topic`. It subscribes on mount and unsubscribes on unmount;
-a different `topic` or `from` subscribes again.
+The latest value on `topic`. It reads on mount and stops on unmount; a different `topic`
+or `from` reads again.
 
-An isolate has one subscription per topic. A second `useTopic` on the same topic, in
-another component or another call in the same one, replaces the first with no error: only
-the last one subscribed gets records, and the first stops updating. When the last one
-unmounts, the topic has no subscription, and the first doesn't get it back. Call
-`useTopic` once per topic, and pass the value down as props or share it through context.
-With the kernel's `dev: true`, the bus warns in the console when this happens.
+Any number of components can read the same topic. Every `useTopic` on a topic in one
+isolate shares one bus subscription: the first to mount subscribes, the last to unmount
+unsubscribes, and each gets the same latest value, so one that mounts later sees the
+current value at once. The first one's `from` sets where the shared subscription starts; a
+later `useTopic` with a different `from` gets the shared value and a console warning.
 
 ```ts nocheck
 function useTopic<Out>(topic: TopicRef<any, Out, any, any>, opts?: UseTopicOptions): Out | undefined;
