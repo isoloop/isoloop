@@ -413,6 +413,9 @@
     "**/coverage/**",
     "docs/diagrams/viewer-*.js",
     "docs/diagrams/*.mjs",
-    "scripts/docs/fence-app/**"
+    "scripts/docs/fence-app/**",
+    // Codemod fixtures are users' code as it was before and after a step,
+    // byte for byte, old APIs included.
+    "packages/cli/src/migrate/*/fixtures/**"
   ]
 }

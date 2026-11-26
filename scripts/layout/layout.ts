@@ -4,7 +4,10 @@
 // 1. The top of `src/` holds only entries and tests named after them.
 // 2. `index.ts` is only ever an entry.
 // 3. Folders under `src/` are one level deep (inside `__fixtures__/` they may
-//    nest), kebab-case, and never a kind name.
+//    nest), kebab-case, and never a kind name. The CLI's codemod steps are
+//    the one other place that nests: `packages/cli/src/migrate/<version>/`
+//    holds a step and its `fixtures/`, the path ADR 0019 (decision 10) and
+//    the changeset check name.
 // 4. `__fixtures__/` exists only at `src/__fixtures__/`, and `test/` holds no
 //    test files.
 // 5. Shipped code never reaches outside its package by a relative path.
@@ -28,6 +31,13 @@ export type Project = { include: readonly string[]; exclude: readonly string[] }
 const ADR = 'ADR 0021';
 const FIXTURES = '__fixtures__';
 const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** A codemod step's folder, `packages/cli/src/migrate/<major.minor>/…` (ADR 0019, decision 10). */
+const isMigrateStep = (pkgDir: string, parts: readonly string[]): boolean =>
+  pkgDir === 'packages/cli' &&
+  parts[0] === 'migrate' &&
+  /^\d+\.\d+$/.test(parts[1] ?? '') &&
+  parts.length > 2;
 const KIND_NAMES = new Set([
   'utils',
   'util',
@@ -155,6 +165,10 @@ export function checkTree(pkg: Package, files: readonly string[]): Problem[] {
     // Rule 3.
     const dirs = parts.slice(0, -1);
     if (fixtureAt === 0) continue;
+    if (isMigrateStep(pkg.dir, parts)) {
+      folders.add('migrate');
+      continue;
+    }
     const limit = fixtureAt < 0 ? dirs.length : fixtureAt;
     if (limit > 1) nested.add(`${pkg.dir}/src/${dirs.slice(0, 2).join('/')}/`);
     for (const d of dirs.slice(0, Math.min(limit, 1))) folders.add(d);

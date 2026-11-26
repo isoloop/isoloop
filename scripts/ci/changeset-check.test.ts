@@ -4,7 +4,10 @@ import {
   bumps,
   type Change,
   decide,
+  isBreaking,
   isVersionPr,
+  migrationTarget,
+  summaryOf,
   parseNameStatus,
   type ReadPair,
 } from './changeset-check.ts';
@@ -69,6 +72,79 @@ describe('the major guard', () => {
       ok: true,
       run: false,
     });
+  });
+});
+
+describe('the codemod gate', () => {
+  const breaking = `---\n'@isoloop/runtime': minor\n---\n\nbreaking: publish takes the value.\n`;
+  const at = '0.1.0';
+  const base: Change[] = [
+    { status: 'A', path: '.changeset/publish-shape.md' },
+    { status: 'M', path: 'packages/runtime/src/bus/bus-client.ts' },
+  ];
+  const read = repo({}, { '.changeset/publish-shape.md': breaking });
+
+  it('fails a breaking: changeset without fixtures for the release it ships in', () => {
+    const result = decide({ version: at, labels: [], changes: base, read });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toContain('.changeset/publish-shape.md is a `breaking:` changeset');
+    expect(result.error).toContain('packages/cli/src/migrate/0.2/fixtures/');
+  });
+
+  it('fails it even with the no-changeset label', () => {
+    expect(decide({ version: at, labels: ['no-changeset'], changes: base, read }).ok).toBe(false);
+  });
+
+  it('passes with a before fixture added or changed under that release', () => {
+    for (const status of ['A', 'M']) {
+      const changes = [
+        ...base,
+        { status, path: 'packages/cli/src/migrate/0.2/fixtures/publish.before.ts' },
+        { status, path: 'packages/cli/src/migrate/0.2/fixtures/publish.after.ts' },
+      ];
+      expect(decide({ version: at, labels: [], changes, read })).toMatchObject({
+        ok: true,
+        run: true,
+      });
+    }
+  });
+
+  it('fails with fixtures for another release, deleted ones, or after files alone', () => {
+    for (const extra of [
+      { status: 'A', path: 'packages/cli/src/migrate/0.3/fixtures/publish.before.ts' },
+      { status: 'D', path: 'packages/cli/src/migrate/0.2/fixtures/publish.before.ts' },
+      { status: 'A', path: 'packages/cli/src/migrate/0.2/fixtures/publish.after.ts' },
+      { status: 'A', path: 'packages/cli/src/migrate/0.2/step.ts' },
+    ]) {
+      expect(decide({ version: at, labels: [], changes: [...base, extra], read }).ok).toBe(false);
+    }
+  });
+
+  it('ignores a breaking changeset the PR deletes, and other summaries', () => {
+    const deleted: Change[] = [{ status: 'D', path: '.changeset/publish-shape.md' }];
+    expect(decide({ version: at, labels: [], changes: deleted, read }).ok).toBe(true);
+    const plain = repo({}, { '.changeset/publish-shape.md': changeset('minor') });
+    expect(decide({ version: at, labels: [], changes: base, read: plain }).ok).toBe(true);
+  });
+
+  it('reads the summary after the front matter', () => {
+    expect(summaryOf(breaking)).toBe('breaking: publish takes the value.');
+    expect(isBreaking(breaking)).toBe(true);
+    expect(isBreaking(changeset('minor'))).toBe(false);
+    expect(isBreaking(`---\n'a': minor\n---\n\nNot breaking: a note.\n`)).toBe(false);
+    expect(isBreaking(`---\r\n'a': minor\r\n---\r\n\r\nbreaking: crlf\r\n`)).toBe(true);
+  });
+
+  it('names the release a change ships in', () => {
+    expect(migrationTarget('0.1.0', [])).toBe('0.2');
+    expect(migrationTarget('0.1.1', [])).toBe('0.2');
+    expect(migrationTarget('0.2.0-next.3', [])).toBe('0.2');
+    expect(migrationTarget('0.2.1-next.0', [])).toBe('0.3');
+    expect(migrationTarget('0.9.2', ['release-1.0'])).toBe('1.0');
+    expect(migrationTarget('1.0.0-next.1', ['release-1.0'])).toBe('1.0');
+    expect(migrationTarget('1.0.0', [])).toBe('2.0');
+    expect(migrationTarget('2.0.0-next.0', [])).toBe('2.0');
   });
 });
 

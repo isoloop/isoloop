@@ -43,6 +43,23 @@ Claude Code: claude mcp add isoloop -- npx isoloop mcp
 | `--allow-write` | Also offer the tools that change something (readOnly: false). |
 | `-h, --help` | Show this help. |
 
+## `isoloop migrate`
+
+Rewrite your source for an Isoloop release that changed an API.
+
+```sh
+isoloop migrate [version] [options]
+```
+
+Starts from the installed @isoloop/* version (or --from) and runs each step up to [version], by default the newest this CLI knows. Reads the .ts, .tsx, .mts, .cts, .js, .jsx, .mjs, .cjs files under the working directory (or --dir), outside node_modules and dot-folders. Prints the changes as a diff and writes nothing, unless --write is given. Code it can't rewrite safely gets a "// isoloop-migrate:" comment above it, listed at the end. Run it before you upgrade, or pass --from with the version you upgraded from. Exits 1 when a file doesn't parse; that file is left as it is.
+
+| Flag | Description |
+| --- | --- |
+| `--write` | Write the changes to the files. |
+| `--from <version>` | The version the code is written for (default: the installed one). |
+| `--dir <folder>` | The folder to migrate (default: the working directory). |
+| `-h, --help` | Show this help. |
+
 ## `isoloop skill add`
 
 Copy the "build with Isoloop" skill into your project, for coding agents.

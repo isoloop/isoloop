@@ -25,6 +25,7 @@ function memoryIo() {
       files.set(path, text);
       return Promise.resolve();
     },
+    list: () => Promise.resolve(undefined),
     load: (path) => import(/* @vite-ignore */ path),
   };
   return { io, files, out: () => out, err: () => err };

@@ -11,6 +11,7 @@
     ".claude/",
     ".mcp.json",
     "docs/diagrams/*.html",
-    "docs/diagrams/viewer-*"
+    "docs/diagrams/viewer-*",
+    "packages/cli/src/migrate/*/fixtures/"
   ]
 }

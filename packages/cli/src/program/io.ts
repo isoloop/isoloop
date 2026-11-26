@@ -3,7 +3,7 @@
  * input and output streams, the environment, the working directory, files
  * and module loading.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -23,9 +23,17 @@ export type Io = {
   /** Makes a folder and the ones above it. */
   readonly mkdir: (path: string) => Promise<void>;
   readonly writeFile: (path: string, text: string) => Promise<void>;
+  /**
+   * A folder's entries, or `undefined` when there's no such folder. A symlink
+   * is `other`, so walking a tree never follows one.
+   */
+  readonly list: (path: string) => Promise<readonly DirEntry[] | undefined>;
   /** Imports a module by absolute path. */
   readonly load: (path: string) => Promise<unknown>;
 };
+
+/** One entry of a folder. */
+export type DirEntry = { readonly name: string; readonly kind: 'file' | 'dir' | 'other' };
 
 /** A path from the command line, resolved against `cwd`. */
 export const resolvePath = (io: Io, path: string): string =>
@@ -50,6 +58,20 @@ export function nodeIo(skills: string): Io {
     },
     mkdir: async (path) => void (await mkdir(path, { recursive: true })),
     writeFile: (path, text) => writeFile(path, text, 'utf8'),
+    list: async (path) => {
+      try {
+        const entries = await readdir(path, { withFileTypes: true });
+        return entries.map((e) => ({
+          name: e.name,
+          kind: e.isFile() ? 'file' : e.isDirectory() ? 'dir' : 'other',
+        }));
+      } catch (e) {
+        if (e instanceof Error && 'code' in e && (e.code === 'ENOENT' || e.code === 'ENOTDIR')) {
+          return undefined;
+        }
+        throw e;
+      }
+    },
     load: (path) => import(pathToFileURL(path).href),
   };
 }
