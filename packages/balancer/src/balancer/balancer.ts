@@ -486,8 +486,13 @@ export function balance<M extends ManifestLike>(
     m.stopping = settled;
   };
 
+  /**
+   * What a member in quarantine is reported as: an offender is `quarantined`
+   * (or `kept-apart` past `maxReturns`); one that never offended is only there
+   * to be measured (never measured, or moved in by a bisect): `measuring`.
+   */
   const stateFor = (m: Member<M>): PlacementState =>
-    m.offences > maxReturns ? 'kept-apart' : 'quarantined';
+    m.offences > maxReturns ? 'kept-apart' : m.offences > 0 ? 'quarantined' : 'measuring';
 
   /** Sends `m` to quarantine for misbehaving (`offence`) or to bisect. */
   const quarantine = (m: Member<M>, reason: MoveReason, offence: boolean): void => {
@@ -513,8 +518,8 @@ export function balance<M extends ManifestLike>(
    * history, and its pool's rules from here.
    */
   const revive = (m: Member<M>): void => {
-    m.state = isQuarantine(m.pool) ? 'quarantined' : 'placed';
     m.offences = 0;
+    m.state = isQuarantine(m.pool) ? stateFor(m) : 'placed';
     m.quarantinedAt = isQuarantine(m.pool) ? now() : -Infinity;
     m.lastSpikeAt = m.spikeNotedAt = m.decayAt = m.risingAt = m.stuckAt = -Infinity;
     m.arrivedAt = now();
@@ -1024,7 +1029,12 @@ export function balance<M extends ManifestLike>(
     // spike, no crash), whatever its load. Either goes where the placement
     // rule finds room; with none, it stays, flagged at the cap.
     for (const m of members.values()) {
-      if (m.state !== 'quarantined' || !movable(m) || !(m.unmeasured || inBudget(m))) continue;
+      if (
+        (m.state !== 'quarantined' && m.state !== 'measuring') ||
+        !movable(m) ||
+        !(m.unmeasured || inBudget(m))
+      )
+        continue;
       const fresh = average(m.beats, windowMs, t);
       if (m.offences === 0) {
         // Members a bisect moved stay until it ends (culprit found, or
@@ -1040,7 +1050,7 @@ export function balance<M extends ManifestLike>(
       }
       m.atCap = false;
       m.decayAt = t;
-      move(m, to.pool, 'steady', 'placed');
+      move(m, to.pool, m.offences === 0 ? 'measured' : 'steady', 'placed');
     }
 
     if (packing && t - lastPackAt >= PACK_EVERY_MS) pack(t);
@@ -1121,7 +1131,7 @@ export function balance<M extends ManifestLike>(
       const m: Member<M> = {
         manifest,
         pool: dest.pool,
-        state: isQuarantine(dest.pool) ? 'quarantined' : 'placed',
+        state: isQuarantine(dest.pool) ? 'measuring' : 'placed',
         beats: [],
         lastBeatAt: undefined,
         knownLoad: known,
