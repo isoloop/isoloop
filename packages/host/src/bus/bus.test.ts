@@ -84,7 +84,7 @@ describe('bus controller', () => {
     kernel.spawn({ id: 'X', src, grants: ALL, config: { topics: ['count.v1'] } });
     const got: BusRecord[] = [];
     kernel.subscribe(count, (r) => got.push(r), { from: 'earliest' });
-    await kernel.publish(count, { key: 'k', value: 41 });
+    await kernel.publish(count, 41, { key: 'k' });
     await vi.waitUntil(() => got.length === 1);
     expect(got[0]).toMatchObject({ offset: 0, key: 'k', value: 41, producer: 'host' });
     expect(ready).toEqual([{ first: true }]);
@@ -98,12 +98,12 @@ describe('bus controller', () => {
   it('rejects isoloop.* and invalid publishes with a BusError', async () => {
     const { kernel } = setup();
     const route = { ...notes, name: 'isoloop.route.v1' };
-    await expect(kernel.publish(route, { value: 'x' })).rejects.toMatchObject({
+    await expect(kernel.publish(route, 'x')).rejects.toMatchObject({
       name: 'BusError',
       code: 'forbidden',
     });
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a wrong value on purpose
-    const bad = kernel.publish(count, { value: 'nope' as unknown as number });
+    const bad = kernel.publish(count, 'nope' as unknown as number);
     await expect(bad).rejects.toBeInstanceOf(BusError);
     await expect(bad).rejects.toMatchObject({ code: 'invalid' });
   });
@@ -148,7 +148,7 @@ describe('bus controller', () => {
     // The bus works after the restart, for host and isolates.
     const got: number[] = [];
     kernel.subscribe(count, (r) => got.push(r.value), { from: 'earliest' });
-    await kernel.publish(count, { value: 7 });
+    await kernel.publish(count, 7);
     await vi.waitUntil(() => got.includes(7));
   });
 
@@ -158,15 +158,15 @@ describe('bus controller', () => {
     kernel.spawn({ id: 'X', src, grants: ALL, config: { topics: ['saved.v1', 'count.v1'] } });
     await vi.waitUntil(() => latest('X') && ready.length === 1);
     // Sent in order on one port, so offsets follow i.
-    await Promise.all(Array.from({ length: 20 }, (_, i) => kernel.publish(saved, { value: i })));
-    await kernel.publish(count, { value: 1 });
+    await Promise.all(Array.from({ length: 20 }, (_, i) => kernel.publish(saved, i)));
+    await kernel.publish(count, 1);
     await vi.waitUntil(() => latest('X')?.offsets['saved.v1']?.length === 20);
 
     kernel.debug.crashBus();
     await vi.waitUntil(() => ready.length === 2, { timeout: 3000 });
     // The memory topic is reset once; the persistent one resumes where X committed.
     await vi.waitUntil(() => latest('X')?.ports === 2 && latest('X')?.resets['count.v1'] === 1);
-    await Promise.all([20, 21, 22, 23, 24].map((i) => kernel.publish(saved, { value: i })));
+    await Promise.all([20, 21, 22, 23, 24].map((i) => kernel.publish(saved, i)));
     // Delivery is at-least-once (design §5, `autoCommit`): X's commits reach the log a moment
     // after the bus answers them, so a crash can land before the last ones do and
     // the new bus redelivers from the last stored commit. On a slow runner that
@@ -202,7 +202,7 @@ describe('bus controller', () => {
     // others not yet seen, and more made while it restarts.
     const pumping = (async () => {
       while (i < n) {
-        for (let k = 0; k < 20 && i < n; k++) sent.push(kernel.publish(saved, { value: i++ }));
+        for (let k = 0; k < 20 && i < n; k++) sent.push(kernel.publish(saved, i++));
         // oxlint-disable-next-line no-await-in-loop -- paced on purpose
         await new Promise((r) => setTimeout(r, 0));
       }
@@ -224,7 +224,7 @@ describe('bus controller', () => {
     const first = setup();
     const ready = first.log('bus:ready');
     await vi.waitUntil(() => ready.length === 1);
-    await Promise.all([0, 1, 2].map((i) => first.kernel.publish(saved, { value: i })));
+    await Promise.all([0, 1, 2].map((i) => first.kernel.publish(saved, i)));
     await first.kernel.destroy();
 
     // A record the codec can't read, with a valid CRC, after the three: the
@@ -255,7 +255,7 @@ describe('bus controller', () => {
     const names: string[] = [];
     for await (const name of dir.keys()) names.push(name);
     expect(names).toContain('0000000000000000.seg.to-0000000000000004.quarantined');
-    await second.kernel.publish(saved, { value: 9 });
+    await second.kernel.publish(saved, 9);
     const got: BusRecord[] = [];
     second.kernel.subscribe(saved, (r) => got.push(r), { from: 'earliest' });
     await vi.waitUntil(() => got.length === 1);
@@ -267,7 +267,7 @@ describe('bus controller', () => {
     const aDegraded = a.log('bus:durability_degraded');
     const aReady = a.log('bus:ready');
     await vi.waitUntil(() => aReady.length === 1);
-    await a.kernel.publish(saved, { value: 1 });
+    await a.kernel.publish(saved, 1);
 
     const b = setup();
     const bDegraded = b.log('bus:durability_degraded');
@@ -276,7 +276,7 @@ describe('bus controller', () => {
     expect(bDegraded).toEqual([{ reason: 'another_tab' }]);
     expect(aDegraded).toEqual([]);
     // It works, in memory.
-    await b.kernel.publish(saved, { value: 2 });
+    await b.kernel.publish(saved, 2);
     const got: number[] = [];
     b.kernel.subscribe(saved, (r) => got.push(r.value), { from: 'earliest' });
     await vi.waitUntil(() => got.length === 1);
@@ -295,14 +295,14 @@ describe('bus controller', () => {
     const quota = log('bus:quota');
     const metrics = log('bus:metrics');
     await vi.waitUntil(() => metrics.length >= 1, { timeout: 3000 });
-    await kernel.publish(saved, { value: 1 });
+    await kernel.publish(saved, 1);
     expect(quota).toEqual([{ usage: 81, quota: 100 }]);
     // The stub reports full from its third read on.
     await vi.waitUntil(() => metrics.some((m) => m.storage?.usage === 100), { timeout: 5000 });
-    await expect(kernel.publish(saved, { value: 2 })).rejects.toMatchObject({
+    await expect(kernel.publish(saved, 2)).rejects.toMatchObject({
       code: 'quota_exceeded',
     });
-    await kernel.publish(count, { value: 1 });
+    await kernel.publish(count, 1);
     expect(quota).toHaveLength(1);
   });
 
@@ -315,7 +315,7 @@ describe('bus controller', () => {
       const ready = log('bus:ready');
       await vi.waitUntil(() => ready.length >= 1, { timeout: 3000 });
       let acked = false;
-      const published = kernel.publish(saved, { value: 1 }).then(() => {
+      const published = kernel.publish(saved, 1).then(() => {
         acked = true;
       });
       // The fixture's group commit waits a minute, so nothing acks yet.
@@ -331,7 +331,7 @@ describe('bus controller', () => {
     const first = setup();
     const ready = first.log('bus:ready');
     await vi.waitUntil(() => ready.length === 1);
-    await Promise.all([0, 1, 2].map((i) => first.kernel.publish(saved, { value: i })));
+    await Promise.all([0, 1, 2].map((i) => first.kernel.publish(saved, i)));
     await expect(first.kernel.dropTopic(saved.name)).rejects.toMatchObject({ code: 'invalid' });
     await first.kernel.destroy();
 
@@ -385,7 +385,7 @@ describe('bus controller', () => {
     expect(() => kernel.spawn({ id: 'Z', src })).toThrow(
       expect.objectContaining({ code: 'bus_failed' }),
     );
-    await expect(kernel.publish(count, { value: 1 })).rejects.toMatchObject({
+    await expect(kernel.publish(count, 1)).rejects.toMatchObject({
       code: 'bus_unavailable',
     });
   });
@@ -403,7 +403,7 @@ describe('bus controller', () => {
     kernel.debug.crashBus();
     await vi.waitUntil(() => failed.length === 1);
     expect(failed[0]).toMatchObject({ reason: 'worker_error' });
-    await expect(kernel.publish(count, { value: 1 })).rejects.toMatchObject({
+    await expect(kernel.publish(count, 1)).rejects.toMatchObject({
       code: 'bus_unavailable',
     });
     expect(kernel.isolates()[0]?.state).toBe('running');
@@ -435,7 +435,7 @@ describe('bus controller', () => {
     const got: number[] = [];
     kernel.subscribe(count, (r) => got.push(r.value), { from: 'earliest' });
     // oxlint-disable-next-line no-await-in-loop -- one at a time, so the log never holds more than the subscriber is behind
-    for (let i = 0; i < 1500; i++) await kernel.publish(count, { value: i });
+    for (let i = 0; i < 1500; i++) await kernel.publish(count, i);
     await vi.waitUntil(() => got.length === 1500, { timeout: 5000 });
     expect(got).toEqual(Array.from({ length: 1500 }, (_, i) => i));
   });

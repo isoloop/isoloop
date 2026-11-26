@@ -76,7 +76,7 @@ const run =
         const healthy = ['B', 'C', 'Q1', 'Q2', 'O1', 'O2'];
         await wait(() => healthy.every((id) => instancesOf(id).length >= 1), 8000, 'start');
         // Records before the fault, read by every member.
-        for (const value of [1, 2, 3]) void kernel.publish({ name: 'feed.v1' }, { value });
+        for (const value of [1, 2, 3]) void kernel.publish({ name: 'feed.v1' }, value);
         const sawAll = (id: string, n: number) =>
           reports.some((r) => r.id === id && r.seen.length >= n);
         await wait(() => healthy.every((id) => sawAll(id, 3)), 8000, 'first records');
@@ -93,7 +93,7 @@ const run =
           await new Promise((r) => setTimeout(r, 300));
         }
         // Records after the fault: each member reads on from its committed offset.
-        for (const value of [4, 5]) void kernel.publish({ name: 'feed.v1' }, { value });
+        for (const value of [4, 5]) void kernel.publish({ name: 'feed.v1' }, value);
         await wait(
           () =>
             healthy.every((id) => {

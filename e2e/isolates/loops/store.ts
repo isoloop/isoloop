@@ -20,7 +20,7 @@ export default defineIsolate({
         const next = JSON.stringify(state);
         if (next === last) return;
         last = next;
-        void ctx.bus.publish(store, { key: 'state', value: { ...state } });
+        void ctx.bus.publish(store, { ...state }, { key: 'state' });
       }, 50);
     };
     ctx.bus.subscribe(

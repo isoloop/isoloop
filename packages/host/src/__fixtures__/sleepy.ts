@@ -12,7 +12,7 @@ type Ctx = {
   root?: Element;
   keepAwake(): () => void;
   bus: {
-    publish(topic: unknown, rec: { value: unknown }): Promise<void>;
+    publish(topic: unknown, value: unknown): Promise<void>;
     subscribe(
       topic: unknown,
       fn: (r: Rec) => void,
@@ -42,7 +42,11 @@ export default {
     const send = (): void => {
       if (out) out.textContent = values.join(',');
       void ctx.bus.publish(report, {
-        value: { id: ctx.id, instance, values: [...values], keys: [...keys], gaps: [...gaps] },
+        id: ctx.id,
+        instance,
+        values: [...values],
+        keys: [...keys],
+        gaps: [...gaps],
       });
     };
     ctx.bus.subscribe(

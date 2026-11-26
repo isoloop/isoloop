@@ -465,15 +465,21 @@ export interface Kernel {
    */
   resume(id: string): Promise<void>;
   /**
-   * Publishes a record from the host.
+   * Publishes a record from the host: `kernel.publish(count, 1)`, or
+   * `kernel.publish(prices, 102, { key: 'AAPL' })` with a key.
    * @param topic The topic, from the contracts.
-   * @param rec The record's `value`, and its `key` if any.
+   * @param value The record's value, checked against the topic's schema.
+   * @param opts The record's `key`. Default: none.
    * @returns Resolves once the bus has appended the record.
    * @throws Rejects with a `BusError`: `forbidden` for `isoloop.*` topics,
    *   `bus_unavailable` without contracts, or the broker's code (`invalid`,
    *   `quota_exceeded`, …).
    */
-  publish<In>(topic: TopicRef<In, any, any, any>, rec: { key?: string; value: In }): Promise<void>;
+  publish<In>(
+    topic: TopicRef<In, any, any, any>,
+    value: In,
+    opts?: { key?: string },
+  ): Promise<void>;
   /**
    * Deletes a persistent topic the contracts no longer list (see
    * `bus:orphaned_topics`).
@@ -1837,7 +1843,7 @@ export function createKernel(config: KernelConfig): Kernel {
       return Promise.resolve();
     },
 
-    async publish(topic, rec) {
+    async publish(topic, value, opts = {}) {
       if (isSystemTopic(topic.name))
         throw new BusError({ code: 'forbidden', message: `${topic.name} belongs to the kernel` });
       if (!controller)
@@ -1845,7 +1851,7 @@ export function createKernel(config: KernelConfig): Kernel {
           code: 'bus_unavailable',
           message: 'No bus worker: KernelConfig.contracts is not set',
         });
-      const r = await controller.publish(topic.name, rec.key, rec.value);
+      const r = await controller.publish(topic.name, opts.key, value);
       if (!r.ok) throw new BusError(r.error);
     },
 

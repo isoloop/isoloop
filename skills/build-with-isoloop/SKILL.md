@@ -97,7 +97,7 @@ kernel.spawn({
   grants: { publish: [], subscribe: ['cart.items.v1'] },
 });
 
-await kernel.publish(cartItems, { key: 'tea', value: { sku: 'tea', qty: 4 } });
+await kernel.publish(cartItems, { sku: 'tea', qty: 4 }, { key: 'tea' });
 ```
 
 - **`contracts` takes both halves:** the URL from `?isolate`, for the bus worker, and the imported list, for the host.
@@ -252,7 +252,7 @@ ctx.bus.subscribe(
   async (r) => {
     if (r.req === undefined) return; // a plain record, not a request
     const id = `note-${r.req.id}`; // the same request gives the same id
-    await ctx.bus.publish(notes, { key: id, value: { id, text: r.value.text } });
+    await ctx.bus.publish(notes, { id, text: r.value.text }, { key: id });
     await ctx.bus.reply(r, { id });
   },
   { from: 'committed' },

@@ -88,7 +88,7 @@ describe('stop, then spawn the same id at once', () => {
       });
       if (neighbour && pool !== undefined)
         kernel.spawn({ id: 'N', src, grants: ALL, config: { instance: 'n' }, pool });
-      await kernel.publish(count, { value: 1 });
+      await kernel.publish(count, 1);
       kernel.spawn(manifest('a'));
       await until(() => seen('a')?.length === 1);
       if (neighbour) await until(() => seen('n')?.length === 1);
@@ -97,7 +97,7 @@ describe('stop, then spawn the same id at once', () => {
       kernel.spawn(manifest('b'));
       await stopped; // the old instance said `bye` (or ran out of grace)
       await until(() => seen('b')?.length === 1);
-      await kernel.publish(count, { value: 2 });
+      await kernel.publish(count, 2);
       await until(() => seen('b')?.length === 2);
       expect(seen('b')).toEqual([1, 2]);
       expect(state('X')).toBe('running');
@@ -111,7 +111,7 @@ describe('stop, then spawn the same id at once', () => {
 
   it('stopped while its suspend is still shutting down: the new instance keeps its subscription', async () => {
     const { kernel, seen, state } = setup();
-    await kernel.publish(count, { value: 1 });
+    await kernel.publish(count, 1);
     kernel.spawn({
       id: 'X',
       src,
@@ -131,7 +131,7 @@ describe('stop, then spawn the same id at once', () => {
     off();
     await stopped;
     await until(() => seen('b')?.length === 1);
-    await kernel.publish(count, { value: 2 });
+    await kernel.publish(count, 2);
     await until(() => seen('b')?.length === 2);
     expect(seen('b')).toEqual([1, 2]);
     expect(state('X')).toBe('running');
@@ -139,7 +139,7 @@ describe('stop, then spawn the same id at once', () => {
 
   it('a second stop and spawn while the first old instance still shuts down', async () => {
     const { kernel, seen, state } = setup();
-    await kernel.publish(count, { value: 1 });
+    await kernel.publish(count, 1);
     kernel.spawn(slow('a'));
     await until(() => seen('a')?.length === 1);
     const first = kernel.stop('X');
@@ -148,7 +148,7 @@ describe('stop, then spawn the same id at once', () => {
     kernel.spawn(slow('c'));
     await Promise.all([first, second]);
     await until(() => seen('c')?.length === 1);
-    await kernel.publish(count, { value: 2 });
+    await kernel.publish(count, 2);
     await until(() => seen('c')?.length === 2);
     expect(seen('c')).toEqual([1, 2]);
     expect(seen('b')).toBeUndefined(); // stopped before it started

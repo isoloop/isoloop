@@ -6,7 +6,7 @@
 // event), `throw` throws in start().
 
 export default {
-  /** @param {{ id: string; config: unknown; bus: { publish(t: { name: string }, r: { value: unknown }): Promise<void>; subscribe(t: { name: string }, fn: (r: { value: unknown }) => void, o?: { from?: string }): () => void } }} ctx */
+  /** @param {{ id: string; config: unknown; bus: { publish(t: { name: string }, value: unknown): Promise<void>; subscribe(t: { name: string }, fn: (r: { value: unknown }) => void, o?: { from?: string }): () => void } }} ctx */
   start(ctx) {
     /** @type {unknown} */
     const fault =
@@ -19,7 +19,7 @@ export default {
     const seen = [];
     const report = () =>
       void ctx.bus
-        .publish({ name: 'pooled.v1' }, { value: { id: ctx.id, instance, seen: [...seen] } })
+        .publish({ name: 'pooled.v1' }, { id: ctx.id, instance, seen: [...seen] })
         .catch(() => {});
     ctx.bus.subscribe(
       { name: 'feed.v1' },

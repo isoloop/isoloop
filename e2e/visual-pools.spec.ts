@@ -105,7 +105,7 @@ const run = (page: import('@playwright/test').Page, faulty: string, fault: Fault
       const all = layout.map(([id]) => id);
       const visual = layout.filter(([, , k]) => k !== 'headless').map(([id]) => id);
       await wait(() => all.every((id) => instancesOf(id).length >= 1), 10_000, 'start');
-      for (const value of [1, 2, 3]) void kernel.publish({ name: 'feed.v1' }, { value });
+      for (const value of [1, 2, 3]) void kernel.publish({ name: 'feed.v1' }, value);
       await wait(
         () => visual.every((id) => shown(id) === '3'),
         10_000,
@@ -128,7 +128,7 @@ const run = (page: import('@playwright/test').Page, faulty: string, fault: Fault
         await wait(() => mates.every((id) => instancesOf(id).length >= 2), 12_000, 'pool restart');
         await new Promise((r) => setTimeout(r, 300));
       }
-      for (const value of [4, 5]) void kernel.publish({ name: 'feed.v1' }, { value });
+      for (const value of [4, 5]) void kernel.publish({ name: 'feed.v1' }, value);
       const healthy = visual.filter((id) => !(which === 'throw' && id === who));
       await wait(() => healthy.every((id) => shown(id) === '5'), 10_000, 'later records');
       const out: Out = { crashes, instances: {}, shown: {}, pools: {}, states: {} };

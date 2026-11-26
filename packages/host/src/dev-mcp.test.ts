@@ -334,7 +334,7 @@ describe("connectDevMCP: the dev MCP's own tools (M4a task 8)", () => {
     s.receive(op('t2', { op: 'tap', topics: [told.name], ms: 5_000, max: 3 }));
     // Let both taps open on the bus before publishing.
     await new Promise((r) => setTimeout(r, 200));
-    for (let i = 0; i < 200; i++) void kernel.publish(told, { value: i });
+    for (let i = 0; i < 200; i++) void kernel.publish(told, i);
     await until(() => s.results().length === 2, 8_000);
     const wide = resultOf(s, 't1');
     const v = wide?.ok

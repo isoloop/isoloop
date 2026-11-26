@@ -29,7 +29,7 @@ export default defineIsolate<HTMLElement>({
   start(ctx) {
     const button = document.createElement('button');
     button.textContent = 'Add one';
-    button.addEventListener('click', () => void ctx.bus.publish(count, { value: 1 }));
+    button.addEventListener('click', () => void ctx.bus.publish(count, 1));
     ctx.root?.append(button);
   },
 });
@@ -64,9 +64,8 @@ An isolate's side of the bus: `ctx.bus`, on its own port to the bus worker.
 
 ```ts nocheck
 interface BusClient {
-  publish<In>(topic: TopicRef<In, any, any, any>, rec: {
+  publish<In>(topic: TopicRef<In, any, any, any>, value: In, opts?: {
     key?: string;
-    value: In;
   }): Promise<void>;
   subscribe<Out>(topic: TopicRef<any, Out, any, any>, fn: (r: TypedRecord<Out>) => void | Promise<void>, opts?: SubscribeOptions): () => void;
   request<In, ROut>(topic: TopicRef<In, any, any, ROut>, value: In, opts?: RequestOptions): Promise<ROut>;
@@ -77,7 +76,7 @@ interface BusClient {
 
 | Member | Description |
 | --- | --- |
-| `publish()` | Appends a record to a topic. |
+| `publish()` | Appends a record to a topic: `publish(count, 1)`, or `publish(prices, 102, { key: 'AAPL' })` with a key. |
 | `subscribe()` | Delivers a topic's records to `fn`, one at a time, in order: the next waits until `fn`'s promise settles. One subscription per topic: subscribing again replaces the last one. |
 | `request()` | **Experimental.** Appends a request record to a topic with a `reply` schema and waits for the first valid reply. |
 | `reply()` | **Experimental.** Answers a request record delivered to this isolate. |

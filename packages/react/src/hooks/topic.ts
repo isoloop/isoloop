@@ -65,8 +65,7 @@ export function usePublish<In>(
 ): (value: In, opts?: { key?: string }) => Promise<void> {
   const { bus } = useIsolate();
   return useCallback(
-    (value: In, o: { key?: string } = {}) =>
-      bus.publish(topic, o.key === undefined ? { value } : { key: o.key, value }),
+    (value: In, o: { key?: string } = {}) => bus.publish(topic, value, o),
     [bus, topic.name],
   );
 }

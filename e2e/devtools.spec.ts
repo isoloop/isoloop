@@ -136,10 +136,10 @@ test.describe('devtools: bus view (M4b task 9)', () => {
     await expect(bus.locator('[data-bus-state]')).toHaveAttribute('data-bus-state', 'running');
     const rejected = await page.evaluate(async () => {
       await Promise.all(
-        [1, 2, 3].map((value) => window.kernel.publish({ name: 'feed.v1' }, { value })),
+        [1, 2, 3].map((value) => window.kernel.publish({ name: 'feed.v1' }, value)),
       );
       try {
-        await window.kernel.publish({ name: 'feed.v1' }, { value: 'not a number' });
+        await window.kernel.publish({ name: 'feed.v1' }, 'not a number');
         return 'accepted';
       } catch (e) {
         return e instanceof Error && 'code' in e ? String(e.code) : 'threw';
@@ -183,10 +183,7 @@ const log = (page: Page, topic = 'feed.v1') =>
   page.locator(`[data-isoloop-devtools] [data-log-table] tbody tr[data-log-topic="${topic}"]`);
 const rows = (page: Page) => page.locator('[data-isoloop-devtools] [data-log-table] tbody tr');
 const publish = (page: Page, topic: string, value: unknown) =>
-  page.evaluate(([t, v]) => window.kernel.publish({ name: t }, { value: v }), [
-    topic,
-    value,
-  ] as const);
+  page.evaluate(([t, v]) => window.kernel.publish({ name: t }, v), [topic, value] as const);
 
 test.describe('devtools: live record log (M4b task 10)', () => {
   test.beforeEach(async ({ page }) => {
@@ -245,9 +242,7 @@ test.describe('devtools: live record log (M4b task 10)', () => {
     await expect(counter).toHaveText('50/s cap · 0 skipped');
     await page.evaluate(() =>
       Promise.all(
-        Array.from({ length: 200 }, (_, i) =>
-          window.kernel.publish({ name: 'notes.v1' }, { value: `n${i}` }),
-        ),
+        Array.from({ length: 200 }, (_, i) => window.kernel.publish({ name: 'notes.v1' }, `n${i}`)),
       ),
     );
     await expect

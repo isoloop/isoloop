@@ -73,11 +73,11 @@ export function createTestContext(o: TestContextOptions = {}): TestContext {
   let portal: object | undefined;
 
   const bus: BusClient = {
-    publish(topic, rec) {
+    publish(topic, value, opts = {}) {
       published.push(
-        rec.key === undefined
-          ? { topic: topic.name, value: rec.value }
-          : { topic: topic.name, key: rec.key, value: rec.value },
+        opts.key === undefined
+          ? { topic: topic.name, value }
+          : { topic: topic.name, key: opts.key, value },
       );
       return Promise.resolve();
     },

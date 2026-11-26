@@ -80,7 +80,7 @@ export default defineIsolate<HTMLElement>({
       // the user may be typing the next note.
       ctx.setValue(input, '', { force: true });
       try {
-        await ctx.bus.publish(note, { value: draft });
+        await ctx.bus.publish(note, draft);
       } catch (e) {
         push(`note rejected: ${e instanceof Error ? e.message : String(e)}`);
       }

@@ -37,7 +37,7 @@ export default defineIsolate<HTMLElement>({
       }
       const ms = Math.round(performance.now() - t);
       result.textContent = `${count.toLocaleString()} primes below 30M in ${ms} ms`;
-      void ctx.bus.publish(primesTopic, { value: { count, ms } });
+      void ctx.bus.publish(primesTopic, { count, ms });
     });
 
     const hang = el('button', {}, 'Hang');

@@ -50,7 +50,7 @@ describe('per-member errors in a pool (M2c)', () => {
     await vi.waitUntil(() => ready.length === 2);
     expect(kernel.debug.workers().pools).toEqual({ p: ['F', 'G'] });
     // oxlint-disable-next-line no-await-in-loop -- in order on purpose
-    for (const value of [1, 2, 3]) await kernel.publish(count, { value });
+    for (const value of [1, 2, 3]) await kernel.publish(count, value);
     await vi.waitUntil(() => reports.some((r) => r.id === 'F' && r.values?.length === 3));
     expect(errors).toEqual([{ id: 'F', message: 'flaky handler' }]);
     expect(crashes).toEqual([]);

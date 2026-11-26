@@ -5,7 +5,7 @@
 type Ctx = {
   id: string;
   config: unknown;
-  bus: { publish(topic: { name: string }, rec: { value: unknown }): Promise<void> };
+  bus: { publish(topic: { name: string }, value: unknown): Promise<void> };
   onShutdown(fn: () => void | Promise<void>): void;
 };
 
@@ -55,7 +55,7 @@ export default {
         override: new MyError().name,
         frozen: Object.isFrozen(Array.prototype),
       };
-      void ctx.bus.publish({ name: 'hello' }, { value: report }).catch(() => {});
+      void ctx.bus.publish({ name: 'hello' }, report).catch(() => {});
       return;
     }
     if (ctx.config === 'taming') {
@@ -124,9 +124,9 @@ export default {
         accessorNotData: where(report.dataProperties, true),
         frozen: report.frozen,
       };
-      void ctx.bus.publish({ name: 'hello' }, { value }).catch(() => {});
+      void ctx.bus.publish({ name: 'hello' }, value).catch(() => {});
       return;
     }
-    void ctx.bus.publish({ name: 'hello' }, { value: ctx.id }).catch(() => {});
+    void ctx.bus.publish({ name: 'hello' }, ctx.id).catch(() => {});
   },
 };

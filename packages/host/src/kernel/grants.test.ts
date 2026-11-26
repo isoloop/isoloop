@@ -67,8 +67,8 @@ describe('grants (I4)', () => {
     expect(errors.filter((e) => e.id === 'G')).toEqual([]);
 
     // Records on both topics: U gets count.v1 only, G gets both.
-    await kernel.publish(notes, { value: 'host note' });
-    await kernel.publish(count, { value: 7 });
+    await kernel.publish(notes, 'host note');
+    await kernel.publish(count, 7);
     await vi.waitUntil(() => latest('U')?.seen.includes('count.v1:7'), { timeout: 5000 });
     await vi.waitUntil(() => latest('G')?.seen.includes('count.v1:7'), { timeout: 5000 });
     expect(latest('G')?.seen).toContain('notes.v1:host note');

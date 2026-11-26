@@ -76,15 +76,21 @@ export type SubscribeOptions = {
 /** An isolate's side of the bus: `ctx.bus`, on its own port to the bus worker. */
 export interface BusClient {
   /**
-   * Appends a record to a topic.
+   * Appends a record to a topic: `publish(count, 1)`, or
+   * `publish(prices, 102, { key: 'AAPL' })` with a key.
    * @param topic The topic, from the contracts.
-   * @param rec The record's `value`, and its `key` if any.
+   * @param value The record's value, checked against the topic's schema.
+   * @param opts The record's `key`. Default: none.
    * @returns Resolves once the broker has appended the record.
    * @throws Rejects with a `BusError`, for example `forbidden` without a
    *   publish grant, `invalid` when the value fails the schema, or
    *   `bus_unavailable` while 1,000 calls wait for an answer.
    */
-  publish<In>(topic: TopicRef<In, any, any, any>, rec: { key?: string; value: In }): Promise<void>;
+  publish<In>(
+    topic: TopicRef<In, any, any, any>,
+    value: In,
+    opts?: { key?: string },
+  ): Promise<void>;
   /**
    * Delivers a topic's records to `fn`, one at a time, in order: the next
    * waits until `fn`'s promise settles. One subscription per topic:
@@ -359,14 +365,14 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
   listen(first);
 
   const client: BusClient = {
-    async publish(topic, rec) {
+    async publish(topic, value, opts = {}) {
       const p: Extract<IsolateToBus, { t: 'publish' }>['p'] = {
         topic: topic.name,
-        value: rec.value,
+        value,
         epoch,
         seq: ++seq,
       };
-      if (rec.key !== undefined) p.key = rec.key;
+      if (opts.key !== undefined) p.key = opts.key;
       check(await call({ v: 1, t: 'publish', p }));
     },
 
