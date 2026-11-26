@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-03
-- **Amended:** 2026-11-20, the bus worker's restart limit is a default (see [the amendment](#amended-the-restart-limit-is-a-default-2026-11-20))
+- **Amended:** 2026-11-20, the bus worker's restart limit is a default (see [the amendment](#amended-the-restart-limit-is-a-default-2026-11-20)); 2026-11-24, short runs count (see [the amendment](#amended-short-runs-count-2026-11-24)); 2026-11-26, the healthy run is `healthyAfterMs` (see [the amendment](#amended-the-healthy-run-is-healthyafterms-2026-11-26))
 - **Fills a gap in:** RFC 0001 (which covers isolate crashes only)
 - **Replaces:** the RFC's "Persistence (later): compacted topics written to IndexedDB"
 
@@ -81,6 +81,10 @@ Every major browser has had sync access handles in normal browsing since 2022 or
 ### Amended: short runs count (2026-11-24)
 
 The bus worker's restart limit follows [ADR 0001](0001-one-worker-per-isolate.md)'s *Restart limit: short runs*: a crash after a healthy run shorter than `withinMs` counts, measured from the bus's `ready` to its last beat, and the sliding window stays as well. The bus has no fallback: when the limit is met it fails as it does today, and isolates get `bus_unavailable` ([#390](https://github.com/isoloop/isoloop/issues/390)).
+
+### Amended: the healthy run is `healthyAfterMs` (2026-11-26)
+
+The healthy run that clears the bus worker's count of short runs is `supervisor.healthyAfterMs`, not `withinMs`, which is the sliding window only ([ADR 0001](0001-one-worker-per-isolate.md), *Restart limit: `healthyAfterMs`*; [#409](https://github.com/isoloop/isoloop/issues/409)). The bus worker reads it from the kernel's `supervisor` config like the other options, with no separate setting; the default, 60 000 ms, keeps today's behaviour.
 
 ## Consequences
 
