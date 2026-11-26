@@ -13,7 +13,7 @@ import { version as cliVersion } from '../program/version';
 import { unifiedDiff } from '../migrate/diff';
 import { FLAG_PREFIX } from '../migrate/edit';
 import { installed } from '../migrate/installed';
-import { loadParser } from '../migrate/parser';
+import { EXTENSIONS, loadParser } from '../migrate/parser';
 import { migrateFolder } from '../migrate/run';
 import type { Step } from '../migrate/step';
 import {
@@ -42,7 +42,7 @@ export function migrateCommand(steps: readonly Step[]): Command {
     usage: '[version]',
     details: [
       'Starts from the installed @isoloop/* version (or --from) and runs each step up to [version], by default the newest this CLI knows.',
-      'Reads the .ts, .tsx, .js and .jsx files under the working directory (or --dir), outside node_modules and dot-folders.',
+      `Reads the ${EXTENSIONS.join(', ')} files under the working directory (or --dir), outside node_modules and dot-folders.`,
       'Prints the changes as a diff and writes nothing, unless --write is given.',
       `Code it can't rewrite safely gets a "${FLAG_PREFIX}" comment above it, listed at the end.`,
       'Run it before you upgrade, or pass --from with the version you upgraded from.',
