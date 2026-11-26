@@ -1,6 +1,6 @@
 # ADR 0001: Own worker by default, named pools later
 
-- **Status:** Accepted. Amended on 2026-11-20 for a warm-up window after `ready` (*Start-up warm-up*, below), from the plant dashboard's restart loop on Firefox; grilled the same day (Q1–Q4, yes to all). Corrected on 2026-11-22: the warm-up was not built and isn't in effect, and the cause it names for that loop was wrong. The question is reopened in [#389](https://github.com/isoloop/isoloop/issues/389). Amended on 2026-11-24 for crash loops slower than the restart window (*Restart limit: short runs*, below; [#390](https://github.com/isoloop/isoloop/issues/390)). Amended on 2026-11-26 for an explicit healthy run, `supervisor.healthyAfterMs`, apart from the window (*Restart limit: `healthyAfterMs`*, below; [#409](https://github.com/isoloop/isoloop/issues/409)).
+- **Status:** Accepted. Amended on 2026-11-20 for a warm-up window after `ready` (*Start-up warm-up*, below), from the plant dashboard's restart loop on Firefox; grilled the same day (Q1–Q4, yes to all). Corrected on 2026-11-22: the warm-up was not built and isn't in effect, and the cause it names for that loop was wrong. The question is reopened in [#389](https://github.com/isoloop/isoloop/issues/389). Amended on 2026-11-24 for crash loops slower than the restart window (*Restart limit: short runs*, below; [#390](https://github.com/isoloop/isoloop/issues/390)). Amended on 2026-11-26 for an explicit healthy run, `supervisor.healthyAfterMs`, apart from the window (*Restart limit: `healthyAfterMs`*, below; [#409](https://github.com/isoloop/isoloop/issues/409)). Amended on 2026-11-26 for CPU starvation: the kill and ready timers run on a clock that leaves out the host's own lateness, capped at 3 × their limit in wall-clock time (*Heartbeat clock: the host's lag*, below; [#389](https://github.com/isoloop/isoloop/issues/389)). It replaces *Start-up warm-up*.
 - **Date:** 2026-11-03
 - **Answers:** RFC 0001 open question "Workers per isolate, or a pool?"
 - **Related:** [ADR 0005](0005-bus-topology-message-channels.md) (per-isolate channels), [ADR 0007](0007-bus-worker-supervision.md) (durable topics), [ADR 0008](0008-isolates-and-surfaces.md) (headless isolates)
@@ -66,7 +66,9 @@ Supporting rules:
 - The `Supervisor` counts live workers (a pool counts as one) and emits a devtools warning when the count passes a configurable soft budget, fixed at 32 by default; devtools shows the device's reported cores and memory next to it. The budget never changes behaviour: it doesn't refuse spawns or trigger suspension. The real ceiling depends on the device, so it is a hint, not a guarantee.
 - If the browser fails to create a worker, that isolate crashes with reason `spawn-failed`: normal backoff and restart limit, ending in `failed` with the fallback UI, while the rest of the app keeps running. Before each retry the supervisor suspends every idle suspendable isolate to free memory.
 
-### Start-up warm-up (amended 2026-11-20; not built, reopened 2026-11-22)
+### Start-up warm-up (amended 2026-11-20; not built, reopened 2026-11-22; replaced 2026-11-26)
+
+**Replaced** by *Heartbeat clock: the host's lag*, below ([#389](https://github.com/isoloop/isoloop/issues/389)). Nothing from #384 is reused. The rest of this section is kept as history.
 
 **Not in effect.** `killAfterMs` applies from `ready` on. [#384](https://github.com/isoloop/isoloop/pull/384) built the warm-up and was closed unmerged on 2026-11-22:
 
@@ -122,6 +124,65 @@ Decided for 0.2 ([#409](https://github.com/isoloop/isoloop/issues/409)); grilled
 **Tests.** The #390 slow-crash-loop cases pass on the default unchanged, and again with a `healthyAfterMs` shorter and longer than `withinMs`, each reaching `failed` (or not) by the count it sets. `invalid_config` gets a case per malformed value.
 
 **Interaction with #389.** None in the rule. A starved worker's crash still counts as a short run; telling starved from hung is #389's own decision.
+
+### Heartbeat clock: the host's lag (amended 2026-11-26)
+
+Decided for 0.2 ([#389](https://github.com/isoloop/isoloop/issues/389)); grilled on 2026-11-26 from a measurement spike (Q7, Q19, Q32–Q36, yes to all). It replaces *Start-up warm-up*, above.
+
+**The problem.** The supervisor measures a worker's silence in wall-clock time. On a CPU-starved page, a worker that is only waiting for a CPU looks the same as a hung one, so it's killed. Firefox shows this and Chromium, under the same starvation, mostly doesn't. Kills cluster on Firefox at a lowered `killAfterMs` (2 s): every starved page in the runs below lost a pool, and most ended with members `failed`. At the default 10 s, pages mostly recover, but with hundreds of needless restarts.
+
+**What the spike found.** The host's own main thread, where beats are heard, is starved as well. On a starved page, its 50 ms tick fired late for 83 to 120 s of each 150 s run, with single ticks up to 3.7 s late. The beats were sent but couldn't be heard. Two detectors were measured on the same setup (prototype and simulation on the branch `spike/389-starvation`, [`1d068eb`](https://github.com/isoloop/isoloop/tree/1d068eb)):
+
+- **(a) Judging a silent worker against its siblings** (hold kills while most workers are silent) removed 0 to 9 % of the false kills. It also delayed the kill of a hang that hits half the workers or more by its cap. Dropped.
+- **(b) A clock that leaves out the host's lateness** removed every false kill at the defaults and 92 % at 2 s. Chosen.
+
+**The rule.**
+
+1. **The lag clock.** The kernel adds up how late its own supervision tick fires: every tick, the time past the 50 ms interval. The **lag clock** is `performance.now()` minus that sum. Silence measured on it counts only time in which the host could have heard a beat.
+2. **Only two timers use it:** the heartbeat kill (`killAfterMs`, reason `unresponsive`) and the ready timeout (`readyTimeoutMs`, reason `ready_timeout`). Everything else stays on wall-clock time:
+   - `blockedAfterMs`, so the busy overlay and the `blocked` state show as they do today;
+   - the restart window (`withinMs`);
+   - the healthy run (`healthyAfterMs`);
+   - the backoff.
+3. **A wall-clock cap of 3 × the limit.** A worker silent for `3 × killAfterMs` of wall-clock time is killed whatever the lag clock says, so a hung worker on a starved page is still killed, at most 3 times later than on a page that isn't starved. The ready timeout gets the same cap on its own limit, `3 × readyTimeoutMs` (30 s by default; decided in this review, 2026-11-26, rather than `3 × killAfterMs` for both, which at plant's 2 s would time out a slow start sooner than today). The factor is fixed, not an option. The build measures it against the spike's figures and comes back here if 3 doesn't hold.
+4. **On a page that isn't starved, nothing changes.** The host's tick was late by about 0.3 s per 150 s there, so a hung worker is killed at `killAfterMs` as before (spike: 1996 ms at 2000, 10009 ms at 10000, Firefox).
+5. **The bus worker uses it too.** Its kill and ready timers use the same lag clock and cap. The rest of its supervision is unchanged ([ADR 0007](0007-bus-worker-supervision.md)).
+6. **No new public API.** No option, no event and no type changes. It's a behaviour change: fewer `unresponsive` and `ready_timeout` crashes on a starved page, and a later kill of a hung worker only while the host itself is late.
+
+**The measured trade.** These are local numbers from the spike, on 2026-11-26: a desktop-class 16-core x64 CPU, Linux under WSL2, every process pinned to one core with `taskset`, 8 pages of plant at once, isoloop/web `5363429`, Playwright 1.65.0. Other work was running on the same machine, so the starvation was heavier than #389's and T7's runs, and the figures don't compare one to one with theirs. The figures for the supervision guide are taken on bench machine 1 after the build.
+
+| Firefox 159, 24 pages | `killAfterMs` | 0.1.0 | Lag clock, no cap |
+|---|--:|--:|--:|
+| `unresponsive` crashes | 10000 | 504 | 0 |
+| `ready_timeout` crashes | 10000 | 576 | 0 |
+| Pages with a failed member | 10000 | 0 | 0 |
+| `unresponsive` crashes | 2000 | 7646 | 576 |
+| Pages with a failed member | 2000 | 22 | 0 |
+
+- **A truly hung worker on a starved page** (a 600 s busy loop in plant's `widgets` pool): on wall-clock time it was killed after a median of 12.6 s at the defaults (worst 23.0 s) and 2.3 s at 2 s. On the lag clock without a cap, it took 26.5 s (worst 37.8 s) and 6.1 s. On Chromium 158 it took 14.1 s against 10.0 s. Every hung worker was killed. The cap bounds the worst case at 30 s and 6 s.
+- **Chromium 158** had no false kill on either clock at the defaults.
+
+**What still holds.**
+
+- **The restart limit** (*Restart limit: short runs* and *Restart limit: `healthyAfterMs`*, above) is unchanged and stays on wall-clock time. The #390 slow crash loop reaches `failed` at the same crash and the same time with the lag clock (spike simulation: 81.9 s at the defaults, 49.9 s at 2 s).
+- **`healthyAfterMs`** ([#409](https://github.com/isoloop/isoloop/issues/409), #466) keeps measuring the healthy run in wall-clock time, from `ready` to the last beat.
+- **#384's regression doesn't come back.** There is no warm-up, so raising `readyTimeoutMs` doesn't change when a worker is killed after `ready`. That becomes a host test.
+- **Hidden tabs** (*What the browser still controls*, below) are unchanged: nothing is judged while `document.hidden` is true, and every clock restarts on the way back.
+
+**Tests in the build.**
+
+- Starvation across the whole page (late ticks with beats held back) causes no kill.
+- A single hung worker on a page that isn't starved is killed within `killAfterMs`.
+- A hung worker on a starved page is killed by the cap at `3 × killAfterMs`, and a worker that never sends `ready` by `3 × readyTimeoutMs`.
+- The #390 slow crash loop still fails.
+- A raised `readyTimeoutMs` doesn't slow kills after `ready`.
+- The bus worker's kill uses the lag clock and the cap.
+- **Measurement:** the starvation matrix is re-run locally at the defaults and at 2 s, against 0.1.0, before the build merges. Bench machine 1 figures follow for the supervision guide.
+
+**Not decided here.**
+
+- **A CPU-time beat** (option (c) in the spike). Not built: a worker that doesn't run can't send it.
+- **Real low-end devices,** which weren't measured.
 
 ### What the browser still controls
 
