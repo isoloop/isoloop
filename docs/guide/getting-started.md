@@ -195,7 +195,7 @@ npx isoloop@latest migrate --write
 
 - **Where it starts:** the `@isoloop/*` version installed in your project, found in the nearest `node_modules`. If you've already upgraded, pass the version you came from: `npx isoloop@latest migrate --from 0.1`.
 - **Where it stops:** the newest release it knows, or the one you name: `npx isoloop@latest migrate 0.2`.
-- **What it reads:** the `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` files under the working directory, or under `--dir <folder>`, outside `node_modules` and folders whose names start with a dot. It changes only the code it rewrites, so your formatting and comments stay.
+- **What it reads:** the `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` files under the working directory, or under `--dir <folder>`, outside `node_modules` and folders whose names start with a dot. It changes only the code it rewrites, so your formatting and comments stay, except comments inside an object it takes apart.
 - **What it can't rewrite safely** gets a `// isoloop-migrate:` comment on the line above, and the run lists each one with its file and line. Fix those by hand and delete the comments.
 - **A file that doesn't parse** is left as it is and listed, and the command exits 1.
 
@@ -212,9 +212,9 @@ The diff goes to stdout and everything else to stderr, so `npx isoloop@latest mi
 
 An isolate built in a separate project on 0.1 keeps the old `ctx.bus.publish` in a 0.2 host until that project upgrades ([isolates built apart](isolates.md#isolates-built-apart)); `kernel.publish` changes at once.
 
-- **What it rewrites:** a `.publish(topic, { value, key })` call whose second argument is an object literal holding `value` and at most `key`, on a receiver named `bus` or `kernel` (`ctx.bus`, a destructured `bus`, `this.kernel`), or on a variable the same file sets from `createKernel(…)`.
-- **What it marks:** a record that spreads (`{ ...rec, value }`), an object with `value` and other fields, a variable the file sets to an object with `value`, a value that is itself such an object, and spread arguments.
-- **What it can't see:** a record passed in a variable from elsewhere, such as a function parameter, looks the same as a 0.2 value, so the call is left as it is. TypeScript reports those calls when the topic has a type, and at run time a topic whose schema doesn't accept `{ value }` rejects them with `invalid`. A kernel under another name (`app.publish` with `app` passed in) and code inside strings aren't rewritten either.
+- **What it rewrites:** a `.publish(topic, { value, key })` call whose second argument is an object literal holding `value` and at most `key`, or a conditional whose two branches are such object literals with the same `value` (`k === undefined ? { value } : { key: k, value }` becomes `value, k === undefined ? {} : { key: k }`). The receiver is named `bus` or `kernel`, as a variable or the last member of a chain (`ctx.bus`, a destructured `bus`, `this.kernel`, `this.#kernel`), or is a variable the same file sets from `createKernel(…)`. A value over several lines keeps its indentation. Comments inside the value stay; comments elsewhere in the removed object go with it.
+- **What it marks:** a record that spreads (`{ ...rec, value }`), an object with `value` and other fields, a variable the file sets to an object with `value`, a value that is itself such an object, a conditional (or `??`, `||`, `&&`) with such a branch that it can't rewrite, and spread arguments. A call on a receiver it can't name, such as `this.#k` or a kernel passed in as `app`, is marked wherever it would be rewritten. A receiver the file sets to `new …(…)` is left alone.
+- **What it can't see:** a record passed in a variable from elsewhere, such as a function parameter, looks the same as a 0.2 value, so the call is left as it is. TypeScript reports those calls when the topic has a type, and at run time a topic whose schema doesn't accept `{ value }` rejects them with `invalid`. Code inside strings isn't rewritten either.
 
 ## Limits
 
