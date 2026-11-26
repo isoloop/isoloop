@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-03
-- **Amended:** 2026-11-20, the bus worker's restart limit is a default (see [the amendment](#amended-the-restart-limit-is-a-default-2026-11-20)); 2026-11-24, short runs count (see [the amendment](#amended-short-runs-count-2026-11-24)); 2026-11-26, the healthy run is `healthyAfterMs` (see [the amendment](#amended-the-healthy-run-is-healthyafterms-2026-11-26))
+- **Amended:** 2026-11-20, the bus worker's restart limit is a default (see [the amendment](#amended-the-restart-limit-is-a-default-2026-11-20)); 2026-11-24, short runs count (see [the amendment](#amended-short-runs-count-2026-11-24)); 2026-11-26, the healthy run is `healthyAfterMs` (see [the amendment](#amended-the-healthy-run-is-healthyafterms-2026-11-26)); 2026-11-26, the kill and ready timers use the host's lag clock (see [the amendment](#amended-the-heartbeat-clock-is-the-hosts-lag-2026-11-26))
 - **Fills a gap in:** RFC 0001 (which covers isolate crashes only)
 - **Replaces:** the RFC's "Persistence (later): compacted topics written to IndexedDB"
 
@@ -85,6 +85,10 @@ The bus worker's restart limit follows [ADR 0001](0001-one-worker-per-isolate.md
 ### Amended: the healthy run is `healthyAfterMs` (2026-11-26)
 
 The healthy run that clears the bus worker's count of short runs is `supervisor.healthyAfterMs`, not `withinMs`, which is the sliding window only ([ADR 0001](0001-one-worker-per-isolate.md), *Restart limit: `healthyAfterMs`*; [#409](https://github.com/isoloop/isoloop/issues/409)). The bus worker reads it from the kernel's `supervisor` config like the other options, with no separate setting; the default, 60 000 ms, keeps today's behaviour.
+
+### Amended: the heartbeat clock is the host's lag (2026-11-26)
+
+The bus worker's heartbeat kill and ready timeout run on the host's lag clock with a wall-clock cap of 3 × their limit, as isolates' do ([ADR 0001](0001-one-worker-per-isolate.md), *Heartbeat clock: the host's lag*; [#389](https://github.com/isoloop/isoloop/issues/389)); its restart limit stays on wall-clock time.
 
 ## Consequences
 
