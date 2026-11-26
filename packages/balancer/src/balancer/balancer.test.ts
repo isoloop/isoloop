@@ -73,19 +73,42 @@ describe('placement', () => {
     balancer.spawn({ id: 'a' });
     expect(balancer.spawn({ id: 'n' })).toMatchObject({
       pool: 'balancer-quarantine-1',
-      state: 'quarantined',
+      state: 'measuring',
     });
     // Under 3 s of beats: no measurement yet.
     await wait(2_000);
-    expect(where('n')?.state).toBe('quarantined');
+    expect(where('n')?.state).toBe('measuring');
     // Measured: it leaves at the next decision, with no 30 s steady window (Q5).
     await wait(2_500);
     expect(moves).toEqual([
-      { id: 'n', from: 'balancer-quarantine-1', to: 'balancer-1', reason: 'steady' },
+      { id: 'n', from: 'balancer-quarantine-1', to: 'balancer-1', reason: 'measured' },
     ]);
     expect(where('n')).toMatchObject({ pool: 'balancer-1', state: 'placed' });
     await wait(20_000);
     expect(loads.all.get('n')).toBeCloseTo(10, 0);
+  });
+
+  it('turns a measuring isolate that offends into a quarantined one in place, and it leaves as steady', async () => {
+    start({ loads: memoryLoads({ a: 5 }) });
+    sim.load('a', 5);
+    sim.load('n', 10);
+    balancer.spawn({ id: 'a' });
+    balancer.spawn({ id: 'n' });
+    expect(where('n')?.state).toBe('measuring');
+    const spikes: { id: string; action: string }[] = [];
+    balancer.on('spike', (e) => spikes.push(e));
+    await wait(1_000);
+    await spikeTwice('n');
+    expect(spikes.at(-1)).toMatchObject({ id: 'n', action: 'quarantined' });
+    expect(where('n')).toMatchObject({ pool: 'balancer-quarantine-1', state: 'quarantined' });
+    // Quarantined in place: no move event, and it stays for its quiet window.
+    expect(moves).toEqual([]);
+    await wait(10_000);
+    expect(where('n')?.state).toBe('quarantined');
+    await wait(40_000);
+    expect(moves).toEqual([
+      { id: 'n', from: 'balancer-quarantine-1', to: 'balancer-1', reason: 'steady' },
+    ]);
   });
 
   it('rejects a manifest that names a pool', () => {
@@ -381,6 +404,27 @@ describe('when busyMs explains too little', () => {
       expect(where(id)?.state).toBe('placed');
       expect(where(id)?.pool).not.toBe(cPool);
     }
+  });
+
+  it('shows an isolate a bisect moved into quarantine as measuring, and lets it out as measured', async () => {
+    start({ loads: memoryLoads({ a: 1, b: 1, c: 1, d: 1 }) });
+    for (const id of ['a', 'b', 'c', 'd']) {
+      sim.load(id, 5);
+      balancer.spawn({ id });
+    }
+    sim.hidden('c', 70);
+    await wait(8_000);
+    // The move in keeps the bisect reason; the state says why it's there.
+    const moved = moves.filter((m) => m.reason === 'bisect');
+    expect(moved.length).toBeGreaterThan(0);
+    const states = balancer.placements().filter((p) => p.pool.startsWith('balancer-quarantine-'));
+    const others = states.filter((p) => p.id !== 'c');
+    expect(others.length).toBeGreaterThan(0);
+    expect(others.every((p) => p.state === 'measuring')).toBe(true);
+    await wait(120_000);
+    const out = moves.filter((m) => m.from.startsWith('balancer-quarantine-') && m.id !== 'c');
+    expect(out.length).toBeGreaterThan(0);
+    expect(out.every((m) => m.reason === 'measured')).toBe(true);
   });
 
   it('bisects on a second spike that busyMs does not explain', async () => {
@@ -1156,7 +1200,7 @@ describe('the move budget after a first measurement (M3j)', () => {
     await wait(5_000);
     // Measured at 15 %: no room with a's 50 %, so a pool of its own.
     expect(moves).toEqual([
-      { id: 'h', from: 'balancer-quarantine-1', to: 'balancer-2', reason: 'steady' },
+      { id: 'h', from: 'balancer-quarantine-1', to: 'balancer-2', reason: 'measured' },
     ]);
     sim.load('a', 20);
     // Held, a stays put: h is the one that packs.

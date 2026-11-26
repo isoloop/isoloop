@@ -178,7 +178,11 @@ export type Report = {
 /**
  * Where an isolate stands:
  * - `placed`: in one of the balancer's pools;
- * - `quarantined`: in a quarantine pool, to be measured or after an offence;
+ * - `measuring`: in a quarantine pool only to be measured, because it was
+ *   never measured or a bisect moved it there; it leaves once it has been
+ *   measured, and becomes `quarantined` in place if it spikes or crashes first;
+ * - `quarantined`: in a quarantine pool after an offence (a second spike, a
+ *   crash, or a bisect's culprit);
  * - `kept-apart`: an offender past `quarantine.maxReturns`, kept out of the
  *   shared pools for good;
  * - `moving`: stopped, and being spawned in its new pool;
@@ -187,7 +191,13 @@ export type Report = {
  *   as new.
  * @experimental
  */
-export type PlacementState = 'placed' | 'quarantined' | 'kept-apart' | 'moving' | 'failed';
+export type PlacementState =
+  | 'placed'
+  | 'measuring'
+  | 'quarantined'
+  | 'kept-apart'
+  | 'moving'
+  | 'failed';
 
 /** Where the balancer has put an isolate, and what it knows of its load. @experimental */
 export type Placement = {
@@ -224,7 +234,8 @@ export type Placement = {
  * Why a member moved: `spike` (a second long task within 60 s), `sustained`
  * (the pool's lag stayed high), `full` (the pool's members' busy time reached
  * 80 % of a core, whatever its lag), `crash`, `bisect` (looking for a pool's
- * unnamed culprit), `steady` (back out of quarantine), `backlog` (its
+ * unnamed culprit), `measured` (out of quarantine after being measured there),
+ * `steady` (an offender back out of quarantine after its quiet window), `backlog` (its
  * reported backlog kept rising), `pack` (a quiet member joining another pool
  * to free a worker) or `room` (a quarantine pool beyond the first folding
  * into the first, like with like, so a member whose backlog is rising gets
@@ -238,6 +249,7 @@ export type MoveReason =
   | 'crash'
   | 'bisect'
   | 'steady'
+  | 'measured'
   | 'backlog'
   | 'pack'
   | 'room';
