@@ -51,6 +51,7 @@ import { createRouter, type OnNavigate, type Router } from '../router/router';
 import { checkRequires } from './version';
 import { createRegistry, type ComponentRegistry, type HostComponent } from '../render/registry';
 import { DEFAULT_BACKOFF, type Backoff } from '../supervisor/timers';
+import { siblingHold } from '../supervisor/spike';
 import {
   DEFAULT_SUPERVISOR_CONFIG,
   initialSupervision,
@@ -796,6 +797,22 @@ export function createKernel(config: KernelConfig): Kernel {
     killAfterMs: config.heartbeat?.killAfterMs ?? def.killAfterMs,
     readyTimeoutMs: config.heartbeat?.readyTimeoutMs ?? def.readyTimeoutMs,
   };
+  // SPIKE #389: local switches, set on globalThis.__isoloopSpike before the kernel starts.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- spike only
+  const spikeIn = ((globalThis as Record<string, unknown>)['__isoloopSpike'] ?? {}) as {
+    a?: boolean;
+    b?: boolean;
+    share?: number;
+    cap?: number;
+  };
+  const spike = {
+    a: spikeIn.a === true,
+    b: spikeIn.b === true,
+    share: spikeIn.share ?? 0.5,
+    cap: spikeIn.cap ?? 3,
+  };
+  const spikeStats = { stall: 0, maxLate: 0, heldTicks: 0, held: 0, spike };
+  (globalThis as Record<string, unknown>)['__isoloopSpikeStats'] = spikeStats;
   const slots = new Map<string, Slot>();
   /**
    * Stopped isolates whose worker is still shutting down, by id. A new
@@ -1038,8 +1055,11 @@ export function createKernel(config: KernelConfig): Kernel {
     }
   };
 
-  const feed = (slot: Slot, input: SupervisorInput): void => {
+  const feed = (slot: Slot, raw: SupervisorInput): void => {
     const loaded = slot.loaded;
+    // SPIKE #389 (b): the supervisor's clock leaves out the host's own lateness.
+    const input: SupervisorInput =
+      spike.b && 'at' in raw ? ({ ...raw, at: raw.at - spikeStats.stall } as SupervisorInput) : raw;
     const { s, effects } = step(slot.sup, input, cfg);
     slot.sup = s;
     run(slot, effects);
@@ -1661,11 +1681,35 @@ export function createKernel(config: KernelConfig): Kernel {
           }
         });
 
+  let prevTick = performance.now();
   const tick = setInterval(() => {
     const at = performance.now();
+    const late = Math.max(0, at - prevTick - TICK_MS);
+    prevTick = at;
+    spikeStats.stall += late;
+    if (late > spikeStats.maxLate) spikeStats.maxLate = late;
     controller?.feed({ k: 'tick', at });
+    // SPIKE #389 (a): judge silence against the sibling workers, a pool counting once.
+    let hold: number | undefined;
+    if (spike.a) {
+      const clockAt = spike.b ? at - spikeStats.stall : at;
+      hold = siblingHold(
+        [...slots.values()].map((sl) => ({ worker: sl.loaded?.pool ?? sl.manifest.id, sup: sl.sup })),
+        clockAt,
+        cfg.blockedAfterMs,
+        spike,
+      );
+      if (hold !== undefined) spikeStats.heldTicks++;
+    }
     for (const slot of slots.values()) {
-      feed(slot, { k: 'tick', at, pool: slot.loaded?.pool });
+      const before = slot.sup.state;
+      feed(slot, { k: 'tick', at, pool: slot.loaded?.pool, hold });
+      if (hold !== undefined && (before === 'blocked' || before === 'loading') && slot.sup.state === before) {
+        const lim = before === 'blocked' ? cfg.killAfterMs : cfg.readyTimeoutMs;
+        const clockAt = spike.b ? at - spikeStats.stall : at;
+        const since = before === 'blocked' ? slot.sup.lastBeatAt : slot.sup.spawnedAt;
+        if (clockAt - since > lim) spikeStats.held++;
+      }
       if (isIdle(slot, at)) feed(slot, { k: 'suspend' });
     }
     if (wakeQueue.length > 0) pumpWakes();

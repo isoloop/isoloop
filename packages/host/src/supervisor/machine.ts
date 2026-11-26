@@ -134,7 +134,13 @@ export type SupervisorInput =
   | { k: 'ready'; at: number }
   | { k: 'beat'; at: number; lagMs: number }
   /** `pool`: the pool whose worker it shares, as on `workerError`. */
-  | { k: 'tick'; at: number; pool?: string | undefined }
+  | {
+      k: 'tick';
+      at: number;
+      pool?: string | undefined;
+      /** SPIKE #389 (a): most sibling workers are silent too, so hold kills up to `holdUntil`× the limit. */
+      hold?: number | undefined;
+    }
   | { k: 'error'; at: number; fatal: boolean; message: string }
   /**
    * With `pool`, the failure is the shared worker's, which can't say which
@@ -263,14 +269,22 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
 
     case 'tick':
       if (s.hidden) return same;
-      if (s.state === 'loading' && input.at - s.spawnedAt > cfg.readyTimeoutMs)
+      if (
+        s.state === 'loading' &&
+        input.at - s.spawnedAt > cfg.readyTimeoutMs &&
+        !(input.hold !== undefined && input.at - s.spawnedAt <= cfg.readyTimeoutMs * input.hold)
+      )
         return crash(s, input.at, 'ready_timeout', `No ready within ${cfg.readyTimeoutMs} ms`, cfg);
       if (s.state === 'running' && input.at - s.lastBeatAt > cfg.blockedAfterMs)
         return {
           s: { ...s, state: 'blocked' },
           effects: [{ k: 'showBusy' }, moved('running', 'blocked')],
         };
-      if (s.state === 'blocked' && input.at - s.lastBeatAt > cfg.killAfterMs)
+      if (
+        s.state === 'blocked' &&
+        input.at - s.lastBeatAt > cfg.killAfterMs &&
+        !(input.hold !== undefined && input.at - s.lastBeatAt <= cfg.killAfterMs * input.hold)
+      )
         return crash(
           s,
           input.at,
