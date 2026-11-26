@@ -18,8 +18,8 @@ type Entry = {
   /** One token per reader, so the same callback added twice counts twice. */
   readers: Set<{ notify: () => void }>;
   unsubscribe: () => void;
-  /** `from` values already warned about, so each warns once. */
-  warned: Set<StartPosition>;
+  /** Whether a reader with another `from` has been warned about. */
+  warned?: true;
 };
 
 const byBus = new WeakMap<BusClient, Map<string, Entry>>();
@@ -33,8 +33,8 @@ export function latest<Out>(bus: BusClient, topic: TopicRef<any, Out, any, any>)
 /**
  * Adds a reader of `topic`, called after every new value or reset. The first
  * reader subscribes from `from`; a later one with another `from` shares that
- * subscription and gets a console warning. Returns the function that removes
- * the reader; the last one out unsubscribes.
+ * subscription, and the first such reader gets a console warning. Returns the
+ * function that removes the reader; the last one out unsubscribes.
  */
 export function addReader<Out>(
   bus: BusClient,
@@ -42,51 +42,30 @@ export function addReader<Out>(
   from: StartPosition,
   notify: () => void,
 ): () => void {
-  let topics = byBus.get(bus);
-  if (!topics) {
-    topics = new Map();
-    byBus.set(bus, topics);
-  }
-  let entry = topics.get(topic.name);
-  if (!entry) {
-    const e: Entry = {
+  const topics = byBus.get(bus) ?? new Map<string, Entry>();
+  byBus.set(bus, topics);
+  let e = topics.get(topic.name);
+  if (!e) {
+    const entry: Entry = { from, latest: undefined, readers: new Set(), unsubscribe: () => {} };
+    const set = (v: Latest<unknown>) => {
+      entry.latest = v;
+      for (const r of entry.readers) r.notify();
+    };
+    entry.unsubscribe = bus.subscribe(topic, (r) => set({ v: r.value }), {
       from,
-      latest: undefined,
-      readers: new Set(),
-      unsubscribe: () => {},
-      warned: new Set(),
-    };
-    const tell = () => {
-      for (const r of e.readers) r.notify();
-    };
-    e.unsubscribe = bus.subscribe(
-      topic,
-      (r) => {
-        e.latest = { v: r.value };
-        tell();
-      },
-      {
-        from,
-        onReset: () => {
-          e.latest = undefined;
-          tell();
-        },
-      },
-    );
-    topics.set(topic.name, e);
-    entry = e;
-  } else if (from !== entry.from && !entry.warned.has(from)) {
-    entry.warned.add(from);
-    console.warn(
-      `[isoloop] useTopic("${topic.name}", { from: '${from}' }) shares the subscription an earlier useTopic opened with from: '${entry.from}'; it gets that subscription's latest value.`,
-    );
+      onReset: () => set(undefined),
+    });
+    topics.set(topic.name, (e = entry));
+  } else if (from !== e.from && !e.warned) {
+    e.warned = true;
+    console.warn(`[isoloop] useTopic("${topic.name}"): from '${from}' shares from '${e.from}'`);
   }
-  const e = entry;
+  const shared = e;
   const reader = { notify };
-  e.readers.add(reader);
+  shared.readers.add(reader);
   return () => {
-    if (!e.readers.delete(reader) || e.readers.size > 0) return;
-    e.unsubscribe();
-    if (topics.get(topic.name) === e) topics.delete(topic.name);
+    if (!shared.readers.delete(reader) || shared.readers.size > 0) return;
+    shared.unsubscribe();
+    if (topics.get(topic.name) === shared) topics.delete(topic.name);
   };
 }

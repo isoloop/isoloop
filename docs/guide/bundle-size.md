@@ -21,8 +21,8 @@ Read this when you're checking what Isoloop costs in bytes, or keeping an isolat
 | The same page with `connectDevtools` | 66.4 KB | 23.4 KB |
 | The same page with `createBalancer` | 79.3 KB | 27.7 KB |
 | A contracts module (`topic`, `contracts`) | 4.0 KB | 1.7 KB |
-| A React isolate (`defineIsolate`, `useTopic`) | 2.7 KB | 1.4 KB |
-| A Preact isolate (`defineIsolate`, `useTopic`) | 2.9 KB | 1.5 KB |
+| A React isolate (`defineIsolate`, `useTopic`) | 3.2 KB | 1.6 KB |
+| A Preact isolate (`defineIsolate`, `useTopic`) | 3.5 KB | 1.8 KB |
 | A vanilla isolate (`defineIsolate`) | 1.5 KB | 843 B |
 
 | Script, loaded by URL | Minified | Gzipped |
@@ -31,7 +31,7 @@ Read this when you're checking what Isoloop costs in bytes, or keeping an isolat
 | The isolate worker | 42.7 KB | 14.9 KB |
 | The devtools panel | 13.1 KB | 5.5 KB |
 
-These are Isoloop `0.1.0-next.11` built with Vite 8.3.7 (Rolldown 1.2.18), minified, with React and Preact left out, on 2026-11-21 ([bench/bundle-size](../../bench/bundle-size/README.md)). Sizes don't depend on the machine. CI checks each one against a budget, so a change that grows one says why.
+These are Isoloop `0.1.0-next.11` built with Vite 8.3.7 (Rolldown 1.2.18), minified, with React and Preact left out, on 2026-11-21, and the React and Preact isolates on `main` at `0.1.0` with Vite 8.3.8 on 2026-11-26 ([bench/bundle-size](../../bench/bundle-size/README.md)). Sizes don't depend on the machine. CI checks each one against a budget, so a change that grows one says why.
 
 ## Keep your bundles small
 

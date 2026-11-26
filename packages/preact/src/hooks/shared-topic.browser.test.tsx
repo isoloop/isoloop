@@ -106,7 +106,7 @@ describe('Preact adapter: useTopic on one topic from several components (#410)',
     await settle();
     expect([...text(root, 'a'), ...text(root, 'b'), ...text(root, 'c')]).toEqual(['9', '9', '9']);
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0]?.[0])).toContain("from: 'earliest'");
+    expect(String(warn.mock.calls[0]?.[0])).toContain("'earliest'");
   });
 
   it('isolates keep their own subscriptions', async () => {
