@@ -282,7 +282,7 @@ Earlier sets of runs, all on wall-clock time, of the plant dashboard's Isoloop p
 - **An isolate that crashes after each run of `healthyAfterMs` or longer is restarted every time.** Each long run clears the count, so it never reaches `failed`. Raise `healthyAfterMs` if crashes that far apart should still add up.
 - **Some failures skip the retries.** A render format mismatch, a version mismatch or a bus that can't load its contracts fails the isolate on the first crash.
 - **A starved worker can still look like a hang.** The kernel leaves out the time its own main thread was late, which covers most of a starved page. A worker that waits for a CPU while the main thread runs on time still counts as silent, and every silence past 3 × `killAfterMs` of wall-clock time is a kill. With a short `killAfterMs` on a badly starved Firefox, such kills still happen and can take a pool to `failed` ([measured above](#measured-a-cpu-starved-firefox)).
-- **A hang on a starved page is caught later,** up to 3 × `killAfterMs` (or 3 × `readyTimeoutMs` before `ready`). Until then the worker is `blocked`, and a pool's other members are blocked with it.
+- **A hang on a starved page is caught later,** up to 3 × `killAfterMs`, or 3 × `readyTimeoutMs` before `ready`. Until then a hung worker is `blocked`, and a pool's other members are blocked with it; a worker that hasn't sent `ready` stays `loading`.
 - **The supervisor can't see inside a worker.** A memory blow-up that the browser doesn't turn into a worker error, or an isolate that beats but does nothing useful, looks healthy.
 - **There's one `supervisor` config per kernel.** You can't give one isolate its own limits.
 
