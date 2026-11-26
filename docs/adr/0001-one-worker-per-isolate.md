@@ -1,6 +1,6 @@
 # ADR 0001: Own worker by default, named pools later
 
-- **Status:** Accepted. Amended on 2026-11-20 for a warm-up window after `ready` (*Start-up warm-up*, below), from the plant dashboard's restart loop on Firefox; grilled the same day (Q1–Q4, yes to all). Corrected on 2026-11-22: the warm-up was not built and isn't in effect, and the cause it names for that loop was wrong. The question is reopened in [#389](https://github.com/isoloop/isoloop/issues/389). Amended on 2026-11-24 for crash loops slower than the restart window (*Restart limit: short runs*, below; [#390](https://github.com/isoloop/isoloop/issues/390)).
+- **Status:** Accepted. Amended on 2026-11-20 for a warm-up window after `ready` (*Start-up warm-up*, below), from the plant dashboard's restart loop on Firefox; grilled the same day (Q1–Q4, yes to all). Corrected on 2026-11-22: the warm-up was not built and isn't in effect, and the cause it names for that loop was wrong. The question is reopened in [#389](https://github.com/isoloop/isoloop/issues/389). Amended on 2026-11-24 for crash loops slower than the restart window (*Restart limit: short runs*, below; [#390](https://github.com/isoloop/isoloop/issues/390)). Amended on 2026-11-26 for an explicit healthy run, `supervisor.healthyAfterMs`, apart from the window (*Restart limit: `healthyAfterMs`*, below; [#409](https://github.com/isoloop/isoloop/issues/409)).
 - **Date:** 2026-11-03
 - **Answers:** RFC 0001 open question "Workers per isolate, or a pool?"
 - **Related:** [ADR 0005](0005-bus-topology-message-channels.md) (per-isolate channels), [ADR 0007](0007-bus-worker-supervision.md) (durable topics), [ADR 0008](0008-isolates-and-surfaces.md) (headless isolates)
@@ -92,17 +92,36 @@ Decided for the 0.1.1 patch ([plan](../plans/0.1.1-patch.md), decision 5; [#390]
 **The rule.**
 
 1. **Each crash records its healthy run:** from the isolate's `ready` to its last heartbeat before the crash. The run doesn't include the time it took to detect the crash. A worker that never sent `ready` had a run of 0.
-2. **A crash after a run shorter than `withinMs` counts.** A crash after a run of `withinMs` or longer clears the count first, so it's the first of a new one: an isolate that runs an hour and then crashes 4 times quickly fails on the 4th, as it did before.
+2. **A crash after a run shorter than `withinMs` counts** (`healthyAfterMs` from 2026-11-26, below). A crash after a run of `withinMs` or longer clears the count first, so it's the first of a new one: an isolate that runs an hour and then crashes 4 times quickly fails on the 4th, as it did before.
 3. **The isolate fails when the count passes `maxRestarts`,** that is, on the crash after `maxRestarts` short runs in a row, however long they took.
 4. **The sliding window stays as well.** `maxRestarts` restarts in `withinMs` still fail the isolate, so a fast loop fails as soon as it did before. An isolate fails on whichever rule is met first.
 5. **The backoff grows with the larger of the two counts.** *Retry* clears both.
 6. **The bus worker uses the same rule,** with the bus's `ready` and its last beat ([ADR 0007](0007-bus-worker-supervision.md), *Amended: the restart limit is a default*).
 7. **A pool is judged as it is today.** Each member keeps its own count and window. A crash the pool shares counts once for each member, judged by that member's own healthy run, so a member that had run `withinMs` or longer has its count cleared. Heartbeats are the worker's, so every member's run ends at the pool's last beat.
-8. **The types don't change.** No option is added or removed, and `withinMs` keeps its name and default; its TSDoc, the supervision guide and the host README say it's both the window and the healthy run that clears the count. `isolate:failed`'s `message` names the rule that was met, for example "3 restarts in 60000 ms" or "4 crashes, each after less than 60000 ms of healthy running". An explicit `healthyAfterMs`, the run that clears the count, is for 0.2 ([#409](https://github.com/isoloop/isoloop/issues/409)).
+8. **The types don't change.** No option is added or removed, and `withinMs` keeps its name and default; its TSDoc, the supervision guide and the host README say it's both the window and the healthy run that clears the count. `isolate:failed`'s `message` names the rule that was met, for example "3 restarts in 60000 ms" or "4 crashes, each after less than 60000 ms of healthy running". An explicit `healthyAfterMs`, the run that clears the count, is for 0.2 ([#409](https://github.com/isoloop/isoloop/issues/409)); it's decided in *Restart limit: `healthyAfterMs`*, below, which replaces this rule's point 8.
 
 **Each row of #390's table** gets a unit test on the machine with a synthetic clock, and the rows measured in a browser get a browser test that reaches `failed`. On the defaults, an isolate that hangs 10 s after each start fails on its 4th crash, about 4 × (10 s + `killAfterMs` 10 s) plus backoff after it started.
 
 **Interaction with #389.** A Firefox worker starved by the page ([#389](https://github.com/isoloop/isoloop/issues/389)) looks like a hang. Under the window alone, pages in #389's runs recovered only because their crashes didn't fit in the window. Under this rule they count. Before this code merges, #389's starvation setup runs on it at the defaults and at `killAfterMs: 2000` (the plan's T7). If pages reach `failed` at the defaults, the rule waits for 0.2 and this amendment is marked not in effect.
+
+### Restart limit: `healthyAfterMs` (amended 2026-11-26)
+
+Decided for 0.2 ([#409](https://github.com/isoloop/isoloop/issues/409)); grilled on 2026-11-26 (Q3, Q11–Q13, yes to all).
+
+**The problem.** Under *Restart limit: short runs*, `withinMs` means two things: the sliding window that counts restarts, and the healthy run that clears the count of short runs. An app can't widen one without the other. A longer window to catch slow loops also asks every isolate to run longer before a crash stops counting, and a shorter healthy run also narrows the window.
+
+**The rule.** It's *Restart limit: short runs* with one change: its healthy run gets its own option.
+
+1. **`supervisor.healthyAfterMs`** is the healthy run, from `ready` to the last heartbeat, that clears the count of short runs. A crash after a run shorter than `healthyAfterMs` counts; a crash after a run of `healthyAfterMs` or longer clears the count first, so it's the first of a new one. Points 1 and 3–7 of the short-run rule stand as written.
+2. **`withinMs` is the sliding window only:** `maxRestarts` restarts in `withinMs` fail the isolate, as before.
+3. **Default 60 000 ms,** `withinMs`'s default, so an app that sets neither behaves as it does on 0.1.1. An app that sets only `withinMs` gets a healthy run of 60 000 ms, not its `withinMs`: the two are independent.
+4. **A positive integer, with no upper cap.** Any other value (0, negative, not an integer, not a number) makes `createKernel` throw `invalid_config`, as other malformed options do. It may be larger or smaller than `withinMs`.
+5. **The bus worker follows it too.** It's supervised with the kernel's `supervisor` config ([ADR 0007](0007-bus-worker-supervision.md)), so `healthyAfterMs` applies to it with no separate option.
+6. **New public API on `@isoloop/host`, in a minor.** It's an added optional field, so nothing breaks. `isolate:failed`'s `message` names the number that was met: "4 crashes, each after less than 60000 ms of healthy running" now quotes `healthyAfterMs`.
+
+**Tests.** The #390 slow-crash-loop cases pass on the default unchanged, and again with a `healthyAfterMs` shorter and longer than `withinMs`, each reaching `failed` (or not) by the count it sets. `invalid_config` gets a case per malformed value.
+
+**Interaction with #389.** None in the rule. A starved worker's crash still counts as a short run; telling starved from hung is #389's own decision.
 
 ### What the browser still controls
 
