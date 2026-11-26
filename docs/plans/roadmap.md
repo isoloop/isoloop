@@ -2,7 +2,7 @@
 
 What comes after `0.1.0`, in order, for the maintainer and the agents working on Isoloop. Each milestone's status is in the [plans index](README.md#milestones); what was decided and when is in the [history](history.md).
 
-Last changed 2026-11-25, in [history](history.md#2026-11-25).
+Last changed 2026-11-26, in [history](history.md#2026-11-26).
 
 ## Releases
 
