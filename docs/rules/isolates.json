@@ -399,7 +399,7 @@
   },
   {
     "id": "iso.wake-queue",
-    "statement": "Wakes go through a queue that starts at most 4 workers at a time, visible surfaces first in on-screen order, then headless isolates. Until an isolate renders, its surface shows the frozen snapshot of its last frame.",
+    "statement": "Wakes go through a queue that starts at most `maxConcurrentWakes` workers at a time (4 by default), visible surfaces first in on-screen order, then headless isolates. Until an isolate renders, its surface shows the frozen snapshot of its last frame.",
     "status": "active",
     "values": ["4 at a time"],
     "knob": "`KernelConfig.suspend.maxConcurrentWakes`",
