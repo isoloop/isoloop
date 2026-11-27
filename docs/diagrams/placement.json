@@ -169,8 +169,8 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 426,
-          "end_line": 440,
+          "line": 428,
+          "end_line": 442,
           "label": "a MessageChannel per isolate",
           "anchor": "const connect: BusController['connect'] = (isolateId, grants, opts = {}) => {"
         }

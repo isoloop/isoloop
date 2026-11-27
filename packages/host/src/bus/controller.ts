@@ -75,6 +75,8 @@ export type BusControllerOptions = {
   contracts: { url: string; list: ContractsList };
   heartbeatMs: number;
   supervisor: SupervisorConfig;
+  /** The host's lateness so far, in ms, which the bus's kill and ready timers leave out. Default: none. */
+  hostLagMs?: () => number;
   dev: boolean;
   events: BusControllerEvents;
   /** Every message from the bus worker, before it is handled (the kernel's I7 count). */
@@ -418,7 +420,7 @@ export function createBusController(o: BusControllerOptions): BusController {
   };
 
   function feed(input: SupervisorInput): void {
-    const out = step(sup, input, o.supervisor);
+    const out = step(sup, input, o.supervisor, o.hostLagMs?.() ?? 0);
     sup = out.s;
     run(out.effects);
   }

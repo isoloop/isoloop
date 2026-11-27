@@ -30,6 +30,8 @@ The runtime in each worker sends a **heartbeat** every `heartbeat.everyMs` (100 
 - **After `blockedAfterMs` (400 ms) without a beat,** the isolate is `blocked`. A beat that arrives brings it back to `running`.
 - **After `killAfterMs` (10 000 ms) without a beat,** the kernel terminates the worker and counts a crash with reason `unresponsive`.
 
+**Time the page's main thread was late doesn't count.** Beats are heard on the main thread, so on a CPU-starved page a worker can beat on time while the kernel can't hear it. The kernel adds up how late its own 50 ms check ran and leaves that time out of the silence it compares with `killAfterMs`, and out of the time it gives a worker to send `ready`. A silence of 3 × `killAfterMs` in wall-clock time terminates the worker anyway, and a start of 3 × `readyTimeoutMs` times it out, so a hung worker on a starved page is caught at most 3 times later. On a page that isn't starved the check runs on time and nothing changes. `blockedAfterMs`, the busy overlay and the restart limit use wall-clock time.
+
 `lagMs` comes with a beat, so a block shows in it only once the block ends and the late beat arrives; while the block lasts, `lagMs` keeps the last beat's value, often 0. To see a block in progress, read `state` and the time since `lastBeatAt` (`sinceBeatMs` in the dev MCP's `isoloop_isolates`).
 
 A crash also comes from the other causes in `CrashReason`:
@@ -208,7 +210,26 @@ Suspension never touches the restart window. A pool suspends only as a whole, wh
 
 ## Measured: a CPU-starved Firefox
 
-Two sets of runs of the plant dashboard's Isoloop page (12 workers, one pool of 72 isolates), with nothing watching the page but a probe that samples it every 2 s. In both, the browser's workers were runnable but waiting for a CPU.
+**2026-11-26, 0.1.0 and the lag clock, `killAfterMs` 2000 and 10 000** ([#389, the build's runs](https://github.com/isoloop/isoloop/issues/389#issuecomment-7199189452)). The lag clock is the host built from `880795a`, which leaves the main thread's lateness out of the kill and ready timers, with the 3 × cap.
+
+- **Machine:** a desktop-class 16-core CPU, Linux in a virtual machine. These are local runs, not the bench machine's.
+- **Browsers:** Playwright 1.65 with Firefox 159 and Chromium 158.
+- **Starvation:** every process pinned to one core (2 logical CPUs), with 8 pages of plant at once. Other work was running on the same machine, so the starvation is heavier than in the sets below, and the numbers don't compare one to one.
+- **Runs:** 150 s each, the two hosts alternating run by run: 24 pages each on Firefox, 16 on Chromium.
+
+| Host | `killAfterMs` | Pages with a heartbeat kill | Heartbeat kills | Ready timeouts | Pages with an isolate in `failed` | Pages without data after 150 s |
+| --- | --: | --: | --: | --: | --: | --: |
+| 0.1.0 | 10 000 (default) | 7 of 24 | 720 | 1,167 | 0 of 24 | 3 |
+| lag clock (`880795a`) | 10 000 (default) | 0 of 24 | 0 | 0 | 0 of 24 | 0 |
+| 0.1.0 | 2000 | 24 of 24 | 7,150 | 919 | 22 of 24 | 8 |
+| lag clock (`880795a`) | 2000 | 20 of 24 | 3,672 | 0 | 4 of 24 | 0 |
+
+- At the defaults, the lag clock had no crash on any page.
+- At 2000 ms, half as many heartbeat kills, no ready timeout, and 4 pages of 24 with the pool of 72 in `failed`, against 22. On this machine a starved page went quiet for longer than the 6 s cap.
+- Chromium had no crash on either host at either setting.
+- **A truly hung worker is caught later on a starved page.** A 600 s busy loop started in plant's pool of 72 by a click: on a page that isn't starved, the lag clock killed it 1976 ms after the click at 2000 and 10 058 ms at 10 000. On the starved Firefox pages (16 per setting), the median was 7.97 s (3.8 to 18.9 s) at 2000 and 31.8 s (24.9 to 53.9 s) at 10 000. The time includes the click's own delay in reaching the starved worker. On starved Chromium (8 pages), it was 3.8 s and 14.2 s.
+
+Earlier sets of runs, all on wall-clock time, of the plant dashboard's Isoloop page (12 workers, one pool of 72 isolates), with nothing watching the page but a probe that samples it every 2 s. In all of them, the browser's workers were runnable but waiting for a CPU.
 
 **2026-11-22, `0.1.0-next.11`, `killAfterMs` 2000** ([#389](https://github.com/isoloop/isoloop/issues/389)). A laptop-class 8-core CPU, Linux, Playwright 1.65 with Firefox 159, 4 threads limited by a CPU quota: 2 pages at once on 1 CPU (3 rounds) and 3 pages at once on 1.5 CPUs (4 rounds), 18 pages. Each run ended when all of its pages showed data.
 
@@ -260,8 +281,8 @@ Two sets of runs of the plant dashboard's Isoloop page (12 workers, one pool of 
 - **A failed isolate isn't retried.** The restart limit ends the automatic retries; a person or your code restarts it.
 - **An isolate that crashes after each run of `healthyAfterMs` or longer is restarted every time.** Each long run clears the count, so it never reaches `failed`. Raise `healthyAfterMs` if crashes that far apart should still add up.
 - **Some failures skip the retries.** A render format mismatch, a version mismatch or a bus that can't load its contracts fails the isolate on the first crash.
-- **A starved browser looks like a hang.** A heartbeat's silence is measured in wall-clock time, so the supervisor can't tell a worker that waits for a CPU from one that's stuck. On a badly CPU-starved Firefox it kills workers that are only waiting. Those crashes count toward the restart limit like any other, so with a short `killAfterMs` such a page can reach `failed` ([measured above](#measured-a-cpu-starved-firefox)).
-- **A worker starved before `ready` times out.** It crashes with `ready_timeout` after `heartbeat.readyTimeoutMs`. It never ran, so each such crash counts toward the limit, and a page that stays starved can reach `failed` at the defaults too. Raising `readyTimeoutMs` and `killAfterMs` gives a slow device more room, but a real hang then takes longer to catch. Telling a starved worker from a hung one is planned ([#389](https://github.com/isoloop/isoloop/issues/389)).
+- **A starved worker can still look like a hang.** The kernel leaves out the time its own main thread was late, which covers most of a starved page. A worker that waits for a CPU while the main thread runs on time still counts as silent, and every silence past 3 × `killAfterMs` of wall-clock time is a kill. With a short `killAfterMs` on a badly starved Firefox, such kills still happen and can take a pool to `failed` ([measured above](#measured-a-cpu-starved-firefox)).
+- **A hang on a starved page is caught later,** up to 3 × `killAfterMs`, or 3 × `readyTimeoutMs` before `ready`. Until then a hung worker is `blocked`, and a pool's other members are blocked with it; a worker that hasn't sent `ready` stays `loading`.
 - **The supervisor can't see inside a worker.** A memory blow-up that the browser doesn't turn into a worker error, or an isolate that beats but does nothing useful, looks healthy.
 - **There's one `supervisor` config per kernel.** You can't give one isolate its own limits.
 

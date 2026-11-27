@@ -25,8 +25,8 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 200,
-          "end_line": 210,
+          "line": 218,
+          "end_line": 228,
           "label": "a new isolate starts here",
           "anchor": "export function initialSupervision(at: number): IsolateSupervision {"
         },
@@ -49,8 +49,8 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 238,
-          "end_line": 256,
+          "line": 267,
+          "end_line": 285,
           "label": "spawned, ready",
           "anchor": "case 'spawned':"
         }
@@ -65,8 +65,8 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 258,
-          "end_line": 285,
+          "line": 295,
+          "end_line": 322,
           "label": "beats, ticks, errors",
           "anchor": "case 'beat': {"
         }
@@ -82,8 +82,8 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 327,
-          "end_line": 336,
+          "line": 383,
+          "end_line": 392,
           "label": "stop with a grace period",
           "anchor": "case 'stop':"
         },
@@ -112,10 +112,10 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 268,
-          "end_line": 279,
+          "line": 305,
+          "end_line": 341,
           "label": "blocked and unresponsive",
-          "anchor": "case 'tick':"
+          "anchor": "case 'tick': {"
         }
       ]
     },
@@ -128,8 +128,8 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 380,
-          "end_line": 422,
+          "line": 438,
+          "end_line": 480,
           "label": "crash: restart or fail",
           "anchor": "function crash("
         }
@@ -144,15 +144,15 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 62,
-          "end_line": 80,
+          "line": 76,
+          "end_line": 94,
           "label": "crash reasons, final ones",
           "anchor": "export type CrashReason ="
         },
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 400,
-          "end_line": 421,
+          "line": 458,
+          "end_line": 479,
           "label": "limit hit or final",
           "anchor": "const healthy = s.readyAt === undefined ? 0 : Math.max(0, s.lastBeatAt - s.readyAt);"
         }
@@ -167,15 +167,15 @@
       "sources": [
         {
           "path": "packages/host/src/supervisor/machine.ts",
-          "line": 351,
-          "end_line": 359,
+          "line": 407,
+          "end_line": 415,
           "label": "suspend and wake",
           "anchor": "case 'suspend':"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 993,
-          "end_line": 1007,
+          "line": 1004,
+          "end_line": 1018,
           "label": "a pool wakes as a whole",
           "anchor": "case 'wake':"
         }

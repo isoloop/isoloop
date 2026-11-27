@@ -28,3 +28,28 @@ export function backoffMs(n: number, b: Backoff): number {
 export function slide(times: readonly number[], at: number, withinMs: number): number[] {
   return times.filter((t) => at - t < withinMs);
 }
+
+/**
+ * The host's lateness (ADR 0001, *Heartbeat clock: the host's lag*): how
+ * long the supervision tick, due every `everyMs`, fired late, summed. On a
+ * CPU-starved page the main thread can't hear beats while it waits for a
+ * CPU, so the kill and ready timers leave this time out.
+ */
+export type HostLag = {
+  /** The tick ran at `at`; adds how late it was. */
+  tick(at: number): void;
+  /** The total so far, in ms. */
+  total(): number;
+};
+
+export function createHostLag(everyMs: number, startAt: number): HostLag {
+  let prev = startAt;
+  let sum = 0;
+  return {
+    tick(at) {
+      sum += Math.max(0, at - prev - everyMs);
+      prev = at;
+    },
+    total: () => sum,
+  };
+}

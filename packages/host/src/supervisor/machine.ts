@@ -19,9 +19,23 @@
  * `maxRestarts` crashes in a row that each came after less than
  * `healthyAfterMs` of healthy running. A healthy run lasts from `ready` to the
  * last beat; a run of `healthyAfterMs` or longer clears the count.
+ *
+ * The heartbeat kill and the ready timeout (ADR 0001, *Heartbeat clock: the
+ * host's lag*) count only time in which the host could have heard a beat:
+ * wall-clock time minus the host's own lateness, which the kernel passes to
+ * `step` as a running total. A silence of `WALL_CAP` times the limit in
+ * wall-clock time fails them anyway. Everything else (`blockedAfterMs`, the
+ * restart window, the healthy run, the backoff) is wall-clock time.
  */
 import { assertNever } from '@isoloop/protocol';
 import { backoffMs, DEFAULT_BACKOFF, slide, type Backoff } from './timers';
+
+/**
+ * A silence this many times `killAfterMs` (or a start this many times
+ * `readyTimeoutMs`) in wall-clock time is judged whatever the host's lag, so
+ * a hung worker on a starved page is still killed.
+ */
+export const WALL_CAP = 3;
 
 /**
  * Where an isolate is in its life:
@@ -118,6 +132,10 @@ export type IsolateSupervision = {
   /** `performance.now()` of the last beat, or of the spawn before the first one. */
   lastBeatAt: number;
   lagMs: number;
+  /** The host's lag total at `spawnedAt`. */
+  hostLagAtSpawn: number;
+  /** The host's lag total at `lastBeatAt`. */
+  hostLagAtBeat: number;
   /** Crash restarts since spawn. A manual respawn doesn't count. */
   restarts: number;
   /** Times of the restarts in the current window, oldest first. */
@@ -203,6 +221,8 @@ export function initialSupervision(at: number): IsolateSupervision {
     spawnedAt: at,
     lastBeatAt: at,
     lagMs: 0,
+    hostLagAtSpawn: 0,
+    hostLagAtBeat: 0,
     restarts: 0,
     window: [],
     short: 0,
@@ -232,7 +252,16 @@ const unready = (s: IsolateSupervision): IsolateSupervision => {
 const workerMessage = (pool: string | undefined, what: string, detail: string): string =>
   pool === undefined ? detail : `pool "${pool}" restarted: its worker ${what} (${detail})`;
 
-export function step(s: IsolateSupervision, input: SupervisorInput, cfg: SupervisorConfig): Step {
+/**
+ * One input. `hostLagMs` is the host's lateness so far: the total time its
+ * supervision tick fired late, which the kill and ready timers leave out.
+ */
+export function step(
+  s: IsolateSupervision,
+  input: SupervisorInput,
+  cfg: SupervisorConfig,
+  hostLagMs = 0,
+): Step {
   const same: Step = { s, effects: [] };
   switch (input.k) {
     case 'spawned':
@@ -244,6 +273,8 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
           spawnedAt: input.at,
           lastBeatAt: input.at,
           lagMs: 0,
+          hostLagAtSpawn: hostLagMs,
+          hostLagAtBeat: hostLagMs,
         },
         effects: [moved(s.state, 'loading')],
       };
@@ -251,13 +282,19 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
     case 'ready':
       if (s.state !== 'loading') return same;
       return {
-        s: { ...s, state: 'running', readyAt: input.at, lastBeatAt: input.at },
+        s: {
+          ...s,
+          state: 'running',
+          readyAt: input.at,
+          lastBeatAt: input.at,
+          hostLagAtBeat: hostLagMs,
+        },
         effects: [emit({ event: 'isolate:ready', data: {} }), moved('loading', 'running')],
       };
 
     case 'beat': {
       if (!live(s.state)) return same;
-      const next = { ...s, lastBeatAt: input.at, lagMs: input.lagMs };
+      const next = { ...s, lastBeatAt: input.at, lagMs: input.lagMs, hostLagAtBeat: hostLagMs };
       if (s.state !== 'blocked') return { s: next, effects: [] };
       return {
         s: { ...next, state: 'running' },
@@ -265,24 +302,43 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
       };
     }
 
-    case 'tick':
+    case 'tick': {
       if (s.hidden) return same;
-      if (s.state === 'loading' && input.at - s.spawnedAt > cfg.readyTimeoutMs)
-        return crash(s, input.at, 'ready_timeout', `No ready within ${cfg.readyTimeoutMs} ms`, cfg);
+      if (s.state === 'loading') {
+        const wall = input.at - s.spawnedAt;
+        const capped = wall > cfg.readyTimeoutMs * WALL_CAP;
+        if (capped || wall - (hostLagMs - s.hostLagAtSpawn) > cfg.readyTimeoutMs)
+          return crash(
+            s,
+            input.at,
+            'ready_timeout',
+            `No ready within ${capped ? cfg.readyTimeoutMs * WALL_CAP : cfg.readyTimeoutMs} ms`,
+            cfg,
+          );
+      }
       if (s.state === 'running' && input.at - s.lastBeatAt > cfg.blockedAfterMs)
         return {
           s: { ...s, state: 'blocked' },
           effects: [{ k: 'showBusy' }, moved('running', 'blocked')],
         };
-      if (s.state === 'blocked' && input.at - s.lastBeatAt > cfg.killAfterMs)
-        return crash(
-          s,
-          input.at,
-          'unresponsive',
-          workerMessage(input.pool, 'stopped responding', `No heartbeat for ${cfg.killAfterMs} ms`),
-          cfg,
-        );
+      if (s.state === 'blocked') {
+        const wall = input.at - s.lastBeatAt;
+        const capped = wall > cfg.killAfterMs * WALL_CAP;
+        if (capped || wall - (hostLagMs - s.hostLagAtBeat) > cfg.killAfterMs)
+          return crash(
+            s,
+            input.at,
+            'unresponsive',
+            workerMessage(
+              input.pool,
+              'stopped responding',
+              `No heartbeat for ${capped ? cfg.killAfterMs * WALL_CAP : cfg.killAfterMs} ms`,
+            ),
+            cfg,
+          );
+      }
       return same;
+    }
 
     case 'error':
       if (!live(s.state)) return same;
@@ -367,7 +423,9 @@ export function step(s: IsolateSupervision, input: SupervisorInput, cfg: Supervi
           ...s,
           hidden: false,
           lastBeatAt: input.at,
+          hostLagAtBeat: hostLagMs,
           spawnedAt: s.state === 'loading' ? input.at : s.spawnedAt,
+          hostLagAtSpawn: s.state === 'loading' ? hostLagMs : s.hostLagAtSpawn,
         },
         effects: [],
       };

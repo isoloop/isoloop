@@ -50,7 +50,7 @@ import { createIsoloopDomBridge, ISOLOOP_DOM_FMT } from '../render/isoloop-dom';
 import { createRouter, type OnNavigate, type Router } from '../router/router';
 import { checkRequires } from './version';
 import { createRegistry, type ComponentRegistry, type HostComponent } from '../render/registry';
-import { DEFAULT_BACKOFF, type Backoff } from '../supervisor/timers';
+import { createHostLag, DEFAULT_BACKOFF, type Backoff } from '../supervisor/timers';
 import {
   DEFAULT_SUPERVISOR_CONFIG,
   initialSupervision,
@@ -113,9 +113,18 @@ export type KernelConfig = {
     everyMs?: number;
     /** No beat for this long marks the isolate `blocked`, in ms. Default 400. */
     blockedAfterMs?: number;
-    /** No beat for this long terminates the worker as `unresponsive`, in ms. Default 10 000 (10 s). */
+    /**
+     * No beat for this long terminates the worker as `unresponsive`, in ms. Default 10 000 (10 s).
+     * Time the page's main thread spent waiting for a CPU doesn't count, so a CPU-starved page
+     * doesn't kill workers that are only slow. A silence of 3 × `killAfterMs` in wall-clock time
+     * terminates the worker anyway.
+     */
     killAfterMs?: number;
-    /** No `ready` this long after the spawn crashes it as `ready_timeout`, in ms. Default 10 000 (10 s). */
+    /**
+     * No `ready` this long after the spawn crashes it as `ready_timeout`, in ms. Default 10 000 (10 s).
+     * Counted like `killAfterMs`: without the main thread's waits for a CPU, and at most
+     * 3 × `readyTimeoutMs` in wall-clock time.
+     */
     readyTimeoutMs?: number;
   };
   /** Stylesheets adopted into every surface's shadow root. Default: none. */
@@ -817,6 +826,8 @@ export function createKernel(config: KernelConfig): Kernel {
     killAfterMs: config.heartbeat?.killAfterMs ?? def.killAfterMs,
     readyTimeoutMs: config.heartbeat?.readyTimeoutMs ?? def.readyTimeoutMs,
   };
+  /** How late the supervision tick fired, summed: the kill and ready timers leave it out. */
+  const hostLag = createHostLag(TICK_MS, performance.now());
   const slots = new Map<string, Slot>();
   /**
    * Stopped isolates whose worker is still shutting down, by id. A new
@@ -1061,7 +1072,7 @@ export function createKernel(config: KernelConfig): Kernel {
 
   const feed = (slot: Slot, input: SupervisorInput): void => {
     const loaded = slot.loaded;
-    const { s, effects } = step(slot.sup, input, cfg);
+    const { s, effects } = step(slot.sup, input, cfg, hostLag.total());
     slot.sup = s;
     run(slot, effects);
     // A member that crashed with its pool doesn't pass the crash on: poolFate
@@ -1455,6 +1466,7 @@ export function createKernel(config: KernelConfig): Kernel {
           heartbeatMs: everyMs,
           commitIntervalMs,
           supervisor: cfg,
+          hostLagMs: () => hostLag.total(),
           dev: config.dev ?? false,
           onControlMessage: (m) => count(m),
           events: {
@@ -1685,6 +1697,7 @@ export function createKernel(config: KernelConfig): Kernel {
 
   const tick = setInterval(() => {
     const at = performance.now();
+    hostLag.tick(at);
     controller?.feed({ k: 'tick', at });
     for (const slot of slots.values()) {
       feed(slot, { k: 'tick', at, pool: slot.loaded?.pool });
