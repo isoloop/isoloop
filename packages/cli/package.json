@@ -1,6 +1,6 @@
 {
   "name": "isoloop",
-  "version": "0.1.0",
+  "version": "0.2.0-next.0",
   "description": "The Isoloop command line: export contracts as JSON Schema, run the dev MCP server for coding agents, add the agent skill, and migrate code between releases.",
   "keywords": [
     "isoloop",

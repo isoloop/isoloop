@@ -1,5 +1,37 @@
 # @isoloop/host
 
+## 0.2.0-next.0
+
+### Minor Changes
+
+- d452be7: breaking: `ctx.bus.publish` and `kernel.publish` take the value first and the key in an options object, like `request`, `reply` and `usePublish`: `publish(topic, value, { key? })` instead of `publish(topic, { value, key? })`. `npx isoloop@latest migrate` rewrites the calls it can prove are Isoloop's and marks the ones it can't with a `// isoloop-migrate:` comment; see [From 0.1 to 0.2](https://isoloop.dev/docs/getting-started/#from-01-to-02). An isolate built apart and stamped below 0.2 by `defineIsolate` still gets the old `ctx.bus.publish(topic, { value, key? })` in 0.2, deprecated, with a warning on its first call when the kernel has `dev: true`. `kernel.publish` changes at once. The record on the bus is unchanged.
+- 208e22c: breaking: `supervisor.healthyAfterMs` is the healthy run, from `ready` to the last heartbeat, that clears the count of short runs. `supervisor.withinMs` is now only the sliding window that counts restarts; before, it was both.
+  
+  The default is 60 000 ms, so an app that sets neither behaves as before. An app that set only `withinMs` would now get a 60 000 ms healthy run instead: run `npx isoloop@latest migrate 0.2 --from 0.1 --write`, which sets `healthyAfterMs` to the same expression beside `withinMs` in a `createKernel` config and flags with `// isoloop-migrate:` the configs it can't rewrite ([the codemod](https://github.com/isoloop/isoloop/blob/main/packages/cli/src/migrate/0.2/healthy-after-ms.ts), [the options](https://github.com/isoloop/isoloop/blob/main/docs/guide/supervision.md#configuring-it)).
+  
+  Any value other than a positive integer makes `createKernel` throw `invalid_config`. The bus worker follows it too, and `isolate:failed`'s message quotes it when the short-run limit is met.
+- 659eefa: `kernel.watch(topic, onView, { keys? })` reads a topic's current value per key from the host, instead of its stream. It is experimental.
+  
+  - It takes the same arguments as `ctx.bus.watch`: `onView(view, changed)` gets a snapshot first, then the keys that changed, and the next view waits until `onView` returns or its promise settles.
+  - The host's watches on one topic share one watch on the bus, on the union of their keys.
+  - After a bus restart a persistent topic keeps its values. A memory topic the restart lost comes back empty, with every key it had in `changed`.
+  - It throws without `KernelConfig.contracts`, as `kernel.subscribe` does.
+  - `@isoloop/host` exports the `OnView` and `WatchOptions` types.
+  - The watch logic moved from `@isoloop/runtime` to `@isoloop/protocol`, so the host and the isolate share it; `ctx.bus.watch` behaves as before.
+
+### Patch Changes
+
+- 62713d1: The heartbeat kill (`heartbeat.killAfterMs`) and the ready timeout (`heartbeat.readyTimeoutMs`) no longer count time in which the page's main thread was waiting for a CPU. The supervisor adds up how late its own 50 ms check fired and leaves that time out of a worker's silence. A CPU-starved page, where beats are sent but the main thread can't hear them, no longer kills workers that are only slow. A silence of 3 × `killAfterMs` in wall-clock time still terminates the worker, and a start of 3 × `readyTimeoutMs` still times out, so a hung worker on a starved page is killed at most 3 times later. On a page that isn't starved nothing changes. The bus worker's kill and ready timeout work the same way. `blockedAfterMs` and the busy overlay, the restart window (`withinMs`), the healthy run (`healthyAfterMs`) and the backoff stay on wall-clock time.
+- eaaa863: A crash loop slower than the restart window now fails. A crash counts toward `supervisor.maxRestarts` when the isolate's healthy run before it (from `ready` to its last heartbeat) was shorter than `supervisor.healthyAfterMs`; a run of `healthyAfterMs` or longer clears the count. The sliding window still applies, and the isolate fails on whichever limit it meets first. Before, an isolate whose crashes took longer to detect than the window allowed restarted without end and never showed its fallback. The bus worker uses the same rule. The backoff grows with the larger of the two counts, Retry clears both, and `isolate:failed`'s message ends with the limit that was met.
+- Updated dependencies [d452be7]
+- Updated dependencies [abf56ab]
+- Updated dependencies [659eefa]
+- Updated dependencies [de19016]
+- Updated dependencies [f96ad9b]
+- Updated dependencies [05e956c]
+  - @isoloop/protocol@0.2.0-next.0
+  - @isoloop/dom@0.2.0-next.0
+
 ## 0.1.0
 
 The first release of the kernel on the page.

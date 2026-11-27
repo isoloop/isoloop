@@ -1,5 +1,24 @@
 # @isoloop/devtools
 
+## 0.2.0-next.0
+
+### Minor Changes
+
+- de19016: The bus metrics and the devtools panel show watched topics. These figures are experimental.
+  
+  - Each topic row in `BusMetrics` gains `watch` once the topic has had a watch: the watches on it now, the distinct keys they hold, the transport (`'messages'`), and the records appended while each watch was on the topic and the values sent to watches, since the bus worker started. The host's watches are counted with the isolates'.
+  - The devtools bus view lists watched topics under the topics table, with how many of the topic's records each watch showed, in words, such as "showed 1 of every 40 records on the topic".
+
+### Patch Changes
+
+- abf56ab: The host writes the `style` an isolate renders through the element's CSSOM (`el.style.cssText`) instead of `setAttribute('style', …)`, and the devtools panel styles its own page elements the same way. A page with surfaces now works under `style-src 'self'`, with no `'unsafe-inline'`: before, the browser dropped those styles and logged a violation for each. `devCsp()` still allows `'unsafe-inline'` in `style-src`, for the `<style>` elements Vite's dev server injects; its TSDoc and the hosting guide say so.
+- Updated dependencies [62713d1]
+- Updated dependencies [d452be7]
+- Updated dependencies [eaaa863]
+- Updated dependencies [208e22c]
+- Updated dependencies [659eefa]
+  - @isoloop/host@0.2.0-next.0
+
 ## 0.1.0
 
 The first release, experimental: the panel and its options may change in any minor.
