@@ -22,6 +22,8 @@ The [investigation](../investigations/codec.md) benched our codec, `@msgpack/msg
 4. **Types:** objects, arrays, strings, numbers (including `-0`, `NaN` and `±Infinity`), booleans, `null`, `undefined`; `bigint`, `Date`, `Map`, `Set`, typed arrays and `ArrayBuffer` (M2b task 4). Functions, symbols, class instances and cycles throw `not_encodable`. Lone surrogates in strings become U+FFFD, as with any UTF-8 encoding; structured clone would keep them.
 5. **`encode` returns a view** into a chunk shared with other results, not a fresh `ArrayBuffer`. A copy per record cost more than encoding it. Callers copy before transferring the `buffer`; the bus copies frames into its segment buffers anyway.
 
+Rules: `dur.codec`, `dur.codec-one-encoding`, `dur.codec-types`
+
 ## Consequences
 
 - No dependency to track, audit or wrap; the codec is about 550 lines, comments included, that we own end to end.
@@ -35,3 +37,5 @@ The [investigation](../investigations/codec.md) benched our codec, `@msgpack/msg
 - **`@msgpack/msgpack`:** the reference MessagePack library; slower than ours in all but one case.
 - **JSON:** 1.7–6× slower to encode than ours, 35 % larger for trades, and it loses `undefined`, `-0`, `NaN`, `bigint`, `Date`, `Map`, `Set` and binary data.
 - **Structured clone bytes:** V8's serializer is 5–16× slower in Node and isn't available in the browser as bytes (only `structuredClone`, which returns an object).
+
+Rules: `dur.no-codec-library`

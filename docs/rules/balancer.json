@@ -1,1 +1,1299 @@
-[]
+[
+  {
+    "id": "bal.opt-in",
+    "statement": "`@isoloop/balancer` is a library on the main thread that an app opts in to with `createBalancer(kernel, options)`. Without it, nothing about placement changes.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.own-pools", "bal.no-kernel-policy"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#1-an-opt-in-host-side-balancer",
+        "why": "A heavy widget placed by hand in a shared pool slows its neighbours, but the runtime must not pool isolates on its own (ADR 0001)."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.own-pools",
+    "statement": "The balancer places only isolates spawned through `balancer.spawn`, whose manifest names no pool, into pools it owns: `balancer-1`, `balancer-2` and so on, and the quarantine pools `balancer-quarantine-1` and up. It never moves an isolate started with `kernel.spawn`.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.opt-in", "bal.reserved-prefix"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#1-an-opt-in-host-side-balancer",
+        "why": "Apps keep full control of the isolates they place themselves."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.reserved-prefix",
+    "statement": "The host reserves every pool name that starts with `balancer-`: a plain `kernel.spawn` into one throws, and a kernel takes only one balancer.",
+    "status": "active",
+    "errors": ["reserved_pool", "balancer_exists"],
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["bal.own-pools"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#1-an-opt-in-host-side-balancer",
+        "why": "No app code can place an isolate into a balancer pool by hand, and one balancer can't be confused by another."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.hold",
+    "statement": "`balancer.hold(id)` returns a release function; while held, an isolate is never moved, and a trigger that would move it waits for the release.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.move-is-restart"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#1-an-opt-in-host-side-balancer",
+        "why": "An editor drawer must not lose the widget it's editing to a move."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.measure-loads",
+    "statement": "`balancer.measure(id)` returns an isolate's load averaged over the last 3 s. An app-supplied `loads` store keeps measured loads across reloads; the balancer writes each one back at most every 10 s, and only when it changed by 5 points or more.",
+    "status": "active",
+    "experimental": true,
+    "values": ["3 s average", "every 10 s", "5 points"],
+    "knob": "`loads` option",
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.unmeasured-quarantine"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#1-an-opt-in-host-side-balancer",
+        "why": "Measured loads survive a reload without the balancer owning a topic."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.busy-ms",
+    "statement": "Each isolate's heartbeat reports `busyMs`: the time its worker spent running that isolate's code in the last interval, per member in a pool. Snapshots from `kernel.isolates()` carry it too.",
+    "status": "active",
+    "code": ["packages/runtime/src/pools/busy.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["bal.attribution", "bal.beat-event"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#2-busyms-a-public-load-signal-per-member",
+        "why": "Pool members all share one `lagMs`, so only time spent per member can name the heavy one; it costs no new messages."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.attribution",
+    "statement": "In every worker, the runtime wraps `setTimeout`, `setInterval`, `requestAnimationFrame`, `queueMicrotask`, `requestIdleCallback` and message listeners on ports members create, before any member loads, and bills each callback to the member that registered it. The wrapped functions behave like the native ones.",
+    "status": "active",
+    "code": ["packages/runtime/src/pools/busy.ts"],
+    "since": "0.1.0",
+    "related": ["bal.framework-attribution", "bal.shared-split", "bal.busy-ms"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#how-work-is-attributed-to-a-member-decided-2026-11-16",
+        "why": "Pool members call the shared timers directly and React renders in its scheduler's tasks, so without wrapping the heavy member would look light."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.framework-attribution",
+    "statement": "React renders are timed through a minimal `__REACT_DEVTOOLS_GLOBAL_HOOK__` the runtime installs, and Preact renders through its public `options` hooks, then billed to the members whose roots they touched.",
+    "status": "active",
+    "code": ["packages/runtime/src/pools/busy.ts"],
+    "since": "0.1.0",
+    "related": ["bal.attribution", "bal.no-profiler"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#how-work-is-attributed-to-a-member-decided-2026-11-16",
+        "why": "Production React builds don't call `<Profiler>`'s `onRender`, and Preact's internals are mangled."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.shared-split",
+    "statement": "Time spent on a task shared by several members is split equally among them. Work no wrapper can trace, such as garbage collection or promise continuations, is no member's time and shows only in `lagMs`.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["bal.unexplained-lag", "bal.reported-busy"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#how-work-is-attributed-to-a-member-decided-2026-11-16",
+        "why": "`busyMs` is a placement guide, not a profiler."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.timing-always-on",
+    "statement": "The busy-time timing always runs, in every worker, with no switch.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["bal.attribution"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#how-work-is-attributed-to-a-member-decided-2026-11-16",
+        "why": "One code path measures every placement; it becomes a kernel option only if its cost shows beyond the measurement's spread."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.unexplained-lag",
+    "statement": "When a pool lags but its members' busy time adds up to less than 50 % of the interval, the balancer bisects instead of picking by busy time. After any move it checks that the pool's lag fell, and moves the next member if not.",
+    "status": "active",
+    "experimental": true,
+    "values": ["50 %"],
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.bisect", "bal.reported-busy"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#how-work-is-attributed-to-a-member-decided-2026-11-16",
+        "why": "It bounds the cost of a wrong attribution."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-17",
+        "ref": "adr/0017#how-work-is-attributed-to-a-member-decided-2026-11-16",
+        "why": "The app can report busy time the wrapping misses, so the balancer bisects only when neither figure explains the lag.",
+        "prev": "The 50 % rule counted the beat's `busyMs` only."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.beat-event",
+    "statement": "The kernel emits `isolate:beat { id, pool?, lagMs, busyMs, at }` for each member on every heartbeat, only while something listens.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["bal.decision-cadence", "bal.busy-ms"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "Polling `kernel.isolates()` missed the beat that carried a spike; the event counts every beat once, and apps without a listener pay nothing."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#202",
+        "why": "Every beat through isolate:beat; maxWorkers counts its own pools."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.decision-cadence",
+    "statement": "The balancer feeds every beat into a 3 s window per pool and member, and decides every 500 ms.",
+    "status": "active",
+    "experimental": true,
+    "values": ["3 s window", "500 ms"],
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.beat-event"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "A short window catches spikes and sustained load without reacting to every beat."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-16",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "The window is fed by the beat event instead of polling.",
+        "prev": "The balancer read `kernel.isolates()` every 100 ms."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#202",
+        "why": "Every beat through isolate:beat; maxWorkers counts its own pools."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.second-spike",
+    "statement": "A heartbeat lag over 100 ms is a spike, blamed on the member with the highest busy time. A first spike is only reported, with a `spike` event; a second within 60 s sends the member to the quarantine. A member's own fatal error quarantines it at once.",
+    "status": "active",
+    "experimental": true,
+    "values": ["100 ms", "60 s"],
+    "knob": "`spike.lagMs`",
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.crash-quarantine", "bal.alone-spike"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "A long task blocks every member of its pool."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-17",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "A one-off block is over before the balancer sees it, and in the File processor most quarantines protected no one.",
+        "prev": "A single spike sent the member to the quarantine at once."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#214",
+        "why": "Backlog, fewer moves, a second spike, packing back (M3i)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.sustained",
+    "statement": "A pool whose lag stays over 50 ms across the 3 s window moves its heaviest member to a balancer pool with room.",
+    "status": "active",
+    "experimental": true,
+    "values": ["50 ms", "3 s"],
+    "knob": "`sustained.lagMs`",
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.full", "bal.predicted-load"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "A steady heavy member slows its neighbours without any single long task."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.full",
+    "statement": "A pool whose members' busy time adds up to 80 % of a core or more over the 3 s window moves its heaviest member, whatever the lag, with the move reason `full`.",
+    "status": "active",
+    "experimental": true,
+    "values": ["80 %"],
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.sustained", "bal.predicted-load"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "Heavy tasks that yield often keep the lag low while a pool at 88 % starves its members."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#203",
+        "why": "A full-pool trigger; quiet is enough to leave quarantine."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.backlog-trigger",
+    "statement": "`balancer.report(id, { backlog })` reports an isolate's pending work. An isolate whose fresh backlog is above zero and has risen over two 10 s windows in a row, since its last move, moves to a pool of its own if the cap allows, else to the least loaded pool that fits; at most one backlog move per fresh window across the balancer.",
+    "status": "active",
+    "experimental": true,
+    "values": ["10 s windows", "2 rising windows"],
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.behind-event", "bal.reported-busy"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "One pool did 44 of 50 files a second and its queue grew while no lag or load trigger fired."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#214",
+        "why": "Backlog, fewer moves, a second spike, packing back (M3i)."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-18",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "Single-window rises kept moving processors through five minutes of calm.",
+        "prev": "An isolate was behind when its latest fresh report was higher than one taken at least 10 s before it."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#238",
+        "why": "Free first way out of quarantine, packing whole pools, two-window backlog (M3j)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.behind-event",
+    "statement": "When an isolate that's behind already has a pool to itself, or there's no pool or worker to give it, the balancer emits `behind` instead, at most every 30 s per isolate, and its placement shows `behind: true`.",
+    "status": "active",
+    "experimental": true,
+    "values": ["every 30 s"],
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.backlog-trigger"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "The app can see a backlog the balancer can't fix."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#214",
+        "why": "Backlog, fewer moves, a second spike, packing back (M3i)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.reported-busy",
+    "statement": "`balancer.report(id, { busyMs })` takes a running total of the work the app measured; the balancer uses the larger of its 3 s difference and the heartbeat's busy time. A total with nothing new for 10 s is ignored.",
+    "status": "active",
+    "experimental": true,
+    "values": ["stale after 10 s"],
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.shared-split", "bal.unexplained-lag"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "Work that resumes after `await` measured 0 to 8 % of a core while its pool fell behind, and counting promise continuations needs `AsyncContext`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#234",
+        "why": "Reported busy time, packing on a steady backlog, offence decay, own-pool bisects, failed isolates (M3j)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.crash-quarantine",
+    "statement": "When a pool restarts after a member's error, that member goes to the quarantine.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.second-spike", "bal.bisect"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "The member that crashed is the known culprit."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.failed",
+    "statement": "A member the kernel gave up on becomes `failed`: it leaves its pool's load, the quarantine and any bisect, a `failed` event reports it, and no move restarts it.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.bisect"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "A given-up member still counted in loads and bisects, and a later move silently restarted it with a fresh crash count."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#234",
+        "why": "Reported busy time, packing on a steady backlog, offence decay, own-pool bisects, failed isolates (M3j)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.bisect",
+    "statement": "When the supervisor kills a pool with no known culprit, the balancer sends half its members to the quarantine on restart and repeats with whichever half blocks again. It starts only when the quarantine is empty or the cap leaves room for a new quarantine pool, and a bisect is forgotten 60 s after its last trigger.",
+    "status": "active",
+    "experimental": true,
+    "values": ["forgotten after 60 s"],
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.unexplained-lag", "bal.no-quarantine-all-killed"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "A member that blocks until its pool is killed never sends the beat that names it; bisecting takes about log₂(n) restarts and never quarantines every healthy widget."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-17",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "Bisects at the cap kept adding suspects to one quarantine pool, where a poison file got the worker killed until the kernel gave up on every member.",
+        "prev": "A bisect started whenever a pool was killed with no known culprit."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#234",
+        "why": "Reported busy time, packing on a steady backlog, offence decay, own-pool bisects, failed isolates (M3j)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.alone-spike",
+    "statement": "A member that spikes while alone in its pool isn't moved unless it has offended before, and nothing joins that pool for 30 s.",
+    "status": "active",
+    "experimental": true,
+    "values": ["30 s"],
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.second-spike"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#3-when-the-balancer-acts",
+        "why": "Moving it can't spare anyone."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.predicted-load",
+    "statement": "An isolate joins or moves into a pool only if the pool's load plus its own stays under 60 %. If no balancer pool fits, it gets a new pool if the cap allows; otherwise it stays where it is and its placement reports `atCap`.",
+    "status": "active",
+    "experimental": true,
+    "values": ["60 %"],
+    "knob": "`headroom.loadPct`",
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.full", "bal.cap"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#4-where-it-places",
+        "why": "Placement stops adding at 60 % and moving starts at 80 %; the gap keeps pools from flapping."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.unmeasured-quarantine",
+    "statement": "An isolate with no measured load starts in the quarantine and leaves once it has 3 s of samples, except members a bisect moved there, which stay until the bisect ends.",
+    "status": "active",
+    "experimental": true,
+    "values": ["3 s"],
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.measure-loads", "bal.move-budget"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#4-where-it-places",
+        "why": "A new widget's weight is unknown until it runs, and the quarantine never slows a healthy pool."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.cap",
+    "statement": "The balancer's `maxWorkers`, by default `max(2, cores − 2)`, counts only its own workers: its `balancer-N` pools and quarantine workers beyond the first. The first quarantine pool is allowed on top. The kernel's worker budget doesn't change.",
+    "status": "active",
+    "experimental": true,
+    "values": ["max(2, cores − 2)"],
+    "knob": "`maxWorkers`",
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.cap-claimed", "bal.predicted-load"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#4-where-it-places",
+        "why": "The balancer gets its own allowance, in its own options."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-16",
+        "ref": "adr/0017#4-where-it-places",
+        "why": "A page with about 13 workers left the balancer at its cap from the start, so a steady heavy widget was never separated.",
+        "prev": "The cap counted every live worker on the page."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#202",
+        "why": "Every beat through isolate:beat; maxWorkers counts its own pools."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.cap-claimed",
+    "statement": "A pool counts toward `maxWorkers` from the moment a move claims it, before its worker runs.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.cap"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-19",
+        "ref": "adr/0017#4-where-it-places",
+        "why": "Two moves in one decision each took the worker a fold had freed, one past the cap."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-19",
+        "ref": "#279",
+        "why": "The cap counts claimed pools; the fold goes like with like (M3j)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.load-only",
+    "statement": "Placement uses load only; which topics an isolate reads isn't an input.",
+    "status": "active",
+    "experimental": true,
+    "since": "0.1.0",
+    "related": ["bal.predicted-load"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#4-where-it-places",
+        "why": "Delivery is per member, so grouping isolates by topic saves nothing."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.quarantine-split",
+    "statement": "The quarantine is one shared pool, `balancer-quarantine-1`. When it goes over budget with more than one member, its heaviest member gets a quarantine worker of its own if the cap allows.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.backlog-outranks", "bal.cap"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#5-the-quarantine",
+        "why": "Suspects can slow each other there but never a healthy pool, and the number of quarantine workers stays bounded."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.backlog-outranks",
+    "statement": "When a member with a rising backlog has nowhere to go, quarantine pools beyond the first fold into the first, with the move reason `room`, and for 10 s no new quarantine pool takes a worker. A fold goes like with like: offenders join offenders, and members that never offended never join one.",
+    "status": "active",
+    "experimental": true,
+    "values": ["10 s"],
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.quarantine-split", "bal.backlog-trigger"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-19",
+        "ref": "adr/0017#5-the-quarantine",
+        "why": "Two crashed processors in two quarantine pools held the last worker while six healthy processors shared one and fell behind."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-19",
+        "ref": "adr/0017#5-the-quarantine",
+        "why": "The two pools can hold the halves of a bisect with no offenders, and an offenders-only fold left the second its worker.",
+        "prev": "Only a quarantine pool holding offenders folded into the first."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-19",
+        "ref": "#268",
+        "why": "A rising backlog outranks a second quarantine worker (M3j)."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-19",
+        "ref": "#279",
+        "why": "The cap counts claimed pools; the fold goes like with like (M3j)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.leave-quarantine",
+    "statement": "An offender leaves the quarantine after a quiet window with no spike and no crash, whatever its load, to wherever the placement rule finds room; with no room anywhere it stays, flagged `atCap`.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.repeat-offenders"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#5-the-quarantine",
+        "why": "Heavy but well-behaved members are the full-pool trigger's business, not the quarantine's."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-16",
+        "ref": "adr/0017#5-the-quarantine",
+        "why": "The load bar kept steady heavy members in the quarantine for good.",
+        "prev": "A member left only once its load was under 20 %."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#203",
+        "why": "A full-pool trigger; quiet is enough to leave quarantine."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.repeat-offenders",
+    "statement": "An offender's quiet window is 30, 60 and then 120 s for its first three offences, and the fourth keeps it apart. It loses one offence for each quiet window it completes, and the window never exceeds 2 minutes.",
+    "status": "active",
+    "experimental": true,
+    "values": ["30, 60, 120 s", "4th offence: kept apart", "cap 2 min"],
+    "knob": "`quarantine.steadyMs`, `quarantine.maxReturns`",
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.leave-quarantine"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#5-the-quarantine",
+        "why": "Repeat offenders stay away from healthy pools for longer."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-17",
+        "ref": "adr/0017#5-the-quarantine",
+        "why": "After 60 s of faults and 60 s of calm, most processors were still waiting out doubled windows.",
+        "prev": "Offences never decayed, and the window kept doubling."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#234",
+        "why": "Reported busy time, packing on a steady backlog, offence decay, own-pool bisects, failed isolates (M3j)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.move-is-restart",
+    "statement": "A move is `stop`, then `spawn` with the same id and the new pool. State comes back from the log within the topics' retention, and a visual isolate gets a fresh surface.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.cooldown", "bal.arrived"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#6-moves-and-hysteresis",
+        "why": "There's no new kernel primitive; a make-before-break move is in would-like."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.cooldown",
+    "statement": "After a move, both pools get 30 s with at most one move each, and need fresh over-budget evidence gathered after it before they move anything again.",
+    "status": "active",
+    "experimental": true,
+    "values": ["30 s"],
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.move-budget"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0017#6-moves-and-hysteresis",
+        "why": "The signals are noisy, and the cooldown bounds how often the balancer acts."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#196",
+        "why": "@isoloop/balancer, experimental auto placement (M3h)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.moves-that-help",
+    "statement": "A move happens only when it's predicted to end its trigger, so that the source pool drops back under its threshold.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.move-budget"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0017#6-moves-and-hysteresis",
+        "why": "Moves that didn't help repeated work and kept files waiting: p95 latency was 16 to 18 s."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#214",
+        "why": "Backlog, fewer moves, a second spike, packing back (M3i)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.move-budget",
+    "statement": "An isolate moves at most 3 times in 5 minutes for load or to leave the quarantine. Quarantine and bisect moves aren't limited but count toward the 3, and a never-measured isolate's first way out of the quarantine doesn't count.",
+    "status": "active",
+    "experimental": true,
+    "values": ["3 moves in 5 min"],
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.moves-that-help", "bal.cooldown"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0017#6-moves-and-hysteresis",
+        "why": "Each move restarts the isolate and repeats the work it held."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#214",
+        "why": "Backlog, fewer moves, a second spike, packing back (M3i)."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-18",
+        "ref": "adr/0017#6-moves-and-hysteresis",
+        "why": "A processor's boot exit used up its budget, keeping it in the quarantine for about 250 s.",
+        "prev": "Every move out of the quarantine counted toward the budget."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#238",
+        "why": "Free first way out of quarantine, packing whole pools, two-window backlog (M3j)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.arrived",
+    "statement": "After a move, an `arrived { id, from, to, reason, costMs }` event reports the time from the stop to the isolate's first beat in its new place.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.move-is-restart"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0017#6-moves-and-hysteresis",
+        "why": "The `move` event fires before the cost is known."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#214",
+        "why": "Backlog, fewer moves, a second spike, packing back (M3i)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.pack",
+    "statement": "A balancer pool whose members have all been steady for 60 s empties into the fullest other pool that stays under 40 % with it, one member per pack and one pack per minute across the balancer, to free a worker. A member or pool with a rising backlog, a hold or a recent spike is left alone. Packing is on by default.",
+    "status": "active",
+    "experimental": true,
+    "values": ["60 s steady", "under 40 %", "1 pack a minute"],
+    "knob": "`pack.enabled`",
+    "code": ["packages/balancer/src/balancer/balancer.ts"],
+    "since": "0.1.0",
+    "related": ["bal.predicted-load", "bal.move-budget"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0017#7-packing-back-added-2026-11-17-m3i",
+        "why": "After faults, the balancer kept as many workers as a worker per processor."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-17",
+        "ref": "adr/0017#7-packing-back-added-2026-11-17-m3i",
+        "why": "A consumer group rarely has a backlog of exactly 0, so no member ever packed.",
+        "prev": "A member packed only while its backlog was zero."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#214",
+        "why": "Backlog, fewer moves, a second spike, packing back (M3i)."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#234",
+        "why": "Reported busy time, packing on a steady backlog, offence decay, own-pool bisects, failed isolates (M3j)."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-18",
+        "ref": "adr/0017#7-packing-back-added-2026-11-17-m3i",
+        "why": "Two pools of four processors at about 16 % each never packed, since neither had a member alone.",
+        "prev": "Only a member alone in its pool packed."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#238",
+        "why": "Free first way out of quarantine, packing whole pools, two-window backlog (M3j)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bal.no-kernel-policy",
+    "statement": "The kernel has no placement policy such as `pool: 'auto'`.",
+    "status": "rejected",
+    "related": ["bal.opt-in"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-16",
+        "ref": "adr/0017#alternatives-considered",
+        "why": "Why not let the kernel place isolates? Every app would pay for it, and the kernel would gain behaviour ADR 0001 rejected."
+      }
+    ]
+  },
+  {
+    "id": "bal.no-profiler",
+    "statement": "React render time doesn't come from `<Profiler>`.",
+    "status": "rejected",
+    "related": ["bal.framework-attribution"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-16",
+        "ref": "adr/0017#alternatives-considered",
+        "why": "Why not use `<Profiler>`'s `onRender`? Production builds don't call it."
+      }
+    ]
+  },
+  {
+    "id": "bal.no-spawn-grant",
+    "statement": "The balancer isn't an isolate with a grant to spawn and stop.",
+    "status": "rejected",
+    "related": ["bal.opt-in"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-16",
+        "ref": "adr/0017#alternatives-considered",
+        "why": "Why not run the balancer as an isolate? A grant to spawn and stop needs a security design of its own."
+      }
+    ]
+  },
+  {
+    "id": "bal.no-bus-backlog",
+    "statement": "The balancer doesn't read backlogs from the bus; the app reports them.",
+    "status": "rejected",
+    "related": ["bal.backlog-trigger"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-17",
+        "ref": "adr/0017#alternatives-considered",
+        "why": "Why not read a consumer group's lag from the bus? It needs a new public bus API or a protocol change."
+      }
+    ]
+  },
+  {
+    "id": "bal.no-quarantine-all-killed",
+    "statement": "A killed pool's members aren't all sent to the quarantine.",
+    "status": "rejected",
+    "related": ["bal.bisect"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-16",
+        "ref": "adr/0017#alternatives-considered",
+        "why": "Why not quarantine the whole pool? It converges at once but moves every healthy widget."
+      }
+    ]
+  }
+]
