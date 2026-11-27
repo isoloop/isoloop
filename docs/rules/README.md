@@ -1623,7 +1623,249 @@ History:
 
 Who owns the URL and how isolates navigate. Prefix `route`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `route.host-owns-url` | The host app owns the URL and its router. Isoloop ships no router. |  | active | since `0.1.0` |
+| `route.routing-switch` | With `KernelConfig.routing: false` the kernel adds no listeners, never publishes the route topic, ignores `syncRoute()`, rejects `navigate()` with `routing_disabled` and leaves link clicks to the browser. | `default: true` | active | since `0.1.0` |
+| `route.base-path` | `KernelConfig.basePath` is the app's mount point, normalised to start and end with `/`. It must match the host router's `basename`. | `default: '/'` | active | since `0.1.0` |
+| `route.base-path-warning` | In dev builds the kernel warns once when `syncRoute()` sees a URL outside `basePath` while isolates are subscribed to the route. | `once`, `dev only` | active | since `0.1.0` |
+| `route.route-topic` | The kernel publishes the current location to the compacted system topic `isoloop.route.v1` (`routeTopic`), key `"current"`, as `{ href, pathname, path, search, hash, state }`. `path` is relative to `basePath`, or `null` outside it. | `key: "current"`, `compacted`, `memory only` | active | since `0.1.0` |
+| `route.state-dropped` | When a route record would exceed the bus size limit, the kernel publishes it with `state: null` and emits `route:state_dropped { bytes }`. |  | active | since `0.1.0` |
+| `route.publish-points` | The kernel publishes the route on start, on `popstate` and `hashchange`, on `kernel.syncRoute()`, after an accepted `navigate` and after a bus restart. It skips a publish when `href` and `state` haven't changed. |  | active | since `0.1.0` |
+| `route.opt-in-subscribe` | Nothing subscribes to the route on an isolate's behalf. An isolate that doesn't subscribe gets no route records and isn't woken from suspension by navigation. |  | active | since `0.1.0` |
+| `route.sync-route` | Navigations the host's router makes itself reach the route topic only through `kernel.syncRoute()`, which reads `location` and `history.state` and publishes if something changed. |  | active | since `0.1.0` |
+| `route.reserved-namespace` | Topics under `isoloop.*` are system topics: every isolate may subscribe to them without a grant, and only the kernel publishes them. An isolate's publish is `forbidden` even with a matching grant, and `kernel.publish` from host code rejects too. |  | active | since `0.1.0` |
+| `route.navigate-grant` | `ctx.host.navigate()` needs `grants.navigate: true` in the manifest, or it rejects with `forbidden`. The runtime rejects locally and the kernel checks again. | `default: false` | active | since `0.1.0` |
+| `route.resolver` | One resolver serves `navigate` and links. An href starting with `/` resolves against `basePath`; `#x` and relative hrefs resolve against the document URL; a full same-origin URL escapes the base. A cross-origin result rejects with `cross_origin`. |  | active | since `0.1.0` |
+| `route.on-navigate` | The kernel calls the host's `onNavigate(req)` with `{ href, replace, state?, from }`, where `href` is absolute and `from` is the calling isolate. The default calls `history.pushState` or `replaceState`. |  | active | since `0.1.0` |
+| `route.navigate-result` | `navigate` resolves with what `onNavigate` returns: `true` (accepted) or `false` (refused), within the 5 s host-call timeout. If `onNavigate` throws, the call rejects with `navigate_failed` and the kernel emits `route:navigate_error`. | `5 s timeout` | active | since `0.1.0` |
+| `route.navigate-ordering` | After an accepted `navigate` the kernel runs `syncRoute()`. If that publishes, the call resolves only after the bus has the route record. If the bus is down, it resolves at once. |  | active | since `0.1.0` |
+| `route.link-hrefs` | The host rewrites every same-origin `href` in an isolate's tree to its resolved absolute URL, on render and on every patch that changes it. |  | active | since `0.1.0` |
+| `route.link-clicks` | A plain primary-button click on a same-origin link is prevented and sent to `onNavigate`, with no `navigate` grant needed. The browser handles it when a modifier key is held, for another button, for a `target` other than `_self`, for `download`, and for cross-origin links. |  | active | since `0.1.0` |
+| `route.no-back-go` | There's no `back()` or `go(n)` for isolates. |  | rejected |  |
+| `route.no-history-patching` | The kernel doesn't detect host navigations by patching `history.pushState` or through the Navigation API. |  | rejected |  |
+
+### `route.host-owns-url`
+
+- **Code:** `packages/host/src/router/router.ts`
+- **Related:** `route.sync-route`
+- **Why:** Workers have no `history`, and only one party can own the address bar without conflicts.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Ownership and configuration](../adr/0002-host-owns-routing.md#ownership-and-configuration) · Workers have no `history`, and only one party can own the address bar without conflicts.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.routing-switch`
+
+- **Change it:** `KernelConfig.routing`
+- **Errors and events:** `routing_disabled`
+- **Code:** `packages/host/src/router/router.ts`, `packages/host/src/kernel/kernel.ts`
+- **Why:** Static pages, widgets embedded in another app and headless setups must keep Isoloop away from the URL.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Ownership and configuration](../adr/0002-host-owns-routing.md#ownership-and-configuration) · Static pages, widgets embedded in another app and headless setups must keep Isoloop away from the URL.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.base-path`
+
+- **Change it:** `KernelConfig.basePath`
+- **Code:** `packages/host/src/router/router.ts`
+- **Related:** `route.base-path-warning`, `route.resolver`
+- **Why:** Isolates written against app-relative paths keep working when the mount point moves.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Ownership and configuration](../adr/0002-host-owns-routing.md#ownership-and-configuration) · Isolates written against app-relative paths keep working when the mount point moves.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.base-path-warning`
+
+- **Code:** `packages/host/src/router/router.ts`
+- **Related:** `route.base-path`
+- **Why:** A URL outside the base is the usual symptom of a `basePath` that doesn't match the router's `basename`.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Ownership and configuration](../adr/0002-host-owns-routing.md#ownership-and-configuration) · A URL outside the base is the usual symptom of a `basePath` that doesn't match the router's `basename`.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.route-topic`
+
+- **Code:** `packages/protocol/src/topics/route.ts`, `packages/host/src/router/router.ts`
+- **Related:** `route.publish-points`, `route.state-dropped`
+- **Why:** Isolates need to read the current route without owning the URL.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Route topic](../adr/0002-host-owns-routing.md#route-topic) · Isolates need to read the current route without owning the URL.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.state-dropped`
+
+- **Errors and events:** `route:state_dropped`
+- **Code:** `packages/host/src/router/router.ts`
+- **Why:** A host whose `history.state` is too large loses the state on the topic, not the route.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Route topic](../adr/0002-host-owns-routing.md#route-topic) · A host whose `history.state` is too large loses the state on the topic, not the route.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.publish-points`
+
+- **Code:** `packages/host/src/router/router.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `route.sync-route`
+- **Why:** The URL is the source of truth, so the topic is republished from it rather than kept on disk.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Route topic](../adr/0002-host-owns-routing.md#route-topic) · The URL is the source of truth, so the topic is republished from it rather than kept on disk.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.opt-in-subscribe`
+
+- **Related:** `route.route-topic`
+- **Why:** Many isolates don't care about the route and shouldn't pay for it.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Route topic](../adr/0002-host-owns-routing.md#route-topic) · Many isolates don't care about the route and shouldn't pay for it.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.sync-route`
+
+- **Change it:** `kernel.syncRoute()`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `route.no-history-patching`
+- **Why:** `history.pushState` fires no event, so the kernel can't see a router's navigations on its own.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Route topic](../adr/0002-host-owns-routing.md#route-topic) · `history.pushState` fires no event, so the kernel can't see a router's navigations on its own.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.reserved-namespace`
+
+- **Errors and events:** `forbidden`
+- **Code:** `packages/bus/src/server/server.ts`, `packages/host/src/kernel/kernel.ts`
+- **Why:** The route topic must come from the kernel alone, or an isolate could fake a navigation.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Reserved namespace](../adr/0002-host-owns-routing.md#reserved-namespace) · The route topic must come from the kernel alone, or an isolate could fake a navigation.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.navigate-grant`
+
+- **Change it:** manifest `grants.navigate`
+- **Errors and events:** `forbidden`
+- **Code:** `packages/host/src/kernel/kernel.ts`, `packages/runtime/src/isolate/host-calls.ts`
+- **Why:** Programmatic navigation is a capability like publishing: off unless the manifest grants it.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Navigation from isolates](../adr/0002-host-owns-routing.md#navigation-from-isolates) · Programmatic navigation is a capability like publishing: off unless the manifest grants it.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.resolver`
+
+- **Errors and events:** `cross_origin`
+- **Code:** `packages/host/src/router/router.ts`
+- **Related:** `route.base-path`, `route.link-clicks`
+- **Why:** Isolates can't send the tab to another origin; only a user's click on a rendered link can.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Navigation from isolates](../adr/0002-host-owns-routing.md#navigation-from-isolates) · Isolates can't send the tab to another origin; only a user's click on a rendered link can.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.on-navigate`
+
+- **Change it:** `KernelConfig.onNavigate`
+- **Code:** `packages/host/src/router/router.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `route.navigate-result`
+- **Why:** The host keeps its veto and its router's guards.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Navigation from isolates](../adr/0002-host-owns-routing.md#navigation-from-isolates) · The host keeps its veto and its router's guards.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.navigate-result`
+
+- **Errors and events:** `navigate_failed`, `route:navigate_error`, `timeout`
+- **Code:** `packages/host/src/router/router.ts`, `packages/host/src/kernel/kernel.ts`
+- **Why:** A refusal and a host bug have to be told apart.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Navigation from isolates](../adr/0002-host-owns-routing.md#navigation-from-isolates) · A refusal and a host bug have to be told apart.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.navigate-ordering`
+
+- **Code:** `packages/host/src/router/router.ts`
+- **Why:** Code that awaits `navigate` can rely on the route being in the log, at least with routers that change the URL synchronously.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Navigation from isolates](../adr/0002-host-owns-routing.md#navigation-from-isolates) · Code that awaits `navigate` can rely on the route being in the log, at least with routers that change the URL synchronously.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.link-hrefs`
+
+- **Code:** `packages/host/src/render/isoloop-dom.ts`
+- **Related:** `route.resolver`
+- **Why:** Hover, copy-link, Ctrl-click and middle-click use the same URL as a plain click.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Links](../adr/0002-host-owns-routing.md#links) · Hover, copy-link, Ctrl-click and middle-click use the same URL as a plain click.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.link-clicks`
+
+- **Code:** `packages/host/src/router/router.ts`
+- **Related:** `route.navigate-grant`
+- **Why:** It's a real user click on the host DOM, which an isolate can't fake.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0002 · Links](../adr/0002-host-owns-routing.md#links) · It's a real user click on the host DOM, which an isolate can't fake.
+- 2026-11-05 · built · [#46](https://github.com/isoloop/isoloop/issues/46) · The route topic, navigate and links were built in M2 task 10.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `route.no-back-go`
+
+History:
+
+- 2026-11-04 · rejected · [ADR 0002 · Navigation from isolates](../adr/0002-host-owns-routing.md#navigation-from-isolates) · Why can't an isolate go back? `go` can't be vetoed beforehand, gives no result and may leave the app; isolates navigate to an explicit href instead.
+
+### `route.no-history-patching`
+
+- **Related:** `route.sync-route`
+
+History:
+
+- 2026-11-04 · rejected · [ADR 0002 · Alternatives considered](../adr/0002-host-owns-routing.md#alternatives-considered) · Why must the host call `syncRoute()`? Patching `pushState` clashes with other libraries, and the Navigation API isn't in every browser Isoloop targets.
 
 ## Rendering
 

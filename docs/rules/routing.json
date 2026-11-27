@@ -1,1 +1,515 @@
-[]
+[
+  {
+    "id": "route.host-owns-url",
+    "statement": "The host app owns the URL and its router. Isoloop ships no router.",
+    "status": "active",
+    "code": ["packages/host/src/router/router.ts"],
+    "since": "0.1.0",
+    "related": ["route.sync-route"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#ownership-and-configuration",
+        "why": "Workers have no `history`, and only one party can own the address bar without conflicts."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.routing-switch",
+    "statement": "With `KernelConfig.routing: false` the kernel adds no listeners, never publishes the route topic, ignores `syncRoute()`, rejects `navigate()` with `routing_disabled` and leaves link clicks to the browser.",
+    "status": "active",
+    "values": ["default: true"],
+    "knob": "`KernelConfig.routing`",
+    "errors": ["routing_disabled"],
+    "code": ["packages/host/src/router/router.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#ownership-and-configuration",
+        "why": "Static pages, widgets embedded in another app and headless setups must keep Isoloop away from the URL."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.base-path",
+    "statement": "`KernelConfig.basePath` is the app's mount point, normalised to start and end with `/`. It must match the host router's `basename`.",
+    "status": "active",
+    "values": ["default: '/'"],
+    "knob": "`KernelConfig.basePath`",
+    "code": ["packages/host/src/router/router.ts"],
+    "since": "0.1.0",
+    "related": ["route.base-path-warning", "route.resolver"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#ownership-and-configuration",
+        "why": "Isolates written against app-relative paths keep working when the mount point moves."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.base-path-warning",
+    "statement": "In dev builds the kernel warns once when `syncRoute()` sees a URL outside `basePath` while isolates are subscribed to the route.",
+    "status": "active",
+    "values": ["once", "dev only"],
+    "code": ["packages/host/src/router/router.ts"],
+    "since": "0.1.0",
+    "related": ["route.base-path"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#ownership-and-configuration",
+        "why": "A URL outside the base is the usual symptom of a `basePath` that doesn't match the router's `basename`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.route-topic",
+    "statement": "The kernel publishes the current location to the compacted system topic `isoloop.route.v1` (`routeTopic`), key `\"current\"`, as `{ href, pathname, path, search, hash, state }`. `path` is relative to `basePath`, or `null` outside it.",
+    "status": "active",
+    "values": ["key: \"current\"", "compacted", "memory only"],
+    "code": ["packages/protocol/src/topics/route.ts", "packages/host/src/router/router.ts"],
+    "since": "0.1.0",
+    "related": ["route.publish-points", "route.state-dropped"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#route-topic",
+        "why": "Isolates need to read the current route without owning the URL."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.state-dropped",
+    "statement": "When a route record would exceed the bus size limit, the kernel publishes it with `state: null` and emits `route:state_dropped { bytes }`.",
+    "status": "active",
+    "errors": ["route:state_dropped"],
+    "code": ["packages/host/src/router/router.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#route-topic",
+        "why": "A host whose `history.state` is too large loses the state on the topic, not the route."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.publish-points",
+    "statement": "The kernel publishes the route on start, on `popstate` and `hashchange`, on `kernel.syncRoute()`, after an accepted `navigate` and after a bus restart. It skips a publish when `href` and `state` haven't changed.",
+    "status": "active",
+    "code": ["packages/host/src/router/router.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["route.sync-route"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#route-topic",
+        "why": "The URL is the source of truth, so the topic is republished from it rather than kept on disk."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.opt-in-subscribe",
+    "statement": "Nothing subscribes to the route on an isolate's behalf. An isolate that doesn't subscribe gets no route records and isn't woken from suspension by navigation.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["route.route-topic"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#route-topic",
+        "why": "Many isolates don't care about the route and shouldn't pay for it."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.sync-route",
+    "statement": "Navigations the host's router makes itself reach the route topic only through `kernel.syncRoute()`, which reads `location` and `history.state` and publishes if something changed.",
+    "status": "active",
+    "knob": "`kernel.syncRoute()`",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["route.no-history-patching"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#route-topic",
+        "why": "`history.pushState` fires no event, so the kernel can't see a router's navigations on its own."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.reserved-namespace",
+    "statement": "Topics under `isoloop.*` are system topics: every isolate may subscribe to them without a grant, and only the kernel publishes them. An isolate's publish is `forbidden` even with a matching grant, and `kernel.publish` from host code rejects too.",
+    "status": "active",
+    "errors": ["forbidden"],
+    "code": ["packages/bus/src/server/server.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#reserved-namespace",
+        "why": "The route topic must come from the kernel alone, or an isolate could fake a navigation."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.navigate-grant",
+    "statement": "`ctx.host.navigate()` needs `grants.navigate: true` in the manifest, or it rejects with `forbidden`. The runtime rejects locally and the kernel checks again.",
+    "status": "active",
+    "values": ["default: false"],
+    "knob": "manifest `grants.navigate`",
+    "errors": ["forbidden"],
+    "code": ["packages/host/src/kernel/kernel.ts", "packages/runtime/src/isolate/host-calls.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#navigation-from-isolates",
+        "why": "Programmatic navigation is a capability like publishing: off unless the manifest grants it."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.resolver",
+    "statement": "One resolver serves `navigate` and links. An href starting with `/` resolves against `basePath`; `#x` and relative hrefs resolve against the document URL; a full same-origin URL escapes the base. A cross-origin result rejects with `cross_origin`.",
+    "status": "active",
+    "errors": ["cross_origin"],
+    "code": ["packages/host/src/router/router.ts"],
+    "since": "0.1.0",
+    "related": ["route.base-path", "route.link-clicks"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#navigation-from-isolates",
+        "why": "Isolates can't send the tab to another origin; only a user's click on a rendered link can."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.on-navigate",
+    "statement": "The kernel calls the host's `onNavigate(req)` with `{ href, replace, state?, from }`, where `href` is absolute and `from` is the calling isolate. The default calls `history.pushState` or `replaceState`.",
+    "status": "active",
+    "knob": "`KernelConfig.onNavigate`",
+    "code": ["packages/host/src/router/router.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["route.navigate-result"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#navigation-from-isolates",
+        "why": "The host keeps its veto and its router's guards."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.navigate-result",
+    "statement": "`navigate` resolves with what `onNavigate` returns: `true` (accepted) or `false` (refused), within the 5 s host-call timeout. If `onNavigate` throws, the call rejects with `navigate_failed` and the kernel emits `route:navigate_error`.",
+    "status": "active",
+    "values": ["5 s timeout"],
+    "errors": ["navigate_failed", "route:navigate_error", "timeout"],
+    "code": ["packages/host/src/router/router.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#navigation-from-isolates",
+        "why": "A refusal and a host bug have to be told apart."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.navigate-ordering",
+    "statement": "After an accepted `navigate` the kernel runs `syncRoute()`. If that publishes, the call resolves only after the bus has the route record. If the bus is down, it resolves at once.",
+    "status": "active",
+    "code": ["packages/host/src/router/router.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#navigation-from-isolates",
+        "why": "Code that awaits `navigate` can rely on the route being in the log, at least with routers that change the URL synchronously."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.link-hrefs",
+    "statement": "The host rewrites every same-origin `href` in an isolate's tree to its resolved absolute URL, on render and on every patch that changes it.",
+    "status": "active",
+    "code": ["packages/host/src/render/isoloop-dom.ts"],
+    "since": "0.1.0",
+    "related": ["route.resolver"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#links",
+        "why": "Hover, copy-link, Ctrl-click and middle-click use the same URL as a plain click."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.link-clicks",
+    "statement": "A plain primary-button click on a same-origin link is prevented and sent to `onNavigate`, with no `navigate` grant needed. The browser handles it when a modifier key is held, for another button, for a `target` other than `_self`, for `download`, and for cross-origin links.",
+    "status": "active",
+    "code": ["packages/host/src/router/router.ts"],
+    "since": "0.1.0",
+    "related": ["route.navigate-grant"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0002#links",
+        "why": "It's a real user click on the host DOM, which an isolate can't fake."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#46",
+        "why": "The route topic, navigate and links were built in M2 task 10."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "route.no-back-go",
+    "statement": "There's no `back()` or `go(n)` for isolates.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-04",
+        "ref": "adr/0002#navigation-from-isolates",
+        "why": "Why can't an isolate go back? `go` can't be vetoed beforehand, gives no result and may leave the app; isolates navigate to an explicit href instead."
+      }
+    ]
+  },
+  {
+    "id": "route.no-history-patching",
+    "statement": "The kernel doesn't detect host navigations by patching `history.pushState` or through the Navigation API.",
+    "status": "rejected",
+    "related": ["route.sync-route"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-04",
+        "ref": "adr/0002#alternatives-considered",
+        "why": "Why must the host call `syncRoute()`? Patching `pushState` clashes with other libraries, and the Navigation API isn't in every browser Isoloop targets."
+      }
+    ]
+  }
+]
