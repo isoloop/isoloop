@@ -153,7 +153,7 @@ export interface BusClient {
    */
   commit(record: TypedRecord<unknown>): void;
   /**
-   * A watcher skips values; use `useTopic` or `subscribe` to get every record.
+   * A watcher skips values; use `subscribe` to get every record.
    *
    * Reads a topic's current value per key, not its stream: `onView` gets a
    * snapshot first, the newest retained value of each key it watches, then

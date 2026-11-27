@@ -90,7 +90,7 @@ export default defineIsolate({
 - **`earliest`:** the oldest record the topic still retains.
 - **`committed`:** the record after the last one this isolate settled on the topic. With no commit yet, it starts at `earliest`.
 
-An isolate's place is kept under its id, so it survives the isolate's restarts. Each isolate has one subscription per topic: subscribing again replaces the first. With the kernel's `dev: true`, the bus warns in the console when that happens. In the React and Preact adapters, every `useTopic` on a topic shares one subscription, so several components can read it.
+An isolate's place is kept under its id, so it survives the isolate's restarts. Each isolate has one subscription per topic: subscribing again replaces the first. With the kernel's `dev: true`, the bus warns in the console when that happens. In the React and Preact adapters, every `useTopic` on a topic shares one subscription, so several components can read it. To show only the current value per key, a [watcher](watchers.md) reads a topic without its stream.
 
 ### Handlers and commits
 
@@ -367,3 +367,4 @@ If the new bus crashes while it loads, or within 2 s of becoming ready, twice in
 - [The inspection feed](inspection.md): per-subscription lag and the records on a topic, live.
 - [Worker pools](pools.md): how a pool's members resubscribe after a crash.
 - [Contracts and grants](contracts.md): declaring topics, their schemas and who may publish.
+- [Watchers](watchers.md): the current value per key, for widgets that show the latest state.

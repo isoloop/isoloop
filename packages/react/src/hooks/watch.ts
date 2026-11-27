@@ -24,7 +24,7 @@ export type UseWatchOptions = {
 const EMPTY: ReadonlyMap<string | null, unknown> = new Map<string | null, unknown>();
 
 /**
- * A watcher skips values; use `useTopic` or `subscribe` to get every record.
+ * A watcher skips values; use `subscribe` to get every record.
  *
  * The current value per key of `topic`, as a map from key to value. Records with no key
  * share the key `null`. It starts with the newest retained value of each key, then follows
@@ -45,7 +45,7 @@ const EMPTY: ReadonlyMap<string | null, unknown> = new Map<string | null, unknow
  */
 export function useWatch<Out>(topic: TopicRef<any, Out, any, any>): ReadonlyMap<string | null, Out>;
 /**
- * A watcher skips values; use `useTopic` or `subscribe` to get every record.
+ * A watcher skips values; use `subscribe` to get every record.
  *
  * The current value of one key of `topic`. It starts with the newest retained value of the
  * key, then follows it; when several values arrive between two renders, only the newest is
