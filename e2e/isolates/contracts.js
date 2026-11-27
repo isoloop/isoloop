@@ -46,7 +46,29 @@ export const pooled = {
   retention: { kind: 'last-n', n: 10_000 },
 };
 
-const topics = [notes, headless, saved, feed, pooled];
+/** Keyed numbers for the watchers suite (M8 Watchers W1), in memory. */
+export const watched = {
+  name: 'watched.v1',
+  schema: schema((v) => typeof v === 'number'),
+  retention: { kind: 'last-n', n: 40 },
+};
+
+/** The same, persistent: it comes back from disk after a bus restart. */
+export const watchedSaved = {
+  name: 'watched-saved.v1',
+  schema: schema((v) => typeof v === 'number'),
+  retention: { kind: 'last-n', n: 40 },
+  durability: 'persistent',
+};
+
+/** What the watcher isolate reports: its instance, the topic, and its view. */
+export const watchView = {
+  name: 'watch-view.v1',
+  schema: schema((v) => typeof v === 'object' && v !== null),
+  retention: { kind: 'last-n', n: 10_000 },
+};
+
+const topics = [notes, headless, saved, feed, pooled, watched, watchedSaved, watchView];
 
 export default {
   '~isoloop': 'contracts',
