@@ -72,7 +72,427 @@ No rules yet.
 
 Reading the current value per key, beside a stream. Prefix `watch`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `watch.current-value` | A watcher gets the current value per key, never the stream: a snapshot when it starts, then only the keys that changed. When several values arrive for a key between two views, only the newest is sent. |  | decided, experimental | target `0.2.0` |
+| `watch.use-topic-unchanged` | `useTopic` stays a stream with the same options and result; `useWatch` sits beside it, with no break and no codemod. |  | decided | target `0.2.0` |
+| `watch.null-key` | Records with no key share one key, `null`. On a topic without keys, that key holds the newest value. |  | decided, experimental | target `0.2.0` |
+| `watch.key-clears` | A key leaves the view when retention removes its newest record. On a compacted topic a key's newest record stays, so its key stays. On a quiet bus a watcher holds the same value per key as a stream reader that started from `earliest`. |  | decided, experimental | target `0.2.0` |
+| `watch.values-not-frozen` | A watcher's values go through the same codec and checks as a delivered record, and aren't frozen; treat them as read-only. |  | decided, experimental | target `0.2.0` |
+| `watch.bus-watch` | `ctx.bus.watch(topic, onView, { keys? })` calls `onView(view, changed)` with the whole map and the keys added, updated or cleared, and returns `unwatch()`. It has no `from`, no group, no `onGap` and nothing to commit. |  | decided, experimental | target `0.2.0` |
+| `watch.use-watch` | `useWatch(topic)` returns the map of current values, empty before the first view; `useWatch(topic, { key })` returns that key's value or `undefined`. It reads through the same external store as `useTopic`, so concurrent renders never tear. |  | decided, experimental | target `0.2.0` |
+| `watch.use-watch-shared` | Components that call `useWatch` on one topic and one key, or all with no key, share one watch entry, so a component that mounts later renders the current view at once. |  | decided, experimental | target `0.2.0` |
+| `watch.skips-values-docs` | The first line of the TSDoc of `bus.watch` and `useWatch` says a watcher skips values, and the guide opens by sending code that needs history, sums or counts to `subscribe`. |  | decided, experimental | target `0.2.0` |
+| `watch.subscribe-grant` | A watch needs the subscribe grant for its topic; a refused watch fails the way a refused `subscribe` does. |  | decided, experimental | target `0.2.0` |
+| `watch.many-watches` | An isolate may have any number of watches on a topic; the client runs them over one bus watch per topic per port, with the union of their keys, and each `onView` gets only its own keys. Watches and subscriptions on a topic are independent. |  | decided, experimental | target `0.2.0` |
+| `watch.wide-watch-warning` | With the kernel's `dev: true`, the bus warns once in the console when an unfiltered watch holds more than 1,000 keys. | `1,000 keys` | decided, experimental | target `0.2.0` |
+| `watch.wire-messages` | Watches add `watch`, `view` and `unwatch` messages and a `seen` field on `commits` to the bus port. `PROTOCOL` stays `{ v: 1, min: 1 }`. |  | decided, experimental | target `0.2.0` |
+| `watch.new-watch-drops-seen` | Before it sends a new `watch` on a topic, the client drops that topic's unsent `seen`, and the bus ignores a `seen` above the last view number it sent. |  | decided, experimental | target `0.2.0` |
+| `watch.replaced-watch-views` | A view that arrives while a newer `watch` on its topic is still unanswered belongs to the replaced watch: its values are applied, but it gets no `seen`. |  | decided, experimental | target `0.2.0` |
+| `watch.no-work-on-append` | An append doesn't touch any watch's state; the bus only notes that the topic has news for watches with no view in flight. |  | decided, experimental | target `0.2.0` |
+| `watch.view-built-when-sent` | The bus builds a view when it sends it, reading the log from the watch's last sent offset to the tail and keeping the newest record per watched key. |  | decided, experimental | target `0.2.0` |
+| `watch.version-pointers` | For each watch, the bus keeps the version it last sent per key as pointers into the log, with no copied values. They decide clears and reattach. |  | decided, experimental | target `0.2.0` |
+| `watch.one-view-in-flight` | At most one view is in flight per watch: the bus sends the next only after the `seen` for the last. | `1 view in flight` | decided, experimental | target `0.2.0` |
+| `watch.snapshot-parts` | A watch's first view carries every key it asked for, in parts of at most 512 values sent back to back; every part but the last carries `more`, and `onView` runs once after the last. | `512 values per part` | decided, experimental | target `0.2.0` |
+| `watch.snapshot-grace` | The bus drops a topic's snapshot map 5 s after its last watch leaves, so a remount or a reattach within that time doesn't read the log again. | `5 s` | decided, experimental | target `0.2.0` |
+| `watch.fixed-constants` | The watch constants are fixed and internal: one view in flight, 512 values per part, 5 s of grace and 1,000 keys for the warning. There is no `KernelConfig.bus` setting for them. |  | decided, experimental | target `0.2.0` |
+| `watch.settled` | A view is settled when its consumer is done with it: when `onView` returns or its promise settles, or for `useWatch` after the render commits. A view several local watches share is settled when all of them are. |  | decided, experimental | target `0.2.0` |
+| `watch.burst-rule` | A view that arrives less than one commit interval after the previous one gets its `seen` at once; any other view's `seen` rides on the next `commits`, or on a `commits` of its own when none goes out within one interval. |  | decided, experimental | target `0.2.0` |
+| `watch.reattach-have` | After a bus restart, isolates and the host send `watch` again with the versions they hold, and the new bus sends only the keys that differ and clears the rest. For a memory topic it ignores those versions and sends a full snapshot, which resets the view. |  | decided, experimental | target `0.2.0` |
+| `watch.wake-from-scratch` | A woken isolate watches from scratch and gets a full snapshot. A changed key on a watched topic wakes a suspended headless isolate, as a subscription does. |  | decided, experimental | target `0.2.0` |
+| `watch.metrics-rows` | The bus metrics have a row per watched topic: the number of watches, live keys, the transport, and totals since the bus worker started of the records on the topic and the values sent to watchers. The devtools show the ratio in words, such as "showed 1 of every 40 records on the topic". |  | decided, experimental | target `0.2.0` |
+| `watch.needs-new-host` | An isolate that uses watches needs a host of the same minor; an older host fails it at start, and there is no fallback over `subscribe`. |  | decided, experimental | target `0.2.0` |
+| `watch.kernel-watch` | `kernel.watch(topic, onView, { keys? })` on the host has the same signature as `ctx.bus.watch`, needs no grant, throws without contracts, and settles a view when `onView` returns. |  | decided, experimental | target `0.2.0` |
+| `watch.host-shares` | The host's watches on a topic share one bus watch, run the same watch code as isolates, and are counted in the same watcher rows with no label of their own. |  | decided, experimental | target `0.2.0` |
+| `watch.w2-pools-wake` | W2 gives a pool one watch per worker, with values handed to its members read-only, and wakes isolates from a snapshot without replay. |  | proposed, experimental | target `0.3.0` |
+| `watch.w3-shared-slots` | W3 adds one `SharedArrayBuffer` per topic, written by the bus worker under a sequence lock, with a message fallback when the page isn't cross-origin isolated. |  | proposed, experimental | target `0.4.0` |
+| `watch.use-topic-not-watcher` | `useTopic` doesn't become a watcher. |  | rejected |  |
+| `watch.no-seen-message` | `seen` doesn't always travel on its own message. |  | rejected |  |
+| `watch.no-slots-on-append` | Watches aren't updated on every append. |  | rejected |  |
+| `watch.key-kept-after-retention` | A key doesn't keep its last value after retention removes its record. |  | rejected |  |
+
+### `watch.current-value`
+
+- **Code:** `packages/bus/src/broker/watch.ts`
+- **Related:** `watch.use-topic-unchanged`, `watch.key-clears`, `watch.bus-watch`
+- **Why:** Most widgets show the current value, and with `useTopic` every record still crosses to the isolate and is committed, including the ones no render shows.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · Semantics](../adr/0023-watchers.md#semantics) · Most widgets show the current value, and with `useTopic` every record still crosses to the isolate and is committed, including the ones no render shows.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.use-topic-unchanged`
+
+- **Related:** `watch.use-watch`, `watch.use-topic-not-watcher`
+- **Why:** Moving `useTopic` onto a watcher is decided when watchers go stable, not on `@experimental` machinery.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · Semantics](../adr/0023-watchers.md#semantics) · Moving `useTopic` onto a watcher is decided when watchers go stable, not on `@experimental` machinery.
+- 2026-11-27 · built · [#480](https://github.com/isoloop/isoloop/issues/480) · useWatch beside useTopic.
+
+### `watch.null-key`
+
+- **Code:** `packages/bus/src/broker/watch.ts`
+- **Related:** `watch.current-value`
+- **Why:** It gives a topic without keys what `useTopic` gives today.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · Semantics](../adr/0023-watchers.md#semantics) · It gives a topic without keys what `useTopic` gives today.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.key-clears`
+
+- **Code:** `packages/bus/src/broker/watch.ts`
+- **Related:** `watch.key-kept-after-retention`, `watch.version-pointers`
+- **Why:** Keeping a key after retention removed it would show values a replay can't, and the equivalence with a replay would need exceptions.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · Semantics](../adr/0023-watchers.md#semantics) · Keeping a key after retention removed it would show values a replay can't, and the equivalence with a replay would need exceptions.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+- 2026-11-27 · built · [#486](https://github.com/isoloop/isoloop/issues/486) · The equivalence property across retention, restarts and wakes.
+
+### `watch.values-not-frozen`
+
+- **Related:** `watch.current-value`
+- **Why:** Freezing costs time on every value.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · Semantics](../adr/0023-watchers.md#semantics) · Freezing costs time on every value.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.bus-watch`
+
+- **Code:** `packages/runtime/src/bus/bus-client.ts`, `packages/protocol/src/topics/watches.ts`
+- **Related:** `watch.current-value`, `watch.kernel-watch`, `watch.many-watches`
+- **Why:** A watcher starts from a snapshot, never joins a consumer group and has nothing to commit.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · The API](../adr/0023-watchers.md#the-api) · A watcher starts from a snapshot, never joins a consumer group and has nothing to commit.
+- 2026-11-27 · built · [#478](https://github.com/isoloop/isoloop/issues/478) · ctx.bus.watch, the current value per key.
+
+### `watch.use-watch`
+
+- **Code:** `packages/react/src/hooks/watch.ts`, `packages/preact/src/hooks/shared-topic.ts`
+- **Related:** `watch.use-watch-shared`, `watch.use-topic-unchanged`
+- **Why:** Every caller would need a check if the map were `undefined` before the first view.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · The API](../adr/0023-watchers.md#the-api) · React and Preact components get the current value with the same tearing guarantee as `useTopic`.
+- 2026-11-27 · amended · [ADR 0023 · The API](../adr/0023-watchers.md#the-api) · Every caller would need a check if the map were `undefined` before the first view. Before: The return value before the first view was not specified.
+- 2026-11-27 · built · [#480](https://github.com/isoloop/isoloop/issues/480) · useWatch in React and Preact.
+
+### `watch.use-watch-shared`
+
+- **Code:** `packages/react/src/hooks/shared-topic.ts`
+- **Related:** `watch.use-watch`, `watch.many-watches`
+- **Why:** With one runtime watch per component, a later component would start empty and wait for the bus.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0023 · The API](../adr/0023-watchers.md#the-api) · With one runtime watch per component, a later component would start empty and wait for the bus.
+- 2026-11-27 · built · [#480](https://github.com/isoloop/isoloop/issues/480) · useWatch in React and Preact.
+
+### `watch.skips-values-docs`
+
+- **Related:** `watch.current-value`
+- **Why:** Code that needs every value could pick a watcher by mistake and lose values with no error.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · The API](../adr/0023-watchers.md#the-api) · Code that needs every value could pick a watcher by mistake and lose values with no error.
+- 2026-11-27 · built · [#487](https://github.com/isoloop/isoloop/issues/487) · The watchers guide.
+
+### `watch.subscribe-grant`
+
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Why:** A watcher is a reader, so no new grant is needed.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · The API](../adr/0023-watchers.md#the-api) · A watcher is a reader, so no new grant is needed.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.many-watches`
+
+- **Code:** `packages/protocol/src/topics/watches.ts`, `packages/runtime/src/bus/bus-client.ts`
+- **Related:** `watch.use-watch-shared`, `watch.host-shares`
+- **Why:** Two components on one topic both get values, which `useTopic` doesn't allow.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · The API](../adr/0023-watchers.md#the-api) · Two components on one topic both get values, which `useTopic` doesn't allow.
+- 2026-11-27 · built · [#478](https://github.com/isoloop/isoloop/issues/478) · ctx.bus.watch, the current value per key.
+
+### `watch.wide-watch-warning`
+
+- **Change it:** `KernelConfig.dev`
+- **Code:** `packages/bus/src/broker/watch.ts`
+- **Related:** `watch.fixed-constants`
+- **Why:** An unfiltered watch on a wide topic holds an entry for every retained key.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · The API](../adr/0023-watchers.md#the-api) · An unfiltered watch on a wide topic holds an entry for every retained key.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.wire-messages`
+
+- **Code:** `packages/protocol/src/messages/control.ts`
+- **Related:** `watch.snapshot-parts`
+- **Why:** Every part of a snapshot but the last carries `more: true`, so the client never needs the part size.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · On the bus port](../adr/0023-watchers.md#on-the-bus-port) · Both ends of the bus port come from one build, and the additions are new message types and an optional field.
+- 2026-11-27 · amended · [ADR 0023 · On the bus port](../adr/0023-watchers.md#on-the-bus-port) · Every part of a snapshot but the last carries `more: true`, so the client never needs the part size. Before: `view { topic, vseq, values, cleared? }`, with no marker for the last part of a snapshot.
+- 2026-11-27 · built · [#475](https://github.com/isoloop/isoloop/issues/475) · Watch, view and unwatch messages, and commits.seen.
+
+### `watch.new-watch-drops-seen`
+
+- **Code:** `packages/protocol/src/topics/watches.ts`, `packages/bus/src/broker/watch.ts`
+- **Related:** `watch.replaced-watch-views`
+- **Why:** View numbers start again at 1 with each watch, so a late `seen` from the old watch could confirm the wrong view.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0023 · On the bus port](../adr/0023-watchers.md#on-the-bus-port) · View numbers start again at 1 with each watch, so a late `seen` from the old watch could confirm the wrong view.
+- 2026-11-27 · built · [#478](https://github.com/isoloop/isoloop/issues/478) · ctx.bus.watch, the current value per key.
+
+### `watch.replaced-watch-views`
+
+- **Code:** `packages/protocol/src/topics/watches.ts`
+- **Related:** `watch.new-watch-drops-seen`
+- **Why:** Ordered delivery and a first view for every `watch` tell the views apart, with no extra field on every view.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0023 · On the bus port](../adr/0023-watchers.md#on-the-bus-port) · Ordered delivery and a first view for every `watch` tell the views apart, with no extra field on every view.
+- 2026-11-27 · built · [#478](https://github.com/isoloop/isoloop/issues/478) · ctx.bus.watch, the current value per key.
+
+### `watch.no-work-on-append`
+
+- **Code:** `packages/bus/src/broker/watch.ts`
+- **Related:** `watch.view-built-when-sent`, `watch.no-slots-on-append`
+- **Why:** The append path carries every publisher, and a watcher must not slow it.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · In the bus worker](../adr/0023-watchers.md#in-the-bus-worker) · The append path carries every publisher, and a watcher must not slow it.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.view-built-when-sent`
+
+- **Code:** `packages/bus/src/broker/watch.ts`
+- **Related:** `watch.no-work-on-append`
+- **Why:** A burst costs one read of its records, and values that arrived while a view was in flight are in that range.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · In the bus worker](../adr/0023-watchers.md#in-the-bus-worker) · A burst costs one read of its records, and values that arrived while a view was in flight are in that range.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.version-pointers`
+
+- **Code:** `packages/bus/src/broker/watch.ts`
+- **Related:** `watch.key-clears`, `watch.reattach-have`
+- **Why:** A second copy of every watched value in the bus worker would cost memory for nothing.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · In the bus worker](../adr/0023-watchers.md#in-the-bus-worker) · A second copy of every watched value in the bus worker would cost memory for nothing.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.one-view-in-flight`
+
+- **Code:** `packages/bus/src/broker/watch.ts`
+- **Related:** `watch.burst-rule`
+- **Why:** A watcher never gets values faster than it uses them.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · In the bus worker](../adr/0023-watchers.md#in-the-bus-worker) · A watcher never gets values faster than it uses them.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.snapshot-parts`
+
+- **Code:** `packages/bus/src/broker/watch.ts`
+- **Related:** `watch.wire-messages`, `watch.snapshot-grace`
+- **Why:** Marking the last part in the message means a snapshot of exactly 512 × n values needs no empty part.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · In the bus worker](../adr/0023-watchers.md#in-the-bus-worker) · The snapshot isn't paced, so a watcher starts with every key at once.
+- 2026-11-27 · amended · [ADR 0023 · In the bus worker](../adr/0023-watchers.md#in-the-bus-worker) · Marking the last part in the message means a snapshot of exactly 512 × n values needs no empty part. Before: The client knew the last part by its size: a part under 512 values ended the snapshot.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.snapshot-grace`
+
+- **Code:** `packages/bus/src/broker/watch.ts`
+- **Related:** `watch.snapshot-parts`
+- **Why:** The first watch of a topic reads the whole retained log once.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · In the bus worker](../adr/0023-watchers.md#in-the-bus-worker) · The first watch of a topic reads the whole retained log once.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.fixed-constants`
+
+- **Code:** `packages/bus/src/broker/watch.ts`
+- **Related:** `watch.one-view-in-flight`, `watch.snapshot-parts`, `watch.snapshot-grace`, `watch.wide-watch-warning`
+- **Why:** Settings are hard to remove once public, and nothing has measured a need.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · In the bus worker](../adr/0023-watchers.md#in-the-bus-worker) · Settings are hard to remove once public, and nothing has measured a need.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.settled`
+
+- **Code:** `packages/protocol/src/topics/watches.ts`, `packages/react/src/hooks/watch.ts`
+- **Related:** `watch.burst-rule`
+- **Why:** `seen` must mean the view was used, so the bus never sends faster than the reader draws.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · When seen is sent](../adr/0023-watchers.md#when-seen-is-sent) · `seen` must mean the view was used, so the bus never sends faster than the reader draws.
+- 2026-11-27 · built · [#478](https://github.com/isoloop/isoloop/issues/478) · ctx.bus.watch, the current value per key.
+- 2026-11-27 · built · [#480](https://github.com/isoloop/isoloop/issues/480) · useWatch in React and Preact.
+
+### `watch.burst-rule`
+
+- **Change it:** `KernelConfig.bus.commitIntervalMs`
+- **Code:** `packages/protocol/src/topics/watches.ts`
+- **Related:** `watch.one-view-in-flight`, `watch.no-seen-message`
+- **Why:** A port with watches and no subscriptions sent no `commits`, so its watch stalled after the first view.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · When seen is sent](../adr/0023-watchers.md#when-seen-is-sent) · A burst then follows the paint rate, and a slow topic costs one message per view, as a delivery does.
+- 2026-11-27 · amended · [ADR 0023 · When seen is sent](../adr/0023-watchers.md#when-seen-is-sent) · A port with watches and no subscriptions sent no `commits`, so its watch stalled after the first view. Before: Any other view gets its `seen` in the next `commits` the client sends.
+- 2026-11-27 · built · [#478](https://github.com/isoloop/isoloop/issues/478) · ctx.bus.watch, the current value per key.
+
+### `watch.reattach-have`
+
+- **Code:** `packages/bus/src/broker/watch.ts`, `packages/protocol/src/topics/watches.ts`
+- **Related:** `watch.version-pointers`
+- **Why:** A memory topic's offsets start again from 0 on the new bus, so a version could name a different record.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · Restart and wake](../adr/0023-watchers.md#restart-and-wake) · A persistent topic comes back from disk, so usually little changes; an empty snapshot is the reset for a lost memory topic.
+- 2026-11-27 · amended · [ADR 0023 · Restart and wake](../adr/0023-watchers.md#restart-and-wake) · A memory topic's offsets start again from 0 on the new bus, so a version could name a different record. Before: The new bus sends only the keys whose version differs from `have`, for every topic.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.wake-from-scratch`
+
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `watch.w2-pools-wake`
+- **Why:** Waking starts a new worker, so the client holds nothing; waking from a snapshot without replay is W2.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · Restart and wake](../adr/0023-watchers.md#restart-and-wake) · Waking starts a new worker, so the client holds nothing; waking from a snapshot without replay is W2.
+- 2026-11-27 · built · [#476](https://github.com/isoloop/isoloop/issues/476) · Watches in the bus worker.
+
+### `watch.metrics-rows`
+
+- **Code:** `packages/bus/src/server/server.ts`, `packages/devtools/src/index.ts`
+- **Related:** `watch.host-shares`
+- **Why:** Counting records per watched key would be work on every append, so the totals come from offsets when the metrics are read.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · Inspection](../adr/0023-watchers.md#inspection) · It makes skipping visible, so a watcher picked by mistake shows up.
+- 2026-11-27 · amended · [ADR 0023 · Inspection](../adr/0023-watchers.md#inspection) · Counting records per watched key would be work on every append, so the totals come from offsets when the metrics are read. Before: Records appended and values delivered to watchers, with the ratio "showed 1 of every 40 values".
+- 2026-11-27 · built · [#485](https://github.com/isoloop/isoloop/issues/485) · Watcher rows in the bus metrics and the devtools bus view.
+
+### `watch.needs-new-host`
+
+- **Errors and events:** `runtime-too-old`
+- **Why:** ADR 0012 already fails such an isolate before it runs, so an emulation would be dead code.
+
+History:
+
+- 2026-11-25 · decided · [ADR 0023 · Older hosts](../adr/0023-watchers.md#older-hosts) · ADR 0012 already fails such an isolate before it runs, so an emulation would be dead code.
+
+### `watch.kernel-watch`
+
+- **Code:** `packages/host/src/bus/controller.ts`
+- **Related:** `watch.bus-watch`, `watch.host-shares`
+- **Why:** The M9 shop's header on the main thread shows the cart count, and `kernel.subscribe` would bring every cart record to the main thread for one number.
+
+History:
+
+- 2026-11-26 · decided · [ADR 0023 · The host's watch (amended 2026-11-26)](../adr/0023-watchers.md#the-hosts-watch-amended-2026-11-26) · The M9 shop's header on the main thread shows the cart count, and `kernel.subscribe` would bring every cart record to the main thread for one number.
+- 2026-11-27 · built · [#481](https://github.com/isoloop/isoloop/issues/481) · kernel.watch, the current value per key from the host.
+
+### `watch.host-shares`
+
+- **Code:** `packages/protocol/src/topics/watches.ts`, `packages/host/src/bus/controller.ts`
+- **Related:** `watch.kernel-watch`, `watch.many-watches`, `watch.metrics-rows`
+- **Why:** Two copies of the watch rules could drift, so the code lives once in `@isoloop/protocol`.
+
+History:
+
+- 2026-11-26 · decided · [ADR 0023 · The host's watch (amended 2026-11-26)](../adr/0023-watchers.md#the-hosts-watch-amended-2026-11-26) · The bus doesn't tell a host watch from an isolate's, so nothing changes in the bus worker.
+- 2026-11-27 · amended · [ADR 0023 · The host's watch (amended 2026-11-26)](../adr/0023-watchers.md#the-hosts-watch-amended-2026-11-26) · Two copies of the watch rules could drift, so the code lives once in `@isoloop/protocol`. Before: Devtools count host watches in the per-topic watcher rows, with an isolate's.
+- 2026-11-27 · built · [#481](https://github.com/isoloop/isoloop/issues/481) · kernel.watch from the host.
+
+### `watch.w2-pools-wake`
+
+- **Related:** `watch.wake-from-scratch`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0023 · Not in this ADR](../adr/0023-watchers.md#not-in-this-adr) · In W1 each pool member watches on its own; W2 is grilled before 0.3.0.
+
+### `watch.w3-shared-slots`
+
+- **Related:** `watch.metrics-rows`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0023 · Not in this ADR](../adr/0023-watchers.md#not-in-this-adr) · Shared slots would remove the view messages; how they're sized is decided in an amendment before W3.
+
+### `watch.use-topic-not-watcher`
+
+- **Related:** `watch.use-topic-unchanged`
+
+History:
+
+- 2026-11-25 · rejected · [ADR 0023 · Alternatives considered](../adr/0023-watchers.md#alternatives-considered) · Why not turn `useTopic` into a watcher? A watcher hands over the current value on attach where `from: 'latest'` gives `undefined`, and a stable hook would rest on `@experimental` code. Revisited when watchers go stable.
+
+### `watch.no-seen-message`
+
+- **Related:** `watch.burst-rule`
+
+History:
+
+- 2026-11-25 · rejected · [ADR 0023 · Alternatives considered](../adr/0023-watchers.md#alternatives-considered) · Why not send `seen` on its own message? On a slow topic that's one extra message per value, the regression the plant dashboard rules out.
+
+### `watch.no-slots-on-append`
+
+- **Related:** `watch.no-work-on-append`
+
+History:
+
+- 2026-11-25 · rejected · [ADR 0023 · Alternatives considered](../adr/0023-watchers.md#alternatives-considered) · Why not keep each watch's values up to date as records land? Every publisher would pay a slot update and a mark per watching port on each append.
+
+### `watch.key-kept-after-retention`
+
+- **Related:** `watch.key-clears`
+
+History:
+
+- 2026-11-25 · rejected · [ADR 0023 · Alternatives considered](../adr/0023-watchers.md#alternatives-considered) · Why not keep the last value? The watcher would show values a replay can't.
 
 ## Versioning & releases
 
