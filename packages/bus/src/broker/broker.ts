@@ -14,9 +14,11 @@ import {
   type RequestVia,
   type SeedEvent,
   type StartPosition,
+  type WatchKey,
 } from '@isoloop/protocol';
 import type { AppendId, LogEngine, NewRecord } from '../engine/types';
 import { estimateSize } from './size';
+import { WatchBook } from './watch';
 import {
   copySeed,
   mapRecord,
@@ -233,6 +235,11 @@ type Connection = {
   /** Set when attached after a bus restart: memory topics not yet reset on this connection. */
   reset: Set<string> | undefined;
   /**
+   * Set when attached after a bus restart: memory topics not yet watched on
+   * this connection, whose `have` names records of the bus that lost them.
+   */
+  rewatch: Set<string> | undefined;
+  /**
    * A `kernel.request`'s caller (ADR 0018): not attached, answered through
    * the control port, and alive as long as the bus is.
    */
@@ -255,6 +262,11 @@ const isOffset = (x: unknown): x is number =>
 
 /** A commit's `seq`: a non-negative integer, 0 before any delivery is settled whole. */
 const isSeq = isOffset;
+
+const isWatchKey = (x: unknown): x is WatchKey => x === null || typeof x === 'string';
+
+const isHave = (x: unknown): x is [WatchKey, number] =>
+  Array.isArray(x) && x.length === 2 && isWatchKey(x[0]) && isOffset(x[1]);
 
 /** FNV-1a: a small, stable string hash for key → group member. */
 function hash(s: string): number {
@@ -328,6 +340,8 @@ export class Broker {
   #dropped = 0;
   /** Inspection taps, with the topic patterns each one matches. */
   readonly #taps = new Map<TapSink, readonly string[]>();
+  /** Watches: the current value per key, read from the log (ADR 0023). */
+  readonly #watches: WatchBook;
 
   constructor(opts: BrokerOptions) {
     this.#engine = opts.engine;
@@ -339,6 +353,12 @@ export class Broker {
     this.#durable = opts.durable ?? ((topic) => this.#engine.durable(topic));
     this.#onWake = opts.onWake ?? (() => {});
     this.#onSeed = opts.onSeed ?? (() => {});
+    this.#watches = new WatchBook({
+      engine: this.#engine,
+      seeding: (topic) => this.#topics.get(topic)?.seeding !== undefined,
+      timers: this.#timers,
+      dev: this.#dev,
+    });
     for (const def of [...(opts.systemTopics ?? SYSTEM_TOPICS), ...opts.contracts.topics]) {
       this.#engine.createTopic(topicConfig(def));
       this.#topics.set(def.name, {
@@ -588,6 +608,7 @@ export class Broker {
     const held = topic.seeding ?? [];
     topic.seeding = undefined;
     this.#drain(name, topic);
+    this.#watches.opened(name);
     for (const h of held) {
       if (this.#conns.get(h.conn.isolateId) !== h.conn) continue; // detached meanwhile
       h.reply(this.#subscribe(h.conn, name, h.from, h.group));
@@ -597,7 +618,10 @@ export class Broker {
 
   /** Retention pass over every topic (`time` and `compacted`); the bus worker runs it every second. */
   compact(): void {
-    for (const name of this.#topics.keys()) this.#engine.compact(name);
+    for (const name of this.#topics.keys()) {
+      this.#engine.compact(name);
+      this.#watches.retained(name);
+    }
   }
 
   /**
@@ -619,6 +643,7 @@ export class Broker {
       subs: new Map(),
       warned: new Set(),
       reset: opts.reattach ? new Set() : undefined,
+      rewatch: opts.reattach ? new Set() : undefined,
     };
     this.#conns.set(isolateId, conn);
     port.onMessage((msg) => {
@@ -644,6 +669,8 @@ export class Broker {
       this.#leave(sub);
     }
     conn.subs.clear();
+    // A watch wakes a suspended isolate as a subscription does (ADR 0023, point 24).
+    for (const topic of this.#watches.drop(conn)) if (opts.wake) this.#sleep(topic, isolateId);
     if (!keepOffsets) {
       for (const name of this.#topics.keys()) this.#forgotten.add(`${name}\u0000${isolateId}`);
     }
@@ -698,6 +725,7 @@ export class Broker {
       subs: new Map(),
       warned: new Set(),
       reset: undefined,
+      rewatch: undefined,
       host: true,
     };
     const req = {
@@ -804,9 +832,11 @@ export class Broker {
         return;
       }
       case 'watch':
+        reply(this.#watch(conn, msg.p.topic, msg.p.keys, msg.p.have));
+        return;
       case 'unwatch':
-        // M8 Watchers W1 task 3 replaces this placeholder
-        reply(fail('unsupported', `${msg.t} is not supported by this bus`));
+        this.#watches.unwatch(conn, msg.p.topic);
+        reply({ ok: true, value: null });
         return;
       case 'commits': {
         // Each entry stands alone (ADR 0016, decision 1): one that fails
@@ -829,6 +859,19 @@ export class Broker {
                 )
               : fail('invalid', 'each commit needs a topic, an offset and a seq');
           if (!r.ok && first.ok) first = r;
+        }
+        // `seen` settles views (ADR 0023, point 13), each entry on its own too.
+        const seen: unknown = msg.p.seen;
+        if (seen !== undefined && !Array.isArray(seen)) {
+          if (first.ok) first = fail('invalid', 'seen must be an array');
+        } else {
+          for (const e of (seen ?? []) as unknown[]) {
+            const r =
+              typeof e === 'object' && e !== null && 'topic' in e && typeof e.topic === 'string'
+                ? this.#watches.seen(conn, e.topic, 'vseq' in e ? e.vseq : undefined)
+                : fail('invalid', 'each seen needs a topic and a vseq');
+            if (!r.ok && first.ok) first = r;
+          }
         }
         reply(first);
         return;
@@ -967,6 +1010,7 @@ export class Broker {
     else p.settle({ ok: true, value: { offset } });
     this.#dropEvicted(name);
     this.#fanOut(name);
+    this.#watches.appended(name);
     this.#wake(name);
     this.#follow(name, { ...rec, offset });
     if (this.#taps.size > 0) this.#toTaps(name, { ...rec, offset }, p.bytes);
@@ -1188,6 +1232,34 @@ export class Broker {
 
   #post(conn: Connection, re: string, r: CallResult): void {
     conn.port.post({ v: 1, t: 'result', re, p: r });
+  }
+
+  // Watches (ADR 0023).
+
+  /**
+   * Starts a watch: refused without the subscribe grant, as `subscribe` is
+   * (point 10). On a connection reattached after a bus restart, the first
+   * watch of a memory topic treats `have` as naming records the old bus
+   * lost, so the snapshot sends every key again (point 23).
+   */
+  #watch(conn: Connection, name: string, keys: unknown, have: unknown): CallResult {
+    if (!isSystemTopic(name) && !matchAny(conn.grants.subscribe, name)) {
+      return fail('forbidden', `no subscribe grant for ${name}`);
+    }
+    if (!this.#topics.has(name)) return fail('unknown_topic', `unknown topic ${name}`);
+    if (keys !== undefined && !(Array.isArray(keys) && keys.every(isWatchKey))) {
+      return fail('invalid', 'keys must be an array of strings or null');
+    }
+    if (have !== undefined && !(Array.isArray(have) && have.every(isHave))) {
+      return fail('invalid', 'have must be an array of [key, version] pairs');
+    }
+    let stale = false;
+    if (conn.rewatch && !conn.rewatch.has(name) && !this.#durable(name)) {
+      conn.rewatch.add(name);
+      stale = true;
+    }
+    this.#watches.watch(conn, name, keys, have, stale);
+    return { ok: true, value: null };
   }
 
   // Subscriptions, groups and commits.

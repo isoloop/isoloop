@@ -78,8 +78,8 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 858,
-          "end_line": 883,
+          "line": 901,
+          "end_line": 926,
           "label": "forbidden, unknown_topic, too_large",
           "anchor": "const system = isSystemTopic(name);"
         }
@@ -96,8 +96,8 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 900,
-          "end_line": 931,
+          "line": 943,
+          "end_line": 974,
           "label": "validate, then drain in order",
           "anchor": "this.#enqueue(name, topic, pending, validate(topic.def.schema, value));"
         }
@@ -114,15 +114,15 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 854,
-          "end_line": 857,
+          "line": 897,
+          "end_line": 900,
           "label": "counted by error code",
           "anchor": "const settle = (r: CallResult): void => {"
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1036,
-          "end_line": 1060,
+          "line": 1080,
+          "end_line": 1104,
           "label": "invalid, not_encodable",
           "anchor": "#check(name: string, r: Validated | undefined, persistent = false): CallResult {"
         }
@@ -139,8 +139,8 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 933,
-          "end_line": 943,
+          "line": 976,
+          "end_line": 986,
           "label": "a re-send gets its old offset",
           "anchor": "#finish(name: string, topic: Topic, p: Pending): void {"
         }
@@ -156,15 +156,15 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 118,
-          "end_line": 123,
+          "line": 120,
+          "end_line": 125,
           "label": "publishes wait while seeding",
           "anchor": "queue: Pending[];"
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 586,
-          "end_line": 589,
+          "line": 606,
+          "end_line": 609,
           "label": "released when the seed ends",
           "anchor": "/** A seed ended: the topic takes its waiting publishes, then its waiting subscribes. */"
         }
@@ -181,15 +181,15 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 944,
-          "end_line": 972,
+          "line": 987,
+          "end_line": 1015,
           "label": "check, quota, append, fan out",
           "anchor": "const checked = this.#check(name, p.result, topic.def.durability === 'persistent');"
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1064,
-          "end_line": 1075,
+          "line": 1108,
+          "end_line": 1119,
           "label": "persistent: ack after flush",
           "anchor": "/** Acknowledged once its batch is on disk (ADR 0007, decision 2). */"
         }
@@ -214,8 +214,8 @@
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1454,
-          "end_line": 1464,
+          "line": 1526,
+          "end_line": 1536,
           "label": "evicted records paged in",
           "anchor": "#pump(sub: Subscription): void {"
         }
@@ -232,8 +232,8 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1432,
-          "end_line": 1476,
+          "line": 1504,
+          "end_line": 1548,
           "label": "deliver under credit",
           "anchor": "#deliver(sub: Subscription, records: BusRecord[], gap?: { from: number; to: number }): number {"
         },
@@ -256,8 +256,8 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1478,
-          "end_line": 1496,
+          "line": 1550,
+          "end_line": 1568,
           "label": "by key hash or round-robin",
           "anchor": "/** The member a record goes to: by key hash, or round-robin when keyless. */"
         }
@@ -282,8 +282,8 @@
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1330,
-          "end_line": 1346,
+          "line": 1402,
+          "end_line": 1418,
           "label": "commit per subscription",
           "anchor": "#commit("
         }
