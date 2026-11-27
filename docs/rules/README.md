@@ -30,7 +30,419 @@ No rules yet.
 
 Topic contracts, schemas, grants and versions of a topic. Prefix `con`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `con.standard-schema` | A topic takes any schema that implements Standard Schema V1, such as Zod 4, Valibot or ArkType. Isoloop depends on no schema library. |  | active | since `0.1.0` |
+| `con.schema-required` | Every topic has a schema. `unchecked<T>()` is the explicit opt-out: it accepts any value and only carries the type. |  | active | since `0.1.0` |
+| `con.reply-schema` | A topic used with `request` declares a `reply` schema. A request on a topic without one rejects. |  | active | since `0.1.0` |
+| `con.contracts-module` | The bus worker imports the module at `KernelConfig.contracts.url` and builds its topics only from that module's default export, `contracts(…)`, which rejects duplicate names. The host passes the same export as `list`. |  | active | since `0.1.0` |
+| `con.boot-check` | At start the host sends the cloneable part of each topic it was built with, and the bus fails if the module's topics differ, naming them. |  | active | since `0.1.0` |
+| `con.system-topics` | Topics named `isoloop.*` are built into the bus, and a contracts module that exports one fails. |  | active | since `0.1.0` |
+| `con.load-failures-fatal` | A contracts module that fails to load is never retried. The kernel emits `bus:failed { code }`, isolates already started fail with reason `bus-failed`, and later `spawn()` calls throw. |  | active | since `0.1.0` |
+| `con.publish-buffer-at-boot` | While the contracts module loads, the bus accepts attaches and subscriptions and holds each port's publishes, then validates them in order. Past 1,000 held publishes on a port it rejects. | `1,000 per port` | active | since `0.1.0` |
+| `con.no-hot-swap` | The contracts loaded at start stay until the page reloads. A bus restart imports the same URL again. |  | active | since `0.1.0` |
+| `con.broker-validates` | Records are validated in the broker only. Isolates and the host carry only the types, and a failed publish rejects with the issues as plain `{ message, path }` objects. |  | active | since `0.1.0` |
+| `con.stores-output` | The log stores each schema's validated output, not the published value, so subscribers get defaults and coercions applied. Publishers are typed with the schema's input, subscribers with its output. |  | active | since `0.1.0` |
+| `con.clone-check-dev` | A memory topic's validated output is checked with `structuredClone` only when `KernelConfig.dev` is set. On a persistent topic the codec rejects a value it can't encode. |  | active | since `0.1.0` |
+| `con.test-contracts` | `testContracts()` from `@isoloop/bus/testing` runs sample values through each topic's schema and checks the output. |  | active | since `0.1.0` |
+| `con.async-order` | When a schema's `validate` returns a promise, the broker awaits it but appends records in publish order per topic. |  | active | since `0.1.0` |
+| `con.validate-on-publish-only` | Records are validated on publish only. Replayed records, records read by late subscribers and records restored from disk aren't validated again. |  | active | since `0.1.0` |
+| `con.unknown-fields` | Unknown fields follow the schema library's own rule; Zod strips them by default. |  | active | since `0.1.0` |
+| `con.contracts-deploy-first` | Contracts deploy before or together with the producers that use them. |  | active | since `0.1.0` |
+| `con.reply-validated` | The broker validates every `reply()` against the topic's `reply` schema and stores nothing. An invalid reply rejects the responder's call, and the caller gets an error at once instead of waiting for its timeout. |  | active | since `0.1.0` |
+| `con.who-replies` | Only an isolate the broker delivered the request to may reply. The first valid reply wins, and later ones reject. |  | active | since `0.1.0` |
+| `con.major-in-name` | A topic's name carries its major version (`cart.items.v1`). Within a version a schema only gains optional fields; any other change is a new topic. |  | active | since `0.1.0` |
+| `con.seed` | A topic can start from an older one with `seed: { from, map }`. On the first start where the old topic has data, the new topic holds its publishes and gives its subscribers nothing until the seed completes; other topics start as usual. |  | active | since `0.1.0` |
+| `con.seed-exactly-once` | A seed copies each old record exactly once, keeping its original `ts` and `producer`, and resumes where it stopped after a crash. It runs in the tab that holds the storage lock. |  | active | since `0.1.0` |
+| `con.seed-map-sync` | A seed's `map` must be pure and synchronous; a returned promise counts as a rejected record. |  | active | since `0.1.0` |
+| `con.seed-rejects` | A record that `map` throws on, or that the new schema rejects, is skipped and reported with `bus:seed_rejected`, and stays in the old topic. When the seed ends the bus emits `bus:seeded { topic, copied, rejected }`; rejected records aren't retried. |  | active | since `0.1.0` |
+| `con.seed-follow` | With `follow: true` a seed keeps mapping new records from the old topic for as long as the contracts list both. The default is `false`. | `default false` | active | since `0.1.0` |
+| `con.orphaned-topics` | Persistent topics on disk that the contracts no longer list are kept but not opened, and reported with `bus:orphaned_topics { names, bytes }`. Nothing is deleted on its own. |  | active | since `0.1.0` |
+| `con.drop-topic` | `kernel.dropTopic(name)` deletes a topic's data. It rejects while a seed that reads from that topic hasn't completed, and needs `{ force: true }` when rejected seed records from it are recorded. |  | active | since `0.1.0` |
+| `con.contracts-export` | `isoloop contracts export` writes JSON Schema (draft 2020-12) for every topic through Standard JSON Schema, with input and output schemas when they differ and the `reply` schema. `unchecked` topics export as `{}` and are flagged. |  | active | since `0.1.0` |
+| `con.no-zod-only` | Isoloop doesn't require Zod. |  | rejected |  |
+| `con.no-json-schema-source` | JSON Schema isn't the source format for topics. |  | rejected |  |
+| `con.no-optional-schemas` | A topic can't leave its schema out. |  | rejected |  |
+| `con.no-isolate-validation` | Isolates don't validate records before they publish. |  | rejected |  |
+| `con.no-retry-contract-load` | A failed contracts load isn't retried like a bus crash. |  | rejected |  |
+| `con.no-auto-delete-orphans` | Orphaned topics aren't deleted automatically. |  | rejected |  |
+
+### `con.standard-schema`
+
+- **Code:** `packages/bus/src/contracts/topic.ts`
+- **Related:** `con.schema-required`, `con.no-zod-only`
+- **Why:** A Zod schema is code that can't be cloned to the bus worker, and tying Isoloop to one library would lock users in.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Schemas](../adr/0003-schema-format-standard-schema.md#schemas) · A Zod schema is code that can't be cloned to the bus worker, and tying Isoloop to one library would lock users in.
+- 2026-11-05 · built · [#13](https://github.com/isoloop/isoloop/issues/13) · Topic definitions and contracts.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.schema-required`
+
+- **Code:** `packages/bus/src/contracts/topic.ts`
+- **Related:** `con.standard-schema`, `con.no-optional-schemas`, `con.contracts-export`
+- **Why:** A forgotten schema would look the same as a deliberate one; with `unchecked` the choice is visible and tools can list it.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Schemas](../adr/0003-schema-format-standard-schema.md#schemas) · A forgotten schema would look the same as a deliberate one; with `unchecked` the choice is visible and tools can list it.
+- 2026-11-05 · built · [#13](https://github.com/isoloop/isoloop/issues/13) · Topic definitions and contracts.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.reply-schema`
+
+- **Errors and events:** `not_requestable`
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `con.reply-validated`
+- **Why:** Half of every request and reply pair would otherwise have no contract.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Schemas](../adr/0003-schema-format-standard-schema.md#schemas) · Half of every request and reply pair would otherwise have no contract.
+- 2026-11-05 · built · [#22](https://github.com/isoloop/isoloop/issues/22) · Consumer groups and request/response.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.contracts-module`
+
+- **Change it:** `KernelConfig.contracts`
+- **Code:** `packages/bus/src/contracts/topic.ts`, `packages/bus/src/server/server.ts`
+- **Related:** `con.boot-check`, `con.no-hot-swap`
+- **Why:** A schema is code, so the bus worker has to load the schemas itself; one module keeps host, isolates and bus on one source.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · The contracts module](../adr/0003-schema-format-standard-schema.md#the-contracts-module) · A schema is code, so the bus worker has to load the schemas itself; one module keeps host, isolates and bus on one source.
+- 2026-11-05 · built · [#13](https://github.com/isoloop/isoloop/issues/13) · Topic definitions and contracts.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.boot-check`
+
+- **Errors and events:** `contracts_mismatch`
+- **Code:** `packages/bus/src/server/server.ts`
+- **Related:** `con.contracts-module`, `con.load-failures-fatal`
+- **Why:** A host bundled against one contracts version and a URL serving another should fail at start, not at the first publish.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · The contracts module](../adr/0003-schema-format-standard-schema.md#the-contracts-module) · A host bundled against one contracts version and a URL serving another should fail at start, not at the first publish.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.system-topics`
+
+- **Errors and events:** `reserved_topic`
+- **Code:** `packages/bus/src/contracts/topic.ts`, `packages/bus/src/server/server.ts`
+- **Why:** System topics such as `isoloop.route.v1` are defined in `@isoloop/protocol`, so an app can't redefine them.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · The contracts module](../adr/0003-schema-format-standard-schema.md#the-contracts-module) · System topics such as `isoloop.route.v1` are defined in `@isoloop/protocol`, so an app can't redefine them.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.load-failures-fatal`
+
+- **Errors and events:** `contracts_failed`, `contracts_invalid`, `contracts_mismatch`, `reserved_topic`, `bus_failed`
+- **Code:** `packages/bus/src/server/server.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `con.boot-check`, `con.no-retry-contract-load`
+- **Why:** `createKernel` stays synchronous, so isolates can start before the failure is known; they fail instead of never being spawned.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · The contracts module](../adr/0003-schema-format-standard-schema.md#the-contracts-module) · These failures are deterministic, so a restart loop would only hide them.
+- 2026-11-06 · amended · [ADR 0003 · The contracts module](../adr/0003-schema-format-standard-schema.md#the-contracts-module) · `createKernel` stays synchronous, so isolates can start before the failure is known; they fail instead of never being spawned. Before: Kernel start fails, the kernel emits `bus:failed { code }`, and no isolate is spawned.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.publish-buffer-at-boot`
+
+- **Errors and events:** `bus_unavailable`
+- **Code:** `packages/bus/src/server/server.ts`
+- **Why:** The buffer is per port in the bus worker, apart from the isolate-side buffer used across a bus restart.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · The contracts module](../adr/0003-schema-format-standard-schema.md#the-contracts-module) · Isolates start in parallel with the schema library instead of waiting for it.
+- 2026-11-06 · amended · [ADR 0003 · The contracts module](../adr/0003-schema-format-standard-schema.md#the-contracts-module) · The buffer is per port in the bus worker, apart from the isolate-side buffer used across a bus restart. Before: The bus buffers publishes in the same buffer as a bus restart, and rejects past the inbox limit.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.no-hot-swap`
+
+- **Related:** `con.contracts-module`
+- **Why:** Topics would otherwise change under running isolates.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · The contracts module](../adr/0003-schema-format-standard-schema.md#the-contracts-module) · Topics would otherwise change under running isolates.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.broker-validates`
+
+- **Errors and events:** `invalid`
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `con.no-isolate-validation`, `con.validate-on-publish-only`
+- **Why:** The broker is the one authoritative place, and isolate bundles stay free of a schema library.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Validation](../adr/0003-schema-format-standard-schema.md#validation) · The broker is the one authoritative place, and isolate bundles stay free of a schema library.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.stores-output`
+
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `con.clone-check-dev`
+- **Why:** Storing the input would mean defaults and coercion never apply and subscribers see raw data.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Validation](../adr/0003-schema-format-standard-schema.md#validation) · Storing the input would mean defaults and coercion never apply and subscribers see raw data.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.clone-check-dev`
+
+- **Change it:** `KernelConfig.dev`
+- **Errors and events:** `not_encodable`
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `con.stores-output`, `con.test-contracts`
+- **Why:** The check follows the kernel's `dev` flag rather than the build.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Validation](../adr/0003-schema-format-standard-schema.md#validation) · A non-cloneable output is a bug in host code that an isolate can't trigger, so production skips the extra copy per record.
+- 2026-11-06 · amended · [ADR 0003 · Validation](../adr/0003-schema-format-standard-schema.md#validation) · The check follows the kernel's `dev` flag rather than the build. Before: For memory topics the broker checks with `structuredClone` in dev builds only.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.test-contracts`
+
+- **Code:** `packages/bus/src/testing.ts`
+- **Related:** `con.clone-check-dev`
+- **Why:** It catches a schema whose output can't be cloned before production, where the check is off.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Validation](../adr/0003-schema-format-standard-schema.md#validation) · It catches a schema whose output can't be cloned before production, where the check is off.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.async-order`
+
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Why:** A slow validation must never reorder records.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Validation](../adr/0003-schema-format-standard-schema.md#validation) · A slow validation must never reorder records.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.validate-on-publish-only`
+
+- **Related:** `con.broker-validates`, `con.major-in-name`
+- **Why:** They were validated when written, and readers must already tolerate old records.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Validation](../adr/0003-schema-format-standard-schema.md#validation) · They were validated when written, and readers must already tolerate old records.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.unknown-fields`
+
+- **Related:** `con.contracts-deploy-first`
+- **Why:** The default, not strict mode, keeps newer producers compatible with older contracts.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Validation](../adr/0003-schema-format-standard-schema.md#validation) · The default, not strict mode, keeps newer producers compatible with older contracts.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.contracts-deploy-first`
+
+- **Related:** `con.unknown-fields`
+- **Why:** A producer publishing a field the deployed contracts don't know yet would have it stripped or rejected.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Validation](../adr/0003-schema-format-standard-schema.md#validation) · A producer publishing a field the deployed contracts don't know yet would have it stripped or rejected.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.reply-validated`
+
+- **Errors and events:** `invalid`, `reply_invalid`
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `con.reply-schema`, `con.who-replies`
+- **Why:** Replies need a contract as much as requests.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Request/reply](../adr/0003-schema-format-standard-schema.md#requestreply) · Replies need a contract as much as requests.
+- 2026-11-05 · built · [#22](https://github.com/isoloop/isoloop/issues/22) · Consumer groups and request/response.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.who-replies`
+
+- **Errors and events:** `already_replied`
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `con.reply-validated`
+- **Why:** Responders can't be impersonated.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Request/reply](../adr/0003-schema-format-standard-schema.md#requestreply) · Responders can't be impersonated.
+- 2026-11-05 · built · [#22](https://github.com/isoloop/isoloop/issues/22) · Consumer groups and request/response.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.major-in-name`
+
+- **Related:** `con.seed`, `con.validate-on-publish-only`
+- **Why:** Old records are never validated again, so readers must be able to read every record a version ever stored.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Versioning and seeding](../adr/0003-schema-format-standard-schema.md#versioning-and-seeding) · Old records are never validated again, so readers must be able to read every record a version ever stored.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.seed`
+
+- **Code:** `packages/bus/src/broker/seed.ts`
+- **Related:** `con.seed-exactly-once`, `con.seed-map-sync`, `con.seed-rejects`, `con.seed-follow`, `con.major-in-name`
+- **Why:** A breaking change costs a new topic name, but the bus moves the data, and history always comes before new records.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Versioning and seeding](../adr/0003-schema-format-standard-schema.md#versioning-and-seeding) · A breaking change costs a new topic name, but the bus moves the data, and history always comes before new records.
+- 2026-11-07 · built · [#113](https://github.com/isoloop/isoloop/issues/113) · Seeding, a topic starts from an older one.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.seed-exactly-once`
+
+- **Code:** `packages/bus/src/broker/seed.ts`
+- **Related:** `con.seed`
+- **Why:** Progress is saved with the appends, so a crash never copies a record twice.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Versioning and seeding](../adr/0003-schema-format-standard-schema.md#versioning-and-seeding) · Progress is saved with the appends, so a crash never copies a record twice.
+- 2026-11-07 · built · [#114](https://github.com/isoloop/isoloop/issues/114) · Seeding exactly once, with progress saved.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.seed-map-sync`
+
+- **Errors and events:** `seed_async`
+- **Code:** `packages/bus/src/broker/seed.ts`
+- **Related:** `con.seed-rejects`
+- **Why:** Exactly-once copying needs a map that can run again with the same result.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Versioning and seeding](../adr/0003-schema-format-standard-schema.md#versioning-and-seeding) · Exactly-once copying needs a map that can run again with the same result.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.seed-rejects`
+
+- **Code:** `packages/bus/src/broker/seed.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `con.seed`, `con.drop-topic`
+- **Why:** Halting on one bad old record would leave the new topic dead on that device.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Versioning and seeding](../adr/0003-schema-format-standard-schema.md#versioning-and-seeding) · Halting on one bad old record would leave the new topic dead on that device.
+- 2026-11-07 · built · [#114](https://github.com/isoloop/isoloop/issues/114) · Rejects reported.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.seed-follow`
+
+- **Code:** `packages/bus/src/broker/seed.ts`
+- **Related:** `con.seed`
+- **Why:** Gradual rollouts have producers still publishing the old version.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Versioning and seeding](../adr/0003-schema-format-standard-schema.md#versioning-and-seeding) · Gradual rollouts have producers still publishing the old version.
+- 2026-11-07 · built · [#115](https://github.com/isoloop/isoloop/issues/115) · Follow, orphaned topics and kernel.dropTopic.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.orphaned-topics`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `con.drop-topic`, `con.no-auto-delete-orphans`
+- **Why:** Deleting them automatically would destroy data whenever the contracts URL serves the wrong version.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Versioning and seeding](../adr/0003-schema-format-standard-schema.md#versioning-and-seeding) · Deleting them automatically would destroy data whenever the contracts URL serves the wrong version.
+- 2026-11-07 · built · [#115](https://github.com/isoloop/isoloop/issues/115) · Follow, orphaned topics and kernel.dropTopic.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.drop-topic`
+
+- **Errors and events:** `seed_pending`
+- **Code:** `packages/bus/src/broker/broker.ts`, `packages/host/src/bus/controller.ts`
+- **Related:** `con.orphaned-topics`, `con.seed-rejects`
+- **Why:** Losing data a pending seed still needs is always deliberate.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Versioning and seeding](../adr/0003-schema-format-standard-schema.md#versioning-and-seeding) · Losing data a pending seed still needs is always deliberate.
+- 2026-11-07 · built · [#115](https://github.com/isoloop/isoloop/issues/115) · Follow, orphaned topics and kernel.dropTopic.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.contracts-export`
+
+- **Code:** `packages/cli/src/commands/contracts-export.ts`, `packages/bus/src/contracts/json-schema.ts`
+- **Related:** `con.schema-required`
+- **Why:** Non-JS tools want a data format, and one vendored interface avoids a converter per schema library.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0003 · Tooling](../adr/0003-schema-format-standard-schema.md#tooling) · Non-JS tools want a data format, and one vendored interface avoids a converter per schema library.
+- 2026-11-18 · built · [#245](https://github.com/isoloop/isoloop/issues/245) · The isoloop CLI with contracts export.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `con.no-zod-only`
+
+- **Related:** `con.standard-schema`
+
+History:
+
+- 2026-11-04 · rejected · [ADR 0003 · Alternatives considered](../adr/0003-schema-format-standard-schema.md#alternatives-considered) · Why not Zod only? It's the simplest, but it locks users in and offers non-JS tools nothing.
+
+### `con.no-json-schema-source`
+
+- **Related:** `con.contracts-export`
+
+History:
+
+- 2026-11-04 · rejected · [ADR 0003 · Alternatives considered](../adr/0003-schema-format-standard-schema.md#alternatives-considered) · Why not write topics in JSON Schema? TypeScript inference is weaker, and Isoloop would own a JSON Schema validator in the worker.
+
+### `con.no-optional-schemas`
+
+- **Related:** `con.schema-required`
+
+History:
+
+- 2026-11-04 · rejected · [ADR 0003 · Alternatives considered](../adr/0003-schema-format-standard-schema.md#alternatives-considered) · Why are schemas required? An optional schema means a forgotten one looks the same as a deliberate one.
+
+### `con.no-isolate-validation`
+
+- **Related:** `con.broker-validates`
+
+History:
+
+- 2026-11-04 · rejected · [ADR 0003 · Alternatives considered](../adr/0003-schema-format-standard-schema.md#alternatives-considered) · Why not validate in the isolate for an immediate error? Every isolate would bundle the schema library.
+
+### `con.no-retry-contract-load`
+
+- **Related:** `con.load-failures-fatal`
+
+History:
+
+- 2026-11-04 · rejected · [ADR 0003 · Alternatives considered](../adr/0003-schema-format-standard-schema.md#alternatives-considered) · Why not retry it? The error is deterministic, so a restart loop only hides it.
+
+### `con.no-auto-delete-orphans`
+
+- **Related:** `con.orphaned-topics`
+
+History:
+
+- 2026-11-04 · rejected · [ADR 0003 · Alternatives considered](../adr/0003-schema-format-standard-schema.md#alternatives-considered) · Why not clean them up? It would destroy data whenever the contracts URL serves the wrong version.
 
 ## Routing
 
