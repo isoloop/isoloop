@@ -44,6 +44,8 @@ Checked on the npm registry, 2026-11-04:
 | E2E | **Playwright**: Chromium, Firefox and WebKit. |
 | Benches | **Playwright** for browser benches (`bench/click-to-paint`, `bench/throughput`), run in Chromium, Firefox and WebKit. Node benches run with Vitest (`pnpm bench`). |
 
+Rules: `tool.pnpm-workspaces`, `tool.node-version`, `tool.typescript`, `tool.oxc-lint-format`, `tool.tsdown-builds`, `tool.test-runners`
+
 ### Rules
 
 1. **Tools are only called through root scripts.** CI, docs and contributors run `pnpm format`, `lint`, `typecheck`, `test`, `build`, `e2e` and `check`, never a tool binary directly. `pnpm check` runs the format check, lint, typecheck and unit tests, to run before pushing. Swapping a tool means editing one script, and CI is the conformance test that the swap changed nothing. No git hooks: CI is the only gate.
@@ -68,6 +70,8 @@ Checked on the npm registry, 2026-11-04:
 10. **No corepack.** `packageManager: "pnpm@12.16.1"` pins the version. Contributors install pnpm's standalone binary, and `pnpm self-update` maintains the pin. CI uses `pnpm/action-setup`, which reads the same field.
 11. **Editor config is committed for VS Code:** `.vscode/settings.json` (workspace TypeScript, oxc as the formatter, format on save, oxlint diagnostics) and `.vscode/extensions.json`. `CONTRIBUTING.md` has a short note for other editors.
 12. **CI runs on Ubuntu only, in four jobs.** `check` runs the format check, lint, typecheck, unit tests and build. `browser` runs Vitest browser mode on Chromium. `e2e` runs a Chromium/Firefox/WebKit matrix against the built example and uploads traces on failure. `bench` runs the browser benches in all three engines. `browser`, `e2e` and `bench` only start after `check` passes, and install browsers through one local action (`.github/actions/install-browsers`), with time limits, retries and caches. Pages deploys from `main` only.
+
+Rules: `tool.root-scripts`, `tool.no-git-hooks`, `tool.isolated-declarations`, `tool.source-condition`, `tool.dependency-rules`, `tool.lint-errors-only`, `tool.format-settings`, `tool.browser-baseline`, `tool.unsupported-browser`, `tool.exact-pins`, `tool.dependabot`, `tool.supply-chain`, `tool.no-corepack`, `tool.vscode-config`, `tool.ci-jobs`
 
 ### Pre-agreed fallback
 
@@ -107,3 +111,6 @@ Checked on the npm registry, 2026-11-04:
 - **Caret ranges and Renovate:** caret ranges let 0.x tools change behaviour without a PR. Renovate is another app to install and configure, where Dependabot is built into GitHub.
 - **Testing old browser versions (BrowserStack, Sauce Labs):** a paid external service, for a risk that the build target and the feature check mostly cover.
 - **`mitata` or another bench harness:** one more dependency, where `vitest bench` is already there.
+
+Rules: `tool.no-eslint`, `tool.no-task-runner`
+

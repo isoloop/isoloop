@@ -117,6 +117,43 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.rules-ship-patches` | A patch from a `release/0.x` branch gets its `shipped` events in that branch's version PR, and they come to `main` with the backport. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.repo-rules` | A rule with `repo: true` is about how this repo works, not the published packages. It's `active` from its `built` event, has no `since`, `target` or `shipped` event, and `rules:ship` skips it. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.rules-lines-sections` | Under an ADR's `## Decision`, a decision is a numbered `###` heading when there are any, otherwise a top-level numbered item, otherwise each `###` section. A heading that says "amended" is an amendment, and a `Rules:` line inside a code fence doesn't count. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.pnpm-workspaces` | The repo is a pnpm 12 workspace, run with plain `pnpm -r` in dependency order and no task runner on top. | `pnpm@12.16.1` | active, repo | in force since [#1](https://github.com/isoloop/isoloop/issues/1) |
+| `tool.node-version` | Development and CI run on Node 26 LTS, pinned in `.nvmrc`. | `Node 26` | active, repo | in force since [#1](https://github.com/isoloop/isoloop/issues/1) |
+| `tool.typescript` | Type checking runs `tsc --noEmit` from TypeScript 7 in every package, and editors, the checker and tsgolint use the same version. | `typescript@7.0.2` | active, repo | in force since [#1](https://github.com/isoloop/isoloop/issues/1) |
+| `tool.oxc-lint-format` | Lint is oxlint with `oxlint-tsgolint`, type-aware on every run, and formatting is oxfmt. |  | active, repo | in force since [#3](https://github.com/isoloop/isoloop/issues/3) |
+| `tool.no-eslint` | The repo doesn't use ESLint, typescript-eslint or Prettier. |  | rejected |  |
+| `tool.tsdown-builds` | Packages are built with tsdown, which writes the `.d.ts` files through `isolatedDeclarations` with no type checker in the build. Apps and the dev server use Vite 8. |  | active, repo | in force since [#1](https://github.com/isoloop/isoloop/issues/1) |
+| `tool.test-runners` | Unit and browser tests run on Vitest 5, as projects in the root config. End-to-end tests and the browser benches run on Playwright in Chromium, Firefox and WebKit. |  | active, repo | in force since [#1](https://github.com/isoloop/isoloop/issues/1) |
+| `tool.root-scripts` | Tools are only called through root scripts (`pnpm format`, `lint`, `typecheck`, `test`, `build`, `e2e`, `check`), never as a tool binary. `pnpm check` runs the format check, lint, typecheck and unit tests. |  | active, repo | in force since [#1](https://github.com/isoloop/isoloop/issues/1) |
+| `tool.no-git-hooks` | The repo has no git hooks. CI is the only gate. |  | active, repo | in force since [#1](https://github.com/isoloop/isoloop/issues/1) |
+| `tool.isolated-declarations` | Every published package compiles with `isolatedDeclarations: true`, so every export has an explicit type. Private packages and the CLI, which publishes no `.d.ts`, keep normal inference. |  | active, repo | in force since [#1](https://github.com/isoloop/isoloop/issues/1) |
+| `tool.source-condition` | Imports between packages resolve to source through the `@isoloop/source` export condition, so type checking, lint and tests need no build first. `publishConfig.exports` replaces it on publish. |  | active, repo | in force since [#1](https://github.com/isoloop/isoloop/issues/1) |
+| `tool.dependency-rules` | A package can only import what its `package.json` lists (pnpm's strict `node_modules`), oxlint `no-restricted-imports` sets the allowed imports per package, and `bus` compiles with no DOM types. |  | active, repo | in force since [#3](https://github.com/isoloop/isoloop/issues/3) |
+| `tool.lint-errors-only` | Every lint rule is an error or off; there are no warnings. The `correctness`, `suspicious` and `perf` groups and the type-aware TypeScript rules are errors, and other rules are added by name. |  | active, repo | in force since [#3](https://github.com/isoloop/isoloop/issues/3) |
+| `tool.format-settings` | oxfmt uses single quotes, semicolons, a print width of 100 and trailing commas everywhere, with defaults otherwise. | `singleQuote`, `semi`, `printWidth 100`, `trailingComma all` | active, repo | in force since [#3](https://github.com/isoloop/isoloop/issues/3) |
+| `tool.browser-baseline` | Isoloop supports Baseline "widely available" browsers, and the packages build to `es2022`. The minimums for the features it relies on are Chrome 108, Firefox 114 and Safari 16.4. | `Chrome 108`, `Firefox 114`, `Safari 16.4`, `es2022` | active | since `0.1.0` |
+| `tool.unsupported-browser` | `createKernel` checks for module workers, `MessageChannel`, adopted stylesheets and OPFS, and throws `unsupported_browser` naming whatever is missing. |  | active | since `0.1.0` |
+| `tool.exact-pins` | Every tool version is pinned exactly, with no `^`, in the pnpm `catalog:` in `pnpm-workspace.yaml`. |  | active, repo | in force since [#1](https://github.com/isoloop/isoloop/issues/1) |
+| `tool.dependabot` | Dependabot opens one grouped PR a week for npm and GitHub Actions minors and patches, with a 3-day cooldown. Majors come as separate PRs. | `weekly`, `3-day cooldown` | active, repo | in force since [#10](https://github.com/isoloop/isoloop/issues/10) |
+| `tool.supply-chain` | pnpm refuses versions younger than 3 days (`minimumReleaseAge: 4320`), lifecycle scripts stay blocked unless allow-listed by name, peers are strict, and GitHub Actions are pinned by commit SHA. | `minimumReleaseAge 4320 min`, `strictPeerDependencies` | active, repo | in force since [#1](https://github.com/isoloop/isoloop/issues/1) |
+| `tool.no-corepack` | `packageManager: "pnpm@12.16.1"` pins pnpm. Contributors install pnpm's standalone binary, and corepack isn't used. |  | active, repo | in force since [#1](https://github.com/isoloop/isoloop/issues/1) |
+| `tool.vscode-config` | VS Code settings are committed in `.vscode/`: the workspace TypeScript, oxc as the formatter, format on save and oxlint diagnostics. |  | active, repo | in force since [#3](https://github.com/isoloop/isoloop/issues/3) |
+| `tool.ci-jobs` | CI runs on Ubuntu only. The `browser`, `e2e` and `bench` jobs start only after `check` passes, and install browsers through one local action with time limits, retries and caches. |  | active, repo | in force since [#10](https://github.com/isoloop/isoloop/issues/10) |
+| `tool.no-task-runner` | The repo uses no NX, turbo or Vite+ task graph. |  | rejected |  |
+| `tool.entries-at-top` | The top of a package's `src/` holds only its entries, the files `exports`, `bin` or the build point at, and tests named after them. dom keeps its entries in its four folders. |  | active, repo | in force since [#360](https://github.com/isoloop/isoloop/issues/360) |
+| `tool.areas` | Everything else in `src/` lives in an area: one level of kebab-case folders named for a concept from the system design, never for a kind (`utils`, `helpers`, `lib`, `common`, `misc`, `types`). |  | active, repo | in force since [#360](https://github.com/isoloop/isoloop/issues/360) |
+| `tool.no-barrels` | `index.ts` is only ever an entry, a module imports the file that defines what it needs, and entries list what they export instead of `export *`. |  | active, repo | in force since [#352](https://github.com/isoloop/isoloop/issues/352) |
+| `tool.tests-next-to-code` | A test sits next to the code it tests. Files tests load by URL live in `src/__fixtures__/`, and helpers tests import live in `test/` at the package root, which holds no test files. |  | active, repo | in force since [#360](https://github.com/isoloop/isoloop/issues/360) |
+| `tool.no-relative-escape` | Shipped code never uses a relative path to leave its package; it imports other packages by name. Tests and fixtures may, to start another package's worker. |  | active, repo | in force since [#349](https://github.com/isoloop/isoloop/issues/349) |
+| `tool.moves-keep-names` | A file that moves keeps its name, and a move changes nothing in `dist` except tsdown's source-path comments. |  | active, repo | in force since [#347](https://github.com/isoloop/isoloop/issues/347) |
+| `tool.docs-paths` | History docs (ADRs, plans, posts, investigations) keep the paths of their day, living docs follow the code, and no living doc carries a folder map. |  | active, repo | in force since [#347](https://github.com/isoloop/isoloop/issues/347) |
+| `tool.esm-only` | Packages ship ESM only, one bundled file per entry plus tsdown's shared chunks. |  | active | since `0.1.0` |
+| `tool.side-effects` | Every package declares `sideEffects: false` except for its scripts (bus's worker, runtime's bootstrap and worker, the devtools panel), which are listed by both their `./src/` and `./dist/` paths. |  | active | since `0.1.0` |
+| `tool.bundle-budgets` | `bench/bundle-size` budgets each library entry's import-time code, seven app bundles and the four scripts, bundled with Vite's own `build()`. Each budget is its size at acceptance plus 5%, rounded up to the next 0.5 KB; a PR that crosses one raises it and says why. | `+5%`, `0.5 KB steps` | active, repo | in force since [#363](https://github.com/isoloop/isoloop/issues/363) |
+| `tool.layout-lint` | oxlint fails `export *` barrels, import cycles and file names that aren't kebab-case, through `oxc/no-barrel-file`, `import/no-cycle` and `unicorn/filename-case`. |  | active, repo | in force since [#349](https://github.com/isoloop/isoloop/issues/349) |
+| `tool.layout-test` | The layout test in `scripts/layout/`, run by `pnpm test`, checks the file tree: entries at the top, `index.ts` only as an entry, areas one level deep, fixtures and `test/` in their places, no relative escapes, every test in a Vitest project and every `./src/` `sideEffects` path existing. |  | active, repo | in force since [#349](https://github.com/isoloop/isoloop/issues/349) |
+| `tool.dom-imports` | `runtime` may import only `@isoloop/dom/worker`, `host` only `@isoloop/dom/host` and only in `render/isoloop-dom.ts`, `protocol`, `bus` and `codec` never import `dom`, and `dom` imports no other `@isoloop/*` package. |  | active, repo | in force since [#29](https://github.com/isoloop/isoloop/issues/29) |
+| `tool.dom-halves` | `dom`'s four source folders (`shared`, `worker`, `host`, `testing`) are each type-checked with their own tsconfig and `lib`. `worker` and `host` import `shared` but not each other. |  | active, repo | in force since [#29](https://github.com/isoloop/isoloop/issues/29) |
 
 ### `tool.rule-one-fact`
 
@@ -432,6 +469,395 @@ History:
 
 - 2026-11-27 · decided · [ADR 0026 · Clarified 2026-11-27: what counts as a decision](../adr/0026-rules-registry.md#clarified-2026-11-27-what-counts-as-a-decision) · The `Rules:` line check has to know which parts of an ADR need a line.
 - 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
+
+### `tool.pnpm-workspaces`
+
+- **Code:** `pnpm-workspace.yaml`, `package.json`
+- **Related:** `tool.no-corepack`, `tool.no-task-runner`
+- **Why:** A workspace and dependency order cover what this repo needs.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Tools](../adr/0009-toolchain.md#tools) · A workspace and dependency order cover what this repo needs.
+- 2026-11-04 · built · [#1](https://github.com/isoloop/isoloop/issues/1) · The workspace skeleton.
+
+### `tool.node-version`
+
+- **Code:** `.nvmrc`
+- **Why:** One Node version for every contributor and every CI job.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Tools](../adr/0009-toolchain.md#tools) · One Node version for every contributor and every CI job.
+- 2026-11-04 · built · [#1](https://github.com/isoloop/isoloop/issues/1) · The workspace skeleton.
+
+### `tool.typescript`
+
+- **Code:** `package.json`, `pnpm-workspace.yaml`
+- **Related:** `tool.isolated-declarations`
+- **Why:** One TypeScript version, so the checker, the editor and lint never disagree.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Tools](../adr/0009-toolchain.md#tools) · One TypeScript version, so the checker, the editor and lint never disagree.
+- 2026-11-04 · built · [#1](https://github.com/isoloop/isoloop/issues/1) · The workspace skeleton.
+
+### `tool.oxc-lint-format`
+
+- **Code:** `.oxlintrc.json`, `.oxfmtrc.json`
+- **Related:** `tool.lint-errors-only`, `tool.format-settings`, `tool.no-eslint`
+- **Why:** Fast enough to run on every save, and from the same project as the bundler.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Tools](../adr/0009-toolchain.md#tools) · Fast enough to run on every save, and from the same project as the bundler.
+- 2026-11-04 · built · [#3](https://github.com/isoloop/isoloop/issues/3) · Lint, format and dependency rules.
+
+### `tool.no-eslint`
+
+- **Related:** `tool.oxc-lint-format`
+
+History:
+
+- 2026-11-04 · rejected · [ADR 0009 · Alternatives considered](../adr/0009-toolchain.md#alternatives-considered) · Why not the usual ESLint and Prettier? They're much slower, and typescript-eslint's type-aware rules need TypeScript's JS API, which TypeScript 7 doesn't offer as stable yet.
+
+### `tool.tsdown-builds`
+
+- **Related:** `tool.isolated-declarations`
+- **Why:** tsdown runs on the same Rolldown core as Vite, and doesn't need TypeScript's JS API.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Tools](../adr/0009-toolchain.md#tools) · tsdown runs on the same Rolldown core as Vite, and doesn't need TypeScript's JS API.
+- 2026-11-04 · built · [#1](https://github.com/isoloop/isoloop/issues/1) · The workspace skeleton.
+
+### `tool.test-runners`
+
+- **Code:** `vitest.config.ts`, `playwright.config.ts`
+- **Why:** One test runner for Node and the browser, and a real browser for each engine.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Tools](../adr/0009-toolchain.md#tools) · One test runner for Node and the browser, and a real browser for each engine.
+- 2026-11-04 · built · [#1](https://github.com/isoloop/isoloop/issues/1) · The workspace skeleton.
+
+### `tool.root-scripts`
+
+- **Code:** `package.json`
+- **Related:** `tool.no-git-hooks`
+- **Why:** Swapping a tool means editing one script, and CI shows the swap changed nothing.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · Swapping a tool means editing one script, and CI shows the swap changed nothing.
+- 2026-11-04 · built · [#1](https://github.com/isoloop/isoloop/issues/1) · The workspace skeleton.
+
+### `tool.no-git-hooks`
+
+- **Related:** `tool.root-scripts`
+- **Why:** Hooks are one more dependency, slow every commit, and `--no-verify` skips them anyway.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · Hooks are one more dependency, slow every commit, and `--no-verify` skips them anyway.
+- 2026-11-04 · built · [#1](https://github.com/isoloop/isoloop/issues/1) · The workspace skeleton.
+
+### `tool.isolated-declarations`
+
+- **Code:** `tsconfig.lib.json`, `packages/cli/tsconfig.json`
+- **Related:** `tool.tsdown-builds`
+- **Why:** A body change can then never change the published `.d.ts` without a visible diff.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · A body change can then never change the published `.d.ts` without a visible diff.
+- 2026-11-04 · built · [#1](https://github.com/isoloop/isoloop/issues/1) · The workspace skeleton.
+
+### `tool.source-condition`
+
+- **Code:** `tsconfig.base.json`, `vitest.config.ts`
+- **Why:** Building first makes every check wait for a build and points errors at `dist`.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · Building first makes every check wait for a build and points errors at `dist`.
+- 2026-11-04 · built · [#1](https://github.com/isoloop/isoloop/issues/1) · The workspace skeleton.
+
+### `tool.dependency-rules`
+
+- **Code:** `.oxlintrc.json`, `packages/bus/tsconfig.json`
+- **Why:** The package boundaries are checked by tools rather than by review.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · The package boundaries are checked by tools rather than by review.
+- 2026-11-04 · built · [#3](https://github.com/isoloop/isoloop/issues/3) · Lint, format and dependency rules.
+
+### `tool.lint-errors-only`
+
+- **Code:** `.oxlintrc.json`
+- **Why:** Warnings pile up unread, and promise rules matter in a message-passing runtime.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · Warnings pile up unread, and promise rules matter in a message-passing runtime.
+- 2026-11-04 · built · [#3](https://github.com/isoloop/isoloop/issues/3) · Lint, format and dependency rules.
+
+### `tool.format-settings`
+
+- **Code:** `.oxfmtrc.json`
+- **Why:** It matches the code samples in the design docs.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · It matches the code samples in the design docs.
+- 2026-11-04 · built · [#3](https://github.com/isoloop/isoloop/issues/3) · Lint, format and dependency rules.
+
+### `tool.browser-baseline`
+
+- **Code:** `tsconfig.base.json`
+- **Related:** `tool.unsupported-browser`
+- **Why:** The minimums were looked up per feature in MDN's browser-compat-data.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · Features in every major engine for 30 months or more cover what the runtime needs.
+- 2026-11-05 · clarified · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · The minimums were looked up per feature in MDN's browser-compat-data. Before: Baseline "widely available", with no version numbers named.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `tool.unsupported-browser`
+
+- **Errors and events:** `unsupported_browser`
+- **Code:** `packages/host/src/kernel/features.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `tool.browser-baseline`
+- **Why:** A missing feature fails at start with its name, not later with a confusing error.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · A missing feature fails at start with its name, not later with a confusing error.
+- 2026-11-05 · built · [#20](https://github.com/isoloop/isoloop/issues/20) · The browser feature check.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `tool.exact-pins`
+
+- **Code:** `pnpm-workspace.yaml`
+- **Related:** `tool.dependabot`, `tool.supply-chain`
+- **Why:** Caret ranges let 0.x tools change behaviour without a PR.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · Caret ranges let 0.x tools change behaviour without a PR.
+- 2026-11-04 · built · [#1](https://github.com/isoloop/isoloop/issues/1) · The workspace skeleton.
+
+### `tool.dependabot`
+
+- **Code:** `.github/dependabot.yml`
+- **Related:** `tool.exact-pins`
+- **Why:** Dependabot is built into GitHub, where Renovate is one more app to install.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · Dependabot is built into GitHub, where Renovate is one more app to install.
+- 2026-11-04 · built · [#10](https://github.com/isoloop/isoloop/issues/10) · CI, Dependabot and Pages.
+
+### `tool.supply-chain`
+
+- **Code:** `pnpm-workspace.yaml`, `.github/workflows/ci.yml`
+- **Related:** `tool.exact-pins`
+- **Why:** A compromised release is usually caught within days, and install scripts are the usual way in.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · A compromised release is usually caught within days, and install scripts are the usual way in.
+- 2026-11-04 · built · [#1](https://github.com/isoloop/isoloop/issues/1) · The workspace skeleton.
+
+### `tool.no-corepack`
+
+- **Code:** `package.json`
+- **Related:** `tool.pnpm-workspaces`
+- **Why:** One field pins the version for contributors and for CI's `pnpm/action-setup`.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · One field pins the version for contributors and for CI's `pnpm/action-setup`.
+- 2026-11-04 · built · [#1](https://github.com/isoloop/isoloop/issues/1) · The workspace skeleton.
+
+### `tool.vscode-config`
+
+- **Code:** `.vscode/settings.json`, `.vscode/extensions.json`
+- **Why:** Editors then use the same tools and versions as CI.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · Editors then use the same tools and versions as CI.
+- 2026-11-04 · built · [#3](https://github.com/isoloop/isoloop/issues/3) · Lint, format and dependency rules.
+
+### `tool.ci-jobs`
+
+- **Code:** `.github/workflows/ci.yml`, `.github/actions/install-browsers`
+- **Why:** One OS keeps CI fast, and the browser jobs skip a run that already failed its checks.
+
+History:
+
+- 2026-11-04 · decided · [ADR 0009 · Rules](../adr/0009-toolchain.md#rules) · One OS keeps CI fast, and the browser jobs skip a run that already failed its checks.
+- 2026-11-04 · built · [#10](https://github.com/isoloop/isoloop/issues/10) · CI, Dependabot and Pages.
+- 2026-11-05 · built · [#52](https://github.com/isoloop/isoloop/issues/52) · Time-limited, retried Playwright install with a browser cache.
+
+### `tool.no-task-runner`
+
+- **Related:** `tool.pnpm-workspaces`
+
+History:
+
+- 2026-11-04 · rejected · [ADR 0009 · Alternatives considered](../adr/0009-toolchain.md#alternatives-considered) · Why not cache builds with a task runner? It pays off in big monorepos; here it would mostly add config. It comes back if CI time becomes a problem.
+
+### `tool.entries-at-top`
+
+- **Code:** `scripts/layout/layout.ts`
+- **Related:** `tool.areas`, `tool.layout-test`
+- **Why:** Entries are the files other things depend on by path, so they stay put and are easy to find.
+
+History:
+
+- 2026-11-21 · decided · [ADR 0021 · 1. Entries sit at the top of src/](../adr/0021-source-layout-and-entry-points.md#1-entries-sit-at-the-top-of-src) · Entries are the files other things depend on by path, so they stay put and are easy to find.
+- 2026-11-21 · built · [#360](https://github.com/isoloop/isoloop/issues/360) · The last packages moved, and the layout test's pending list went.
+
+### `tool.areas`
+
+- **Code:** `scripts/layout/layout.ts`
+- **Related:** `tool.entries-at-top`, `tool.layout-test`
+- **Why:** A folder named for a concept says where a change goes; one named for a kind collects anything.
+
+History:
+
+- 2026-11-21 · decided · [ADR 0021 · 2. Everything else lives in an area](../adr/0021-source-layout-and-entry-points.md#2-everything-else-lives-in-an-area) · A folder named for a concept says where a change goes; one named for a kind collects anything.
+- 2026-11-21 · built · [#360](https://github.com/isoloop/isoloop/issues/360) · The last packages moved into areas.
+
+### `tool.no-barrels`
+
+- **Code:** `.oxlintrc.json`
+- **Why:** Barrels hide where code lives and make import cycles easy.
+
+History:
+
+- 2026-11-21 · decided · [ADR 0021 · 3. No barrels inside a package](../adr/0021-source-layout-and-entry-points.md#3-no-barrels-inside-a-package) · Barrels hide where code lives and make import cycles easy.
+- 2026-11-21 · built · [#352](https://github.com/isoloop/isoloop/issues/352) · protocol's and bus's entries name what they export.
+
+### `tool.tests-next-to-code`
+
+- **Code:** `scripts/layout/layout.ts`
+- **Why:** A test next to its code moves with it, and a fixture loaded by URL needs one known place.
+
+History:
+
+- 2026-11-21 · decided · [ADR 0021 · 4. Tests and fixtures](../adr/0021-source-layout-and-entry-points.md#4-tests-and-fixtures) · A test next to its code moves with it, and a fixture loaded by URL needs one known place.
+- 2026-11-21 · built · [#360](https://github.com/isoloop/isoloop/issues/360) · The last packages moved.
+
+### `tool.no-relative-escape`
+
+- **Code:** `scripts/layout/layout.ts`
+- **Related:** `tool.dependency-rules`
+- **Why:** A relative import across packages skips the dependency rules and breaks once published.
+
+History:
+
+- 2026-11-21 · decided · [ADR 0021 · 4. Tests and fixtures](../adr/0021-source-layout-and-entry-points.md#4-tests-and-fixtures) · A relative import across packages skips the dependency rules and breaks once published.
+- 2026-11-21 · built · [#349](https://github.com/isoloop/isoloop/issues/349) · The layout checks.
+
+### `tool.moves-keep-names`
+
+- **Why:** tsdown names shared declaration chunks after their first module, and the API check reads those names.
+
+History:
+
+- 2026-11-21 · decided · [ADR 0021 · 5. Moving files](../adr/0021-source-layout-and-entry-points.md#5-moving-files) · tsdown names shared declaration chunks after their first module, and the API check reads those names.
+- 2026-11-21 · built · [#347](https://github.com/isoloop/isoloop/issues/347) · In force from the ADR's PR.
+
+### `tool.docs-paths`
+
+- **Why:** A folder map would drift, and the tree shows the layout anyway.
+
+History:
+
+- 2026-11-21 · decided · [ADR 0021 · 5. Moving files](../adr/0021-source-layout-and-entry-points.md#5-moving-files) · A folder map would drift, and the tree shows the layout anyway.
+- 2026-11-21 · built · [#347](https://github.com/isoloop/isoloop/issues/347) · In force from the ADR's PR.
+
+### `tool.esm-only`
+
+- **Related:** `tool.side-effects`
+- **Why:** One file per entry keeps what an app imports small and predictable.
+
+History:
+
+- 2026-11-21 · decided · [ADR 0021 · 6. The tree-shaking contract](../adr/0021-source-layout-and-entry-points.md#6-the-tree-shaking-contract) · One file per entry keeps what an app imports small and predictable.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `tool.side-effects`
+
+- **Code:** `packages/runtime/package.json`, `scripts/check-exports.ts`
+- **Related:** `tool.esm-only`, `tool.bundle-budgets`
+- **Why:** Bundlers drop unused exports, and the files that run on load are named so they're kept.
+
+History:
+
+- 2026-11-21 · decided · [ADR 0021 · 6. The tree-shaking contract](../adr/0021-source-layout-and-entry-points.md#6-the-tree-shaking-contract) · Bundlers drop unused exports, and the files that run on load are named so they're kept.
+- 2026-11-21 · built · [#363](https://github.com/isoloop/isoloop/issues/363) · The bundle guard, and scripts declared in `sideEffects`.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `tool.bundle-budgets`
+
+- **Code:** `bench/bundle-size/bundle-size.ts`, `bench/bundle-size/budgets.json`
+- **Related:** `tool.side-effects`
+- **Why:** A new global side effect or a heavier entry shows up as a number in CI.
+
+History:
+
+- 2026-11-21 · decided · [ADR 0021 · 7. Bundle budgets](../adr/0021-source-layout-and-entry-points.md#7-bundle-budgets) · A new global side effect or a heavier entry shows up as a number in CI.
+- 2026-11-21 · built · [#363](https://github.com/isoloop/isoloop/issues/363) · The bundle guard, with budgets.
+
+### `tool.layout-lint`
+
+- **Code:** `.oxlintrc.json`
+- **Related:** `tool.no-barrels`, `tool.lint-errors-only`
+- **Why:** Three rules added by name, as the lint rules allow.
+
+History:
+
+- 2026-11-21 · decided · [ADR 0021 · 8. Enforcement](../adr/0021-source-layout-and-entry-points.md#8-enforcement) · Three rules added by name, as the lint rules allow.
+- 2026-11-21 · built · [#349](https://github.com/isoloop/isoloop/issues/349) · The layout checks, `import/no-cycle` and kebab-case file names.
+
+### `tool.layout-test`
+
+- **Code:** `scripts/layout/layout.ts`, `scripts/layout/layout.test.ts`
+- **Related:** `tool.entries-at-top`, `tool.areas`
+- **Why:** There's no custom lint rule, since oxlint's JS plugins are alpha, so a test checks the tree.
+
+History:
+
+- 2026-11-21 · decided · [ADR 0021 · 8. Enforcement](../adr/0021-source-layout-and-entry-points.md#8-enforcement) · There's no custom lint rule, since oxlint's JS plugins are alpha, so a test checks the tree.
+- 2026-11-21 · built · [#349](https://github.com/isoloop/isoloop/issues/349) · The layout checks.
+
+### `tool.dom-imports`
+
+- **Code:** `.oxlintrc.json`
+- **Related:** `tool.dependency-rules`, `tool.dom-halves`
+- **Why:** Each side of the render bridge sees only its own half, so a host-only API can't leak into a worker.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0011 · Decision](../adr/0011-dom-package.md#decision) · Each side of the render bridge sees only its own half, so a host-only API can't leak into a worker.
+- 2026-11-05 · built · [#29](https://github.com/isoloop/isoloop/issues/29) · `@isoloop/dom`, the render bridge `isoloop-dom@1`.
+
+### `tool.dom-halves`
+
+- **Code:** `packages/dom/tsconfig.worker.json`, `packages/dom/tsconfig.host.json`
+- **Related:** `tool.dom-imports`
+- **Why:** A stray `document` in the worker half then fails the build, not a review.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0011 · Decision](../adr/0011-dom-package.md#decision) · A stray `document` in the worker half then fails the build, not a review.
+- 2026-11-05 · built · [#29](https://github.com/isoloop/isoloop/issues/29) · `@isoloop/dom`, the render bridge `isoloop-dom@1`.
 
 ## Derived topics
 
