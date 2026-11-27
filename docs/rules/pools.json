@@ -1,1 +1,656 @@
-[]
+[
+  {
+    "id": "pool.opt-in",
+    "statement": "An isolate whose manifest sets `pool: 'name'` runs in one shared worker with every other isolate naming that pool. Visual and headless isolates may share a pool. The runtime never pools isolates on its own.",
+    "status": "active",
+    "knob": "manifest `pool`",
+    "code": ["packages/host/src/kernel/kernel.ts", "packages/runtime/src/bootstrap.ts"],
+    "since": "0.1.0",
+    "related": ["pool.shared-globals", "pool.shared-fate", "pool.no-heuristic-pooling"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#decision",
+        "why": "Many small headless isolates each pay for a whole worker; a pool saves a heap and a runtime copy per member."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#139",
+        "why": "Headless isolates join named worker pools, built in M2c, after the gate measured 71–86% less memory for 20 members."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "Each member gets its own render root in the worker's one document, so visual isolates can join too.",
+        "prev": "Only headless isolates may join a pool; a visual isolate that names one is rejected with `pools_headless_only`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#154",
+        "why": "Visual isolates join pools, built in M2d."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.shared-globals",
+    "statement": "Members of a pool share an event loop, timers, `globalThis` and the built-in prototypes, so one member can block the others.",
+    "status": "active",
+    "code": ["packages/runtime/src/bootstrap.ts"],
+    "since": "0.1.0",
+    "related": ["pool.opt-in", "pool.shared-dom"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#consequences",
+        "why": "Browsers offer no per-module realm in a worker yet, which is why pooling is opt-in and for trusted isolates."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-08",
+        "ref": "#138",
+        "why": "The pool bootstrap, built in M2c."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.shared-fate",
+    "statement": "When a pool's worker stops responding or errors, every member crashes and restarts together, in a new worker. A member's own fatal error stays its own, and it restarts alone.",
+    "status": "active",
+    "code": ["packages/host/src/supervisor/machine.ts"],
+    "since": "0.1.0",
+    "related": ["pool.attributed-errors", "pool.crash-counts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0001#decision",
+        "why": "A worker can only be terminated as a whole. Recorded in ADR 0001 as M2c built it."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#140",
+        "why": "A pool's members restart together when its worker fails, built in M2c."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.attributed-errors",
+    "statement": "An error the runtime can attribute stays the member's own: `start()` throwing, and a render error the React or Preact adapter catches at the member's root. An error it can't attribute, such as one thrown from a shared scheduler or a timer, is a worker error and restarts the pool.",
+    "status": "active",
+    "code": ["packages/runtime/src/bootstrap.ts"],
+    "since": "0.1.0",
+    "related": ["pool.shared-fate"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "Visual members need render errors kept apart; per-member attribution of the rest waits for `AsyncContext`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#153",
+        "why": "A per-isolate error boundary and portal root in the adapters, built in M2d."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.crash-counts",
+    "statement": "Each member of a pool keeps its own restart count and window. A crash the pool shares counts once for each member, judged by that member's own healthy run, and every member's run ends at the pool's last beat.",
+    "status": "active",
+    "code": ["packages/host/src/supervisor/machine.ts"],
+    "since": "0.1.1",
+    "related": ["pool.shared-fate"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-24",
+        "ref": "adr/0001#restart-limit-short-runs-amended-2026-11-24",
+        "why": "Short runs count for pools as for own workers; heartbeats are the worker's, so all members' runs end together."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-24",
+        "ref": "#430",
+        "why": "Built on main; backported to release/0.1 in #439."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-24",
+        "ref": "v0.1.1",
+        "why": "First released in 0.1.1."
+      }
+    ]
+  },
+  {
+    "id": "pool.suspend-whole",
+    "statement": "A pool suspends only as a whole, when every member is suspendable and idle. Otherwise it never suspends, and registration warns that the setting has no effect. Any member's wake condition wakes the pool.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#suspension-opt-in",
+        "why": "Members share one worker, so it can only be terminated as one."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#144",
+        "why": "A pool suspends only as a whole and wakes together, built in M2c."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.frozen-builtins",
+    "statement": "A pool worker freezes every built-in prototype before its first member loads. Inherited data properties become accessors, so an instance can still override them, except the ones V8 guards with protectors.",
+    "status": "active",
+    "code": ["packages/runtime/src/pools/freeze.ts"],
+    "since": "0.1.0",
+    "related": ["pool.protected-properties"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0001#decision",
+        "why": "One member mustn't patch a built-in another member uses. Recorded in ADR 0001 as M2c built it."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#145",
+        "why": "A pool worker freezes the built-ins before its members load, built in M2c."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.protected-properties",
+    "statement": "In a pool, the built-in properties V8 guards with protectors stay plain frozen data: `Symbol.iterator` and the iterators' `next`, `constructor` on arrays and typed arrays, `then` and `constructor` on `Promise.prototype`, and all of `RegExp.prototype` and `String.prototype`. In strict code, overriding one on an instance throws `TypeError`.",
+    "status": "active",
+    "code": ["packages/runtime/src/pools/freeze.ts"],
+    "since": "0.1.0",
+    "related": ["pool.frozen-builtins", "pool.no-ses-allowlist"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-12",
+        "ref": "adr/0001#decision",
+        "why": "Turning these into accessors switched off V8's fast paths for the whole worker: array `map` and `slice` ran 23× slower. Left as data, every workload is within 2% of a plain worker."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-12",
+        "ref": "#173",
+        "why": "A pool's frozen built-ins leave the properties V8 protects as plain data."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.no-ses-allowlist",
+    "statement": "The pool freeze doesn't use SES's default override list as an allow-list.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-12",
+        "ref": "adr/0001#decision",
+        "why": "Why not SES's moderate list? It breaks Preact in a pool: copying a record's own `constructor` key by assignment would throw."
+      }
+    ]
+  },
+  {
+    "id": "pool.grants-union",
+    "statement": "A pool holds, in effect, the union of its members' grants, and `kernel.pools()` reports that union with each pool's members.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#consequences",
+        "why": "Members can reach each other's bus ports, so the pool can do what any member can."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#143",
+        "why": "Pools in the kernel's reports, with effective grants, built in M2c."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.one-document",
+    "statement": "A pool worker has one `isoloop-dom` document, with one render root per visual member. That root is the member's `ctx.root`, and node ids are unique across the worker.",
+    "status": "active",
+    "code": ["packages/dom/src/worker/dom.ts"],
+    "since": "0.1.0",
+    "related": ["pool.records-per-member", "pool.shared-dom"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "Frameworks and libraries see one global document, as on a page with several widgets, with no rebinding and no build step."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#152",
+        "why": "A render root per pool member in one shared document, built in M2d."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.records-per-member",
+    "statement": "The worker attributes each DOM record to the member whose root holds the node, and posts each member's batch on its own envelope.",
+    "status": "active",
+    "code": ["packages/dom/src/worker/dom.ts"],
+    "since": "0.1.0",
+    "related": ["pool.no-cross-member-move", "pool.host-applier"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "Each surface must get only its own member's records."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#154",
+        "why": "Visual isolates join pools, built in M2d."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.no-cross-member-move",
+    "statement": "Moving a node from one member's root into another's throws, and the error is attributed to the member doing the move.",
+    "status": "active",
+    "code": ["packages/dom/src/worker/dom.ts"],
+    "since": "0.1.0",
+    "related": ["pool.records-per-member"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "One member mustn't take or inject another's nodes."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#155",
+        "why": "A pool member can't reach another member's node, tested in M2d."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.host-applier",
+    "statement": "The host keeps one applier per surface, as for an own worker. The worker writes each member's root as the standard root id on the way out and maps it back on the way in, and frame budgets, update counts and timings stay per isolate.",
+    "status": "active",
+    "code": ["packages/dom/src/worker/dom.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["pool.records-per-member"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "The record format and the host applier don't change."
+      },
+      {
+        "type": "clarified",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "Written down as M2d built it, with the same effect.",
+        "prev": "The applier takes each member's root id."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#154",
+        "why": "Visual isolates join pools, built in M2d."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.events-per-member",
+    "statement": "Events and host calls such as `measure` and `focus` carry the member. An event is delivered to the node it names, and capture and bubble run through the member's root to the shared document.",
+    "status": "active",
+    "code": ["packages/dom/src/worker/dom.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "Events behave as on a page with several widgets."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#154",
+        "why": "Visual isolates join pools, built in M2d."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.shared-dom",
+    "statement": "Members of a pool can read each other's DOM and input. They share the document, `document` and `window` listeners, the focus, the head, framework instances when built together, and one animation-frame loop. The kernel reports this on each pool as \"Members of this pool can read each other's DOM and input.\"",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["pool.one-document", "pool.shared-globals"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "Option D gives up DOM isolation between members; pools stay for trusted members, and widgets that handle secrets stay on their own worker."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#157",
+        "why": "Pools report a shared document, M2d task 7."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.mixed-frameworks",
+    "statement": "React and Preact members may share a pool.",
+    "status": "active",
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "They share the document like any members; one framework per pool saves the most memory."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#156",
+        "why": "The adapter suite in a pool, tested in M2d."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.stop-member",
+    "statement": "Stopping one member unmounts its root, removes it from the document and forgets its nodes, while the rest of the pool keeps running.",
+    "status": "active",
+    "code": ["packages/dom/src/worker/dom.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["pool.stopped-callbacks"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "A member can stop without restarting its neighbours."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#154",
+        "why": "Visual isolates join pools, built in M2d."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.stopped-callbacks",
+    "statement": "Once a stopping member's `onShutdown` handlers settle, or the grace runs out, none of its timers, animation frames, idle callbacks, queued microtasks or port listeners run again. Work started outside its code and promise continuations aren't covered.",
+    "status": "active",
+    "code": ["packages/runtime/src/bootstrap.ts"],
+    "since": "0.1.0",
+    "related": ["pool.stop-member"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "A stopped member's timers were left to its `onShutdown`."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-16",
+        "ref": "adr/0015#decision",
+        "why": "A task moved by the processor playground kept burning CPU in the pool it left and doubled its `busyMs` when it came back.",
+        "prev": "Timers a stopped member left running keep going; the guide says to clear them in `onShutdown`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-16",
+        "ref": "#206",
+        "why": "A stopped pool member's callbacks no longer run."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.built-apart",
+    "statement": "Isolates built apart from the host can join a pool. They bring their own framework copy, so they share less memory.",
+    "status": "active",
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "Option D needs nothing from the isolate's build: it renders into `ctx.root` and uses the global document."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.portal-root",
+    "statement": "The React and Preact adapters give each member a portal container inside its own root, for modals, tooltips and menus that would otherwise render into `document.body`.",
+    "status": "active",
+    "knob": "`usePortalRoot()`",
+    "code": ["packages/react/src/isolate/context.ts", "packages/preact/src/isolate/context.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-09",
+        "ref": "adr/0015#decision",
+        "why": "`document.body` reaches no surface, in a pool or in an own worker."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-09",
+        "ref": "#153",
+        "why": "A per-isolate error boundary and portal root in the adapters, built in M2d."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "pool.no-heuristic-pooling",
+    "statement": "The runtime doesn't pick \"light\" isolates to pool by heuristics.",
+    "status": "rejected",
+    "related": ["pool.opt-in"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0001#alternatives-considered",
+        "why": "Why doesn't Isoloop pool small isolates for me? It would be surprising behaviour; an app can opt in to the balancer, which places by measurement."
+      }
+    ]
+  },
+  {
+    "id": "pool.no-build-rebinding",
+    "statement": "Pooled members don't get their own `document` by rewriting their code at build time.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-09",
+        "ref": "adr/0015#options",
+        "why": "Why not rewrite each isolate's `document` and `window` in the Vite plugin? A shared chunk is evaluated once per worker, so it costs a framework copy per member, it misses `globalThis.document`, and isolates built apart couldn't join."
+      }
+    ]
+  },
+  {
+    "id": "pool.no-global-switch",
+    "statement": "The pool doesn't switch `globalThis.document` to the running member's document.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-09",
+        "ref": "adr/0015#options",
+        "why": "Why not swap the global per task? Any `await`, timer or framework scheduler crosses members, so one member's code sees another's document."
+      }
+    ]
+  },
+  {
+    "id": "pool.no-document-per-member",
+    "statement": "Members of a pool don't each get their own document.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-09",
+        "ref": "adr/0015#options",
+        "why": "Why not a document per member? Code that uses the global `document`, Preact 10 and many libraries, creates nodes and listens in the wrong member's document, silently."
+      }
+    ]
+  },
+  {
+    "id": "pool.no-shadowrealm",
+    "statement": "Pools don't use `ShadowRealm` for separate globals per member.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-09",
+        "ref": "adr/0015#options",
+        "why": "Why not `ShadowRealm`, which would solve this cleanly? It hasn't shipped in any browser, workers included. It's the long-term option."
+      }
+    ]
+  }
+]

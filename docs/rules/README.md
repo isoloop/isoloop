@@ -951,7 +951,309 @@ No rules yet.
 
 Several isolates in one worker, by choice. Prefix `pool`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `pool.opt-in` | An isolate whose manifest sets `pool: 'name'` runs in one shared worker with every other isolate naming that pool. Visual and headless isolates may share a pool. The runtime never pools isolates on its own. |  | active | since `0.1.0` |
+| `pool.shared-globals` | Members of a pool share an event loop, timers, `globalThis` and the built-in prototypes, so one member can block the others. |  | active | since `0.1.0` |
+| `pool.shared-fate` | When a pool's worker stops responding or errors, every member crashes and restarts together, in a new worker. A member's own fatal error stays its own, and it restarts alone. |  | active | since `0.1.0` |
+| `pool.attributed-errors` | An error the runtime can attribute stays the member's own: `start()` throwing, and a render error the React or Preact adapter catches at the member's root. An error it can't attribute, such as one thrown from a shared scheduler or a timer, is a worker error and restarts the pool. |  | active | since `0.1.0` |
+| `pool.crash-counts` | Each member of a pool keeps its own restart count and window. A crash the pool shares counts once for each member, judged by that member's own healthy run, and every member's run ends at the pool's last beat. |  | active | since `0.1.1` |
+| `pool.suspend-whole` | A pool suspends only as a whole, when every member is suspendable and idle. Otherwise it never suspends, and registration warns that the setting has no effect. Any member's wake condition wakes the pool. |  | active | since `0.1.0` |
+| `pool.frozen-builtins` | A pool worker freezes every built-in prototype before its first member loads. Inherited data properties become accessors, so an instance can still override them, except the ones V8 guards with protectors. |  | active | since `0.1.0` |
+| `pool.protected-properties` | In a pool, the built-in properties V8 guards with protectors stay plain frozen data: `Symbol.iterator` and the iterators' `next`, `constructor` on arrays and typed arrays, `then` and `constructor` on `Promise.prototype`, and all of `RegExp.prototype` and `String.prototype`. In strict code, overriding one on an instance throws `TypeError`. |  | active | since `0.1.0` |
+| `pool.no-ses-allowlist` | The pool freeze doesn't use SES's default override list as an allow-list. |  | rejected |  |
+| `pool.grants-union` | A pool holds, in effect, the union of its members' grants, and `kernel.pools()` reports that union with each pool's members. |  | active | since `0.1.0` |
+| `pool.one-document` | A pool worker has one `isoloop-dom` document, with one render root per visual member. That root is the member's `ctx.root`, and node ids are unique across the worker. |  | active | since `0.1.0` |
+| `pool.records-per-member` | The worker attributes each DOM record to the member whose root holds the node, and posts each member's batch on its own envelope. |  | active | since `0.1.0` |
+| `pool.no-cross-member-move` | Moving a node from one member's root into another's throws, and the error is attributed to the member doing the move. |  | active | since `0.1.0` |
+| `pool.host-applier` | The host keeps one applier per surface, as for an own worker. The worker writes each member's root as the standard root id on the way out and maps it back on the way in, and frame budgets, update counts and timings stay per isolate. |  | active | since `0.1.0` |
+| `pool.events-per-member` | Events and host calls such as `measure` and `focus` carry the member. An event is delivered to the node it names, and capture and bubble run through the member's root to the shared document. |  | active | since `0.1.0` |
+| `pool.shared-dom` | Members of a pool can read each other's DOM and input. They share the document, `document` and `window` listeners, the focus, the head, framework instances when built together, and one animation-frame loop. The kernel reports this on each pool as "Members of this pool can read each other's DOM and input." |  | active | since `0.1.0` |
+| `pool.mixed-frameworks` | React and Preact members may share a pool. |  | active | since `0.1.0` |
+| `pool.stop-member` | Stopping one member unmounts its root, removes it from the document and forgets its nodes, while the rest of the pool keeps running. |  | active | since `0.1.0` |
+| `pool.stopped-callbacks` | Once a stopping member's `onShutdown` handlers settle, or the grace runs out, none of its timers, animation frames, idle callbacks, queued microtasks or port listeners run again. Work started outside its code and promise continuations aren't covered. |  | active | since `0.1.0` |
+| `pool.built-apart` | Isolates built apart from the host can join a pool. They bring their own framework copy, so they share less memory. |  | active | since `0.1.0` |
+| `pool.portal-root` | The React and Preact adapters give each member a portal container inside its own root, for modals, tooltips and menus that would otherwise render into `document.body`. |  | active | since `0.1.0` |
+| `pool.no-heuristic-pooling` | The runtime doesn't pick "light" isolates to pool by heuristics. |  | rejected |  |
+| `pool.no-build-rebinding` | Pooled members don't get their own `document` by rewriting their code at build time. |  | rejected |  |
+| `pool.no-global-switch` | The pool doesn't switch `globalThis.document` to the running member's document. |  | rejected |  |
+| `pool.no-document-per-member` | Members of a pool don't each get their own document. |  | rejected |  |
+| `pool.no-shadowrealm` | Pools don't use `ShadowRealm` for separate globals per member. |  | rejected |  |
+
+### `pool.opt-in`
+
+- **Change it:** manifest `pool`
+- **Code:** `packages/host/src/kernel/kernel.ts`, `packages/runtime/src/bootstrap.ts`
+- **Related:** `pool.shared-globals`, `pool.shared-fate`, `pool.no-heuristic-pooling`
+- **Why:** Each member gets its own render root in the worker's one document, so visual isolates can join too.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · Many small headless isolates each pay for a whole worker; a pool saves a heap and a runtime copy per member.
+- 2026-11-09 · built · [#139](https://github.com/isoloop/isoloop/issues/139) · Headless isolates join named worker pools, built in M2c, after the gate measured 71–86% less memory for 20 members.
+- 2026-11-09 · amended · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · Each member gets its own render root in the worker's one document, so visual isolates can join too. Before: Only headless isolates may join a pool; a visual isolate that names one is rejected with `pools_headless_only`.
+- 2026-11-09 · built · [#154](https://github.com/isoloop/isoloop/issues/154) · Visual isolates join pools, built in M2d.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.shared-globals`
+
+- **Code:** `packages/runtime/src/bootstrap.ts`
+- **Related:** `pool.opt-in`, `pool.shared-dom`
+- **Why:** Browsers offer no per-module realm in a worker yet, which is why pooling is opt-in and for trusted isolates.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Consequences](../adr/0001-one-worker-per-isolate.md#consequences) · Browsers offer no per-module realm in a worker yet, which is why pooling is opt-in and for trusted isolates.
+- 2026-11-08 · built · [#138](https://github.com/isoloop/isoloop/issues/138) · The pool bootstrap, built in M2c.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.shared-fate`
+
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `pool.attributed-errors`, `pool.crash-counts`
+- **Why:** A worker can only be terminated as a whole. Recorded in ADR 0001 as M2c built it.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · A worker can only be terminated as a whole. Recorded in ADR 0001 as M2c built it.
+- 2026-11-09 · built · [#140](https://github.com/isoloop/isoloop/issues/140) · A pool's members restart together when its worker fails, built in M2c.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.attributed-errors`
+
+- **Code:** `packages/runtime/src/bootstrap.ts`
+- **Related:** `pool.shared-fate`
+- **Why:** Visual members need render errors kept apart; per-member attribution of the rest waits for `AsyncContext`.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · Visual members need render errors kept apart; per-member attribution of the rest waits for `AsyncContext`.
+- 2026-11-09 · built · [#153](https://github.com/isoloop/isoloop/issues/153) · A per-isolate error boundary and portal root in the adapters, built in M2d.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.crash-counts`
+
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `pool.shared-fate`
+- **Why:** Short runs count for pools as for own workers; heartbeats are the worker's, so all members' runs end together.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0001 · Restart limit: short runs (amended 2026-11-24)](../adr/0001-one-worker-per-isolate.md#restart-limit-short-runs-amended-2026-11-24) · Short runs count for pools as for own workers; heartbeats are the worker's, so all members' runs end together.
+- 2026-11-24 · built · [#430](https://github.com/isoloop/isoloop/issues/430) · Built on main; backported to release/0.1 in #439.
+- 2026-11-24 · shipped · [v0.1.1](https://github.com/isoloop/isoloop/releases/tag/v0.1.1) · First released in 0.1.1.
+
+### `pool.suspend-whole`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Why:** Members share one worker, so it can only be terminated as one.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Members share one worker, so it can only be terminated as one.
+- 2026-11-09 · built · [#144](https://github.com/isoloop/isoloop/issues/144) · A pool suspends only as a whole and wakes together, built in M2c.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.frozen-builtins`
+
+- **Code:** `packages/runtime/src/pools/freeze.ts`
+- **Related:** `pool.protected-properties`
+- **Why:** One member mustn't patch a built-in another member uses. Recorded in ADR 0001 as M2c built it.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · One member mustn't patch a built-in another member uses. Recorded in ADR 0001 as M2c built it.
+- 2026-11-09 · built · [#145](https://github.com/isoloop/isoloop/issues/145) · A pool worker freezes the built-ins before its members load, built in M2c.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.protected-properties`
+
+- **Code:** `packages/runtime/src/pools/freeze.ts`
+- **Related:** `pool.frozen-builtins`, `pool.no-ses-allowlist`
+- **Why:** Turning these into accessors switched off V8's fast paths for the whole worker: array `map` and `slice` ran 23× slower. Left as data, every workload is within 2% of a plain worker.
+
+History:
+
+- 2026-11-12 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · Turning these into accessors switched off V8's fast paths for the whole worker: array `map` and `slice` ran 23× slower. Left as data, every workload is within 2% of a plain worker.
+- 2026-11-12 · built · [#173](https://github.com/isoloop/isoloop/issues/173) · A pool's frozen built-ins leave the properties V8 protects as plain data.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.no-ses-allowlist`
+
+History:
+
+- 2026-11-12 · rejected · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · Why not SES's moderate list? It breaks Preact in a pool: copying a record's own `constructor` key by assignment would throw.
+
+### `pool.grants-union`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Why:** Members can reach each other's bus ports, so the pool can do what any member can.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Consequences](../adr/0001-one-worker-per-isolate.md#consequences) · Members can reach each other's bus ports, so the pool can do what any member can.
+- 2026-11-09 · built · [#143](https://github.com/isoloop/isoloop/issues/143) · Pools in the kernel's reports, with effective grants, built in M2c.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.one-document`
+
+- **Code:** `packages/dom/src/worker/dom.ts`
+- **Related:** `pool.records-per-member`, `pool.shared-dom`
+- **Why:** Frameworks and libraries see one global document, as on a page with several widgets, with no rebinding and no build step.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · Frameworks and libraries see one global document, as on a page with several widgets, with no rebinding and no build step.
+- 2026-11-09 · built · [#152](https://github.com/isoloop/isoloop/issues/152) · A render root per pool member in one shared document, built in M2d.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.records-per-member`
+
+- **Code:** `packages/dom/src/worker/dom.ts`
+- **Related:** `pool.no-cross-member-move`, `pool.host-applier`
+- **Why:** Each surface must get only its own member's records.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · Each surface must get only its own member's records.
+- 2026-11-09 · built · [#154](https://github.com/isoloop/isoloop/issues/154) · Visual isolates join pools, built in M2d.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.no-cross-member-move`
+
+- **Code:** `packages/dom/src/worker/dom.ts`
+- **Related:** `pool.records-per-member`
+- **Why:** One member mustn't take or inject another's nodes.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · One member mustn't take or inject another's nodes.
+- 2026-11-09 · built · [#155](https://github.com/isoloop/isoloop/issues/155) · A pool member can't reach another member's node, tested in M2d.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.host-applier`
+
+- **Code:** `packages/dom/src/worker/dom.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `pool.records-per-member`
+- **Why:** Written down as M2d built it, with the same effect.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · The record format and the host applier don't change.
+- 2026-11-09 · clarified · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · Written down as M2d built it, with the same effect. Before: The applier takes each member's root id.
+- 2026-11-09 · built · [#154](https://github.com/isoloop/isoloop/issues/154) · Visual isolates join pools, built in M2d.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.events-per-member`
+
+- **Code:** `packages/dom/src/worker/dom.ts`, `packages/host/src/kernel/kernel.ts`
+- **Why:** Events behave as on a page with several widgets.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · Events behave as on a page with several widgets.
+- 2026-11-09 · built · [#154](https://github.com/isoloop/isoloop/issues/154) · Visual isolates join pools, built in M2d.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.shared-dom`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `pool.one-document`, `pool.shared-globals`
+- **Why:** Option D gives up DOM isolation between members; pools stay for trusted members, and widgets that handle secrets stay on their own worker.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · Option D gives up DOM isolation between members; pools stay for trusted members, and widgets that handle secrets stay on their own worker.
+- 2026-11-09 · built · [#157](https://github.com/isoloop/isoloop/issues/157) · Pools report a shared document, M2d task 7.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.mixed-frameworks`
+
+- **Why:** They share the document like any members; one framework per pool saves the most memory.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · They share the document like any members; one framework per pool saves the most memory.
+- 2026-11-09 · built · [#156](https://github.com/isoloop/isoloop/issues/156) · The adapter suite in a pool, tested in M2d.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.stop-member`
+
+- **Code:** `packages/dom/src/worker/dom.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `pool.stopped-callbacks`
+- **Why:** A member can stop without restarting its neighbours.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · A member can stop without restarting its neighbours.
+- 2026-11-09 · built · [#154](https://github.com/isoloop/isoloop/issues/154) · Visual isolates join pools, built in M2d.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.stopped-callbacks`
+
+- **Code:** `packages/runtime/src/bootstrap.ts`
+- **Related:** `pool.stop-member`
+- **Why:** A task moved by the processor playground kept burning CPU in the pool it left and doubled its `busyMs` when it came back.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · A stopped member's timers were left to its `onShutdown`.
+- 2026-11-16 · amended · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · A task moved by the processor playground kept burning CPU in the pool it left and doubled its `busyMs` when it came back. Before: Timers a stopped member left running keep going; the guide says to clear them in `onShutdown`.
+- 2026-11-16 · built · [#206](https://github.com/isoloop/isoloop/issues/206) · A stopped pool member's callbacks no longer run.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.built-apart`
+
+- **Why:** Option D needs nothing from the isolate's build: it renders into `ctx.root` and uses the global document.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · Option D needs nothing from the isolate's build: it renders into `ctx.root` and uses the global document.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.portal-root`
+
+- **Change it:** `usePortalRoot()`
+- **Code:** `packages/react/src/isolate/context.ts`, `packages/preact/src/isolate/context.ts`
+- **Why:** `document.body` reaches no surface, in a pool or in an own worker.
+
+History:
+
+- 2026-11-09 · decided · [ADR 0015 · Decision](../adr/0015-visual-pools.md#decision) · `document.body` reaches no surface, in a pool or in an own worker.
+- 2026-11-09 · built · [#153](https://github.com/isoloop/isoloop/issues/153) · A per-isolate error boundary and portal root in the adapters, built in M2d.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `pool.no-heuristic-pooling`
+
+- **Related:** `pool.opt-in`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why doesn't Isoloop pool small isolates for me? It would be surprising behaviour; an app can opt in to the balancer, which places by measurement.
+
+### `pool.no-build-rebinding`
+
+History:
+
+- 2026-11-09 · rejected · [ADR 0015 · Options](../adr/0015-visual-pools.md#options) · Why not rewrite each isolate's `document` and `window` in the Vite plugin? A shared chunk is evaluated once per worker, so it costs a framework copy per member, it misses `globalThis.document`, and isolates built apart couldn't join.
+
+### `pool.no-global-switch`
+
+History:
+
+- 2026-11-09 · rejected · [ADR 0015 · Options](../adr/0015-visual-pools.md#options) · Why not swap the global per task? Any `await`, timer or framework scheduler crosses members, so one member's code sees another's document.
+
+### `pool.no-document-per-member`
+
+History:
+
+- 2026-11-09 · rejected · [ADR 0015 · Options](../adr/0015-visual-pools.md#options) · Why not a document per member? Code that uses the global `document`, Preact 10 and many libraries, creates nodes and listens in the wrong member's document, silently.
+
+### `pool.no-shadowrealm`
+
+History:
+
+- 2026-11-09 · rejected · [ADR 0015 · Options](../adr/0015-visual-pools.md#options) · Why not `ShadowRealm`, which would solve this cleanly? It hasn't shipped in any browser, workers included. It's the long-term option.
 
 ## Balancer
 
