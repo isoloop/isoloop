@@ -1,0 +1,687 @@
+[
+  {
+    "id": "tool.rule-one-fact",
+    "statement": "A rule holds one fact: one default or one behaviour, as it holds today. An ADR section with several facts becomes several rules, linked through `related`.",
+    "status": "active",
+    "repo": true,
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#what-a-rule-is",
+        "why": "A card that holds a paragraph brings back the problem of digging a default out of an ADR."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rule-fields",
+    "statement": "A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `repo`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy` and `aliases`.",
+    "status": "active",
+    "repo": true,
+    "code": ["docs/rules/schema.json", "scripts/rules/check.ts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#what-a-rule-is",
+        "why": "Each field answers one question a reader asks about a fact: its value, how to change it, where it's built, since when."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-27",
+        "ref": "adr/0026#amended-2026-11-27-rules-about-the-repo",
+        "why": "Rules about the repo need a flag, since they never ship in a version.",
+        "prev": "A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy` and `aliases`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.statement-form",
+    "statement": "A statement is one or two sentences in the present tense that say what holds, with no why. It follows `docs/writing.md`.",
+    "status": "active",
+    "repo": true,
+    "related": ["tool.current-why"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#what-a-rule-is",
+        "why": "A card should read as a fact; the why changes over time and lives in the events."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.current-why",
+    "statement": "A rule's current why is the `why` of its newest `decided`, `amended` or `clarified` event. There's no separate field for it.",
+    "status": "active",
+    "repo": true,
+    "related": ["tool.statement-form"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#what-a-rule-is",
+        "why": "A separate field would drift from the history it summarises."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.ids-never-change",
+    "statement": "A rule id is `<prefix>.<slug>` in kebab-case and never changes. A renamed or moved rule gets a new id and keeps the old one in `aliases`.",
+    "status": "active",
+    "repo": true,
+    "related": ["tool.rules-never-deleted", "tool.rule-ids-kept"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#what-a-rule-is",
+        "why": "ADRs cite ids, and aliases keep those links working."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-never-deleted",
+    "statement": "A rule that stops holding changes status. It's never deleted.",
+    "status": "active",
+    "repo": true,
+    "related": ["tool.rule-ids-kept"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#what-a-rule-is",
+        "why": "The history of a fact that no longer holds is still the answer to why it changed."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rule-statuses",
+    "statement": "A rule's status is one of six: `active`, `decided`, `proposed`, `withdrawn`, `rejected` or `superseded`. Merged but unreleased work is a `built` event, not a status, except that a repo rule is `active` from its `built` event.",
+    "status": "active",
+    "repo": true,
+    "values": ["6 statuses"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#what-a-rule-is",
+        "why": "Status answers whether the rule holds today; events say what happened."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-27",
+        "ref": "adr/0026#amended-2026-11-27-rules-about-the-repo",
+        "why": "A repo rule is in force once its PR merges.",
+        "prev": "A rule's status is one of six: `active`, `decided`, `proposed`, `withdrawn`, `rejected` or `superseded`. Merged but unreleased work is a `built` event, not a status."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rejected-rules",
+    "statement": "An alternative becomes a `rejected` rule only when it answers a real \"why don't you just…?\" question, and its `why` names that question.",
+    "status": "active",
+    "repo": true,
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#what-a-rule-is",
+        "why": "A board full of rejections would bury the rules that hold."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.event-types",
+    "statement": "An event has a `type`, a `date`, a `ref` and a one-line `why`. The type is one of twelve: `proposed`, `decided`, `clarified`, `amended`, `built`, `shipped`, `corrected`, `reopened`, `removed`, `rejected`, `withdrawn` and `superseded`.",
+    "status": "active",
+    "repo": true,
+    "values": ["12 event types"],
+    "related": ["tool.event-prev", "tool.event-refs"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#what-a-rule-is",
+        "why": "These are the steps a decision went through while the ADRs were grilled."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.event-prev",
+    "statement": "A `clarified` or `amended` event carries `prev`, the wording or behaviour before it.",
+    "status": "active",
+    "repo": true,
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#what-a-rule-is",
+        "why": "The rule as it was can then be read without opening the ADR."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.event-refs",
+    "statement": "An event's `ref` is something a reader can open on GitHub: `adr/NNNN#anchor` for an ADR heading (the anchor is required), `#N` or `repo#N` for a PR or an issue, or `vX.Y.Z` for a release tag. Each event type takes only the ref kinds in decision 6's table, and grilling notes and agent memory are never a source.",
+    "status": "active",
+    "repo": true,
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#what-a-rule-is",
+        "why": "A reader has to be able to check every event."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-27",
+        "ref": "adr/0026#amended-2026-11-27-every-adr-ref-names-a-heading",
+        "why": "A ref opens at the decision it means.",
+        "prev": "An event's `ref` is something a reader can open on GitHub: an ADR section, a PR, an issue or a release tag. Grilling notes and agent memory are never a source."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rule-concepts",
+    "statement": "Concepts are a fixed list in `docs/rules/concepts.json`, each with an id, a prefix, a name, a description and an order. Each rule belongs to exactly one concept.",
+    "status": "active",
+    "repo": true,
+    "values": ["17 concepts"],
+    "code": ["docs/rules/concepts.json"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#where-rules-live",
+        "why": "One concept per rule keeps the board from showing a rule twice; cross-links go through `related`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-json",
+    "statement": "The registry is JSON, one file per concept in `docs/rules/`, validated by `scripts/rules/check.ts` with no library. `schema.json` gives editors hints only.",
+    "status": "active",
+    "repo": true,
+    "code": ["docs/rules/schema.json", "scripts/rules/check.ts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#where-rules-live",
+        "why": "One file per concept keeps a PR's diff inside the concept it touches, and the repo owns its checks."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.registry-source",
+    "statement": "The registry is the source of truth for what holds today. ADRs keep the story of why.",
+    "status": "active",
+    "repo": true,
+    "related": ["tool.rules-lines"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#where-rules-live",
+        "why": "A fact often has several ADRs behind it and fields no ADR has, so it can't live inside one ADR."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-lines",
+    "statement": "Each decision and each amendment in an ADR ends with a `Rules:` line naming the rules it adds or changes.",
+    "status": "active",
+    "repo": true,
+    "related": ["tool.rules-lines-from-0026", "tool.adr-pairing"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#where-rules-live",
+        "why": "The line ties an ADR to its rules, and the checks read it."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-check",
+    "statement": "`pnpm rules:check` runs in CI. It fails on a malformed registry, an unknown or repeated id, a broken ADR ref, a status that doesn't match its fields and events, a repo rule with a version or a shipped event, a missing `code` path or an out-of-date README.",
+    "status": "active",
+    "repo": true,
+    "knob": "`pnpm rules:check`",
+    "code": ["scripts/rules/check.ts", ".github/workflows/ci.yml"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#checks",
+        "why": "Each of these is a way the registry could quietly be wrong."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-27",
+        "ref": "adr/0026#amended-2026-11-27-rules-about-the-repo",
+        "why": "Repo rules have their own fields and events to check.",
+        "prev": "`pnpm rules:check` runs in CI. It fails on a malformed registry, an unknown or repeated id, a broken ADR ref, a status that doesn't match its fields and events, a missing `code` path or an out-of-date README."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.adr-pairing",
+    "statement": "A PR that changes an ADR with `Rules:` lines, or any ADR from 0026 on, also changes `docs/rules/`, unless it's labelled `no-rules`.",
+    "status": "active",
+    "repo": true,
+    "values": ["label: no-rules"],
+    "code": ["scripts/rules/pr.ts", ".github/workflows/rules.yml"],
+    "related": ["tool.rules-same-pr"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#checks",
+        "why": "A fact must change in the same PR as the ADR that changes it."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rule-ids-kept",
+    "statement": "A PR fails if a rule id or alias on `main` is missing from it. The `no-rules` label doesn't skip this.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/rules/pr.ts"],
+    "related": ["tool.ids-never-change"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#checks",
+        "why": "Rules are never deleted, and links from ADRs must keep working."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-lines-from-0026",
+    "statement": "Every decision and amendment in an ADR numbered 0026 or higher has a `Rules:` line from the start. Older ADRs are checked once they have `Rules:` lines.",
+    "status": "active",
+    "repo": true,
+    "values": ["from ADR 0026"],
+    "code": ["scripts/rules/check.ts", "scripts/rules/pr.ts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#checks",
+        "why": "New ADRs shouldn't add to the backfill."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-same-pr",
+    "statement": "Whoever changes an ADR updates its rules in the same PR. The steward treats rules that don't match the ADR as a must-fix.",
+    "status": "active",
+    "repo": true,
+    "code": ["AGENTS.md"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#checks",
+        "why": "CI catches a registry left untouched; only a review catches one that says the wrong thing."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-ship",
+    "statement": "`pnpm rules:ship <version>` runs in the version PR. Each rule whose `target` is that version becomes `active`, with `since` set, a `shipped` event and no `target`.",
+    "status": "active",
+    "repo": true,
+    "knob": "`pnpm rules:ship <version>`",
+    "code": ["scripts/rules/ship.ts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#checks",
+        "why": "Shipped events are generated, so a card's version can't be wrong."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-readme",
+    "statement": "`pnpm rules:build` writes `docs/rules/README.md`, which is committed: per concept, a table of rules, then each rule's history.",
+    "status": "active",
+    "repo": true,
+    "knob": "`pnpm rules:build`",
+    "code": ["scripts/rules/build.ts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#views",
+        "why": "Agents and GitHub readers get every fact and every why in one file, with no tooling."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-board",
+    "statement": "`pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. It has the Board, a rule drawer and the Agenda by day or by version.",
+    "status": "active",
+    "repo": true,
+    "knob": "`pnpm rules:board`",
+    "code": ["scripts/rules/build.ts", "scripts/rules/board.html"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#views",
+        "why": "The board is the view for reading across concepts and over time."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-backfill",
+    "statement": "Rules for the existing ADRs are added one concept per PR, each reviewed by the maintainer. Supervision, Durability and Versioning & releases go first.",
+    "status": "active",
+    "repo": true,
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#rollout",
+        "why": "Each PR stays small enough to check against its ADRs."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.agents-md-rules",
+    "statement": "`AGENTS.md` sends agents to `docs/rules/README.md` for what holds today.",
+    "status": "active",
+    "repo": true,
+    "code": ["AGENTS.md"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#rollout",
+        "why": "Agents can't find the registry from the file tree alone."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-scope",
+    "statement": "The registry covers this repo's ADRs only.",
+    "status": "active",
+    "repo": true,
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#rollout",
+        "why": "CI can only hold this repo's ADR PRs to their rules."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-not-milestone",
+    "statement": "The rules registry is internal tooling outside the milestones, and its PRs take the `no-changeset` label.",
+    "status": "active",
+    "repo": true,
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#rollout",
+        "why": "It ships nothing to npm and waits for no release."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-ship-due",
+    "statement": "`rules:check` fails when a `decided` or `proposed` rule's `target` is at or below the packages' version. Previews such as `0.2.0-next.3` never trigger it.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/rules/check.ts"],
+    "related": ["tool.rules-ship"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#clarified-2026-11-27-when-rulesship-is-due",
+        "why": "The version PR that sets a version is where its rules ship."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-ship-patches",
+    "statement": "A patch from a `release/0.x` branch gets its `shipped` events in that branch's version PR, and they come to `main` with the backport.",
+    "status": "active",
+    "repo": true,
+    "related": ["tool.rules-ship"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#clarified-2026-11-27-when-rulesship-is-due",
+        "why": "The branch is where the patch's version is set."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.repo-rules",
+    "statement": "A rule with `repo: true` is about how this repo works, not the published packages. It's `active` from its `built` event, has no `since`, `target` or `shipped` event, and `rules:ship` skips it.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/rules/check.ts", "scripts/rules/ship.ts"],
+    "related": ["tool.rule-statuses"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#amended-2026-11-27-rules-about-the-repo",
+        "why": "Repo tooling and process never ship in an npm version, but they are in force once merged."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-lines-sections",
+    "statement": "Under an ADR's `## Decision`, a decision is a numbered `###` heading when there are any, otherwise a top-level numbered item, otherwise each `###` section. A heading that says \"amended\" is an amendment, and a `Rules:` line inside a code fence doesn't count.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/rules/registry.ts"],
+    "related": ["tool.rules-lines", "tool.rules-lines-from-0026"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0026#clarified-2026-11-27-what-counts-as-a-decision",
+        "why": "The `Rules:` line check has to know which parts of an ADR need a line."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#483",
+        "why": "In force from the PR that built the rules registry."
+      }
+    ]
+  }
+]

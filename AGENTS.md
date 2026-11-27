@@ -23,6 +23,7 @@ A change is done when all six hold:
 
 - **One PR per task** from a plan's task table.
 - **ADRs** record decisions; the maintainer reviews each one on its own, and it's committed once the review ends.
+- **Rules:** for what holds today, read [`docs/rules/README.md`](docs/rules/README.md); an ADR change updates `docs/rules/` in the same PR ([ADR 0026](docs/adr/0026-rules-registry.md)). For the steward: rules that don't match what the ADR says are a must-fix.
 - **The maintainer reviews** ADRs, docs-only PRs in this repo, and new public API. Forks merge their own code PRs on green.
 - **Releases:** each stage and finish run of `release.yml` needs the maintainer's explicit word for that release, and only the maintainer approves what's staged on npm. The finish run creates the tag; nobody pushes `v*` tags by hand ([`CONTRIBUTING.md`](CONTRIBUTING.md#releases)).
 

@@ -1,0 +1,1058 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Isoloop rules</title>
+    <!-- The rules board (ADR 0026, decision 15). `pnpm rules:board` inlines the registry at RULES_DATA and writes .rules-board/index.html. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap"
+    />
+    <style>
+      /* Layout: a rule register. Board = concepts as columns of rule cards; Agenda = one dated ledger of events; a drawer shows one rule's facts then its history.
+   Palette: isoloop.dev's tokens (web packages/ui/src/tokens.css, ADR 0003): paper/ink light, graphite dark; blue accent, green released, orange experimental, violet for superseded. */
+      :root {
+        --bg: #f6f7f9;
+        --surface: #ffffff;
+        --sunk: #e9ecf3;
+        --line: #d5dae2;
+        --fg: #14161c;
+        --muted: #4a5160;
+        --accent: #2f57cc;
+        --accent-soft: rgb(47 87 204 / 0.1);
+        --ok: #23793f;
+        --ok-soft: rgb(35 121 63 / 0.11);
+        --info: #2f57cc;
+        --info-soft: rgb(47 87 204 / 0.1);
+        --warn: #b75400;
+        --warn-soft: rgb(183 84 0 / 0.11);
+        --off: #5d6472;
+        --off-soft: #e9ecf3;
+        --gone: #6e46c2;
+        --gone-soft: rgb(110 70 194 / 0.1);
+        --display: 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --body: 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+        --shadow: 0 12px 40px rgb(20 22 28 / 0.16);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --bg: #171b26;
+          --surface: #1f232d;
+          --sunk: #1b1f29;
+          --line: #343945;
+          --fg: #e9ecf3;
+          --muted: #aab2c3;
+          --accent: #8aa5ff;
+          --accent-soft: rgb(138 165 255 / 0.14);
+          --ok: #6fcf87;
+          --ok-soft: rgb(111 207 135 / 0.13);
+          --info: #8aa5ff;
+          --info-soft: rgb(138 165 255 / 0.14);
+          --warn: #f9aa60;
+          --warn-soft: rgb(249 170 96 / 0.13);
+          --off: #9aa2b2;
+          --off-soft: #2a2f3a;
+          --gone: #b79af6;
+          --gone-soft: rgb(183 154 246 / 0.14);
+          --shadow: 0 12px 40px rgb(0 0 0 / 0.5);
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme='dark'] {
+        --bg: #171b26;
+        --surface: #1f232d;
+        --sunk: #1b1f29;
+        --line: #343945;
+        --fg: #e9ecf3;
+        --muted: #aab2c3;
+        --accent: #8aa5ff;
+        --accent-soft: rgb(138 165 255 / 0.14);
+        --ok: #6fcf87;
+        --ok-soft: rgb(111 207 135 / 0.13);
+        --info: #8aa5ff;
+        --info-soft: rgb(138 165 255 / 0.14);
+        --warn: #f9aa60;
+        --warn-soft: rgb(249 170 96 / 0.13);
+        --off: #9aa2b2;
+        --off-soft: #2a2f3a;
+        --gone: #b79af6;
+        --gone-soft: rgb(183 154 246 / 0.14);
+        --shadow: 0 12px 40px rgb(0 0 0 / 0.5);
+        color-scheme: dark;
+      }
+      :root[data-theme='light'] {
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--body);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .wrap {
+        max-width: none;
+        margin: 0;
+        padding-block: 20px 48px;
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 12px 24px;
+      }
+      h1 {
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 1.6rem;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .sub {
+        color: var(--muted);
+        margin: 2px 0 0;
+        max-width: 60ch;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        background: var(--sunk);
+        padding: 4px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+      }
+      .tabs button {
+        font: 500 13px var(--body);
+        border: 0;
+        background: none;
+        color: var(--muted);
+        padding: 6px 14px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .tabs button[aria-selected='true'] {
+        background: var(--surface);
+        color: var(--fg);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+      }
+      .tools {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .search {
+        flex: 1 1 220px;
+        min-width: 0;
+        font: 14px var(--body);
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--fg);
+      }
+      .chip-f {
+        font: 500 12px var(--body);
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--muted);
+        padding: 5px 10px;
+        border-radius: 999px;
+        cursor: pointer;
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .chip-f[aria-pressed='true'] {
+        border-color: var(--accent);
+        color: var(--fg);
+        background: var(--accent-soft);
+      }
+      .chip-f .n {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+      }
+      button:focus-visible,
+      input:focus-visible,
+      .card:focus-visible,
+      .row:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      /* status pill */
+      .st {
+        font: 500 11px var(--body);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 2px 7px;
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+      .st.active {
+        color: var(--ok);
+        background: var(--ok-soft);
+      }
+      .st.decided {
+        color: var(--info);
+        background: var(--info-soft);
+      }
+      .st.proposed {
+        color: var(--warn);
+        background: var(--warn-soft);
+      }
+      .st.withdrawn,
+      .st.rejected {
+        color: var(--off);
+        background: var(--off-soft);
+      }
+      .st.superseded {
+        color: var(--gone);
+        background: var(--gone-soft);
+      }
+      .exp {
+        font: 500 11px var(--body);
+        color: var(--warn);
+        border: 1px dashed var(--warn);
+        padding: 1px 6px;
+        border-radius: 4px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        flex: none;
+      }
+      .dot.active {
+        background: var(--ok);
+      }
+      .dot.decided {
+        background: var(--info);
+      }
+      .dot.proposed {
+        background: var(--warn);
+      }
+      .dot.withdrawn,
+      .dot.rejected {
+        background: var(--off);
+      }
+      .dot.superseded {
+        background: var(--gone);
+      }
+
+      /* board */
+      .board {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+        gap: 16px;
+        align-items: start;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+      }
+      .col-h {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: 0 2px 4px;
+        border-bottom: 2px solid var(--line);
+      }
+      .col-h h2 {
+        font-family: var(--display);
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin: 0;
+      }
+      .col-h .meta {
+        font: 12px var(--mono);
+        color: var(--muted);
+      }
+      .col-h p {
+        margin: 0;
+      }
+      .col-desc {
+        color: var(--muted);
+        font-size: 12.5px;
+        margin: 0 2px 4px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        cursor: pointer;
+        text-align: left;
+        font: inherit;
+        color: inherit;
+        width: 100%;
+      }
+      .card:hover {
+        border-color: var(--accent);
+      }
+      .card.dim {
+        opacity: 0.62;
+      }
+      .card.dim .stmt {
+        text-decoration: line-through;
+        text-decoration-color: var(--off);
+      }
+      .card-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+      }
+      .rid {
+        font: 12px var(--mono);
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+      .stmt {
+        margin: 0;
+        font-size: 13.5px;
+      }
+      .facts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .fact {
+        font: 12px var(--mono);
+        background: var(--sunk);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 1px 6px;
+        overflow-wrap: anywhere;
+      }
+      .card-foot {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .empty {
+        color: var(--muted);
+        font-size: 13px;
+        padding: 8px 2px;
+      }
+
+      /* agenda */
+      .agenda {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .day {
+        display: grid;
+        grid-template-columns: 7.5rem 1fr;
+        gap: 0 20px;
+      }
+      .day-h {
+        font: 500 13px var(--mono);
+        color: var(--muted);
+        padding-top: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+      .day-h b {
+        display: block;
+        font: 600 1rem var(--display);
+        color: var(--fg);
+      }
+      .rows {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        overflow: hidden;
+        min-width: 0;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 6.5rem 1fr auto;
+        gap: 4px 14px;
+        padding: 10px 14px;
+        border: 0;
+        border-top: 1px solid var(--line);
+        background: none;
+        text-align: left;
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+        width: 100%;
+      }
+      .row:first-child {
+        border-top: 0;
+      }
+      .row:hover {
+        background: var(--sunk);
+      }
+      .ev {
+        font: 500 12px var(--mono);
+        text-transform: lowercase;
+      }
+      .row .what {
+        min-width: 0;
+      }
+      .row .what b {
+        font-weight: 500;
+      }
+      .row .why {
+        color: var(--muted);
+        font-size: 13px;
+        display: block;
+      }
+      .row .src {
+        font: 12px var(--mono);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .cpt {
+        font-size: 11px;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 0 7px;
+        margin-left: 6px;
+        white-space: nowrap;
+      }
+      @media (max-width: 640px) {
+        .day {
+          grid-template-columns: 1fr;
+        }
+        .day-h {
+          padding: 0 0 6px;
+        }
+        .day-h b {
+          display: inline;
+          margin-right: 8px;
+        }
+        .row {
+          grid-template-columns: 1fr;
+        }
+        .row .src {
+          white-space: normal;
+        }
+      }
+
+      /* event colours */
+      .ev.decided,
+      .ev.shipped {
+        color: var(--ok);
+      }
+      .ev.amended,
+      .ev.clarified {
+        color: var(--info);
+      }
+      .ev.built {
+        color: var(--ok);
+      }
+      .ev.proposed,
+      .ev.reopened {
+        color: var(--warn);
+      }
+      .ev.corrected,
+      .ev.removed,
+      .ev.rejected,
+      .ev.withdrawn,
+      .ev.superseded {
+        color: var(--gone);
+      }
+
+      /* drawer */
+      .scrim {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 15, 25, 0.35);
+        z-index: 20;
+      }
+      .drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(34rem, 100%);
+        background: var(--surface);
+        border-left: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        z-index: 21;
+        overflow-y: auto;
+        padding: calc(20px + env(safe-area-inset-top, 0px))
+          max(20px, env(safe-area-inset-right, 0px)) calc(28px + env(safe-area-inset-bottom, 0px))
+          20px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .d-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .close {
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--fg);
+        border-radius: 6px;
+        width: 32px;
+        height: 32px;
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+        flex: none;
+      }
+      .d-stmt {
+        font: 500 1.15rem/1.4 var(--display);
+        margin: 4px 0 0;
+        text-wrap: balance;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: 7rem 1fr;
+        gap: 8px 14px;
+        margin: 0;
+        padding: 14px;
+        background: var(--sunk);
+        border-radius: 8px;
+        border: 1px solid var(--line);
+      }
+      dt {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding-top: 2px;
+      }
+      dd {
+        margin: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      dd code,
+      .why code,
+      .stmt code,
+      .d-stmt code {
+        font-family: var(--mono);
+        font-size: 0.92em;
+      }
+      .sec-h {
+        font: 600 12px var(--body);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin: 0;
+      }
+      .tl {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .tl li {
+        display: grid;
+        grid-template-columns: 16px 1fr;
+        gap: 0 12px;
+      }
+      .tl .rail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .tl .rail i {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 2px solid var(--accent);
+        background: var(--surface);
+        margin-top: 5px;
+        flex: none;
+      }
+      .tl .rail span {
+        flex: 1;
+        width: 2px;
+        background: var(--line);
+        margin: 2px 0;
+      }
+      .tl li:last-child .rail span {
+        display: none;
+      }
+      .tl .body {
+        padding-bottom: 16px;
+        min-width: 0;
+      }
+      .tl .line1 {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        align-items: baseline;
+      }
+      .tl .date {
+        font: 12px var(--mono);
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .tl .why {
+        margin: 2px 0 0;
+      }
+      .tl .prev {
+        margin: 6px 0 0;
+        font-size: 12.5px;
+        color: var(--muted);
+        border-left: 2px solid var(--line);
+        padding-left: 8px;
+      }
+      .tl .ref {
+        font: 12px var(--mono);
+        color: var(--accent);
+      }
+      .related {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .related button {
+        font: 12px var(--mono);
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--accent);
+        border-radius: 4px;
+        padding: 2px 8px;
+        cursor: pointer;
+      }
+      .note {
+        font-size: 12px;
+        color: var(--muted);
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+        margin: 0;
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .drawer {
+          animation: slide 0.18s ease-out;
+        }
+        @keyframes slide {
+          from {
+            transform: translateX(24px);
+            opacity: 0.6;
+          }
+        }
+      }
+      /* added for the registry template (ADR 0026, decision 15) */
+      html {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+      }
+      a {
+        color: var(--accent);
+      }
+      .why-now {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .why-now b {
+        color: var(--fg);
+        font-weight: 500;
+      }
+      .tl a.ref {
+        text-decoration: none;
+      }
+      .tl a.ref:hover {
+        text-decoration: underline;
+      }
+      .group {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .rel-h {
+        font: 600 1rem var(--display);
+        margin: 0;
+      }
+      .empty-board {
+        padding: 32px 4px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div>
+          <h1>Isoloop rules</h1>
+          <p class="sub">
+            What holds today, one fact per card. Open a card for its values, where it lives in the
+            code, and every decision that touched it.
+          </p>
+        </div>
+        <div class="tools">
+          <div class="tabs" role="tablist">
+            <button role="tab" id="tab-board" aria-selected="true">Board</button>
+            <button role="tab" id="tab-agenda" aria-selected="false">Agenda</button>
+          </div>
+          <div class="tabs" role="radiogroup" aria-label="Agenda grouping" id="group" hidden>
+            <button role="radio" data-g="day" aria-selected="true">By day</button>
+            <button role="radio" data-g="version" aria-selected="false">By version</button>
+          </div>
+          <div class="tabs" role="radiogroup" aria-label="Theme" id="theme">
+            <button role="radio" data-t="system" aria-selected="true">System</button>
+            <button role="radio" data-t="light" aria-selected="false">Light</button>
+            <button role="radio" data-t="dark" aria-selected="false">Dark</button>
+          </div>
+        </div>
+      </header>
+      <div class="tools">
+        <input
+          class="search"
+          id="q"
+          type="search"
+          placeholder="Search rules, values, knobs, refs…"
+          aria-label="Search"
+        />
+        <div class="tools" id="filters"></div>
+      </div>
+      <main id="view"></main>
+      <p class="note" id="note"></p>
+    </div>
+    <div id="drawer-root"></div>
+    <script>
+      const DATA = /*RULES_DATA*/ null || { concepts: [], rules: [], refs: {} };
+      const CONCEPTS = DATA.concepts;
+      const RULES = DATA.rules;
+      const REFS = DATA.refs;
+      const STATUS = {
+        active: 'Active',
+        decided: 'Decided',
+        proposed: 'Proposed',
+        withdrawn: 'Withdrawn',
+        rejected: 'Rejected',
+        superseded: 'Superseded',
+      };
+      const DIM = ['withdrawn', 'rejected', 'superseded'];
+      const byId = Object.fromEntries(
+        RULES.flatMap((r) => [[r.id, r], ...(r.aliases || []).map((a) => [a, r])]),
+      );
+      const cName = Object.fromEntries(CONCEPTS.map((c) => [c.id, c.name]));
+      const esc = (s) =>
+        String(s).replace(
+          /[&<>"]/g,
+          (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m],
+        );
+      const md = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+      const fmtDate = (d) =>
+        new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      const refLabel = (ref) => (REFS[ref] ? REFS[ref].label : ref);
+      const refHtml = (ref) => {
+        const r = REFS[ref];
+        return r && r.url
+          ? `<a class="ref" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.label)}</a>`
+          : `<span class="ref">${esc(refLabel(ref))}</span>`;
+      };
+      const inForce = (r) => (r.repo ? r.events.find((e) => e.type === 'built') : undefined);
+      const currentWhy = (r) => {
+        for (let i = r.events.length - 1; i >= 0; i--) {
+          const t = r.events[i].type;
+          if (t === 'decided' || t === 'amended' || t === 'clarified') return r.events[i];
+        }
+        return undefined;
+      };
+
+      // Releases, from the shipped events: an event belongs to the first release dated on or after it.
+      const RELEASES = [
+        ...new Map(
+          RULES.flatMap((r) =>
+            r.events.filter((e) => e.type === 'shipped').map((e) => [e.ref, e.date]),
+          ),
+        ).entries(),
+      ]
+        .map(([tag, date]) => ({ tag, date }))
+        .sort((a, b) => a.date.localeCompare(b.date) || a.tag.localeCompare(b.tag));
+      const releaseOf = (e) => {
+        if (e.type === 'shipped') return e.ref;
+        const rel = RELEASES.find((x) => x.date >= e.date);
+        return rel ? rel.tag : 'Unreleased';
+      };
+
+      let view = 'board';
+      let group = 'day';
+      let query = '';
+      const on = new Set(['active', 'decided', 'proposed']);
+      const load = (k) => {
+        try {
+          return localStorage.getItem(k);
+        } catch (e) {
+          return null;
+        }
+      };
+      const save = (k, v) => {
+        try {
+          localStorage.setItem(k, v);
+        } catch (e) {}
+      };
+      if (load('rb-view') === 'agenda') view = 'agenda';
+      if (load('rb-group') === 'version') group = 'version';
+
+      function matches(r) {
+        if (!on.has(r.status)) return false;
+        if (!query) return true;
+        const hay = [
+          r.id,
+          r.statement,
+          r.knob,
+          ...(r.code || []),
+          ...(r.errors || []),
+          ...(r.values || []),
+          ...(r.aliases || []),
+          ...r.events.map((e) => e.ref + ' ' + refLabel(e.ref) + ' ' + e.why),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return hay.includes(query);
+      }
+      function renderFilters() {
+        const counts = {};
+        RULES.forEach((r) => (counts[r.status] = (counts[r.status] || 0) + 1));
+        document.getElementById('filters').innerHTML = Object.keys(STATUS)
+          .map(
+            (s) =>
+              `<button class="chip-f" aria-pressed="${on.has(s)}" data-s="${s}"><span class="dot ${s}"></span>${STATUS[s]}<span class="n">${counts[s] || 0}</span></button>`,
+          )
+          .join('');
+      }
+      function card(r) {
+        const last = r.events[r.events.length - 1];
+        const built = inForce(r);
+        const ver = built
+          ? 'in force since ' + refLabel(built.ref)
+          : r.since
+            ? 'since ' + r.since
+            : r.target
+              ? 'target ' + r.target
+              : '';
+        return `<button class="card${DIM.includes(r.status) ? ' dim' : ''}" data-id="${esc(r.id)}">
+    <div class="card-top"><span class="rid">${esc(r.id)}</span><span class="facts">${r.experimental ? '<span class="exp">experimental</span>' : ''}${r.repo ? '<span class="fact">repo</span>' : ''}<span class="st ${r.status}">${STATUS[r.status]}</span></span></div>
+    <p class="stmt">${md(r.statement)}</p>
+    ${r.values && r.values.length ? `<div class="facts">${r.values.map((f) => `<span class="fact">${esc(f)}</span>`).join('')}</div>` : ''}
+    <div class="card-foot"><span>${r.events.length} event${r.events.length > 1 ? 's' : ''} · ${last.type} ${fmtDate(last.date)}</span><span>${esc(ver)}</span></div>
+  </button>`;
+      }
+      function renderBoard() {
+        if (RULES.length === 0)
+          return '<p class="empty-board">No rules yet. Add them to the JSON files in docs/rules, then run pnpm rules:board again.</p>';
+        return `<div class="board">${CONCEPTS.filter((c) => RULES.some((r) => r.concept === c.id))
+          .map((c) => {
+            const rs = RULES.filter((r) => r.concept === c.id && matches(r));
+            const total = RULES.filter((r) => r.concept === c.id).length;
+            return `<section class="col"><div class="col-h"><h2>${esc(c.name)}</h2><span class="meta">${rs.length}/${total}</span></div>
+      <p class="col-desc">${esc(c.description)}</p>
+      ${rs.length ? rs.map(card).join('') : '<div class="empty">No rules match.</div>'}</section>`;
+          })
+          .join('')}</div>`;
+      }
+      function rowsHtml(list) {
+        return `<div class="rows">${list
+          .map(
+            (e) => `<button class="row" data-id="${esc(e.r.id)}">
+    <span class="ev ${e.type}">${e.type}</span>
+    <span class="what"><b>${esc(e.r.id)}</b><span class="cpt">${esc(cName[e.r.concept] || e.r.concept)}</span><span class="why">${md(e.why)}</span></span>
+    <span class="src">${group === 'version' ? esc(e.date) + ' · ' : ''}${esc(refLabel(e.ref))}</span></button>`,
+          )
+          .join('')}</div>`;
+      }
+      function renderAgenda() {
+        const evs = [];
+        RULES.filter(matches).forEach((r) => r.events.forEach((e) => evs.push({ ...e, r })));
+        evs.sort((a, b) => b.date.localeCompare(a.date) || a.r.concept.localeCompare(b.r.concept));
+        if (!evs.length) return '<div class="empty">No events match.</div>';
+        const groups = new Map();
+        for (const e of evs) {
+          const k = group === 'version' ? releaseOf(e) : e.date;
+          if (!groups.has(k)) groups.set(k, []);
+          groups.get(k).push(e);
+        }
+        let keys = [...groups.keys()];
+        if (group === 'version') {
+          const order = ['Unreleased', ...RELEASES.map((x) => x.tag).reverse()];
+          keys = keys.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+        }
+        return `<div class="agenda">${keys
+          .map((k) => {
+            const list = groups.get(k);
+            const n = `${list.length} event${list.length > 1 ? 's' : ''}`;
+            let h;
+            if (group === 'version') {
+              const rel = RELEASES.find((x) => x.tag === k);
+              h = `<b>${esc(k)}</b>${rel ? esc(rel.date) + ' · ' : ''}${n}`;
+            } else {
+              const dt = new Date(k + 'T00:00:00');
+              h = `<b>${dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</b>${dt.toLocaleDateString('en-GB', { weekday: 'short' })} ${dt.getFullYear()} · ${n}`;
+            }
+            return `<section class="day"><div class="day-h">${h}</div>${rowsHtml(list)}</section>`;
+          })
+          .join('')}</div>`;
+      }
+      function render() {
+        document.getElementById('tab-board').setAttribute('aria-selected', view === 'board');
+        document.getElementById('tab-agenda').setAttribute('aria-selected', view === 'agenda');
+        document.getElementById('group').hidden = view !== 'agenda';
+        document
+          .querySelectorAll('#group button')
+          .forEach((b) => b.setAttribute('aria-selected', b.dataset.g === group));
+        renderFilters();
+        document.getElementById('view').innerHTML =
+          view === 'board' ? renderBoard() : renderAgenda();
+      }
+      function openRule(id) {
+        const r = byId[id];
+        if (!r) return;
+        const undone = r.status === 'decided' || r.status === 'proposed';
+        const rows = [
+          [
+            'Status',
+            `<span class="st ${r.status}">${STATUS[r.status]}</span>${r.experimental ? ' <span class="exp">experimental</span>' : ''}`,
+          ],
+          inForce(r) && ['In force since', refHtml(inForce(r).ref)],
+          r.repo && ['Scope', 'How this repo works, not the published packages'],
+          r.since && ['Since', `<code>${esc(r.since)}</code>`],
+          r.target && [
+            'Target',
+            `<code>${esc(r.target)}</code>${undone ? ' (not released yet)' : ''}`,
+          ],
+          r.values &&
+            r.values.length && [
+              'Values',
+              r.values.map((f) => `<code>${esc(f)}</code>`).join(' · '),
+            ],
+          r.knob && ['Change it', md(r.knob)],
+          r.errors &&
+            r.errors.length && [
+              'Errors / events',
+              r.errors.map((f) => `<code>${esc(f)}</code>`).join(' · '),
+            ],
+          r.code &&
+            r.code.length && ['Code', r.code.map((f) => `<code>${esc(f)}</code>`).join('<br>')],
+          r.supersededBy && ['Superseded by', `<code>${esc(r.supersededBy)}</code>`],
+          r.aliases &&
+            r.aliases.length && [
+              'Old ids',
+              r.aliases.map((f) => `<code>${esc(f)}</code>`).join(' · '),
+            ],
+          ['Concept', esc(cName[r.concept] || r.concept)],
+        ].filter(Boolean);
+        const why = currentWhy(r);
+        const evs = [...r.events].reverse();
+        const links = [...(r.related || []), ...(r.supersededBy ? [r.supersededBy] : [])];
+        document.getElementById('drawer-root').innerHTML = `<div class="scrim" data-close></div>
+  <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="d-id">
+    <div class="d-top"><div><span class="rid" id="d-id">${esc(r.id)}</span><p class="d-stmt">${md(r.statement)}</p>
+      ${why ? `<p class="why-now"><b>Why:</b> ${md(why.why)}</p>` : ''}</div>
+      <button class="close" data-close aria-label="Close">×</button></div>
+    <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
+    <h3 class="sec-h">History · newest first</h3>
+    <ol class="tl">${evs
+      .map(
+        (e) => `<li><div class="rail"><i></i><span></span></div><div class="body">
+      <div class="line1"><span class="ev ${e.type}">${e.type}</span><span class="date">${esc(e.date)}</span>${refHtml(e.ref)}</div>
+      <p class="why">${md(e.why)}</p>${e.prev ? `<p class="prev">Before: ${md(e.prev)}</p>` : ''}</div></li>`,
+      )
+      .join('')}</ol>
+    ${links.length ? `<h3 class="sec-h">Related rules</h3><div class="related">${links.map((x) => `<button data-id="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : ''}
+  </aside>`;
+        document.querySelector('.drawer .close').focus();
+      }
+      function closeRule() {
+        document.getElementById('drawer-root').innerHTML = '';
+      }
+
+      document.getElementById('tab-board').onclick = () => {
+        view = 'board';
+        save('rb-view', view);
+        render();
+      };
+      document.getElementById('tab-agenda').onclick = () => {
+        view = 'agenda';
+        save('rb-view', view);
+        render();
+      };
+      document.getElementById('group').addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (b) {
+          group = b.dataset.g;
+          save('rb-group', group);
+          render();
+        }
+      });
+      document.getElementById('q').addEventListener('input', (e) => {
+        query = e.target.value.trim().toLowerCase();
+        render();
+      });
+      document.addEventListener('click', (e) => {
+        if (e.target.closest('a')) return;
+        const f = e.target.closest('.chip-f');
+        if (f) {
+          const s = f.dataset.s;
+          on.has(s) ? on.delete(s) : on.add(s);
+          render();
+          return;
+        }
+        if (e.target.closest('[data-close]')) {
+          closeRule();
+          return;
+        }
+        const t = e.target.closest('[data-id]');
+        if (t) openRule(t.dataset.id);
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeRule();
+      });
+
+      function setTheme(t) {
+        const root = document.documentElement;
+        if (t === 'system') root.removeAttribute('data-theme');
+        else root.setAttribute('data-theme', t);
+        document
+          .querySelectorAll('#theme button')
+          .forEach((b) => b.setAttribute('aria-selected', b.dataset.t === t));
+        save('rb-theme', t);
+      }
+      document.getElementById('theme').addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (b) setTheme(b.dataset.t);
+      });
+      setTheme(load('rb-theme') || 'system');
+      document.getElementById('note').textContent =
+        `${RULES.length} rules in ${CONCEPTS.length} concepts, built from docs/rules by pnpm rules:board.`;
+      render();
+    </script>
+  </body>
+</html>

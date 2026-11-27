@@ -1,0 +1,37 @@
+# A PR that changes an ADR changes the rules registry with it (ADR 0026,
+# decision 11). scripts/rules/pr.ts decides:
+# - an ADR with `Rules:` lines that changed needs a change under docs/rules/,
+#   unless the PR is labelled `no-rules` (an edit that changes no fact);
+# - every rule id and alias on the base is still there on the PR, label or not.
+# Its own workflow, like changeset.yml, so adding or removing the label re-runs
+# only this check. The registry itself is checked in ci.yml (pnpm rules:check).
+name: Rules
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rules-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The base branch's history, so the diff can compare against it.
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # No install: the script runs on the runner's Node.
+      - name: ADR changes come with rules changes; no rule id removed
+        run: node scripts/rules/pr.ts
+        env:
+          BASE_REF: origin/${{ github.base_ref }}

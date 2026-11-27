@@ -1,0 +1,456 @@
+// The rules registry (ADR 0026): its types, and reading it and the ADRs from
+// disk. check.ts, build.ts, ship.ts and pr.ts share this module; none of it
+// needs a dependency.
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+export const RULES_DIR = 'docs/rules';
+export const ADR_DIR = 'docs/adr';
+export const README = `${RULES_DIR}/README.md`;
+export const CONCEPTS_FILE = `${RULES_DIR}/concepts.json`;
+/** Files in docs/rules that hold no rules. */
+export const NOT_RULE_FILES = new Set(['concepts.json', 'schema.json']);
+
+/** Decision 5. */
+export const STATUSES = [
+  'active',
+  'decided',
+  'proposed',
+  'withdrawn',
+  'rejected',
+  'superseded',
+] as const;
+export type Status = (typeof STATUSES)[number];
+
+/** Decision 6. */
+export const EVENT_TYPES = [
+  'proposed',
+  'decided',
+  'clarified',
+  'amended',
+  'built',
+  'shipped',
+  'corrected',
+  'reopened',
+  'removed',
+  'rejected',
+  'withdrawn',
+  'superseded',
+] as const;
+export type EventType = (typeof EVENT_TYPES)[number];
+
+/** The kind of `ref` each event type takes (decision 6's table). */
+export const REF_KINDS: Record<EventType, readonly RefKind[]> = {
+  proposed: ['adr', 'issue'],
+  decided: ['adr'],
+  clarified: ['adr'],
+  amended: ['adr'],
+  built: ['issue'],
+  shipped: ['tag'],
+  corrected: ['adr'],
+  reopened: ['issue'],
+  removed: ['adr'],
+  rejected: ['adr'],
+  withdrawn: ['adr'],
+  superseded: ['adr'],
+};
+
+export interface RuleEvent {
+  type: EventType;
+  date: string;
+  ref: string;
+  why: string;
+  prev?: string;
+}
+
+export interface Rule {
+  id: string;
+  statement: string;
+  status: Status;
+  experimental?: boolean;
+  /** About how the repo works, not the packages: active from its `built` event, no versions (amended 2026-11-27). */
+  repo?: boolean;
+  values?: string[];
+  knob?: string;
+  errors?: string[];
+  code?: string[];
+  since?: string;
+  target?: string;
+  related?: string[];
+  supersededBy?: string;
+  aliases?: string[];
+  events: RuleEvent[];
+}
+
+export interface Concept {
+  id: string;
+  prefix: string;
+  name: string;
+  description: string;
+  order: number;
+}
+
+/** One concept file as read, before validation. */
+export interface RuleFile {
+  /** Repo-relative path, for messages. */
+  path: string;
+  /** The concept id the file is named for. */
+  concept: string;
+  /** Parsed JSON; validated by check.ts. */
+  data: unknown;
+}
+
+export interface Registry {
+  concepts: unknown;
+  files: RuleFile[];
+}
+
+/** An ADR file: its number, file name, text, heading anchors and `Rules:` ids. */
+export interface Adr {
+  number: string;
+  file: string;
+  anchors: Map<string, string>;
+  rulesIds: string[];
+  /** Decisions and amendments with no `Rules:` line (decision 11 holds ADR 0026 on to them). */
+  unruled: string[];
+}
+
+/** From this ADR on, every decision and amendment has a `Rules:` line from the start (decision 11). */
+export const RULES_LINES_FROM = '0026';
+
+export interface Problem {
+  file: string;
+  message: string;
+}
+
+// --- Refs ---------------------------------------------------------------------
+
+export type RefKind = 'adr' | 'issue' | 'tag';
+export type Ref =
+  | { kind: 'adr'; number: string; anchor: string }
+  | { kind: 'issue'; repo?: string; number: number }
+  | { kind: 'tag'; tag: string };
+
+/**
+ * The three ref forms:
+ * - `adr/0007#1-supervise-the-bus-like-an-isolate` (an ADR and a heading in it; the
+ *   anchor is required, amended 2026-11-27);
+ * - `#390` or `web#285` (a PR or an issue; GitHub serves both under one number);
+ * - `v0.1.0` (a release tag).
+ */
+export function parseRef(ref: string): Ref | undefined {
+  let m = /^adr\/(\d{4})#([a-z0-9_-]+)$/.exec(ref);
+  if (m) return { kind: 'adr', number: m[1]!, anchor: m[2]! };
+  m = /^(?:([a-z][a-z0-9-]*))?#(\d+)$/.exec(ref);
+  if (m)
+    return m[1]
+      ? { kind: 'issue', repo: m[1], number: Number(m[2]) }
+      : { kind: 'issue', number: Number(m[2]) };
+  m = /^v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/.exec(ref);
+  if (m) return { kind: 'tag', tag: ref };
+  return undefined;
+}
+
+const GITHUB = 'https://github.com/isoloop';
+
+/** Where a ref points, for the board (absolute) or the README (`relativeAdr` from docs/rules). */
+export function refUrl(ref: Ref, adrs: Map<string, Adr>, relativeAdr: boolean): string | undefined {
+  if (ref.kind === 'adr') {
+    const adr = adrs.get(ref.number);
+    if (!adr) return undefined;
+    const base = relativeAdr
+      ? `../adr/${adr.file}`
+      : `${GITHUB}/isoloop/blob/main/${ADR_DIR}/${adr.file}`;
+    return ref.anchor ? `${base}#${ref.anchor}` : base;
+  }
+  if (ref.kind === 'issue') return `${GITHUB}/${ref.repo ?? 'isoloop'}/issues/${ref.number}`;
+  return `${GITHUB}/isoloop/releases/tag/${ref.tag}`;
+}
+
+/** A short label: `ADR 0007 · 1. Supervise the bus like an isolate`, `#390`, `v0.1.0`. */
+export function refLabel(ref: Ref, adrs: Map<string, Adr>): string {
+  if (ref.kind === 'adr') {
+    const heading = ref.anchor ? adrs.get(ref.number)?.anchors.get(ref.anchor) : undefined;
+    return heading ? `ADR ${ref.number} · ${heading}` : `ADR ${ref.number}`;
+  }
+  if (ref.kind === 'issue') return `${ref.repo ?? ''}#${ref.number}`;
+  return ref.tag;
+}
+
+// --- ADRs ---------------------------------------------------------------------
+
+/** Heading text as shown: inline code, links and emphasis reduced to their text. */
+export function headingText(raw: string): string {
+  return raw
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/(\*\*|__|\*)(.*?)\1/g, '$2')
+    .trim();
+}
+
+/**
+ * GitHub's heading anchor: lower case, punctuation removed (letters, digits,
+ * spaces, `-` and `_` kept), each space a `-`. Repeats get `-1`, `-2`, … in
+ * readAnchors.
+ */
+export function slug(text: string): string {
+  return headingText(text)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+    .replace(/ /g, '-');
+}
+
+/** Anchor → heading text, for every heading outside code fences. */
+export function readAnchors(md: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const seen = new Map<string, number>();
+  let fence: string | undefined;
+  for (const line of md.split('\n')) {
+    const f = /^\s*(```+|~~~+)/.exec(line);
+    if (f) {
+      if (fence === undefined) fence = f[1]!.slice(0, 3);
+      else if (f[1]!.startsWith(fence)) fence = undefined;
+      continue;
+    }
+    if (fence !== undefined) continue;
+    const h = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+    if (!h) continue;
+    const base = slug(h[1]!);
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    out.set(n === 0 ? base : `${base}-${n}`, headingText(h[1]!));
+  }
+  return out;
+}
+
+/** The lines of a Markdown file outside code fences, with their index. */
+function outsideFences(md: string): { i: number; line: string }[] {
+  const out: { i: number; line: string }[] = [];
+  let fence: string | undefined;
+  md.split('\n').forEach((line, i) => {
+    const f = /^\s*(```+|~~~+)/.exec(line);
+    if (f) {
+      if (fence === undefined) fence = f[1]!.slice(0, 3);
+      else if (f[1]!.startsWith(fence)) fence = undefined;
+      return;
+    }
+    if (fence === undefined) out.push({ i, line });
+  });
+  return out;
+}
+
+const RULES_LINE = /^\s*Rules:(.*)$/;
+
+/** The ids on an ADR's `Rules:` lines (decision 9): backticked, comma-separated, outside fences. */
+export function readRulesLines(md: string): string[] {
+  const ids: string[] = [];
+  for (const { line } of outsideFences(md)) {
+    const m = RULES_LINE.exec(line);
+    if (m) for (const id of m[1]!.matchAll(/`([^`]+)`/g)) ids.push(id[1]!);
+  }
+  return ids;
+}
+
+/**
+ * The decisions and amendments in an ADR that have no `Rules:` line.
+ * - A decision, under the `## Decision` heading, is a numbered `###` heading
+ *   (`### 1. …`, ADR 0007's style) when there are any; otherwise a top-level
+ *   numbered item (`12. …` at column 0, ADR 0026's style), up to the next such
+ *   item or heading; otherwise each `###` section.
+ * - An amendment is any heading whose text says "amended", up to the next
+ *   heading of the same or a higher level.
+ */
+export function unruledSections(md: string): string[] {
+  const lines = outsideFences(md);
+  type Unit = { name: string; level: number; isHeading: boolean; ruled: boolean };
+  const units: Unit[] = [];
+  const itemUnits: Unit[] = [];
+  const open: Unit[] = [];
+  let inDecision = false;
+  let decisionLevel = 0;
+  const h3s: Unit[] = [];
+  const close = (level: number, item: boolean) => {
+    for (let k = open.length - 1; k >= 0; k--) {
+      const u = open[k]!;
+      if (item ? !u.isHeading : u.level >= level) open.splice(k, 1);
+    }
+  };
+  for (const { line } of lines) {
+    const h = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+    if (h) {
+      const level = h[1]!.length;
+      const text = headingText(h[2]!);
+      close(level, false);
+      close(0, true); // a heading ends any numbered item
+      if (inDecision && level <= decisionLevel) inDecision = false;
+      if (level === 2 && /^decision\b/i.test(text)) {
+        inDecision = true;
+        decisionLevel = 2;
+      }
+      if (/amended/i.test(text)) {
+        const u = { name: `amendment "${text}"`, level, isHeading: true, ruled: false };
+        units.push(u);
+        open.push(u);
+      } else if (inDecision && level === 3) {
+        const num = /^(\d+)\.\s/.exec(text);
+        const name = num ? `decision ${num[1]}` : `section "${text}"`;
+        const u = { name, level, isHeading: true, ruled: false };
+        h3s.push(u);
+        open.push(u);
+      }
+      continue;
+    }
+    const n = /^(\d+)\.\s/.exec(line);
+    if (inDecision && n) {
+      close(0, true);
+      const u = { name: `decision ${n[1]}`, level: 99, isHeading: false, ruled: false };
+      itemUnits.push(u);
+      open.push(u);
+      continue;
+    }
+    if (RULES_LINE.test(line)) for (const u of open) u.ruled = true;
+  }
+  const numbered = h3s.filter((u) => u.name.startsWith('decision '));
+  if (numbered.length > 0) units.push(...numbered);
+  else if (itemUnits.length > 0) units.push(...itemUnits);
+  else units.push(...h3s);
+  return units.filter((u) => !u.ruled).map((u) => u.name);
+}
+
+export function parseAdr(file: string, md: string): Adr | undefined {
+  const m = /^(\d{4})-.+\.md$/.exec(file);
+  if (!m) return undefined;
+  return {
+    number: m[1]!,
+    file,
+    anchors: readAnchors(md),
+    rulesIds: readRulesLines(md),
+    unruled: unruledSections(md),
+  };
+}
+
+export function readAdrs(root: string): Map<string, Adr> {
+  const out = new Map<string, Adr>();
+  const dir = join(root, ADR_DIR);
+  if (!existsSync(dir)) return out;
+  const files = readdirSync(dir);
+  files.sort();
+  for (const file of files) {
+    const adr = parseAdr(file, readFileSync(join(dir, file), 'utf8'));
+    if (adr) out.set(adr.number, adr);
+  }
+  return out;
+}
+
+// --- The registry on disk -----------------------------------------------------
+
+export function readRegistry(root: string): Registry {
+  const dir = join(root, RULES_DIR);
+  const concepts: unknown = JSON.parse(readFileSync(join(root, CONCEPTS_FILE), 'utf8'));
+  const files: RuleFile[] = [];
+  const names = readdirSync(dir);
+  names.sort();
+  for (const name of names) {
+    if (!name.endsWith('.json') || NOT_RULE_FILES.has(name)) continue;
+    const path = `${RULES_DIR}/${name}`;
+    let data: unknown;
+    try {
+      data = JSON.parse(readFileSync(join(root, path), 'utf8'));
+    } catch (e) {
+      data = { parseError: e instanceof Error ? e.message : String(e) };
+    }
+    files.push({ path, concept: name.slice(0, -'.json'.length), data });
+  }
+  return { concepts, files };
+}
+
+// --- Versions -----------------------------------------------------------------
+
+export const isVersion = (v: string): boolean => /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(v);
+
+/** Semver order, prereleases below their release; prerelease ids compared numerically or as text. */
+export function compareVersions(a: string, b: string): number {
+  const [ma = '', pa] = a.split(/-(.*)/s);
+  const [mb = '', pb] = b.split(/-(.*)/s);
+  const na = ma.split('.').map(Number);
+  const nb = mb.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const d = (na[i] ?? 0) - (nb[i] ?? 0);
+    if (d !== 0) return Math.sign(d);
+  }
+  if (pa === undefined || pb === undefined) return pa === pb ? 0 : pa === undefined ? 1 : -1;
+  const xa = pa.split('.');
+  const xb = pb.split('.');
+  for (let i = 0; i < Math.max(xa.length, xb.length); i++) {
+    const s = xa[i];
+    const t = xb[i];
+    if (s === undefined) return -1;
+    if (t === undefined) return 1;
+    const ns = /^\d+$/.test(s);
+    const nt = /^\d+$/.test(t);
+    if (ns && nt && Number(s) !== Number(t)) return Math.sign(Number(s) - Number(t));
+    if (ns !== nt) return ns ? -1 : 1;
+    if (s !== t) return s < t ? -1 : 1;
+  }
+  return 0;
+}
+
+/** The fixed group's version, from the public packages' manifests (undefined when they differ). */
+export function packagesVersion(root: string): string | undefined {
+  const versions = new Set<string>();
+  const dir = join(root, 'packages');
+  if (!existsSync(dir)) return undefined;
+  for (const d of readdirSync(dir, { withFileTypes: true })) {
+    if (!d.isDirectory()) continue;
+    const manifest = join(dir, d.name, 'package.json');
+    if (!existsSync(manifest)) continue;
+    const pkg: unknown = JSON.parse(readFileSync(manifest, 'utf8'));
+    if (typeof pkg !== 'object' || pkg === null) continue;
+    if (Reflect.get(pkg, 'private') === true) continue;
+    const v: unknown = Reflect.get(pkg, 'version');
+    if (typeof v === 'string') versions.add(v);
+  }
+  return versions.size === 1 ? [...versions][0] : undefined;
+}
+
+const isRec = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** A shallow guard: check.ts validates the fields; this only keeps the readers from crashing. */
+export const isRule = (v: unknown): v is Rule =>
+  isRec(v) && typeof v['id'] === 'string' && Array.isArray(v['events']);
+
+export const isConcept = (v: unknown): v is Concept =>
+  isRec(v) && typeof v['id'] === 'string' && typeof v['order'] === 'number';
+
+/** The rules in a file's data, for readers after check.ts. */
+export function rulesIn(data: unknown): Rule[] {
+  const list: unknown[] = Array.isArray(data) ? data : [];
+  return list.filter(isRule);
+}
+
+/** Rules as checked, with their concept. */
+export function rulesOf(reg: Registry): { concept: string; rule: Rule }[] {
+  return reg.files.flatMap((f) => rulesIn(f.data).map((rule) => ({ concept: f.concept, rule })));
+}
+
+export function conceptsOf(reg: Registry): Concept[] {
+  const list: unknown[] = Array.isArray(reg.concepts) ? reg.concepts : [];
+  const out = list.filter(isConcept);
+  out.sort((a, b) => a.order - b.order);
+  return out;
+}
+
+/** A repo rule's `built` event: the PR that put it in force. */
+export function inForce(rule: Rule): RuleEvent | undefined {
+  return rule.repo ? rule.events.find((e) => e.type === 'built') : undefined;
+}
+
+/** The current why (decision 3): the newest decided, amended or clarified event's. */
+export function currentWhy(rule: Rule): RuleEvent | undefined {
+  for (let i = rule.events.length - 1; i >= 0; i--) {
+    const e = rule.events[i]!;
+    if (e.type === 'decided' || e.type === 'amended' || e.type === 'clarified') return e;
+  }
+  return undefined;
+}
