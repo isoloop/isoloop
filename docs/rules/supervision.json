@@ -1,1 +1,651 @@
-[]
+[
+  {
+    "id": "sup.heartbeat-interval",
+    "statement": "Each worker sends a heartbeat to the host every `heartbeat.everyMs`.",
+    "status": "active",
+    "values": ["100 ms"],
+    "knob": "`KernelConfig.heartbeat.everyMs`",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["sup.blocked-after", "sup.kill-after"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#decision",
+        "why": "The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#15",
+        "why": "The supervisor wired to real workers, built in M1."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.blocked-after",
+    "statement": "A worker with no beat for `blockedAfterMs` marks its isolates `blocked`, and their surfaces show the busy overlay. Nothing is restarted.",
+    "status": "active",
+    "values": ["400 ms"],
+    "knob": "`KernelConfig.heartbeat.blockedAfterMs`",
+    "code": ["packages/host/src/supervisor/machine.ts"],
+    "since": "0.1.0",
+    "related": ["sup.kill-after"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#decision",
+        "why": "The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#12",
+        "why": "The supervisor's state machine, built in M1."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.kill-after",
+    "statement": "A worker with no beat for `killAfterMs` is terminated, and its isolates crash with reason `unresponsive`.",
+    "status": "active",
+    "values": ["10 000 ms"],
+    "knob": "`KernelConfig.heartbeat.killAfterMs`",
+    "errors": ["unresponsive"],
+    "code": ["packages/host/src/supervisor/machine.ts"],
+    "since": "0.1.0",
+    "related": ["sup.lag-clock", "sup.restart-window"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#decision",
+        "why": "The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#12",
+        "why": "The supervisor's state machine, built in M1."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.ready-timeout",
+    "statement": "An isolate that sends no `ready` within `readyTimeoutMs` of its spawn crashes with reason `ready_timeout`.",
+    "status": "active",
+    "values": ["10 000 ms"],
+    "knob": "`KernelConfig.heartbeat.readyTimeoutMs`",
+    "errors": ["ready_timeout"],
+    "code": ["packages/host/src/supervisor/machine.ts"],
+    "since": "0.1.0",
+    "related": ["sup.lag-clock"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#decision",
+        "why": "The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#12",
+        "why": "The supervisor's state machine, built in M1."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.restart-window",
+    "statement": "An isolate that crashes after `maxRestarts` restarts within `withinMs` is `failed`: the kernel emits `isolate:failed`, its surface shows the fallback, and the rest of the app keeps running.",
+    "status": "active",
+    "values": ["3 restarts", "60 000 ms"],
+    "knob": "`KernelConfig.supervisor.maxRestarts`, `KernelConfig.supervisor.withinMs`",
+    "errors": ["isolate:failed"],
+    "code": ["packages/host/src/supervisor/machine.ts", "packages/host/src/supervisor/timers.ts"],
+    "since": "0.1.0",
+    "related": ["sup.short-runs", "sup.backoff", "sup.bus-restart-limit"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#decision",
+        "why": "The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#12",
+        "why": "The supervisor's state machine, built in M1."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.short-runs",
+    "statement": "A crash after a healthy run shorter than 60 s, from `ready` to the last beat, counts toward `maxRestarts` however long the runs took. A crash after a longer run clears the count first. The isolate fails on this rule or the sliding window, whichever is met first. The bus worker follows the same rule.",
+    "status": "active",
+    "values": ["60 000 ms healthy run"],
+    "knob": "`KernelConfig.supervisor.withinMs`",
+    "errors": ["isolate:failed"],
+    "code": ["packages/host/src/supervisor/machine.ts"],
+    "since": "0.1.1",
+    "related": ["sup.restart-window", "sup.healthy-after", "sup.failed-message"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-24",
+        "ref": "adr/0001#restart-limit-short-runs-amended-2026-11-24",
+        "why": "A crash loop slower than the window never reached `failed`: #390 measured isolates that hung 10 s after each start still restarting after 150 s."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-24",
+        "ref": "#430",
+        "why": "Built on main; backported to release/0.1 in #439."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-24",
+        "ref": "v0.1.1",
+        "why": "First released in 0.1.1."
+      }
+    ]
+  },
+  {
+    "id": "sup.healthy-after",
+    "statement": "`supervisor.healthyAfterMs` is the healthy run that clears the count of short runs. `withinMs` is the sliding window only, and either may be the larger. It applies to the bus worker too.",
+    "status": "decided",
+    "values": ["60 000 ms"],
+    "knob": "`KernelConfig.supervisor.healthyAfterMs`",
+    "code": ["packages/host/src/supervisor/machine.ts", "packages/host/src/kernel/kernel.ts"],
+    "target": "0.2.0",
+    "related": ["sup.short-runs", "sup.healthy-after-valid"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-26",
+        "ref": "adr/0001#restart-limit-healthyafterms-amended-2026-11-26",
+        "why": "One number was both the window and the healthy run, so an app couldn't widen one without the other. The 0.2 codemod sets it beside an existing `withinMs`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-26",
+        "ref": "#466",
+        "why": "Built on main; ships in 0.2.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.healthy-after-valid",
+    "statement": "`healthyAfterMs` must be a positive integer, with no upper limit. Any other value makes `createKernel` throw `invalid_config`.",
+    "status": "decided",
+    "knob": "`KernelConfig.supervisor.healthyAfterMs`",
+    "errors": ["invalid_config"],
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "target": "0.2.0",
+    "related": ["sup.healthy-after"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-26",
+        "ref": "adr/0001#restart-limit-healthyafterms-amended-2026-11-26",
+        "why": "A malformed option fails at start, as other options do."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-26",
+        "ref": "#466",
+        "why": "Built on main; ships in 0.2.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.backoff",
+    "statement": "Each restart waits `initialMs × factorⁿ`, capped at `maxMs`, where n is the larger of the window count and the short-run count. *Retry* clears both.",
+    "status": "active",
+    "values": ["250 ms", "× 2", "max 4 000 ms"],
+    "knob": "`KernelConfig.supervisor.backoff`",
+    "code": ["packages/host/src/supervisor/timers.ts"],
+    "since": "0.1.0",
+    "related": ["sup.restart-window", "sup.short-runs"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#decision",
+        "why": "The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#12",
+        "why": "The supervisor's state machine, built in M1."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-24",
+        "ref": "adr/0001#restart-limit-short-runs-amended-2026-11-24",
+        "why": "With a second count, the backoff follows whichever count is larger; shipped in 0.1.1.",
+        "prev": "Each restart waits `initialMs × factorⁿ`, capped at `maxMs`, where n is the restart count."
+      }
+    ]
+  },
+  {
+    "id": "sup.failed-message",
+    "statement": "`isolate:failed`'s `message` names the rule that was met, for example \"3 restarts in 60000 ms\" or \"4 crashes, each after less than 60000 ms of healthy running\".",
+    "status": "active",
+    "errors": ["isolate:failed"],
+    "code": ["packages/host/src/supervisor/machine.ts"],
+    "since": "0.1.1",
+    "related": ["sup.short-runs"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-24",
+        "ref": "adr/0001#restart-limit-short-runs-amended-2026-11-24",
+        "why": "With two rules, a reader needs to know which one failed the isolate."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-24",
+        "ref": "#430",
+        "why": "Built on main; backported to release/0.1 in #439."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-24",
+        "ref": "v0.1.1",
+        "why": "First released in 0.1.1."
+      }
+    ]
+  },
+  {
+    "id": "sup.lag-clock",
+    "statement": "The heartbeat kill and the ready timeout measure silence on a lag clock: `performance.now()` minus the total time the host's 50 ms supervision tick fired late. Time in which the host couldn't hear a beat doesn't count. The bus worker's timers use it too.",
+    "status": "decided",
+    "code": [
+      "packages/host/src/supervisor/machine.ts",
+      "packages/host/src/kernel/kernel.ts",
+      "packages/host/src/bus/controller.ts"
+    ],
+    "target": "0.2.0",
+    "related": ["sup.lag-clock-cap", "sup.lag-clock-scope", "sup.kill-after", "sup.ready-timeout"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-26",
+        "ref": "adr/0001#heartbeat-clock-the-hosts-lag-amended-2026-11-26",
+        "why": "On a CPU-starved page the host itself is late, so a worker waiting for a CPU looked hung and was killed. The lag clock removed every false kill at the defaults in the spike."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#472",
+        "why": "Built on main; ships in 0.2.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.lag-clock-cap",
+    "statement": "A worker silent for 3 × `killAfterMs` of wall-clock time is killed whatever the lag clock says. The ready timeout has the same cap on its own limit, 3 × `readyTimeoutMs`. The factor isn't an option.",
+    "status": "decided",
+    "values": ["3 × killAfterMs", "3 × readyTimeoutMs (30 s)"],
+    "code": ["packages/host/src/supervisor/machine.ts"],
+    "target": "0.2.0",
+    "related": ["sup.lag-clock"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-26",
+        "ref": "adr/0001#heartbeat-clock-the-hosts-lag-amended-2026-11-26",
+        "why": "A hung worker on a starved page must still be killed, at most 3 times later than on a page that isn't starved."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#472",
+        "why": "Built on main; ships in 0.2.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.lag-clock-scope",
+    "statement": "Only the heartbeat kill and the ready timeout use the lag clock. `blockedAfterMs`, the restart window, the healthy run and the backoff stay on wall-clock time.",
+    "status": "decided",
+    "code": ["packages/host/src/supervisor/machine.ts"],
+    "target": "0.2.0",
+    "related": ["sup.lag-clock"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-26",
+        "ref": "adr/0001#heartbeat-clock-the-hosts-lag-amended-2026-11-26",
+        "why": "The busy overlay and the restart limit keep behaving as they did; the #390 crash loop still fails at the same crash."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#472",
+        "why": "Built on main; ships in 0.2.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.warm-up",
+    "statement": "For `readyTimeoutMs` after an isolate's `ready`, a blocked isolate is killed only after `readyTimeoutMs` without a beat, not `killAfterMs`.",
+    "status": "superseded",
+    "supersededBy": "sup.lag-clock",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-20",
+        "ref": "adr/0001#start-up-warm-up-amended-2026-11-20-not-built-reopened-2026-11-22-replaced-2026-11-26",
+        "why": "Plant's restart loop on Firefox CI looked like start-up work killed by a short `killAfterMs`."
+      },
+      {
+        "type": "corrected",
+        "date": "2026-11-22",
+        "ref": "adr/0001#start-up-warm-up-amended-2026-11-20-not-built-reopened-2026-11-22-replaced-2026-11-26",
+        "why": "Never built (#384 closed unmerged), and the loop came from the tests, not start-up. It also weakened the restart limit (#390)."
+      },
+      {
+        "type": "reopened",
+        "date": "2026-11-22",
+        "ref": "#389",
+        "why": "What a CPU-starved worker needs went back to its issue."
+      },
+      {
+        "type": "superseded",
+        "date": "2026-11-26",
+        "ref": "adr/0001#heartbeat-clock-the-hosts-lag-amended-2026-11-26",
+        "why": "Replaced by the lag clock; nothing from #384 is reused."
+      }
+    ]
+  },
+  {
+    "id": "sup.no-sibling-detector",
+    "statement": "The supervisor doesn't judge a silent worker against its siblings (holding kills while most workers are silent).",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-26",
+        "ref": "adr/0001#heartbeat-clock-the-hosts-lag-amended-2026-11-26",
+        "why": "Why not hold a kill while most workers are silent? Measured, it removed only 0 to 9 % of the false kills and delayed the kill of a hang that hits half the workers or more."
+      }
+    ]
+  },
+  {
+    "id": "sup.no-cpu-beat",
+    "statement": "Workers don't send a beat counted in CPU time.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-26",
+        "ref": "adr/0001#heartbeat-clock-the-hosts-lag-amended-2026-11-26",
+        "why": "Why not count a worker's CPU time instead? A worker that doesn't get a CPU can't send that beat either."
+      }
+    ]
+  },
+  {
+    "id": "sup.worker-budget",
+    "statement": "When the count of live workers passes the soft budget, the kernel warns once with `workers:budget`. A pool counts as one worker. The budget never refuses a spawn or suspends an isolate.",
+    "status": "active",
+    "values": ["32 workers", "warning only"],
+    "knob": "`KernelConfig.workers.budget`",
+    "errors": ["workers:budget"],
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["sup.no-device-budget", "sup.no-hard-worker-limit", "sup.no-budget-suspend"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#worker-budget-and-spawn-failures",
+        "why": "The real ceiling depends on the device, so the budget is a hint, not a guarantee."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#18",
+        "why": "Loader hardening, built in M1."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.spawn-failed",
+    "statement": "If the browser fails to create a worker, the isolate crashes with reason `spawn_failed` and gets the usual backoff and restart limit. Before each retry the supervisor suspends every idle suspendable isolate, to free memory.",
+    "status": "active",
+    "errors": ["spawn_failed"],
+    "code": ["packages/host/src/kernel/kernel.ts", "packages/host/src/supervisor/machine.ts"],
+    "since": "0.1.0",
+    "related": ["sup.worker-budget", "sup.restart-window"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#worker-budget-and-spawn-failures",
+        "why": "Memory runs out on the device, not at a count Isoloop can know, so a failed spawn is handled like any crash."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#18",
+        "why": "Loader hardening, built in M1."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.no-device-budget",
+    "statement": "The worker budget isn't derived from the device (for example cores × 4).",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0001#alternatives-considered",
+        "why": "Why not scale the budget to the device? Browser-reported figures are coarse or hidden, and the warning would differ per machine."
+      }
+    ]
+  },
+  {
+    "id": "sup.no-hard-worker-limit",
+    "statement": "There is no hard limit on the number of workers.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0001#alternatives-considered",
+        "why": "Why not refuse spawns past a limit? It fails apps on capable machines and still doesn't protect weak ones."
+      }
+    ]
+  },
+  {
+    "id": "sup.no-budget-suspend",
+    "statement": "Passing the worker budget doesn't suspend isolates. Memory is freed only after a real `spawn_failed`.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0001#alternatives-considered",
+        "why": "Why not suspend isolates once the budget is passed? It would turn a warning into behaviour."
+      }
+    ]
+  },
+  {
+    "id": "sup.hidden-tab",
+    "statement": "While `document.hidden` is true, the supervisor doesn't judge hangs: no busy overlay and no kills. Worker errors are still handled.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["sup.clocks-reset-on-show"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#what-the-browser-still-controls",
+        "why": "Background tabs throttle main-thread timers, so beats look late when they aren't."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#15",
+        "why": "The supervisor wired to real workers, built in M1."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.clocks-reset-on-show",
+    "statement": "On `visibilitychange` to visible and on the Page Lifecycle `resume` event, every heartbeat clock, the isolates' and the bus worker's, restarts from zero.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["sup.hidden-tab"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#what-the-browser-still-controls",
+        "why": "Returning to a tab must never kill an isolate for beats missed while it was hidden or frozen."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#15",
+        "why": "The supervisor wired to real workers, built in M1."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.bus-supervised",
+    "statement": "The bus worker sends `beat` on its control port, and the supervisor judges it with the same blocked and kill timeouts as an isolate. The kernel emits `bus:ready { first }`, `bus:crash`, `bus:restart` and `bus:failed`.",
+    "status": "active",
+    "errors": ["bus:crash", "bus:restart"],
+    "code": ["packages/host/src/bus/controller.ts"],
+    "since": "0.1.0",
+    "related": ["sup.bus-restart-limit"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#1-supervise-the-bus-like-an-isolate",
+        "why": "The bus worker holds every topic log and offset, so it gets the same supervision as an isolate."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#44",
+        "why": "The host's bus controller and its supervision, built in M2."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "sup.bus-restart-limit",
+    "statement": "The bus worker restarts under the kernel's `supervisor` config, like an isolate. Past the limit the kernel emits `bus:failed`; isolates keep running, and every publish rejects with `bus_unavailable`.",
+    "status": "active",
+    "values": ["3 restarts", "60 000 ms"],
+    "knob": "`KernelConfig.supervisor`",
+    "errors": ["bus:failed", "bus_unavailable"],
+    "code": ["packages/host/src/bus/controller.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["sup.bus-supervised", "sup.restart-window", "sup.short-runs"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#1-supervise-the-bus-like-an-isolate",
+        "why": "Same limit as an isolate, so a bus that keeps crashing ends in a state the app can show."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#44",
+        "why": "The host's bus controller and its supervision, built in M2."
+      },
+      {
+        "type": "clarified",
+        "date": "2026-11-20",
+        "ref": "adr/0007#amended-the-restart-limit-is-a-default-2026-11-20",
+        "why": "Found while writing the supervision guide (#320): an app that sets `supervisor` sets it for the bus worker too.",
+        "prev": "Up to 3 restarts in 60 s, read as a fixed limit."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  }
+]

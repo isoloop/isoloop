@@ -6,13 +6,599 @@ What holds in Isoloop today, one fact per rule, with every decision that touched
 
 What an isolate is, how it starts and stops, and the worker it runs in. Prefix `iso`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `iso.unit` | An isolate is a manifest plus a code bundle, running in a worker, supervised, with the topics it's granted. Visual and headless code are the same kind of isolate. |  | active | since `0.1.0` |
+| `iso.api-names` | The host starts and controls isolates with `kernel.spawn(manifest)`, `kernel.stop(id)`, `kernel.restart(id)` and `kernel.isolates()`. An isolate module exports `defineIsolate({ start(ctx) { … } })`, or an adapter's `defineIsolate(Component)`, and runs on `@isoloop/runtime`. |  | active | since `0.1.0` |
+| `iso.own-worker` | Each isolate runs in its own dedicated module worker unless its manifest names a pool. | `default: own worker` | active | since `0.1.0` |
+| `iso.placement-host` | Placement is set in the host's manifest alone. Isolate code is the same in its own worker and in a pool, and an isolate module can't ask for a pool or refuse one. |  | active | since `0.1.0` |
+| `iso.no-worker-identity` | Nothing in the public API exposes which worker an isolate runs in. The supervisor, the compositor and the bus key everything by isolate id. |  | active | since `0.1.0` |
+| `iso.surface-optional` | `surface` is an optional manifest field: the host element an isolate renders into. An isolate without one is headless. |  | active | since `0.1.0` |
+| `iso.headless-no-dom` | A headless isolate starts with `renderFmt: 'none'`: no DOM subset is installed and `ctx.root` is `undefined`. It never reaches the compositor, and a `patch` it posts is dropped and counted. |  | active | since `0.1.0` |
+| `iso.headless-no-surface-calls` | In a headless isolate, the host calls `measure`, `focus`, `scrollIntoView` and `requestCanvas` reject with `no_surface`. `navigate` still works. |  | active | since `0.1.0` |
+| `iso.headless-same-supervision` | A headless isolate gets the same supervision, heartbeats, bus access and replay as a visual one. When it crashes there's no fallback UI; the host sees `isolate:crash` and `isolate:failed`. |  | active | since `0.1.0` |
+| `iso.no-pane` | The unit isn't a pane with a `headless: true` flag. |  | rejected |  |
+| `iso.no-actor` | Isolates aren't actors: there's no mailbox per isolate and no addressing by isolate id. |  | rejected |  |
+| `iso.suspend-opt-in` | `manifest.suspend` is `'never'`, `'when-idle'` or `{ whenIdle: { afterMs } }`. `'never'` means Isoloop never suspends the isolate, in a hidden tab or anywhere else; `'when-idle'` waits 60 s. | `default: 'never'`, `60 000 ms` | active | since `0.1.0` |
+| `iso.suspend-idle` | An isolate is idle when it has no visible surface, nothing was delivered for `afterMs`, it holds no `ctx.keepAwake()`, and no host call or acknowledged-pending publish is in flight. Off-screen, `display: none` and hidden-tab surfaces count as not visible; headless isolates are never visible. |  | active | since `0.1.0` |
+| `iso.keep-awake` | `ctx.keepAwake()` keeps an isolate from being suspended until its release function is called. A hold has no time limit; devtools lists each with its age and where it was taken, and with `KernelConfig.dev` the console warns once a hold passes 10 minutes. | `warn after 10 min (dev)` | active | since `0.1.0` |
+| `iso.suspend-steps` | Suspending an isolate runs its `shutdown` with the usual grace, detaches it from the bus keeping its offsets, then terminates the worker. A suspended member of a consumer group leaves the group, so the group rebalances. |  | active | since `0.1.0` |
+| `iso.wake` | A suspended visual isolate wakes when its surface becomes visible. A suspended headless isolate wakes when a record arrives on a topic it subscribes to, or a request does while it's the last member of its group. Either wakes on `kernel.resume(id)`. |  | active | since `0.1.0` |
+| `iso.wake-queue` | Wakes go through a queue that starts at most `maxConcurrentWakes` workers at a time (4 by default), visible surfaces first in on-screen order, then headless isolates. Until an isolate renders, its surface shows the frozen snapshot of its last frame. | `4 at a time` | active | since `0.1.0` |
+| `iso.wake-on-bus-restart` | A bus restart wakes every suspended headless isolate: they resubscribe, replay and suspend again once idle. Suspended visual isolates aren't woken and catch up when shown. |  | active | since `0.1.0` |
+| `iso.wake-replay` | On waking, an isolate resubscribes from its committed offsets and replays what it missed. A subscription that asked for `from: 'latest'` resumes from `committed`, so nothing published while it slept is skipped. Losses arrive as `deliver.gap` or `reset`, never silently. |  | active | since `0.1.0` |
+| `iso.suspend-retention-warning` | The kernel warns when a suspendable isolate subscribes to a `last-n` or `time` topic, within about a second of the subscribe. |  | active | since `0.1.0` |
+| `iso.no-auto-suspend` | Isolates aren't suspended automatically, even when every subscription is durable. |  | rejected |  |
+| `iso.no-snapshot-api` | There's no snapshot API for a suspended isolate's state. |  | rejected |  |
+| `iso.no-wake-every-record` | A record doesn't wake suspended visual isolates. |  | rejected |  |
+
+### `iso.unit`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.surface-optional`, `iso.own-worker`
+- **Why:** Much of what's worth isolating draws nothing: state managers, sync engines, calculators. RFC 0001's "pane" made them fake an empty pane.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · Much of what's worth isolating draws nothing: state managers, sync engines, calculators. RFC 0001's "pane" made them fake an empty pane.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.api-names`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`, `packages/runtime/src/isolate/vanilla.ts`
+- **Related:** `iso.unit`
+- **Why:** The names follow from the isolate being the unit.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · The names follow from the isolate being the unit.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.own-worker`
+
+- **Change it:** manifest `pool`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.placement-host`, `iso.no-worker-identity`
+- **Why:** Thread isolation is the main promise: a blocked or crashed isolate affects only itself.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · Thread isolation is the main promise: a blocked or crashed isolate affects only itself.
+- 2026-11-05 · built · [#15](https://github.com/isoloop/isoloop/issues/15) · The supervisor wired to real workers, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.placement-host`
+
+- **Change it:** manifest `pool`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.own-worker`
+- **Why:** Moving an isolate between placements is a config change, and the host decides what shares a worker.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · Moving an isolate between placements is a config change, and the host decides what shares a worker.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.no-worker-identity`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.own-worker`
+- **Why:** So pools could come later without breaking the API.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · So pools could come later without breaking the API.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.surface-optional`
+
+- **Change it:** manifest `surface`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.unit`, `iso.headless-no-dom`, `iso.headless-no-surface-calls`
+- **Why:** Headless isolates are first-class, not visual ones with an empty pane.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · Headless isolates are first-class, not visual ones with an empty pane.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.headless-no-dom`
+
+- **Code:** `packages/runtime/src/isolate/vanilla.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.surface-optional`
+- **Why:** A smaller, faster start for code that draws nothing.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · A smaller, faster start for code that draws nothing.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.headless-no-surface-calls`
+
+- **Errors and events:** `no_surface`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.surface-optional`
+- **Why:** `requestCanvas` shipped in M3a, so only headless isolates reject it.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · There's no element to measure, focus or draw on.
+- 2026-11-05 · built · [#31](https://github.com/isoloop/isoloop/issues/31) · The host calls `measure`, `focus` and `scrollIntoView`, built in M1.
+- 2026-11-07 · amended · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · `requestCanvas` shipped in M3a, so only headless isolates reject it. Before: `measure`, `focus` and `scrollIntoView` reject with `no_surface` in a headless isolate, and `requestCanvas` rejects with `unsupported` in every isolate.
+- 2026-11-07 · built · [#96](https://github.com/isoloop/isoloop/issues/96) · `requestCanvas`, an `OffscreenCanvas` for canvas isolates.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.headless-same-supervision`
+
+- **Errors and events:** `isolate:crash`, `isolate:failed`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Why:** Headless code gets every guarantee visual code does.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · Headless code gets every guarantee visual code does.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.no-pane`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0008 · Alternatives considered](../adr/0008-isolates-and-surfaces.md#alternatives-considered) · Why not keep RFC 0001's pane and add a flag? The word would mislead for half the use cases.
+
+### `iso.no-actor`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0008 · Alternatives considered](../adr/0008-isolates-and-surfaces.md#alternatives-considered) · Why not the actor model, which fits the supervision? Actor semantics, a mailbox per actor and addressing by id, are what the topic-based bus deliberately avoids.
+
+### `iso.suspend-opt-in`
+
+- **Change it:** manifest `suspend`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.suspend-idle`, `iso.suspend-steps`, `iso.wake`
+- **Why:** A worker per isolate costs memory, so an app can let idle isolates go; isolates that keep state in memory must opt in knowingly.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · A worker per isolate costs memory, so an app can let idle isolates go; isolates that keep state in memory must opt in knowingly.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.suspend-idle`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.suspend-opt-in`, `iso.keep-awake`
+- **Why:** Suspending must never cut off work that's still going on.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Suspending must never cut off work that's still going on.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.keep-awake`
+
+- **Change it:** `ctx.keepAwake()`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.suspend-idle`
+- **Why:** An isolate in the middle of work it can't see from the bus needs a way to say so.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · An isolate in the middle of work it can't see from the bus needs a way to say so.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.suspend-steps`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.no-snapshot-api`, `iso.wake-replay`
+- **Why:** Suspension rebuilds from the log, so the isolate gets a chance to commit and to publish what it wants kept.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Suspension rebuilds from the log, so the isolate gets a chance to commit and to publish what it wants kept.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.wake`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.wake-queue`, `iso.wake-on-bus-restart`, `iso.no-wake-every-record`
+- **Why:** Each kind wakes when it has something to do.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Each kind wakes when it has something to do.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.wake-queue`
+
+- **Change it:** `KernelConfig.suspend.maxConcurrentWakes`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.wake`
+- **Why:** Waking many isolates at once would stall the page they're waking for.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Waking many isolates at once would stall the page they're waking for.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.wake-on-bus-restart`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.wake`
+- **Why:** The new bus has no record of the subscriptions the suspended isolates were waiting on.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · The new bus has no record of the subscriptions the suspended isolates were waiting on.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.wake-replay`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.suspend-steps`, `iso.suspend-retention-warning`
+- **Why:** Suspension rebuilds from the log, for memory and persistent topics alike.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Suspension rebuilds from the log, for memory and persistent topics alike.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.suspend-retention-warning`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.wake-replay`
+- **Why:** Retention may drop records before a sleeping isolate reads them; the warning comes from the bus metrics.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Retention may drop records before a sleeping isolate reads them; the warning comes from the bus metrics.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.no-auto-suspend`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why not suspend on its own when nothing would be lost from the log? Restarts become hard to predict, and isolates with in-memory state would lose it silently.
+
+### `iso.no-snapshot-api`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why not save and restore state on suspend? It's a second source of state next to the log; an isolate publishes what it wants kept to a compacted topic on shutdown instead.
+
+### `iso.no-wake-every-record`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why not wake every suspended isolate on any record? It wakes hidden visual isolates for records nobody can see; they catch up from the log when shown.
 
 ## Supervision
 
 Beats, timeouts, restarts and failure, for isolates and the bus worker. Prefix `sup`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `sup.heartbeat-interval` | Each worker sends a heartbeat to the host every `heartbeat.everyMs`. | `100 ms` | active | since `0.1.0` |
+| `sup.blocked-after` | A worker with no beat for `blockedAfterMs` marks its isolates `blocked`, and their surfaces show the busy overlay. Nothing is restarted. | `400 ms` | active | since `0.1.0` |
+| `sup.kill-after` | A worker with no beat for `killAfterMs` is terminated, and its isolates crash with reason `unresponsive`. | `10 000 ms` | active | since `0.1.0` |
+| `sup.ready-timeout` | An isolate that sends no `ready` within `readyTimeoutMs` of its spawn crashes with reason `ready_timeout`. | `10 000 ms` | active | since `0.1.0` |
+| `sup.restart-window` | An isolate that crashes after `maxRestarts` restarts within `withinMs` is `failed`: the kernel emits `isolate:failed`, its surface shows the fallback, and the rest of the app keeps running. | `3 restarts`, `60 000 ms` | active | since `0.1.0` |
+| `sup.short-runs` | A crash after a healthy run shorter than 60 s, from `ready` to the last beat, counts toward `maxRestarts` however long the runs took. A crash after a longer run clears the count first. The isolate fails on this rule or the sliding window, whichever is met first. The bus worker follows the same rule. | `60 000 ms healthy run` | active | since `0.1.1` |
+| `sup.healthy-after` | `supervisor.healthyAfterMs` is the healthy run that clears the count of short runs. `withinMs` is the sliding window only, and either may be the larger. It applies to the bus worker too. | `60 000 ms` | decided | target `0.2.0` |
+| `sup.healthy-after-valid` | `healthyAfterMs` must be a positive integer, with no upper limit. Any other value makes `createKernel` throw `invalid_config`. |  | decided | target `0.2.0` |
+| `sup.backoff` | Each restart waits `initialMs × factorⁿ`, capped at `maxMs`, where n is the larger of the window count and the short-run count. *Retry* clears both. | `250 ms`, `× 2`, `max 4 000 ms` | active | since `0.1.0` |
+| `sup.failed-message` | `isolate:failed`'s `message` names the rule that was met, for example "3 restarts in 60000 ms" or "4 crashes, each after less than 60000 ms of healthy running". |  | active | since `0.1.1` |
+| `sup.lag-clock` | The heartbeat kill and the ready timeout measure silence on a lag clock: `performance.now()` minus the total time the host's 50 ms supervision tick fired late. Time in which the host couldn't hear a beat doesn't count. The bus worker's timers use it too. |  | decided | target `0.2.0` |
+| `sup.lag-clock-cap` | A worker silent for 3 × `killAfterMs` of wall-clock time is killed whatever the lag clock says. The ready timeout has the same cap on its own limit, 3 × `readyTimeoutMs`. The factor isn't an option. | `3 × killAfterMs`, `3 × readyTimeoutMs (30 s)` | decided | target `0.2.0` |
+| `sup.lag-clock-scope` | Only the heartbeat kill and the ready timeout use the lag clock. `blockedAfterMs`, the restart window, the healthy run and the backoff stay on wall-clock time. |  | decided | target `0.2.0` |
+| `sup.warm-up` | For `readyTimeoutMs` after an isolate's `ready`, a blocked isolate is killed only after `readyTimeoutMs` without a beat, not `killAfterMs`. |  | superseded |  |
+| `sup.no-sibling-detector` | The supervisor doesn't judge a silent worker against its siblings (holding kills while most workers are silent). |  | rejected |  |
+| `sup.no-cpu-beat` | Workers don't send a beat counted in CPU time. |  | rejected |  |
+| `sup.worker-budget` | When the count of live workers passes the soft budget, the kernel warns once with `workers:budget`. A pool counts as one worker. The budget never refuses a spawn or suspends an isolate. | `32 workers`, `warning only` | active | since `0.1.0` |
+| `sup.spawn-failed` | If the browser fails to create a worker, the isolate crashes with reason `spawn_failed` and gets the usual backoff and restart limit. Before each retry the supervisor suspends every idle suspendable isolate, to free memory. |  | active | since `0.1.0` |
+| `sup.no-device-budget` | The worker budget isn't derived from the device (for example cores × 4). |  | rejected |  |
+| `sup.no-hard-worker-limit` | There is no hard limit on the number of workers. |  | rejected |  |
+| `sup.no-budget-suspend` | Passing the worker budget doesn't suspend isolates. Memory is freed only after a real `spawn_failed`. |  | rejected |  |
+| `sup.hidden-tab` | While `document.hidden` is true, the supervisor doesn't judge hangs: no busy overlay and no kills. Worker errors are still handled. |  | active | since `0.1.0` |
+| `sup.clocks-reset-on-show` | On `visibilitychange` to visible and on the Page Lifecycle `resume` event, every heartbeat clock, the isolates' and the bus worker's, restarts from zero. |  | active | since `0.1.0` |
+| `sup.bus-supervised` | The bus worker sends `beat` on its control port, and the supervisor judges it with the same blocked and kill timeouts as an isolate. The kernel emits `bus:ready { first }`, `bus:crash`, `bus:restart` and `bus:failed`. |  | active | since `0.1.0` |
+| `sup.bus-restart-limit` | The bus worker restarts under the kernel's `supervisor` config, like an isolate. Past the limit the kernel emits `bus:failed`; isolates keep running, and every publish rejects with `bus_unavailable`. | `3 restarts`, `60 000 ms` | active | since `0.1.0` |
+
+### `sup.heartbeat-interval`
+
+- **Change it:** `KernelConfig.heartbeat.everyMs`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.blocked-after`, `sup.kill-after`
+- **Why:** The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+- 2026-11-05 · built · [#15](https://github.com/isoloop/isoloop/issues/15) · The supervisor wired to real workers, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.blocked-after`
+
+- **Change it:** `KernelConfig.heartbeat.blockedAfterMs`
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.kill-after`
+- **Why:** The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+- 2026-11-05 · built · [#12](https://github.com/isoloop/isoloop/issues/12) · The supervisor's state machine, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.kill-after`
+
+- **Change it:** `KernelConfig.heartbeat.killAfterMs`
+- **Errors and events:** `unresponsive`
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.lag-clock`, `sup.restart-window`
+- **Why:** The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+- 2026-11-05 · built · [#12](https://github.com/isoloop/isoloop/issues/12) · The supervisor's state machine, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.ready-timeout`
+
+- **Change it:** `KernelConfig.heartbeat.readyTimeoutMs`
+- **Errors and events:** `ready_timeout`
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.lag-clock`
+- **Why:** The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+- 2026-11-05 · built · [#12](https://github.com/isoloop/isoloop/issues/12) · The supervisor's state machine, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.restart-window`
+
+- **Change it:** `KernelConfig.supervisor.maxRestarts`, `KernelConfig.supervisor.withinMs`
+- **Errors and events:** `isolate:failed`
+- **Code:** `packages/host/src/supervisor/machine.ts`, `packages/host/src/supervisor/timers.ts`
+- **Related:** `sup.short-runs`, `sup.backoff`, `sup.bus-restart-limit`
+- **Why:** The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+- 2026-11-05 · built · [#12](https://github.com/isoloop/isoloop/issues/12) · The supervisor's state machine, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.short-runs`
+
+- **Change it:** `KernelConfig.supervisor.withinMs`
+- **Errors and events:** `isolate:failed`
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.restart-window`, `sup.healthy-after`, `sup.failed-message`
+- **Why:** A crash loop slower than the window never reached `failed`: #390 measured isolates that hung 10 s after each start still restarting after 150 s.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0001 · Restart limit: short runs (amended 2026-11-24)](../adr/0001-one-worker-per-isolate.md#restart-limit-short-runs-amended-2026-11-24) · A crash loop slower than the window never reached `failed`: #390 measured isolates that hung 10 s after each start still restarting after 150 s.
+- 2026-11-24 · built · [#430](https://github.com/isoloop/isoloop/issues/430) · Built on main; backported to release/0.1 in #439.
+- 2026-11-24 · shipped · [v0.1.1](https://github.com/isoloop/isoloop/releases/tag/v0.1.1) · First released in 0.1.1.
+
+### `sup.healthy-after`
+
+- **Change it:** `KernelConfig.supervisor.healthyAfterMs`
+- **Code:** `packages/host/src/supervisor/machine.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.short-runs`, `sup.healthy-after-valid`
+- **Why:** One number was both the window and the healthy run, so an app couldn't widen one without the other. The 0.2 codemod sets it beside an existing `withinMs`.
+
+History:
+
+- 2026-11-26 · decided · [ADR 0001 · Restart limit: healthyAfterMs (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#restart-limit-healthyafterms-amended-2026-11-26) · One number was both the window and the healthy run, so an app couldn't widen one without the other. The 0.2 codemod sets it beside an existing `withinMs`.
+- 2026-11-26 · built · [#466](https://github.com/isoloop/isoloop/issues/466) · Built on main; ships in 0.2.0.
+
+### `sup.healthy-after-valid`
+
+- **Change it:** `KernelConfig.supervisor.healthyAfterMs`
+- **Errors and events:** `invalid_config`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.healthy-after`
+- **Why:** A malformed option fails at start, as other options do.
+
+History:
+
+- 2026-11-26 · decided · [ADR 0001 · Restart limit: healthyAfterMs (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#restart-limit-healthyafterms-amended-2026-11-26) · A malformed option fails at start, as other options do.
+- 2026-11-26 · built · [#466](https://github.com/isoloop/isoloop/issues/466) · Built on main; ships in 0.2.0.
+
+### `sup.backoff`
+
+- **Change it:** `KernelConfig.supervisor.backoff`
+- **Code:** `packages/host/src/supervisor/timers.ts`
+- **Related:** `sup.restart-window`, `sup.short-runs`
+- **Why:** With a second count, the backoff follows whichever count is larger; shipped in 0.1.1.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+- 2026-11-05 · built · [#12](https://github.com/isoloop/isoloop/issues/12) · The supervisor's state machine, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+- 2026-11-24 · amended · [ADR 0001 · Restart limit: short runs (amended 2026-11-24)](../adr/0001-one-worker-per-isolate.md#restart-limit-short-runs-amended-2026-11-24) · With a second count, the backoff follows whichever count is larger; shipped in 0.1.1. Before: Each restart waits `initialMs × factorⁿ`, capped at `maxMs`, where n is the restart count.
+
+### `sup.failed-message`
+
+- **Errors and events:** `isolate:failed`
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.short-runs`
+- **Why:** With two rules, a reader needs to know which one failed the isolate.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0001 · Restart limit: short runs (amended 2026-11-24)](../adr/0001-one-worker-per-isolate.md#restart-limit-short-runs-amended-2026-11-24) · With two rules, a reader needs to know which one failed the isolate.
+- 2026-11-24 · built · [#430](https://github.com/isoloop/isoloop/issues/430) · Built on main; backported to release/0.1 in #439.
+- 2026-11-24 · shipped · [v0.1.1](https://github.com/isoloop/isoloop/releases/tag/v0.1.1) · First released in 0.1.1.
+
+### `sup.lag-clock`
+
+- **Code:** `packages/host/src/supervisor/machine.ts`, `packages/host/src/kernel/kernel.ts`, `packages/host/src/bus/controller.ts`
+- **Related:** `sup.lag-clock-cap`, `sup.lag-clock-scope`, `sup.kill-after`, `sup.ready-timeout`
+- **Why:** On a CPU-starved page the host itself is late, so a worker waiting for a CPU looked hung and was killed. The lag clock removed every false kill at the defaults in the spike.
+
+History:
+
+- 2026-11-26 · decided · [ADR 0001 · Heartbeat clock: the host's lag (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#heartbeat-clock-the-hosts-lag-amended-2026-11-26) · On a CPU-starved page the host itself is late, so a worker waiting for a CPU looked hung and was killed. The lag clock removed every false kill at the defaults in the spike.
+- 2026-11-27 · built · [#472](https://github.com/isoloop/isoloop/issues/472) · Built on main; ships in 0.2.0.
+
+### `sup.lag-clock-cap`
+
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.lag-clock`
+- **Why:** A hung worker on a starved page must still be killed, at most 3 times later than on a page that isn't starved.
+
+History:
+
+- 2026-11-26 · decided · [ADR 0001 · Heartbeat clock: the host's lag (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#heartbeat-clock-the-hosts-lag-amended-2026-11-26) · A hung worker on a starved page must still be killed, at most 3 times later than on a page that isn't starved.
+- 2026-11-27 · built · [#472](https://github.com/isoloop/isoloop/issues/472) · Built on main; ships in 0.2.0.
+
+### `sup.lag-clock-scope`
+
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.lag-clock`
+- **Why:** The busy overlay and the restart limit keep behaving as they did; the #390 crash loop still fails at the same crash.
+
+History:
+
+- 2026-11-26 · decided · [ADR 0001 · Heartbeat clock: the host's lag (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#heartbeat-clock-the-hosts-lag-amended-2026-11-26) · The busy overlay and the restart limit keep behaving as they did; the #390 crash loop still fails at the same crash.
+- 2026-11-27 · built · [#472](https://github.com/isoloop/isoloop/issues/472) · Built on main; ships in 0.2.0.
+
+### `sup.warm-up`
+
+- **Superseded by:** `sup.lag-clock`
+- **Why:** Plant's restart loop on Firefox CI looked like start-up work killed by a short `killAfterMs`.
+
+History:
+
+- 2026-11-20 · decided · [ADR 0001 · Start-up warm-up (amended 2026-11-20; not built, reopened 2026-11-22; replaced 2026-11-26)](../adr/0001-one-worker-per-isolate.md#start-up-warm-up-amended-2026-11-20-not-built-reopened-2026-11-22-replaced-2026-11-26) · Plant's restart loop on Firefox CI looked like start-up work killed by a short `killAfterMs`.
+- 2026-11-22 · corrected · [ADR 0001 · Start-up warm-up (amended 2026-11-20; not built, reopened 2026-11-22; replaced 2026-11-26)](../adr/0001-one-worker-per-isolate.md#start-up-warm-up-amended-2026-11-20-not-built-reopened-2026-11-22-replaced-2026-11-26) · Never built (#384 closed unmerged), and the loop came from the tests, not start-up. It also weakened the restart limit (#390).
+- 2026-11-22 · reopened · [#389](https://github.com/isoloop/isoloop/issues/389) · What a CPU-starved worker needs went back to its issue.
+- 2026-11-26 · superseded · [ADR 0001 · Heartbeat clock: the host's lag (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#heartbeat-clock-the-hosts-lag-amended-2026-11-26) · Replaced by the lag clock; nothing from #384 is reused.
+
+### `sup.no-sibling-detector`
+
+History:
+
+- 2026-11-26 · rejected · [ADR 0001 · Heartbeat clock: the host's lag (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#heartbeat-clock-the-hosts-lag-amended-2026-11-26) · Why not hold a kill while most workers are silent? Measured, it removed only 0 to 9 % of the false kills and delayed the kill of a hang that hits half the workers or more.
+
+### `sup.no-cpu-beat`
+
+History:
+
+- 2026-11-26 · rejected · [ADR 0001 · Heartbeat clock: the host's lag (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#heartbeat-clock-the-hosts-lag-amended-2026-11-26) · Why not count a worker's CPU time instead? A worker that doesn't get a CPU can't send that beat either.
+
+### `sup.worker-budget`
+
+- **Change it:** `KernelConfig.workers.budget`
+- **Errors and events:** `workers:budget`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.no-device-budget`, `sup.no-hard-worker-limit`, `sup.no-budget-suspend`
+- **Why:** The real ceiling depends on the device, so the budget is a hint, not a guarantee.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Worker budget and spawn failures](../adr/0001-one-worker-per-isolate.md#worker-budget-and-spawn-failures) · The real ceiling depends on the device, so the budget is a hint, not a guarantee.
+- 2026-11-05 · built · [#18](https://github.com/isoloop/isoloop/issues/18) · Loader hardening, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.spawn-failed`
+
+- **Errors and events:** `spawn_failed`
+- **Code:** `packages/host/src/kernel/kernel.ts`, `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.worker-budget`, `sup.restart-window`
+- **Why:** Memory runs out on the device, not at a count Isoloop can know, so a failed spawn is handled like any crash.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Worker budget and spawn failures](../adr/0001-one-worker-per-isolate.md#worker-budget-and-spawn-failures) · Memory runs out on the device, not at a count Isoloop can know, so a failed spawn is handled like any crash.
+- 2026-11-05 · built · [#18](https://github.com/isoloop/isoloop/issues/18) · Loader hardening, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.no-device-budget`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why not scale the budget to the device? Browser-reported figures are coarse or hidden, and the warning would differ per machine.
+
+### `sup.no-hard-worker-limit`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why not refuse spawns past a limit? It fails apps on capable machines and still doesn't protect weak ones.
+
+### `sup.no-budget-suspend`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why not suspend isolates once the budget is passed? It would turn a warning into behaviour.
+
+### `sup.hidden-tab`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.clocks-reset-on-show`
+- **Why:** Background tabs throttle main-thread timers, so beats look late when they aren't.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · What the browser still controls](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls) · Background tabs throttle main-thread timers, so beats look late when they aren't.
+- 2026-11-05 · built · [#15](https://github.com/isoloop/isoloop/issues/15) · The supervisor wired to real workers, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.clocks-reset-on-show`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.hidden-tab`
+- **Why:** Returning to a tab must never kill an isolate for beats missed while it was hidden or frozen.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · What the browser still controls](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls) · Returning to a tab must never kill an isolate for beats missed while it was hidden or frozen.
+- 2026-11-05 · built · [#15](https://github.com/isoloop/isoloop/issues/15) · The supervisor wired to real workers, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.bus-supervised`
+
+- **Errors and events:** `bus:crash`, `bus:restart`
+- **Code:** `packages/host/src/bus/controller.ts`
+- **Related:** `sup.bus-restart-limit`
+- **Why:** The bus worker holds every topic log and offset, so it gets the same supervision as an isolate.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 1. Supervise the bus like an isolate](../adr/0007-bus-worker-supervision.md#1-supervise-the-bus-like-an-isolate) · The bus worker holds every topic log and offset, so it gets the same supervision as an isolate.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller and its supervision, built in M2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.bus-restart-limit`
+
+- **Change it:** `KernelConfig.supervisor`
+- **Errors and events:** `bus:failed`, `bus_unavailable`
+- **Code:** `packages/host/src/bus/controller.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.bus-supervised`, `sup.restart-window`, `sup.short-runs`
+- **Why:** Found while writing the supervision guide (#320): an app that sets `supervisor` sets it for the bus worker too.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 1. Supervise the bus like an isolate](../adr/0007-bus-worker-supervision.md#1-supervise-the-bus-like-an-isolate) · Same limit as an isolate, so a bus that keeps crashing ends in a state the app can show.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller and its supervision, built in M2.
+- 2026-11-20 · clarified · [ADR 0007 · Amended: the restart limit is a default (2026-11-20)](../adr/0007-bus-worker-supervision.md#amended-the-restart-limit-is-a-default-2026-11-20) · Found while writing the supervision guide (#320): an app that sets `supervisor` sets it for the bus worker too. Before: Up to 3 restarts in 60 s, read as a fixed limit.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
 
 ## Bus
 
@@ -24,7 +610,324 @@ No rules yet.
 
 What survives a bus crash or a reload, and where it's stored. Prefix `dur`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `dur.per-topic` | Each topic sets its durability. `memory` keeps the log in the bus worker's memory only; `persistent` also writes it to segment files in the Origin Private File System (OPFS). | `default: memory` | active | since `0.1.0` |
+| `dur.group-commit` | Appends to persistent topics are written in batches, every 5 ms or 256 records. A `publish` is acknowledged only after its batch is flushed, and committed offsets are flushed the same way. | `5 ms`, `256 records` | active | since `0.1.0` |
+| `dur.log-storage` | The `LogEngine` is the broker's only interface to the log. Durability is a `LogStorage` the engine writes through: `MemoryStorage` or `OpfsStorage`. |  | active | since `0.1.0` |
+| `dur.evict-replay` | Old segments of a persistent topic can be evicted from memory and read back from disk on replay, so the topic can hold more than fits in memory. |  | active | since `0.1.0` |
+| `dur.codec` | Records of persistent topics are encoded with `@isoloop/codec`, in the format `isoloop-codec@1`. The codec has no dependency. |  | active | since `0.1.0` |
+| `dur.codec-one-encoding` | Every value has exactly one encoding in `isoloop-codec@1`, fixed by a byte-layout test. Changing the format means a new version that reads the old one. |  | active | since `0.1.0` |
+| `dur.codec-types` | A persistent topic accepts objects, arrays, strings, numbers, booleans, `null`, `undefined`, `bigint`, `Date`, `Map`, `Set`, typed arrays and `ArrayBuffer`. A `publish` of a function, a symbol, a class instance or a cycle rejects with `not_encodable`. Memory topics don't check. |  | active | since `0.1.0` |
+| `dur.no-codec-library` | The codec isn't a MessagePack or CBOR library. |  | rejected |  |
+| `dur.reattach` | After a bus crash, isolates keep running. The kernel gives each a new bus port with `reattach` as soon as the new bus worker is booted, before it reports `ready`, and the new bus buffers each port's publishes and subscriptions while it loads. |  | active | since `0.1.0` |
+| `dur.resume-committed` | After a bus restart, a subscription to a persistent topic resumes after its committed offset, with no gap, whatever `from` it asked for. One that never committed starts at its `from`. |  | active | since `0.1.0` |
+| `dur.memory-reset` | After a bus restart, a memory topic answers each subscription with `reset { topic, reason: 'bus_restart' }`. Adapters clear their topic state and replay from `earliest`; a plain `subscribe` gets its `onReset` callback. |  | active | since `0.1.0` |
+| `dur.on-reset-restart` | An isolate whose manifest sets `bus: { onReset: 'restart' }` is restarted by the supervisor on a reset, instead of handling it. | `default: 'reset'` | active | since `0.1.0` |
+| `dur.publish-buffer` | While the bus restarts, an isolate's `BusClient` buffers its publishes, up to 1,000 unanswered calls, then sends them after its subscriptions. Past the limit a publish rejects with `bus_unavailable`. | `1 000 calls` | active | since `0.1.0` |
+| `dur.dedupe` | On a persistent topic, every publish and request carries `(producer, epoch, seq)`. A re-send whose `seq` the bus already has, among the producer's last 1,000 on that topic, is answered with the original offset and not appended again. Memory topics skip the check. | `last 1 000 seqs` | active | since `0.1.0` |
+| `dur.host-resend` | `kernel.publish` calls the old bus never answered are sent again on the new bus, with the host as the producer. Calls made while no bus is running wait for the new one, up to 1,000. | `1 000 calls` | active | since `0.1.0` |
+| `dur.safe-mode` | If the bus crashes a second time during or right after loading from OPFS, the new bus worker sets the newest segment of each persistent topic aside, renamed and not deleted, and starts from the one before. The kernel emits `bus:recovered { quarantined }`. |  | active | since `0.1.0` |
+| `dur.one-tab` | The first tab takes the `isoloop-bus` Web Lock and uses OPFS. Other tabs on the same origin run every topic in memory, and the kernel emits `bus:durability_degraded` with `reason: 'another_tab'`. |  | active | since `0.1.0` |
+| `dur.no-sync-access` | Where sync access handles are missing or the files can't be opened (as in Firefox's and Safari's private windows), persistent topics behave as memory topics. The bus reports `ready.storage: 'memory'`, and `bus:durability_degraded` carries `no_sync_access` or `open_failed`. |  | active | since `0.1.0` |
+| `dur.tab-own-bus` | Each tab runs its own bus worker. Tabs don't share a bus. |  | active | since `0.1.0` |
+| `dur.quota` | The bus reports OPFS usage in its metrics. The kernel emits `bus:quota` once usage reaches 80 % of the quota, and when storage is full, publishes to persistent topics reject with `quota_exceeded` while memory topics carry on. | `80 %` | active | since `0.1.0` |
+| `dur.flush-on-freeze` | On the Page Lifecycle `freeze` event and on `pagehide`, the kernel asks the bus to flush persistent topics at once. |  | active | since `0.1.0` |
+| `dur.survives-reload` | Persistent topics survive a page reload and a discarded tab. Memory topics don't. |  | active | since `0.1.0` |
+| `dur.no-replicas` | The bus worker has no replicas. |  | rejected |  |
+| `dur.no-indexeddb` | Persistent topics aren't stored in IndexedDB. |  | rejected |  |
+| `dur.no-main-thread-mirror` | The log isn't mirrored on the main thread. |  | rejected |  |
+| `dur.no-snapshots` | Persistent topics are a write-ahead log, not periodic snapshots. |  | rejected |  |
+
+### `dur.per-topic`
+
+- **Change it:** topic `durability`
+- **Code:** `packages/bus/src/storage/opfs.ts`
+- **Related:** `dur.group-commit`, `dur.survives-reload`
+- **Why:** Held only in memory, every log and offset is lost when the bus worker crashes. OPFS gives dedicated workers synchronous file access, which suits append-only segments.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 2. Durability per topic](../adr/0007-bus-worker-supervision.md#2-durability-per-topic) · Held only in memory, every log and offset is lost when the bus worker crashes. OPFS gives dedicated workers synchronous file access, which suits append-only segments.
+- 2026-11-07 · built · [#98](https://github.com/isoloop/isoloop/issues/98) · The bus worker keeps persistent topics in OPFS, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.group-commit`
+
+- **Code:** `packages/bus/src/storage/opfs.ts`
+- **Related:** `dur.per-topic`
+- **Why:** Batching keeps writes cheap without acknowledging a record that isn't on disk.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 2. Durability per topic](../adr/0007-bus-worker-supervision.md#2-durability-per-topic) · Batching keeps writes cheap without acknowledging a record that isn't on disk.
+- 2026-11-07 · built · [#89](https://github.com/isoloop/isoloop/issues/89) · Segments and group commit, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.log-storage`
+
+- **Code:** `packages/bus/src/engine/types.ts`, `packages/bus/src/storage/opfs.ts`
+- **Why:** Storage plugs in under the engine, so adding OPFS changed nothing above it.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 3. Storage layer under the engine](../adr/0007-bus-worker-supervision.md#3-storage-layer-under-the-engine) · Storage plugs in under the engine, so adding OPFS changed nothing above it.
+- 2026-11-07 · built · [#89](https://github.com/isoloop/isoloop/issues/89) · `OpfsStorage` with segments and group commit, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.evict-replay`
+
+- **Code:** `packages/bus/src/storage/opfs.ts`
+- **Related:** `dur.per-topic`
+- **Why:** A durable log shouldn't be capped by the bus worker's memory.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 3. Storage layer under the engine](../adr/0007-bus-worker-supervision.md#3-storage-layer-under-the-engine) · A durable log shouldn't be capped by the bus worker's memory.
+- 2026-11-07 · built · [#105](https://github.com/isoloop/isoloop/issues/105) · Eviction and replay from disk, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.codec`
+
+- **Code:** `packages/codec/src/codec/format.ts`
+- **Related:** `dur.codec-one-encoding`, `dur.codec-types`, `dur.no-codec-library`
+- **Why:** It was the fastest or within 1.42× of the fastest library in every engine, with the smallest records and a 3.1 KB gzipped bundle.
+
+History:
+
+- 2026-11-07 · decided · [ADR 0014 · Decision](../adr/0014-own-codec.md#decision) · It was the fastest or within 1.42× of the fastest library in every engine, with the smallest records and a 3.1 KB gzipped bundle.
+- 2026-11-07 · built · [#74](https://github.com/isoloop/isoloop/issues/74) · The codec's core types, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.codec-one-encoding`
+
+- **Code:** `packages/codec/src/codec/format.ts`
+- **Related:** `dur.codec`
+- **Why:** Files on disk must stay readable, so the format can't drift.
+
+History:
+
+- 2026-11-07 · decided · [ADR 0014 · Decision](../adr/0014-own-codec.md#decision) · Files on disk must stay readable, so the format can't drift.
+- 2026-11-07 · built · [#74](https://github.com/isoloop/isoloop/issues/74) · The codec's core types, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.codec-types`
+
+- **Errors and events:** `not_encodable`
+- **Code:** `packages/codec/src/codec/format.ts`, `packages/bus/src/broker/broker.ts`
+- **Related:** `dur.codec`
+- **Why:** The codec's type list settled: the other structured-clone types are in, and cycles fail.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · Consequences](../adr/0007-bus-worker-supervision.md#consequences) · Topic values must be structured-clone data the codec can write.
+- 2026-11-07 · amended · [ADR 0014 · Decision](../adr/0014-own-codec.md#decision) · The codec's type list settled: the other structured-clone types are in, and cycles fail. Before: A persistent topic accepts structured-clone data without functions, DOM nodes or class instances.
+- 2026-11-07 · built · [#84](https://github.com/isoloop/isoloop/issues/84) · The codec covers the other structured-clone types, and the broker rejects `not_encodable`.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.no-codec-library`
+
+History:
+
+- 2026-11-07 · rejected · [ADR 0014 · Alternatives considered](../adr/0014-own-codec.md#alternatives-considered) · Why not use msgpackr or cbor-x? No library was more than 2× faster (at most 1.42×), and ours is smaller on the wire and in the bundle.
+
+### `dur.reattach`
+
+- **Code:** `packages/host/src/bus/controller.ts`
+- **Related:** `dur.resume-committed`, `dur.memory-reset`, `dur.publish-buffer`
+- **Why:** Written down as built in `controller.ts`, so isolates don't wait on the restore.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · A bus crash should be a short pause, not a restart of every isolate.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller and its supervision, built in M2.
+- 2026-11-13 · clarified · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · Written down as built in `controller.ts`, so isolates don't wait on the restore. Before: The kernel gives every running isolate a new bus port via `reattach`, with no word on when.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.resume-committed`
+
+- **Code:** `packages/runtime/src/bus/bus-client.ts`, `packages/bus/src/broker/broker.ts`
+- **Related:** `dur.reattach`
+- **Why:** A reattached `from: 'earliest'` subscription first replayed the whole log; the committed offset wins.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · A persistent topic survives the crash, so a reader picks up where it left off.
+- 2026-11-07 · clarified · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · A reattached `from: 'earliest'` subscription first replayed the whole log; the committed offset wins. Before: Persistent topics resume after the committed offset.
+- 2026-11-07 · built · [#118](https://github.com/isoloop/isoloop/issues/118) · A reattached subscription to a persistent topic resumes after its committed offset.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.memory-reset`
+
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `dur.reattach`, `dur.on-reset-restart`
+- **Why:** The old log is gone, and a reset is cheaper than restarting every isolate.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · The old log is gone, and a reset is cheaper than restarting every isolate.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller and its supervision, built in M2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.on-reset-restart`
+
+- **Change it:** manifest `bus.onReset`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `dur.memory-reset`
+- **Why:** Some isolates can't rebuild their state from a replay.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · Some isolates can't rebuild their state from a replay.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller and its supervision, built in M2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.publish-buffer`
+
+- **Errors and events:** `bus_unavailable`
+- **Code:** `packages/runtime/src/bus/bus-client.ts`
+- **Related:** `dur.dedupe`, `dur.host-resend`
+- **Why:** Publishes in flight across a restart are sent again, not lost.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · Publishes in flight across a restart are sent again, not lost.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller and its supervision, built in M2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.dedupe`
+
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `dur.publish-buffer`
+- **Why:** The old bus may have flushed a record before it crashed. Rejecting the re-send wouldn't stop the duplicate, since an app that retries writes it again.
+
+History:
+
+- 2026-11-07 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · The old bus may have flushed a record before it crashed. Rejecting the re-send wouldn't stop the duplicate, since an app that retries writes it again.
+- 2026-11-07 · built · [#116](https://github.com/isoloop/isoloop/issues/116) · Re-sent publishes are deduplicated on persistent topics, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.host-resend`
+
+- **Code:** `packages/host/src/bus/controller.ts`
+- **Related:** `dur.dedupe`
+- **Why:** Deduplication makes the re-send safe, so the host stops rejecting.
+
+History:
+
+- 2026-11-06 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · Recorded as built in M2.
+- 2026-11-07 · amended · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · Deduplication makes the re-send safe, so the host stops rejecting. Before: `kernel.publish` calls the old bus never answered reject with `bus_unavailable`, since the host can't tell whether they were appended.
+- 2026-11-07 · built · [#116](https://github.com/isoloop/isoloop/issues/116) · Re-sent publishes are deduplicated on persistent topics, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.safe-mode`
+
+- **Errors and events:** `bus:recovered`
+- **Code:** `packages/bus/src/server/server.ts`, `packages/bus/src/storage/safe-mode.ts`
+- **Why:** A crash right after loading most likely comes from a persisted record.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 5. Safe mode against crash loops](../adr/0007-bus-worker-supervision.md#5-safe-mode-against-crash-loops) · A crash right after loading most likely comes from a persisted record.
+- 2026-11-07 · built · [#106](https://github.com/isoloop/isoloop/issues/106) · Safe mode, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.one-tab`
+
+- **Errors and events:** `bus:durability_degraded`
+- **Code:** `packages/bus/src/storage/lock.ts`
+- **Related:** `dur.no-sync-access`, `dur.tab-own-bus`
+- **Why:** Sync access handles are exclusive, so only one tab can write the files.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 6. One tab owns the files](../adr/0007-bus-worker-supervision.md#6-one-tab-owns-the-files) · Sync access handles are exclusive, so only one tab can write the files.
+- 2026-11-07 · built · [#107](https://github.com/isoloop/isoloop/issues/107) · One tab owns the files, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.no-sync-access`
+
+- **Errors and events:** `bus:durability_degraded`
+- **Code:** `packages/bus/src/server/server.ts`
+- **Related:** `dur.one-tab`, `dur.no-indexeddb`
+- **Why:** Every major browser has had sync access handles in normal browsing since 2022 or 2023, so a second engine would only serve private windows and old browsers.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 6. One tab owns the files](../adr/0007-bus-worker-supervision.md#6-one-tab-owns-the-files) · Without sync access handles, the bus needs somewhere else to put persistent topics.
+- 2026-11-07 · amended · [ADR 0007 · 6. One tab owns the files](../adr/0007-bus-worker-supervision.md#6-one-tab-owns-the-files) · Every major browser has had sync access handles in normal browsing since 2022 or 2023, so a second engine would only serve private windows and old browsers. Before: Where sync access handles are missing, persistent topics are stored in IndexedDB.
+- 2026-11-07 · built · [#110](https://github.com/isoloop/isoloop/issues/110) · Memory with `bus:durability-degraded` where sync access handles are missing, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.tab-own-bus`
+
+- **Related:** `dur.one-tab`, `dur.no-replicas`
+- **Why:** Sharing a bus across tabs is out of scope for v1.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 6. One tab owns the files](../adr/0007-bus-worker-supervision.md#6-one-tab-owns-the-files) · Sharing a bus across tabs is out of scope for v1.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller, built in M2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.quota`
+
+- **Errors and events:** `bus:quota`, `quota_exceeded`
+- **Code:** `packages/host/src/kernel/kernel.ts`, `packages/bus/src/broker/broker.ts`
+- **Why:** OPFS quota and eviction apply to the origin, so the app needs to hear before writes fail.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · Consequences](../adr/0007-bus-worker-supervision.md#consequences) · OPFS quota and eviction apply to the origin, so the app needs to hear before writes fail.
+- 2026-11-07 · built · [#108](https://github.com/isoloop/isoloop/issues/108) · Quota, `bus:quota` at 80 % and `quota_exceeded` when full, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.flush-on-freeze`
+
+- **Code:** `packages/host/src/bus/controller.ts`, `packages/bus/src/server/server.ts`
+- **Related:** `dur.survives-reload`
+- **Why:** A frozen or closing tab may never run again, so nothing waits for the next group commit.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · What the browser still controls](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls) · A frozen or closing tab may never run again, so nothing waits for the next group commit.
+- 2026-11-07 · built · [#112](https://github.com/isoloop/isoloop/issues/112) · Flush on freeze, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.survives-reload`
+
+- **Related:** `dur.per-topic`, `dur.flush-on-freeze`
+- **Why:** A browser may discard a tab, so state that must outlive it goes in a persistent topic.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · What the browser still controls](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls) · A browser may discard a tab, so state that must outlive it goes in a persistent topic.
+- 2026-11-07 · built · [#98](https://github.com/isoloop/isoloop/issues/98) · The bus worker keeps persistent topics in OPFS, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.no-replicas`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0007 · Context](../adr/0007-bus-worker-supervision.md#context) · Why not run follower bus workers, like Kafka replicas? They share the page's browser process, so they die with the leader; a record or memory pressure that crashes the leader crashes them too; and they double every append and the memory.
+
+### `dur.no-indexeddb`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0007 · Alternatives considered](../adr/0007-bus-worker-supervision.md#alternatives-considered) · Why not IndexedDB, as RFC 0001 planned? It's slower for append-heavy logs and asynchronous only; OPFS with sync handles fits a log better. It stayed as the fallback until the 2026-11-07 amendment.
+
+### `dur.no-main-thread-mirror`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0007 · Alternatives considered](../adr/0007-bus-worker-supervision.md#alternatives-considered) · Why not keep a copy where the host is? It puts every record back on the main thread, against ADR 0005.
+
+### `dur.no-snapshots`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0007 · Alternatives considered](../adr/0007-bus-worker-supervision.md#alternatives-considered) · Why not snapshot now and then? Writes are cheaper, but records since the last snapshot are lost. It could come later as an extra `durability: 'snapshot'` mode.
 
 ## Contracts & schemas
 
@@ -380,7 +1283,531 @@ No rules yet.
 
 Version numbers, what a release may change, and how a version ships. Prefix `ver`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `ver.project-name` | The project is Isoloop. Its packages are published under the `@isoloop/*` npm scope, and the CLI as the unscoped `isoloop`. | `@isoloop/*`, `isoloop` | active | since `0.1.0` |
+| `ver.no-federa-name` | The packages aren't published under the working name Federa. |  | rejected |  |
+| `ver.name-prefixes` | System topics are named `isoloop.*`, for example `isoloop.route.v1`, and the host's surface element is `<iso-surface>`. | `isoloop.*`, `<iso-surface>` | active | since `0.1.0` |
+| `ver.one-version` | Every `@isoloop/*` package and the `isoloop` CLI share one version, through one Changesets `fixed` group. |  | active | since `0.1.0` |
+| `ver.app-versions` | Each app in `isoloop/web` (`plant-v*`, `markets-v*`, `processor-v*`, `site-v*`) has its own version, apart from the library's, and the maintainer pushes its tags. |  | active, repo | in force since [#229](https://github.com/isoloop/isoloop/issues/229) |
+| `ver.protocol-unversioned` | The host-to-worker protocol (`PROTOCOL { v, min }`) may change in any release. |  | active | since `0.1.0` |
+| `ver.previews` | Previews are `x.y.z-next.N` versions under npm `next`, made in Changesets pre mode `next`. Releases are plain `x.y.z` under `latest`. | `next`, `latest` | active, repo | in force since [#221](https://github.com/isoloop/isoloop/issues/221) |
+| `ver.pre-mode-counter` | In pre mode a version PR moves only the `-next.N` counter, whatever the changesets' bump types. |  | active, repo | in force since [#221](https://github.com/isoloop/isoloop/issues/221) |
+| `ver.minor-on-0x` | On 0.x a minor may contain anything: breaking changes, and additions to the isolate seam (`IsolateContext`, `defineIsolate`, the DOM subset, the adapter hooks). |  | active | since `0.1.0` |
+| `ver.patch-on-0x` | On 0.x a patch holds fixes plus compatible additions outside the isolate seam: the host API, `KernelConfig` and new packages. |  | active | since `0.1.0` |
+| `ver.semver-from-1` | From 1.0 the versions are plain semver: a major breaks, a minor adds, the isolate seam included, and a patch fixes. |  | decided | target `1.0.0` |
+| `ver.experimental` | An `@experimental` API may change or be removed in any minor, before and after 1.0. |  | active | since `0.1.0` |
+| `ver.experimental-marked` | Each `@experimental` API is marked `@experimental` in its TSDoc, and a change to it is called out in the changelog. |  | active | since `0.1.0` |
+| `ver.experimental-exit` | An API leaves `@experimental` through a decision recorded in its ADR. From then on it follows the minor and patch rules. |  | active, repo | in force since [#229](https://github.com/isoloop/isoloop/issues/229) |
+| `ver.patch-branch` | A patch to the current release during a preview cycle comes from a `release/0.x` branch, cut from the latest `v0.x.y` tag only when a fix is needed. |  | active, repo | in force since [#420](https://github.com/isoloop/isoloop/issues/420) |
+| `ver.fix-main-first` | A fix goes to `main` first. Its backport to the release branch is its own PR, with its own regression test. |  | active, repo | in force since [#396](https://github.com/isoloop/isoloop/issues/396) |
+| `ver.small-backports` | Only a small, reviewable backport goes to a release branch. A larger fix ships in the next minor, brought forward if it's urgent. |  | active, repo | in force since [#396](https://github.com/isoloop/isoloop/issues/396) |
+| `ver.release-branch-admitted` | A release branch can stage only once it's admitted: added to the `npm` environment by its exact name, with a ruleset of its own. `release.yml` accepts `main` and that branch by exact name. | `main`, `release/0.1` | active, repo | in force since [#420](https://github.com/isoloop/isoloop/issues/420) |
+| `ver.release-branch-lifetime` | One release branch exists at a time. It's deleted when the next minor takes `latest`, keeps its tags, and is never merged back into `main`. |  | active, repo | in force since [#396](https://github.com/isoloop/isoloop/issues/396) |
+| `ver.no-older-line-patch` | No patch is released for an older line. `release.yml` refuses a version that would move `latest` or `next` back. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.no-standing-branches` | There's no standing `release/0.x` branch for every minor. |  | rejected |  |
+| `ver.tag-per-version` | Every published version has an annotated tag `v<version>` on the commit it was built from, made by the `finish` run after the publish. Pushing a tag starts nothing. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.no-tag-first` | A release isn't started by pushing its tag. |  | rejected |  |
+| `ver.github-releases` | Each release from 0.1.0 on gets a GitHub Release, made by `finish`; previews get none. Its text is `.github/releases/<version>.md` where that file exists, and the changelog sections otherwise. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.release-workflow` | Every version, preview or release, is published by one workflow, `release.yml`. It's started by hand, it's a dry run unless told otherwise, and the npm dist-tag comes from the version. | `dry run by default` | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.stage-approve-finish` | A version is staged by `release.yml`, then the maintainer approves each of the 13 packages on npmjs.com with 2FA, then a `finish` run checks every package's version, dist-tag and provenance before it tags. | `13 packages`, `2FA approval` | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.approval-order` | The maintainer approves the staged packages in dependency order: protocol, codec, dom and vite; then bus and runtime; then host, react and preact; then balancer, devtools, webmcp and the `isoloop` CLI. None is approved until all 13 are staged. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.stage-only-trust` | Each package trusts only `release.yml` in the `npm` environment, allowed to stage and not to publish or change dist-tags. Tokens are disallowed, and there's no fallback publish. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.no-direct-publish` | Packages aren't published directly from a GitHub environment, for releases or previews. |  | rejected |  |
+| `ver.no-cli-approval` | Staged packages are approved in the browser, not with the npm CLI. |  | rejected |  |
+| `ver.pages-by-hand` | GitHub Pages isn't part of a release. It serves a redirect to isoloop.dev, and `pages.yml` is run by hand when that changes. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.no-major-below-1` | The changeset check fails a changeset that asks for a `major` bump while the version is below 1.0.0, unless the PR has the `release-1.0` label. | `label: release-1.0` | active, repo | in force since [#230](https://github.com/isoloop/isoloop/issues/230) |
+| `ver.version-pr-passes` | A PR whose diff only consumes changesets passes the changeset check without the `no-changeset` label. The check reads the diff, not the branch name. |  | active, repo | in force since [#230](https://github.com/isoloop/isoloop/issues/230) |
+| `ver.no-mixed-versions` | `release.yml` stages only when every package has the same version: a `-next.N` in pre mode, or a plain `x.y.z` out of it. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.old-versions-deprecated` | Every `0.0.0*` version of each `@isoloop/*` package is deprecated on npm, not unpublished. |  | active | since `0.1.0` |
+| `ver.latest-only` | Only the version on npm `latest` is supported. `next` previews are never supported. | `latest only` | active | since `0.1.0` |
+| `ver.security-advisory` | A security bug in an unsupported version is fixed in `latest` and published as a GitHub security advisory that names the affected range and the fixed version. |  | active | since `0.1.0` |
+| `ver.deprecate-known-bug` | A version range is deprecated on npm, with the message "Upgrade to latest", only for a known security or data-loss bug. |  | active | since `0.1.0` |
+| `ver.no-support-window` | The previous minor gets no support window on 0.x. |  | rejected |  |
+| `ver.breaking-listed` | Each minor's changesets name its breaking changes and how to migrate. The steward checks it. |  | active, repo | in force since [#396](https://github.com/isoloop/isoloop/issues/396) |
+| `ver.codemod-rule` | A breaking change to a stable API ships with a codemod that migrates it, in the same release, or it doesn't ship. Stable means every export the API check compares, except `@internal` ones. |  | active, repo | in force since [#462](https://github.com/isoloop/isoloop/issues/462) |
+| `ver.codemod-gate` | A changeset whose summary starts with `breaking:` fails the changeset check unless the PR adds codemod fixtures under `packages/cli/src/migrate/<version>/fixtures/`. |  | active, repo | in force since [#462](https://github.com/isoloop/isoloop/issues/462) |
+| `ver.migrate-command` | `npx isoloop migrate` reads the installed `@isoloop/*` version and applies each codemod up to the latest; `npx isoloop migrate 0.2` names the target. It's a dry run that prints the diff unless given `--write`. |  | decided | target `0.2.0` |
+| `ver.migrate-comments` | A behaviour change with no syntax to rewrite gets an `// isoloop-migrate:` comment where the code uses it, and a migration section in the guide. |  | decided | target `0.2.0` |
+| `ver.codemod-parser` | Codemods parse TypeScript and JSX with `oxc-parser`, behind Isoloop's own `parse` and `edit` interface with conformance tests, and rewrite by text edits so the user's formatting is kept. |  | decided | target `0.2.0` |
+| `ver.experimental-codemods` | A change to an `@experimental` API gets a codemod when the change is mechanical, and a migration note otherwise. |  | active, repo | in force since [#434](https://github.com/isoloop/isoloop/issues/434) |
+| `ver.codemods-on-real-apps` | `isoloop/web`'s plant-bench runs the codemods on every run branch that needs them, and a codemod that fails there blocks the release. |  | decided, repo |  |
+
+### `ver.project-name`
+
+- **Related:** `ver.no-federa-name`, `ver.name-prefixes`
+- **Why:** An isolated event loop per unit is what the runtime gives, visual or headless, and the name was free on npm, as an npm scope and as a GitHub org.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0004 · Decision](../adr/0004-npm-name.md#decision) · An isolated event loop per unit is what the runtime gives, visual or headless, and the name was free on npm, as an npm scope and as a GitHub org.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.no-federa-name`
+
+- **Related:** `ver.project-name`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0004 · Context](../adr/0004-npm-name.md#context) · Why not keep Federa? The `@federa` npm scope belongs to another maintainer, so `@federa/host` couldn't be published and npm searches would mix us with an unrelated project.
+
+### `ver.name-prefixes`
+
+- **Code:** `packages/host/src/render/compositor.ts`
+- **Related:** `ver.project-name`
+- **Why:** One prefix per kind of name, taken from the project's name.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0004 · Decision](../adr/0004-npm-name.md#decision) · One prefix per kind of name, taken from the project's name.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.one-version`
+
+- **Code:** `.changeset/config.json`
+- **Related:** `ver.no-mixed-versions`
+- **Why:** The CLI joins the group, so one number names a build across every package.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0011 · Decision](../adr/0011-dom-package.md#decision) · `runtime` and `host` must always speak the same render format, so they're released together.
+- 2026-11-17 · amended · [ADR 0019 · 1. Three kinds of version](../adr/0019-versioning-and-releases.md#1-three-kinds-of-version) · The CLI joins the group, so one number names a build across every package. Before: Every `@isoloop/*` package shares one version.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.app-versions`
+
+- **Why:** The apps deploy on their own schedule, so tying them to the library's version would say nothing.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 1. Three kinds of version](../adr/0019-versioning-and-releases.md#1-three-kinds-of-version) · The apps deploy on their own schedule, so tying them to the library's version would say nothing.
+- 2026-11-17 · built · [#229](https://github.com/isoloop/isoloop/issues/229) · In force from the ADR's PR.
+
+### `ver.protocol-unversioned`
+
+- **Why:** Both ends ship in one build, so no released version ever talks to another.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 1. Three kinds of version](../adr/0019-versioning-and-releases.md#1-three-kinds-of-version) · Both ends ship in one build, so no released version ever talks to another.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.previews`
+
+- **Code:** `.changeset/pre.json`, `scripts/release/rules.ts`
+- **Related:** `ver.pre-mode-counter`
+- **Why:** `0.0.0-next.<sha>` didn't sort by time and led to no release.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 2. The road to 1.0](../adr/0019-versioning-and-releases.md#2-the-road-to-10) · `0.0.0-next.<sha>` didn't sort by time and led to no release.
+- 2026-11-17 · built · [#221](https://github.com/isoloop/isoloop/issues/221) · Changesets went into pre mode `next`, with the version step and the changeset check.
+
+### `ver.pre-mode-counter`
+
+- **Related:** `ver.previews`
+- **Why:** That's how Changesets pre mode counts, so previews of one minor stay in order.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 2. The road to 1.0](../adr/0019-versioning-and-releases.md#2-the-road-to-10) · That's how Changesets pre mode counts, so previews of one minor stay in order.
+- 2026-11-17 · built · [#221](https://github.com/isoloop/isoloop/issues/221) · Changesets went into pre mode `next`.
+
+### `ver.minor-on-0x`
+
+- **Related:** `ver.patch-on-0x`, `ver.codemod-rule`
+- **Why:** The isolate check compares only `major.minor`, so a seam member added in a patch would pass the check on an older host and then fail.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 3. What a minor and a patch may contain on 0.x](../adr/0019-versioning-and-releases.md#3-what-a-minor-and-a-patch-may-contain-on-0x) · The isolate check compares only `major.minor`, so a seam member added in a patch would pass the check on an older host and then fail.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.patch-on-0x`
+
+- **Related:** `ver.minor-on-0x`
+- **Why:** Host-side additions don't need the isolate check, so they needn't wait for a minor.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 3. What a minor and a patch may contain on 0.x](../adr/0019-versioning-and-releases.md#3-what-a-minor-and-a-patch-may-contain-on-0x) · Host-side additions don't need the isolate check, so they needn't wait for a minor.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.semver-from-1`
+
+- **Related:** `ver.no-major-below-1`
+- **Why:** From 1.0 the isolate check compares majors, so a minor may add to the seam.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 3. What a minor and a patch may contain on 0.x](../adr/0019-versioning-and-releases.md#3-what-a-minor-and-a-patch-may-contain-on-0x) · From 1.0 the isolate check compares majors, so a minor may add to the seam.
+
+### `ver.experimental`
+
+- **Related:** `ver.experimental-marked`, `ver.experimental-codemods`
+- **Why:** Tying 1.0 to every new API settling would hold 1.0 back on a browser shipping WebMCP and on the balancer's design.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 4. @experimental](../adr/0019-versioning-and-releases.md#4-experimental) · Tying 1.0 to every new API settling would hold 1.0 back on a browser shipping WebMCP and on the balancer's design.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.experimental-marked`
+
+- **Related:** `ver.experimental`
+- **Why:** A promise that may change in any minor has to be visible where people read the API.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 4. @experimental](../adr/0019-versioning-and-releases.md#4-experimental) · A promise that may change in any minor has to be visible where people read the API.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.experimental-exit`
+
+- **Related:** `ver.experimental`
+- **Why:** Leaving experimental is a promise to users, so it's decided on the record.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 4. @experimental](../adr/0019-versioning-and-releases.md#4-experimental) · Leaving experimental is a promise to users, so it's decided on the record.
+- 2026-11-17 · built · [#229](https://github.com/isoloop/isoloop/issues/229) · In force from the ADR's PR.
+
+### `ver.patch-branch`
+
+- **Code:** `scripts/release/rules.ts`
+- **Related:** `ver.fix-main-first`, `ver.release-branch-admitted`, `ver.release-branch-lifetime`, `ver.no-standing-branches`
+- **Why:** Pre mode applies to the whole repo, so `main` can't release a patch while it previews the next minor.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · Pre mode applies to the whole repo, so `main` can't release a patch while it previews the next minor.
+- 2026-11-24 · built · [#420](https://github.com/isoloop/isoloop/issues/420) · `release.yml` releases from `release/0.1` as well as `main`, for 0.1.1.
+
+### `ver.fix-main-first`
+
+- **Related:** `ver.patch-branch`, `ver.small-backports`
+- **Why:** A fix that skips `main` comes back as a regression in the next minor.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · A fix that skips `main` comes back as a regression in the next minor.
+- 2026-11-23 · built · [#396](https://github.com/isoloop/isoloop/issues/396) · In force from the amendment's PR.
+
+### `ver.small-backports`
+
+- **Related:** `ver.fix-main-first`
+- **Why:** Backports are made by hand, and a large one is a second change nobody tested on `main`.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · Backports are made by hand, and a large one is a second change nobody tested on `main`.
+- 2026-11-23 · built · [#396](https://github.com/isoloop/isoloop/issues/396) · In force from the amendment's PR.
+
+### `ver.release-branch-admitted`
+
+- **Code:** `scripts/release/rules.ts`, `.github/workflows/release.yml`
+- **Related:** `ver.patch-branch`
+- **Why:** A pattern such as `release/*` would also match version-PR branches, which no ruleset protects.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · A pattern such as `release/*` would also match version-PR branches, which no ruleset protects.
+- 2026-11-24 · built · [#420](https://github.com/isoloop/isoloop/issues/420) · `RELEASE_BRANCHES` lists `main` and `release/0.1`.
+
+### `ver.release-branch-lifetime`
+
+- **Related:** `ver.patch-branch`
+- **Why:** Only the latest release is supported, so an older line needs no branch.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · Only the latest release is supported, so an older line needs no branch.
+- 2026-11-23 · built · [#396](https://github.com/isoloop/isoloop/issues/396) · In force from the amendment's PR.
+
+### `ver.no-older-line-patch`
+
+- **Code:** `scripts/release/rules.ts`
+- **Related:** `ver.latest-only`
+- **Why:** Once 0.2.0 is `latest`, a 0.1.x must not take that dist-tag back.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · Once 0.2.0 is `latest`, a 0.1.x must not take that dist-tag back.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · The stage run checks each package's current dist-tags before it stages.
+
+### `ver.no-standing-branches`
+
+- **Related:** `ver.patch-branch`
+
+History:
+
+- 2026-11-23 · rejected · [ADR 0019 · Alternatives considered](../adr/0019-versioning-and-releases.md#alternatives-considered) · Why not keep a branch per minor? It costs a ruleset, CI, a Changesets state and hand cherry-picks every week, for a line users are told to leave.
+
+### `ver.tag-per-version`
+
+- **Code:** `scripts/release/finish.ts`, `.github/workflows/release.yml`
+- **Related:** `ver.release-workflow`, `ver.no-tag-first`
+- **Why:** The tags ruleset forbids moving a tag, so a tag made before a rejected stage would stay on the wrong commit.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · One tag per version answers which commit a build came from.
+- 2026-11-22 · amended · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · The tags ruleset forbids moving a tag, so a tag made before a rejected stage would stay on the wrong commit. Before: The Prerelease workflow tagged previews after publishing, and a release tag pushed by the maintainer started the release.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · Staged releases from `release.yml`, with `finish` making the tag.
+
+### `ver.no-tag-first`
+
+- **Related:** `ver.tag-per-version`
+
+History:
+
+- 2026-11-22 · rejected · [ADR 0019 · Alternatives considered](../adr/0019-versioning-and-releases.md#alternatives-considered) · Why not tag first and let the tag start the release? A tag can't be moved or deleted, so a rejected stage would leave the version's tag on the wrong commit for good.
+
+### `ver.github-releases`
+
+- **Code:** `scripts/release/notes.ts`, `.github/releases/0.1.0.md`
+- **Why:** 0.1.0's changelogs would repeat every preview's entries, so a release can carry its own text.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · Previews are for this project and `isoloop/web`, and their tag and changelogs are enough.
+- 2026-11-22 · amended · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · 0.1.0's changelogs would repeat every preview's entries, so a release can carry its own text. Before: Each release from 0.1.0 on gets a GitHub Release; previews get none.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · `finish` makes the Release.
+
+### `ver.release-workflow`
+
+- **Code:** `.github/workflows/release.yml`
+- **Related:** `ver.stage-approve-finish`, `ver.tag-per-version`
+- **Why:** One path to audit, and previews rehearse the path a release takes.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · One path to audit, and previews rehearse the path a release takes.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · Staged releases from `release.yml`.
+
+### `ver.stage-approve-finish`
+
+- **Code:** `.github/workflows/release.yml`, `scripts/release/finish.ts`
+- **Related:** `ver.approval-order`, `ver.stage-only-trust`
+- **Why:** A publish then needs the maintainer's 2FA, which an agent or a job holding GitHub credentials doesn't have.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · A publish then needs the maintainer's 2FA, which an agent or a job holding GitHub credentials doesn't have.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · Staged releases from `release.yml`.
+
+### `ver.approval-order`
+
+- **Code:** `scripts/release/rules.ts`
+- **Related:** `ver.stage-approve-finish`
+- **Why:** Each approval moves a dist-tag at once, so this order keeps what's on npm installable at every step.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · Each approval moves a dist-tag at once, so this order keeps what's on npm installable at every step.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · `APPROVAL_ORDER` holds the order, and the stage summary follows it.
+
+### `ver.stage-only-trust`
+
+- **Related:** `ver.stage-approve-finish`, `ver.no-direct-publish`, `ver.no-cli-approval`
+- **Why:** npm accepts a publish that matches any one trust entry, so the gate holds only if it's the only way in.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · npm accepts a publish that matches any one trust entry, so the gate holds only if it's the only way in.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · Staged releases from `release.yml`.
+
+### `ver.no-direct-publish`
+
+- **Related:** `ver.stage-only-trust`
+
+History:
+
+- 2026-11-22 · rejected · [ADR 0019 · Alternatives considered](../adr/0019-versioning-and-releases.md#alternatives-considered) · Why not publish from a protected environment and skip the approvals? Whoever holds the maintainer's GitHub credentials, as agents do, can change the environment and publish.
+
+### `ver.no-cli-approval`
+
+- **Related:** `ver.stage-only-trust`
+
+History:
+
+- 2026-11-22 · rejected · [ADR 0019 · Alternatives considered](../adr/0019-versioning-and-releases.md#alternatives-considered) · Why not approve 13 packages faster from the CLI? Agents share that shell's npm session, and npm can skip 2FA for 5 minutes after a prompt.
+
+### `ver.pages-by-hand`
+
+- **Code:** `.github/workflows/pages.yml`
+- **Why:** The redirect doesn't change with a release, and the `github-pages` environment refuses deploys from tags.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · The redirect doesn't change with a release, and the `github-pages` environment refuses deploys from tags.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · Staged releases from `release.yml`, with no Pages step.
+
+### `ver.no-major-below-1`
+
+- **Code:** `scripts/ci/changeset-check.ts`, `.github/workflows/changeset.yml`
+- **Related:** `ver.minor-on-0x`, `ver.semver-from-1`
+- **Why:** On 0.x a breaking change is a minor, so a major is a mistake until 1.0's previews start.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 7. Guards in CI](../adr/0019-versioning-and-releases.md#7-guards-in-ci) · On 0.x a breaking change is a minor, so a major is a mistake until 1.0's previews start.
+- 2026-11-17 · built · [#230](https://github.com/isoloop/isoloop/issues/230) · Changeset guards for majors and version PRs.
+
+### `ver.version-pr-passes`
+
+- **Code:** `scripts/ci/changeset-check.ts`
+- **Why:** A version PR has no changeset of its own by design.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 7. Guards in CI](../adr/0019-versioning-and-releases.md#7-guards-in-ci) · A version PR has no changeset of its own by design.
+- 2026-11-17 · built · [#230](https://github.com/isoloop/isoloop/issues/230) · Changeset guards for majors and version PRs.
+
+### `ver.no-mixed-versions`
+
+- **Code:** `scripts/release/packages.ts`
+- **Related:** `ver.one-version`
+- **Why:** Releases go through the same workflow as previews, so the check covers both.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 7. Guards in CI](../adr/0019-versioning-and-releases.md#7-guards-in-ci) · Packages in one fixed group must never reach npm at different versions.
+- 2026-11-22 · amended · [ADR 0019 · 7. Guards in CI](../adr/0019-versioning-and-releases.md#7-guards-in-ci) · Releases go through the same workflow as previews, so the check covers both. Before: The preview workflow stages only when every package has the same `-next.N` version.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · Staged releases from `release.yml`.
+
+### `ver.old-versions-deprecated`
+
+- **Why:** Unpublishing would break old lockfiles, and npm limits it anyway.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 8. The versions before this ADR](../adr/0019-versioning-and-releases.md#8-the-versions-before-this-adr) · Unpublishing would break old lockfiles, and npm limits it anyway.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.latest-only`
+
+- **Code:** `SECURITY.md`
+- **Related:** `ver.no-older-line-patch`, `ver.security-advisory`, `ver.no-support-window`
+- **Why:** On 0.x a minor may break anything, so a second supported line would mean backports to code users were told to leave.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 9. What is supported (amended 2026-11-23)](../adr/0019-versioning-and-releases.md#9-what-is-supported-amended-2026-11-23) · On 0.x a minor may break anything, so a second supported line would mean backports to code users were told to leave.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.security-advisory`
+
+- **Code:** `SECURITY.md`
+- **Related:** `ver.latest-only`, `ver.deprecate-known-bug`
+- **Why:** Users of an old line still need to learn they're affected and where the fix is.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 9. What is supported (amended 2026-11-23)](../adr/0019-versioning-and-releases.md#9-what-is-supported-amended-2026-11-23) · Users of an old line still need to learn they're affected and where the fix is.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.deprecate-known-bug`
+
+- **Code:** `SECURITY.md`
+- **Related:** `ver.security-advisory`
+- **Why:** Deprecating every superseded minor would warn on every install for no known risk.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 9. What is supported (amended 2026-11-23)](../adr/0019-versioning-and-releases.md#9-what-is-supported-amended-2026-11-23) · Deprecating every superseded minor would warn on every install for no known risk.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.no-support-window`
+
+- **Related:** `ver.latest-only`
+
+History:
+
+- 2026-11-23 · rejected · [ADR 0019 · Alternatives considered](../adr/0019-versioning-and-releases.md#alternatives-considered) · Why not support the previous minor for a while? On 0.x a minor may break anything. The question comes back at 1.0.
+
+### `ver.breaking-listed`
+
+- **Why:** Users who must upgrade to stay supported need to know what breaks.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 9. What is supported (amended 2026-11-23)](../adr/0019-versioning-and-releases.md#9-what-is-supported-amended-2026-11-23) · Users who must upgrade to stay supported need to know what breaks.
+- 2026-11-23 · built · [#396](https://github.com/isoloop/isoloop/issues/396) · In force from the amendment's PR.
+
+### `ver.codemod-rule`
+
+- **Related:** `ver.codemod-gate`, `ver.migrate-command`, `ver.experimental-codemods`
+- **Why:** Moving the web apps to 0.1.0 meant migrating each API change by hand.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · Moving the web apps to 0.1.0 meant migrating each API change by hand.
+- 2026-11-26 · built · [#462](https://github.com/isoloop/isoloop/issues/462) · `isoloop migrate`, the codemod gate and the parser interface.
+
+### `ver.codemod-gate`
+
+- **Code:** `scripts/ci/changeset-check.ts`
+- **Related:** `ver.codemod-rule`
+- **Why:** The rule holds only if CI holds a breaking change to it.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · The rule holds only if CI holds a breaking change to it.
+- 2026-11-26 · built · [#462](https://github.com/isoloop/isoloop/issues/462) · `isoloop migrate`, the codemod gate and the parser interface.
+
+### `ver.migrate-command`
+
+- **Change it:** `--write`
+- **Code:** `packages/cli/src/migrate/run.ts`
+- **Related:** `ver.codemod-rule`, `ver.migrate-comments`, `ver.codemod-parser`
+- **Why:** Users get each breaking change's migration from one command, in order.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · Users get each breaking change's migration from one command, in order.
+- 2026-11-26 · built · [#462](https://github.com/isoloop/isoloop/issues/462) · `isoloop migrate`, the codemod gate and the parser interface.
+
+### `ver.migrate-comments`
+
+- **Code:** `packages/cli/src/migrate/`
+- **Related:** `ver.migrate-command`
+- **Why:** A codemod can't rewrite behaviour, but it can point at every place that depends on it.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · A codemod can't rewrite behaviour, but it can point at every place that depends on it.
+- 2026-11-26 · built · [#462](https://github.com/isoloop/isoloop/issues/462) · `isoloop migrate`, the codemod gate and the parser interface.
+
+### `ver.codemod-parser`
+
+- **Code:** `packages/cli/src/migrate/parser.ts`, `packages/cli/src/migrate/edit.ts`
+- **Related:** `ver.migrate-command`
+- **Why:** It comes from the same project as the repo's oxlint and oxfmt, needs no printer, and can be swapped for TypeScript 7's own API once that's stable.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · It comes from the same project as the repo's oxlint and oxfmt, needs no printer, and can be swapped for TypeScript 7's own API once that's stable.
+- 2026-11-26 · built · [#462](https://github.com/isoloop/isoloop/issues/462) · `isoloop migrate`, the codemod gate and the parser interface.
+
+### `ver.experimental-codemods`
+
+- **Related:** `ver.experimental`, `ver.codemod-rule`
+- **Why:** Experimental APIs may change in any minor, but a mechanical rewrite still costs users nothing.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · Experimental APIs may change in any minor, but a mechanical rewrite still costs users nothing.
+- 2026-11-24 · built · [#434](https://github.com/isoloop/isoloop/issues/434) · In force from the amendment's PR.
+
+### `ver.codemods-on-real-apps`
+
+- **Related:** `ver.codemod-rule`
+- **Why:** Fixtures prove a codemod on small cases; real apps prove it on code nobody wrote for it.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · Fixtures prove a codemod on small cases; real apps prove it on code nobody wrote for it.
 
 ## Toolchain & layout
 
@@ -419,6 +1846,14 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.rules-ship-patches` | A patch from a `release/0.x` branch gets its `shipped` events in that branch's version PR, and they come to `main` with the backport. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.repo-rules` | A rule with `repo: true` is about how this repo works, not the published packages. It's `active` from its `built` event, has no `since`, `target` or `shipped` event, and `rules:ship` skips it. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.rules-lines-sections` | Under an ADR's `## Decision`, a decision is a numbered `###` heading when there are any, otherwise a top-level numbered item, otherwise each `###` section. A heading that says "amended" is an amendment, and a `Rules:` line inside a code fence doesn't count. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.ci-docs-only` | On a docs-only pull request, `check` runs in full and `cli-node24`, `browser`, `e2e` and `bench` report success without running their steps. |  | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.ci-docs-only-paths` | A pull request is docs-only when every changed file is under `docs/`, `.changeset/` or `.claude/`, or ends in `.md`. Any other file makes it a full run. | `docs/**`, `**/*.md`, `.changeset/**`, `.claude/**` | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.ci-docs-only-required-checks` | On a docs-only pull request the `e2e` jobs run and skip their steps, so `e2e (chromium)`, `e2e (firefox)` and `e2e (webkit)` still report as required checks. |  | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.ci-docs-only-pr-events` | Only `pull_request` runs can be docs-only. Release dry runs and stage runs, the nightly, pushes and runs by hand always run every job they include. |  | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.ci-nightly` | Every CI job, `bench` included, runs on `main` each night at 03:00 UTC, through `nightly.yml` calling `ci.yml`. | `03:00 UTC daily` | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.ci-nightly-quiet-skip` | A scheduled nightly is skipped when `main` has no commits since the last green nightly. A nightly run by hand always runs. |  | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.ci-nightly-issue` | A failed nightly opens an issue labelled `nightly-failure`, or comments on the open one, with the failed jobs and the commits since the last green nightly. The next green nightly closes it. | `label: nightly-failure` | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.no-ci-paths-ignore` | We don't use `paths-ignore` or a path-filter action to skip CI for docs. |  | rejected, repo |  |
 
 ### `tool.rule-one-fact`
 
@@ -734,6 +2169,91 @@ History:
 
 - 2026-11-27 · decided · [ADR 0026 · Clarified 2026-11-27: what counts as a decision](../adr/0026-rules-registry.md#clarified-2026-11-27-what-counts-as-a-decision) · The `Rules:` line check has to know which parts of an ADR need a line.
 - 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
+
+### `tool.ci-docs-only`
+
+- **Code:** `.github/workflows/ci.yml`
+- **Related:** `tool.ci-docs-only-paths`, `tool.ci-docs-only-required-checks`, `tool.ci-nightly`
+- **Why:** A docs change can't break runtime code, and the e2e and bench runs cost runner time for files they never read.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · A docs change can't break runtime code, and the e2e and bench runs cost runner time for files they never read.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.ci-docs-only-paths`
+
+- **Code:** `.github/workflows/ci.yml`
+- **Related:** `tool.ci-docs-only`
+- **Why:** An allowlist defaults to the full run, so a kind of file nobody listed never skips the tests.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · An allowlist defaults to the full run, so a kind of file nobody listed never skips the tests.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.ci-docs-only-required-checks`
+
+- **Code:** `.github/workflows/ci.yml`
+- **Related:** `tool.ci-docs-only`
+- **Why:** A matrix job skipped as a whole reports one unexpanded `e2e` check, and the required names would stay pending.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · A matrix job skipped as a whole reports one unexpanded `e2e` check, and the required names would stay pending.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.ci-docs-only-pr-events`
+
+- **Code:** `.github/workflows/ci.yml`
+- **Related:** `tool.ci-docs-only`
+- **Why:** A release run is the last full check before npm, so it must never skip.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · A release run is the last full check before npm, so it must never skip.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.ci-nightly`
+
+- **Code:** `.github/workflows/nightly.yml`
+- **Related:** `tool.ci-nightly-quiet-skip`, `tool.ci-nightly-issue`, `tool.ci-docs-only`
+- **Why:** With docs-only PRs skipping e2e, a daily full run catches flaky tests, browser drift and interactions between PRs merged the same day; it replaces the weekly run.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · With docs-only PRs skipping e2e, a daily full run catches flaky tests, browser drift and interactions between PRs merged the same day; it replaces the weekly run.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.ci-nightly-quiet-skip`
+
+- **Code:** `.github/workflows/nightly.yml`
+- **Related:** `tool.ci-nightly`
+- **Why:** A night with nothing new can only repeat the last result.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · A night with nothing new can only repeat the last result.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.ci-nightly-issue`
+
+- **Code:** `.github/workflows/nightly.yml`
+- **Related:** `tool.ci-nightly`
+- **Why:** GitHub emails a failed scheduled run only to whoever last edited the workflow; an issue is seen by everyone, and the commit range points at the cause.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · GitHub emails a failed scheduled run only to whoever last edited the workflow; an issue is seen by everyone, and the commit range points at the cause.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.no-ci-paths-ignore`
+
+- **Related:** `tool.ci-docs-only`
+
+History:
+
+- 2026-11-27 · rejected · [ADR 0009 · Alternatives considered](../adr/0009-toolchain.md#alternatives-considered) · Why not just `paths-ignore`? The workflow wouldn't start, so the required checks would stay pending and the PR couldn't merge; a path-filter action is a dependency for a dozen lines of shell.
 
 ## Derived topics
 
