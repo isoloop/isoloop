@@ -11,6 +11,7 @@ type HarnessKernel = {
     pool?: string;
     config?: unknown;
     grants?: { publish: string[]; subscribe: string[]; navigate?: boolean };
+    suspend?: 'never' | { whenIdle: { afterMs: number } };
   }): unknown;
   on(event: 'isolate:ready', fn: (e: { id: string }) => void): () => void;
   on(
@@ -30,10 +31,16 @@ type HarnessKernel = {
   ): () => void;
   subscribe(
     topic: { name: string },
-    fn: (r: { offset: number; value: unknown; producer: string }) => void,
+    fn: (r: { offset: number; key?: string; value: unknown; producer: string }) => void,
     opts?: { from?: 'latest' | 'earliest' | 'committed' },
   ): () => void;
   publish(topic: { name: string }, value: unknown, opts?: { key?: string }): Promise<void>;
+  /** `kernel.watch` (ADR 0023), as far as the watchers E2E reads it. */
+  watch(
+    topic: { name: string },
+    onView: (view: ReadonlyMap<string | null, unknown>) => void,
+    opts?: { keys?: (string | null)[] },
+  ): () => void;
   request(topic: { name: string }, value: unknown, opts?: { timeoutMs?: number }): Promise<unknown>;
   isolates(): {
     id: string;
