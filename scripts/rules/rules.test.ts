@@ -105,7 +105,12 @@ function rules(): { sup: Rule[]; dur: Rule[] } {
         status: 'decided',
         target: '0.2.0',
         events: [
-          { type: 'decided', date: '2026-11-24', ref: 'adr/0007', why: 'Slow loops never failed.' },
+          {
+            type: 'decided',
+            date: '2026-11-24',
+            ref: 'adr/0007#decision',
+            why: 'Slow loops never failed.',
+          },
           { type: 'built', date: '2026-11-24', ref: '#430', why: 'Merged on main.' },
         ],
       },
@@ -119,7 +124,7 @@ function rules(): { sup: Rule[]; dur: Rule[] } {
           {
             type: 'rejected',
             date: '2026-11-03',
-            ref: 'adr/0007',
+            ref: 'adr/0007#consequences',
             why: 'Why not replicas? Same failure domain.',
           },
         ],
@@ -167,6 +172,17 @@ const messages = (inp: CheckInput): string[] =>
 
 /** Mutates the first event of the first supervision rule and returns the check's messages. */
 const ev = (change: (e: Raw) => void): string[] => withRule((r) => change(evs(r)[0]!));
+
+/** The first supervision rule as an active repo rule, then `change`; the check's messages. */
+const repo = (change: (r: Raw) => void): string[] =>
+  withRule((r) => {
+    r['repo'] = true;
+    delete r['since'];
+    const list: unknown = r['events'];
+    if (Array.isArray(list)) list.pop();
+    pushEvent(r, { type: 'built', date: '2026-11-24', ref: '#483', why: 'Merged.' });
+    change(r);
+  });
 
 /** Mutates the first supervision rule (or the one at `i`) and returns the check's messages. */
 function withRule(change: (r: Raw) => void, i = 0): string[] {
@@ -257,6 +273,7 @@ describe('registry helpers', () => {
     expect(parseRef('web#285')).toEqual({ kind: 'issue', repo: 'web', number: 285 });
     expect(parseRef('v0.1.0-next.12')).toEqual({ kind: 'tag', tag: 'v0.1.0-next.12' });
     expect(parseRef('ADR 0007')).toBeUndefined();
+    expect(parseRef('adr/0007')).toBeUndefined();
   });
 
   it('orders versions with prereleases below their release', () => {
@@ -411,7 +428,7 @@ describe('rules:check', () => {
       expect.stringContaining('unknown field "note"'),
     );
     expect(ev((e) => (e['ref'] = 'ADR 0007 §1'))).toContainEqual(
-      expect.stringContaining('must be adr/NNNN#anchor'),
+      expect.stringContaining('must be adr/NNNN#heading-anchor'),
     );
     expect(ev((e) => (e['ref'] = '#12'))).toContainEqual(
       expect.stringContaining("a decided event's ref must be adr, not issue"),
@@ -426,8 +443,11 @@ describe('rules:check', () => {
   });
 
   it('fails on an ADR ref to a missing file or heading', () => {
-    expect(withRule((r) => (evs(r)[0]!['ref'] = 'adr/0099'))).toContainEqual(
+    expect(withRule((r) => (evs(r)[0]!['ref'] = 'adr/0099#decision'))).toContainEqual(
       expect.stringContaining('no ADR 0099 in docs/adr'),
+    );
+    expect(withRule((r) => (evs(r)[0]!['ref'] = 'adr/0007'))).toContainEqual(
+      expect.stringContaining('ref "adr/0007" must be adr/NNNN#heading-anchor'),
     );
     expect(withRule((r) => (evs(r)[0]!['ref'] = 'adr/0007#2-nothing'))).toContainEqual(
       expect.stringContaining('no heading #2-nothing in 0007-bus-worker-supervision.md'),
@@ -482,7 +502,12 @@ describe('rules:check', () => {
       withRule((r) => {
         r['status'] = 'superseded';
         r['supersededBy'] = 'sup.short-runs';
-        pushEvent(r, { type: 'superseded', date: '2026-11-25', ref: 'adr/0007', why: 'Replaced.' });
+        pushEvent(r, {
+          type: 'superseded',
+          date: '2026-11-25',
+          ref: 'adr/0007#decision',
+          why: 'Replaced.',
+        });
       }),
     ).toEqual([]);
     expect(
@@ -508,6 +533,35 @@ describe('rules:check', () => {
     ]);
   });
 
+  it('holds a repo rule to a built event and no versions', () => {
+    expect(repo(() => {})).toEqual([]);
+    expect(repo((r) => (r['repo'] = 'yes'))).toContainEqual(
+      expect.stringContaining('"repo" must be true or false'),
+    );
+    expect(repo((r) => (r['since'] = '0.1.0'))).toContainEqual(
+      expect.stringContaining('a repo rule has no "since"'),
+    );
+    expect(repo((r) => (r['target'] = '0.2.0'))).toContainEqual(
+      expect.stringContaining('a repo rule has no "target"'),
+    );
+    expect(
+      repo((r) => pushEvent(r, { type: 'shipped', date: '2026-11-30', ref: 'v0.2.0', why: 'x' })),
+    ).toContainEqual(expect.stringContaining('a repo rule has no shipped event'));
+    expect(
+      repo((r) => {
+        const list: unknown = r['events'];
+        if (Array.isArray(list)) list.pop();
+      }),
+    ).toContainEqual(expect.stringContaining('an active repo rule needs a built event'));
+    expect(
+      repo((r) => {
+        r['status'] = 'decided';
+        const list: unknown = r['events'];
+        if (Array.isArray(list)) list.pop();
+      }),
+    ).toEqual([]);
+  });
+
   it('fails a version PR that leaves a rule waiting on its version', () => {
     expect(messages(input(registry(), { version: '0.2.0' }))).toContainEqual(
       expect.stringContaining(
@@ -526,6 +580,18 @@ describe('rules:check', () => {
 });
 
 describe('rules:build', () => {
+  it('shows a repo rule as in force since its PR', () => {
+    const r = rules();
+    const rule = raw(r.sup[1]);
+    rule['repo'] = true;
+    rule['status'] = 'active';
+    delete rule['target'];
+    const md = renderReadme(registry(r), adrs());
+    expect(md).toContain(
+      '| active, repo | in force since [#430](https://github.com/isoloop/isoloop/issues/430) |',
+    );
+  });
+
   it("writes a section per concept, a table and each rule's history", () => {
     const md = renderReadme(registry(), adrs());
     expect(md).toContain('## Supervision');
@@ -588,6 +654,13 @@ describe('rules:ship', () => {
       why: 'First released in 0.2.0.',
     });
     expect(messages(input(reg, { version: '0.2.0' }))).toEqual([]);
+  });
+
+  it('skips repo rules', () => {
+    const r = rules();
+    raw(r.sup[1])['repo'] = true;
+    const reg = registry(r);
+    expect(ship(reg, '0.2.0', '2026-12-10').size).toBe(0);
   });
 
   it('leaves rules with another target alone', () => {

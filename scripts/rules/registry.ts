@@ -68,6 +68,8 @@ export interface Rule {
   statement: string;
   status: Status;
   experimental?: boolean;
+  /** About how the repo works, not the packages: active from its `built` event, no versions (amended 2026-11-27). */
+  repo?: boolean;
   values?: string[];
   knob?: string;
   errors?: string[];
@@ -125,20 +127,20 @@ export interface Problem {
 
 export type RefKind = 'adr' | 'issue' | 'tag';
 export type Ref =
-  | { kind: 'adr'; number: string; anchor?: string }
+  | { kind: 'adr'; number: string; anchor: string }
   | { kind: 'issue'; repo?: string; number: number }
   | { kind: 'tag'; tag: string };
 
 /**
  * The three ref forms:
- * - `adr/0007#1-supervise-the-bus-like-an-isolate` (an ADR, optionally a heading);
+ * - `adr/0007#1-supervise-the-bus-like-an-isolate` (an ADR and a heading in it; the
+ *   anchor is required, amended 2026-11-27);
  * - `#390` or `web#285` (a PR or an issue; GitHub serves both under one number);
  * - `v0.1.0` (a release tag).
  */
 export function parseRef(ref: string): Ref | undefined {
-  let m = /^adr\/(\d{4})(?:#([a-z0-9_-]+))?$/.exec(ref);
-  if (m)
-    return m[2] ? { kind: 'adr', number: m[1]!, anchor: m[2] } : { kind: 'adr', number: m[1]! };
+  let m = /^adr\/(\d{4})#([a-z0-9_-]+)$/.exec(ref);
+  if (m) return { kind: 'adr', number: m[1]!, anchor: m[2]! };
   m = /^(?:([a-z][a-z0-9-]*))?#(\d+)$/.exec(ref);
   if (m)
     return m[1]
@@ -437,6 +439,11 @@ export function conceptsOf(reg: Registry): Concept[] {
   const out = list.filter(isConcept);
   out.sort((a, b) => a.order - b.order);
   return out;
+}
+
+/** A repo rule's `built` event: the PR that put it in force. */
+export function inForce(rule: Rule): RuleEvent | undefined {
+  return rule.repo ? rule.events.find((e) => e.type === 'built') : undefined;
 }
 
 /** The current why (decision 3): the newest decided, amended or clarified event's. */

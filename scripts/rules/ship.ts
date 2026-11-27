@@ -24,7 +24,8 @@ export function ship(reg: Registry, version: string, date: string): Map<string, 
   for (const f of reg.files) {
     if (!Array.isArray(f.data)) continue;
     f.data = rulesIn(f.data).map((r) => {
-      if (r.target !== version) return r;
+      // Repo rules have no versions (amended 2026-11-27).
+      if (r.repo === true || r.target !== version) return r;
       shipped.set(f.path, [...(shipped.get(f.path) ?? []), r.id]);
       return shippedRule(r, version, date);
     });

@@ -20,6 +20,10 @@
       "status": {
         "enum": ["active", "decided", "proposed", "withdrawn", "rejected", "superseded"]
       },
+      "repo": {
+        "type": "boolean",
+        "description": "About how this repo works, not the published packages: active from its built event, with no since, target or shipped event"
+      },
       "experimental": {
         "type": "boolean"
       },
@@ -104,8 +108,8 @@
             },
             "ref": {
               "type": "string",
-              "description": "adr/NNNN#heading-anchor, #N or repo#N (a PR or an issue), or vX.Y.Z (a release tag)",
-              "pattern": "^(adr/\\d{4}(#[a-z0-9_-]+)?|([a-z][a-z0-9-]*)?#\\d+|v\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?)$"
+              "description": "adr/NNNN#heading-anchor (the anchor is required), #N or repo#N (a PR or an issue), or vX.Y.Z (a release tag)",
+              "pattern": "^(adr/\\d{4}#[a-z0-9_-]+|([a-z][a-z0-9-]*)?#\\d+|v\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?)$"
             },
             "why": {
               "type": "string",

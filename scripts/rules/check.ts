@@ -51,6 +51,7 @@ const RULE_FIELDS = new Set([
   'statement',
   'status',
   'experimental',
+  'repo',
   'values',
   'knob',
   'errors',
@@ -138,8 +139,9 @@ export function checkRules(input: CheckInput): Problem[] {
       if (!isStr(r['statement'])) at(f.path, `${name}: "statement" must be a non-empty string`);
       if (!isOneOf(STATUSES, r['status']))
         at(f.path, `${name}: "status" must be one of ${STATUSES.join(', ')}`);
-      if ('experimental' in r && typeof r['experimental'] !== 'boolean')
-        at(f.path, `${name}: "experimental" must be true or false`);
+      for (const k of ['experimental', 'repo'])
+        if (k in r && typeof r[k] !== 'boolean')
+          at(f.path, `${name}: "${k}" must be true or false`);
       for (const k of ['values', 'errors', 'code', 'related', 'aliases'])
         if (k in r && !isStrArr(r[k])) at(f.path, `${name}: "${k}" must be an array of strings`);
       for (const k of ['knob', 'supersededBy'])
@@ -205,7 +207,10 @@ export function checkRules(input: CheckInput): Problem[] {
       }
       const ref = parseRef(e['ref']);
       if (!ref) {
-        at(file, `${where}: ref "${e['ref']}" must be adr/NNNN#anchor, #N, repo#N or vX.Y.Z`);
+        at(
+          file,
+          `${where}: ref "${e['ref']}" must be adr/NNNN#heading-anchor, #N, repo#N or vX.Y.Z`,
+        );
         return;
       }
       if (isOneOf(EVENT_TYPES, type) && !REF_KINDS[type].includes(ref.kind))
@@ -216,21 +221,30 @@ export function checkRules(input: CheckInput): Problem[] {
       if (ref.kind === 'adr') {
         const adr = adrs.get(ref.number);
         if (!adr) at(file, `${where}: ref "${e['ref']}": no ADR ${ref.number} in docs/adr`);
-        else if (ref.anchor && !adr.anchors.has(ref.anchor))
+        else if (!adr.anchors.has(ref.anchor))
           at(file, `${where}: ref "${e['ref']}": no heading #${ref.anchor} in ${adr.file}`);
       }
     });
 
     const has = (t: string) => events.some((e) => isObj(e) && e['type'] === t);
     const status = r['status'];
-    if (status === 'active') {
-      if (!isStr(r['since'])) at(file, `${name}: an active rule needs "since"`);
-      if (!has('shipped')) at(file, `${name}: an active rule needs a shipped event`);
+    if (r['repo'] === true) {
+      // Amended 2026-11-27: a repo rule has no versions; its built event puts it in force.
+      for (const k of ['since', 'target'])
+        if (k in r) at(file, `${name}: a repo rule has no "${k}"`);
+      if (has('shipped')) at(file, `${name}: a repo rule has no shipped event`);
+      if (status === 'active' && !has('built'))
+        at(file, `${name}: an active repo rule needs a built event`);
+    } else {
+      if (status === 'active') {
+        if (!isStr(r['since'])) at(file, `${name}: an active rule needs "since"`);
+        if (!has('shipped')) at(file, `${name}: an active rule needs a shipped event`);
+      }
+      if ((status === 'decided' || status === 'proposed') && !isStr(r['target']))
+        at(file, `${name}: a ${status} rule needs "target"`);
+      if (status !== 'decided' && status !== 'proposed' && 'target' in r)
+        at(file, `${name}: only a decided or proposed rule has "target"`);
     }
-    if ((status === 'decided' || status === 'proposed') && !isStr(r['target']))
-      at(file, `${name}: a ${status} rule needs "target"`);
-    if (status !== 'decided' && status !== 'proposed' && 'target' in r)
-      at(file, `${name}: only a decided or proposed rule has "target"`);
     for (const s of ['withdrawn', 'rejected', 'superseded'] as const)
       if (status === s && !has(s)) at(file, `${name}: a ${s} rule needs a ${s} event`);
     if (status === 'superseded' && !isStr(r['supersededBy']))

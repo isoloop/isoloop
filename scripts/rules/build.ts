@@ -8,6 +8,7 @@ import {
   type Adr,
   conceptsOf,
   currentWhy,
+  inForce,
   parseRef,
   README,
   readAdrs,
@@ -35,7 +36,9 @@ function refMd(raw: string, adrs: Map<string, Adr>): string {
   return url ? `[${cell(label)}](${url})` : cell(label);
 }
 
-function versionCell(r: Rule): string {
+function versionCell(r: Rule, adrs: Map<string, Adr>): string {
+  const built = inForce(r);
+  if (built) return `in force since ${refMd(built.ref, adrs)}`;
   if (r.since) return `since \`${r.since}\``;
   if (r.target) return `target \`${r.target}\``;
   return '';
@@ -60,10 +63,14 @@ export function renderReadme(reg: Registry, adrs: Map<string, Adr>): string {
     }
     out.push('| Rule | Statement | Values | Status | Version |', '| --- | --- | --- | --- | --- |');
     for (const r of rules) {
-      const status = r.experimental ? `${r.status}, experimental` : r.status;
+      const status = [
+        r.status,
+        ...(r.experimental ? ['experimental'] : []),
+        ...(r.repo ? ['repo'] : []),
+      ].join(', ');
       const values = (r.values ?? []).map((v) => `\`${cell(v)}\``).join(', ');
       out.push(
-        `| \`${r.id}\` | ${cell(r.statement)} | ${values} | ${status} | ${versionCell(r)} |`,
+        `| \`${r.id}\` | ${cell(r.statement)} | ${values} | ${status} | ${versionCell(r, adrs)} |`,
       );
     }
     out.push('');

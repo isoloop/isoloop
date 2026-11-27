@@ -86,33 +86,37 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 
 | Rule | Statement | Values | Status | Version |
 | --- | --- | --- | --- | --- |
-| `tool.rule-one-fact` | A rule holds one fact: one default or one behaviour, as it holds today. An ADR section with several facts becomes several rules, linked through `related`. |  | decided | target `0.2.0` |
-| `tool.rule-fields` | A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy` and `aliases`. |  | decided | target `0.2.0` |
-| `tool.statement-form` | A statement is one or two sentences in the present tense that say what holds, with no why. It follows `docs/writing.md`. |  | decided | target `0.2.0` |
-| `tool.current-why` | A rule's current why is the `why` of its newest `decided`, `amended` or `clarified` event. There's no separate field for it. |  | decided | target `0.2.0` |
-| `tool.ids-never-change` | A rule id is `<prefix>.<slug>` in kebab-case and never changes. A renamed or moved rule gets a new id and keeps the old one in `aliases`. |  | decided | target `0.2.0` |
-| `tool.rules-never-deleted` | A rule that stops holding changes status. It's never deleted. |  | decided | target `0.2.0` |
-| `tool.rule-statuses` | A rule's status is one of six: `active`, `decided`, `proposed`, `withdrawn`, `rejected` or `superseded`. Merged but unreleased work is a `built` event, not a status. | `6 statuses` | decided | target `0.2.0` |
-| `tool.rejected-rules` | An alternative becomes a `rejected` rule only when it answers a real "why don't you just…?" question, and its `why` names that question. |  | decided | target `0.2.0` |
-| `tool.event-types` | An event has a `type`, a `date`, a `ref` and a one-line `why`. The type is one of twelve: `proposed`, `decided`, `clarified`, `amended`, `built`, `shipped`, `corrected`, `reopened`, `removed`, `rejected`, `withdrawn` and `superseded`. | `12 event types` | decided | target `0.2.0` |
-| `tool.event-prev` | A `clarified` or `amended` event carries `prev`, the wording or behaviour before it. |  | decided | target `0.2.0` |
-| `tool.event-refs` | An event's `ref` is something a reader can open on GitHub: an ADR section, a PR, an issue or a release tag. Grilling notes and agent memory are never a source. |  | decided | target `0.2.0` |
-| `tool.rule-concepts` | Concepts are a fixed list in `docs/rules/concepts.json`, each with an id, a prefix, a name, a description and an order. Each rule belongs to exactly one concept. | `17 concepts` | decided | target `0.2.0` |
-| `tool.rules-json` | The registry is JSON, one file per concept in `docs/rules/`, validated by `scripts/rules/check.ts` with no library. `schema.json` gives editors hints only. |  | decided | target `0.2.0` |
-| `tool.registry-source` | The registry is the source of truth for what holds today. ADRs keep the story of why. |  | decided | target `0.2.0` |
-| `tool.rules-lines` | Each decision and each amendment in an ADR ends with a `Rules:` line naming the rules it adds or changes. |  | decided | target `0.2.0` |
-| `tool.rules-check` | `pnpm rules:check` runs in CI. It fails on a malformed registry, an unknown or repeated id, a broken ADR ref, a status that doesn't match its fields and events, a missing `code` path or an out-of-date README. |  | decided | target `0.2.0` |
-| `tool.adr-pairing` | A PR that changes an ADR with `Rules:` lines, or any ADR from 0026 on, also changes `docs/rules/`, unless it's labelled `no-rules`. | `label: no-rules` | decided | target `0.2.0` |
-| `tool.rule-ids-kept` | A PR fails if a rule id or alias on `main` is missing from it. The `no-rules` label doesn't skip this. |  | decided | target `0.2.0` |
-| `tool.rules-lines-from-0026` | Every decision and amendment in an ADR numbered 0026 or higher has a `Rules:` line from the start. Older ADRs are checked once they have `Rules:` lines. | `from ADR 0026` | decided | target `0.2.0` |
-| `tool.rules-same-pr` | Whoever changes an ADR updates its rules in the same PR. The steward treats rules that don't match the ADR as a must-fix. |  | decided | target `0.2.0` |
-| `tool.rules-ship` | `pnpm rules:ship <version>` runs in the version PR. Each rule whose `target` is that version becomes `active`, with `since` set, a `shipped` event and no `target`. |  | decided | target `0.2.0` |
-| `tool.rules-readme` | `pnpm rules:build` writes `docs/rules/README.md`, which is committed: per concept, a table of rules, then each rule's history. |  | decided | target `0.2.0` |
-| `tool.rules-board` | `pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. It has the Board, a rule drawer and the Agenda by day or by version. |  | decided | target `0.2.0` |
-| `tool.rules-backfill` | Rules for the existing ADRs are added one concept per PR, each reviewed by the maintainer. Supervision, Durability and Versioning & releases go first. |  | decided | target `0.2.0` |
-| `tool.agents-md-rules` | `AGENTS.md` sends agents to `docs/rules/README.md` for what holds today. |  | decided | target `0.2.0` |
-| `tool.rules-scope` | The registry covers this repo's ADRs only. |  | decided | target `0.2.0` |
-| `tool.rules-not-milestone` | The rules registry is internal tooling outside the milestones, and its PRs take the `no-changeset` label. |  | decided | target `0.2.0` |
+| `tool.rule-one-fact` | A rule holds one fact: one default or one behaviour, as it holds today. An ADR section with several facts becomes several rules, linked through `related`. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rule-fields` | A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `repo`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy` and `aliases`. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.statement-form` | A statement is one or two sentences in the present tense that say what holds, with no why. It follows `docs/writing.md`. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.current-why` | A rule's current why is the `why` of its newest `decided`, `amended` or `clarified` event. There's no separate field for it. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.ids-never-change` | A rule id is `<prefix>.<slug>` in kebab-case and never changes. A renamed or moved rule gets a new id and keeps the old one in `aliases`. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-never-deleted` | A rule that stops holding changes status. It's never deleted. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rule-statuses` | A rule's status is one of six: `active`, `decided`, `proposed`, `withdrawn`, `rejected` or `superseded`. Merged but unreleased work is a `built` event, not a status, except that a repo rule is `active` from its `built` event. | `6 statuses` | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rejected-rules` | An alternative becomes a `rejected` rule only when it answers a real "why don't you just…?" question, and its `why` names that question. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.event-types` | An event has a `type`, a `date`, a `ref` and a one-line `why`. The type is one of twelve: `proposed`, `decided`, `clarified`, `amended`, `built`, `shipped`, `corrected`, `reopened`, `removed`, `rejected`, `withdrawn` and `superseded`. | `12 event types` | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.event-prev` | A `clarified` or `amended` event carries `prev`, the wording or behaviour before it. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.event-refs` | An event's `ref` is something a reader can open on GitHub: `adr/NNNN#anchor` for an ADR heading (the anchor is required), `#N` or `repo#N` for a PR or an issue, or `vX.Y.Z` for a release tag. Each event type takes only the ref kinds in decision 6's table, and grilling notes and agent memory are never a source. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rule-concepts` | Concepts are a fixed list in `docs/rules/concepts.json`, each with an id, a prefix, a name, a description and an order. Each rule belongs to exactly one concept. | `17 concepts` | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-json` | The registry is JSON, one file per concept in `docs/rules/`, validated by `scripts/rules/check.ts` with no library. `schema.json` gives editors hints only. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.registry-source` | The registry is the source of truth for what holds today. ADRs keep the story of why. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-lines` | Each decision and each amendment in an ADR ends with a `Rules:` line naming the rules it adds or changes. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-check` | `pnpm rules:check` runs in CI. It fails on a malformed registry, an unknown or repeated id, a broken ADR ref, a status that doesn't match its fields and events, a repo rule with a version or a shipped event, a missing `code` path or an out-of-date README. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.adr-pairing` | A PR that changes an ADR with `Rules:` lines, or any ADR from 0026 on, also changes `docs/rules/`, unless it's labelled `no-rules`. | `label: no-rules` | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rule-ids-kept` | A PR fails if a rule id or alias on `main` is missing from it. The `no-rules` label doesn't skip this. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-lines-from-0026` | Every decision and amendment in an ADR numbered 0026 or higher has a `Rules:` line from the start. Older ADRs are checked once they have `Rules:` lines. | `from ADR 0026` | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-same-pr` | Whoever changes an ADR updates its rules in the same PR. The steward treats rules that don't match the ADR as a must-fix. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-ship` | `pnpm rules:ship <version>` runs in the version PR. Each rule whose `target` is that version becomes `active`, with `since` set, a `shipped` event and no `target`. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-readme` | `pnpm rules:build` writes `docs/rules/README.md`, which is committed: per concept, a table of rules, then each rule's history. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-board` | `pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. It has the Board, a rule drawer and the Agenda by day or by version. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-backfill` | Rules for the existing ADRs are added one concept per PR, each reviewed by the maintainer. Supervision, Durability and Versioning & releases go first. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.agents-md-rules` | `AGENTS.md` sends agents to `docs/rules/README.md` for what holds today. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-scope` | The registry covers this repo's ADRs only. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-not-milestone` | The rules registry is internal tooling outside the milestones, and its PRs take the `no-changeset` label. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-ship-due` | `rules:check` fails when a `decided` or `proposed` rule's `target` is at or below the packages' version. Previews such as `0.2.0-next.3` never trigger it. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-ship-patches` | A patch from a `release/0.x` branch gets its `shipped` events in that branch's version PR, and they come to `main` with the backport. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.repo-rules` | A rule with `repo: true` is about how this repo works, not the published packages. It's `active` from its `built` event, has no `since`, `target` or `shipped` event, and `rules:ship` skips it. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-lines-sections` | Under an ADR's `## Decision`, a decision is a numbered `###` heading when there are any, otherwise a top-level numbered item, otherwise each `###` section. A heading that says "amended" is an amendment, and a `Rules:` line inside a code fence doesn't count. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 
 ### `tool.rule-one-fact`
 
@@ -121,15 +125,18 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · A card that holds a paragraph brings back the problem of digging a default out of an ADR.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rule-fields`
 
 - **Code:** `docs/rules/schema.json`, `scripts/rules/check.ts`
-- **Why:** Each field answers one question a reader asks about a fact: its value, how to change it, where it's built, since when.
+- **Why:** Rules about the repo need a flag, since they never ship in a version.
 
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · Each field answers one question a reader asks about a fact: its value, how to change it, where it's built, since when.
+- 2026-11-27 · amended · [ADR 0026 · Amended 2026-11-27: rules about the repo](../adr/0026-rules-registry.md#amended-2026-11-27-rules-about-the-repo) · Rules about the repo need a flag, since they never ship in a version. Before: A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy` and `aliases`.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.statement-form`
 
@@ -139,6 +146,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · A card should read as a fact; the why changes over time and lives in the events.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.current-why`
 
@@ -148,6 +156,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · A separate field would drift from the history it summarises.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.ids-never-change`
 
@@ -157,6 +166,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · ADRs cite ids, and aliases keep those links working.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rules-never-deleted`
 
@@ -166,14 +176,17 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · The history of a fact that no longer holds is still the answer to why it changed.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rule-statuses`
 
-- **Why:** Status answers whether the rule holds today; events say what happened.
+- **Why:** A repo rule is in force once its PR merges.
 
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · Status answers whether the rule holds today; events say what happened.
+- 2026-11-27 · amended · [ADR 0026 · Amended 2026-11-27: rules about the repo](../adr/0026-rules-registry.md#amended-2026-11-27-rules-about-the-repo) · A repo rule is in force once its PR merges. Before: A rule's status is one of six: `active`, `decided`, `proposed`, `withdrawn`, `rejected` or `superseded`. Merged but unreleased work is a `built` event, not a status.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rejected-rules`
 
@@ -182,6 +195,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · A board full of rejections would bury the rules that hold.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.event-types`
 
@@ -191,6 +205,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · These are the steps a decision went through while the ADRs were grilled.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.event-prev`
 
@@ -199,14 +214,17 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · The rule as it was can then be read without opening the ADR.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.event-refs`
 
-- **Why:** A reader has to be able to check every event.
+- **Why:** A ref opens at the decision it means.
 
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · A reader has to be able to check every event.
+- 2026-11-27 · amended · [ADR 0026 · Amended 2026-11-27: every ADR ref names a heading](../adr/0026-rules-registry.md#amended-2026-11-27-every-adr-ref-names-a-heading) · A ref opens at the decision it means. Before: An event's `ref` is something a reader can open on GitHub: an ADR section, a PR, an issue or a release tag. Grilling notes and agent memory are never a source.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rule-concepts`
 
@@ -216,6 +234,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Where rules live](../adr/0026-rules-registry.md#where-rules-live) · One concept per rule keeps the board from showing a rule twice; cross-links go through `related`.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rules-json`
 
@@ -225,6 +244,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Where rules live](../adr/0026-rules-registry.md#where-rules-live) · One file per concept keeps a PR's diff inside the concept it touches, and the repo owns its checks.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.registry-source`
 
@@ -234,6 +254,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Where rules live](../adr/0026-rules-registry.md#where-rules-live) · A fact often has several ADRs behind it and fields no ADR has, so it can't live inside one ADR.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rules-lines`
 
@@ -243,16 +264,19 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Where rules live](../adr/0026-rules-registry.md#where-rules-live) · The line ties an ADR to its rules, and the checks read it.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rules-check`
 
 - **Change it:** `pnpm rules:check`
 - **Code:** `scripts/rules/check.ts`, `.github/workflows/ci.yml`
-- **Why:** Each of these is a way the registry could quietly be wrong.
+- **Why:** Repo rules have their own fields and events to check.
 
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Checks](../adr/0026-rules-registry.md#checks) · Each of these is a way the registry could quietly be wrong.
+- 2026-11-27 · amended · [ADR 0026 · Amended 2026-11-27: rules about the repo](../adr/0026-rules-registry.md#amended-2026-11-27-rules-about-the-repo) · Repo rules have their own fields and events to check. Before: `pnpm rules:check` runs in CI. It fails on a malformed registry, an unknown or repeated id, a broken ADR ref, a status that doesn't match its fields and events, a missing `code` path or an out-of-date README.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.adr-pairing`
 
@@ -263,6 +287,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Checks](../adr/0026-rules-registry.md#checks) · A fact must change in the same PR as the ADR that changes it.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rule-ids-kept`
 
@@ -273,6 +298,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Checks](../adr/0026-rules-registry.md#checks) · Rules are never deleted, and links from ADRs must keep working.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rules-lines-from-0026`
 
@@ -282,6 +308,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Checks](../adr/0026-rules-registry.md#checks) · New ADRs shouldn't add to the backfill.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rules-same-pr`
 
@@ -291,6 +318,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Checks](../adr/0026-rules-registry.md#checks) · CI catches a registry left untouched; only a review catches one that says the wrong thing.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rules-ship`
 
@@ -301,6 +329,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Checks](../adr/0026-rules-registry.md#checks) · Shipped events are generated, so a card's version can't be wrong.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rules-readme`
 
@@ -311,6 +340,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Views](../adr/0026-rules-registry.md#views) · Agents and GitHub readers get every fact and every why in one file, with no tooling.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rules-board`
 
@@ -321,6 +351,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Views](../adr/0026-rules-registry.md#views) · The board is the view for reading across concepts and over time.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rules-backfill`
 
@@ -329,6 +360,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Rollout](../adr/0026-rules-registry.md#rollout) · Each PR stays small enough to check against its ADRs.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.agents-md-rules`
 
@@ -338,6 +370,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Rollout](../adr/0026-rules-registry.md#rollout) · Agents can't find the registry from the file tree alone.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rules-scope`
 
@@ -346,6 +379,7 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Rollout](../adr/0026-rules-registry.md#rollout) · CI can only hold this repo's ADR PRs to their rules.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ### `tool.rules-not-milestone`
 
@@ -354,6 +388,50 @@ History:
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Rollout](../adr/0026-rules-registry.md#rollout) · It ships nothing to npm and waits for no release.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
+
+### `tool.rules-ship-due`
+
+- **Code:** `scripts/rules/check.ts`
+- **Related:** `tool.rules-ship`
+- **Why:** The version PR that sets a version is where its rules ship.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Clarified 2026-11-27: when rules:ship is due](../adr/0026-rules-registry.md#clarified-2026-11-27-when-rulesship-is-due) · The version PR that sets a version is where its rules ship.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
+
+### `tool.rules-ship-patches`
+
+- **Related:** `tool.rules-ship`
+- **Why:** The branch is where the patch's version is set.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Clarified 2026-11-27: when rules:ship is due](../adr/0026-rules-registry.md#clarified-2026-11-27-when-rulesship-is-due) · The branch is where the patch's version is set.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
+
+### `tool.repo-rules`
+
+- **Code:** `scripts/rules/check.ts`, `scripts/rules/ship.ts`
+- **Related:** `tool.rule-statuses`
+- **Why:** Repo tooling and process never ship in an npm version, but they are in force once merged.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Amended 2026-11-27: rules about the repo](../adr/0026-rules-registry.md#amended-2026-11-27-rules-about-the-repo) · Repo tooling and process never ship in an npm version, but they are in force once merged.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
+
+### `tool.rules-lines-sections`
+
+- **Code:** `scripts/rules/registry.ts`
+- **Related:** `tool.rules-lines`, `tool.rules-lines-from-0026`
+- **Why:** The `Rules:` line check has to know which parts of an ADR need a line.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Clarified 2026-11-27: what counts as a decision](../adr/0026-rules-registry.md#clarified-2026-11-27-what-counts-as-a-decision) · The `Rules:` line check has to know which parts of an ADR need a line.
+- 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
 
 ## Derived topics
 

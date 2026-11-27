@@ -1,6 +1,6 @@
 # ADR 0026: Rules registry
 
-- **Status:** Accepted 2026-11-27 (proposed the same day), from a grilling with the maintainer (Q1–Q31, yes to all), with a `superseded` event and `Rules:` lines required from ADR 0026 on, added in review.
+- **Status:** Accepted 2026-11-27 (proposed the same day), from a grilling with the maintainer (Q1–Q31, yes to all), with a `superseded` event and `Rules:` lines required from ADR 0026 on, added in review. Amended 2026-11-27 (accepted the same day), from the four open points of the infrastructure PR (#483), grilled yes to all: every ADR ref names a heading (decision 6), rules about the repo (decisions 2, 5 and 10), when `rules:ship` is due (decision 13) and what counts as a decision (decision 9).
 - **Date:** 2026-11-27
 - **Plan:** none. This is internal tooling for the repo, not a milestone, and it ships nothing to npm.
 - **Touches:** every ADR (each decision gains a `Rules:` line), [ADR 0019](0019-versioning-and-releases.md) (version PRs run `rules:ship`), [ADR 0009](0009-toolchain.md) (scripts run on Node with no new dependency).
@@ -42,6 +42,8 @@ The forces:
    | `aliases` | no | old ids, after a rename or a move |
    | `events` | yes | its history, oldest first (decision 6) |
 
+   Amended 2026-11-27: a rule may also carry `repo: true` ([rules about the repo](#amended-2026-11-27-rules-about-the-repo)).
+
    Rules: `tool.rule-fields`
 
 3. **The statement follows [`docs/writing.md`](../writing.md),** and gets the prose check during the backfill like other copy. The why isn't in the statement: the current why is the newest `decided`, `amended` or `clarified` event's `why`, so there's no separate field to drift from the history.
@@ -59,6 +61,8 @@ The forces:
    - **`superseded`:** replaced by the rule in `supersededBy`.
 
    "Merged but not released" is a `built` event, not a status.
+
+   Amended 2026-11-27: a repo rule is `active` from its `built` event ([rules about the repo](#amended-2026-11-27-rules-about-the-repo)).
 
    Rules: `tool.rule-statuses`, `tool.rejected-rules`
 6. **Events.** Twelve types. Each has a `type`, a `date` (`YYYY-MM-DD`), a `ref` and a one-line `why`:
@@ -79,6 +83,8 @@ The forces:
 | `superseded` | replaced by another rule, named in `supersededBy` | ADR section |
 
    `clarified` and `amended` also need `prev`: the old wording or behaviour, so the rule as it was can be read without opening the ADR. A `ref` is something a reader can open on GitHub: an ADR file and heading anchor, a PR, an issue or a release tag. Grilling notes and agent memory are never a source.
+
+   Amended 2026-11-27: an ADR ref always names a heading ([every ADR ref names a heading](#amended-2026-11-27-every-adr-ref-names-a-heading)).
 
    Rules: `tool.event-types`, `tool.event-prev`, `tool.event-refs`
 
@@ -127,6 +133,8 @@ The forces:
    ```
    This amends the ADR template in [the index](README.md). The `Rules:` lines are added to the existing ADRs during the backfill (decision 16), and to every new ADR from the start.
 
+   Clarified 2026-11-27: which parts of an ADR count as decisions ([what counts as a decision](#clarified-2026-11-27-what-counts-as-a-decision)).
+
    Rules: `tool.registry-source`, `tool.rules-lines`
 
 ### Checks
@@ -144,6 +152,8 @@ The forces:
 
     Whether each `values` entry matches the default in the code is left for after the backfill, once it's clear how many can be read from the code ([would-like](../would-like.md)).
 
+    Amended 2026-11-27: it also checks repo rules ([rules about the repo](#amended-2026-11-27-rules-about-the-repo)).
+
     Rules: `tool.rules-check`
 11. **`rules.yml`**, a workflow of its own like `changeset.yml`, so adding or removing its label re-runs only this check:
     - a PR that changes `docs/adr/**` must change `docs/rules/**`, unless it has the `no-rules` label. That label is for edits that change no fact (typos, links), and an agent may add it, like `no-changeset`;
@@ -158,6 +168,8 @@ The forces:
 
     Rules: `tool.rules-same-pr`
 13. **`pnpm rules:ship <version>`** runs in the version PR. Each rule whose `target` is that version becomes `active`: `since` is set, a `shipped` event is added with the tag's date, and `target` is removed. `rules:check` fails a version PR that leaves such a rule `decided`. Version PRs then carry edits beyond the changesets, so they take the `no-changeset` label. The backfill runs it for `0.1.0` and `0.1.1` to create the existing `shipped` events.
+
+    Clarified 2026-11-27: when a version PR has to run it, and patches from a `release/0.x` branch ([when `rules:ship` is due](#clarified-2026-11-27-when-rulesship-is-due)).
 
     Rules: `tool.rules-ship`
 
@@ -191,6 +203,49 @@ The forces:
 19. **No milestone.** It runs beside the milestones (now M8 Watchers W1), every PR takes `no-changeset`, and it isn't on the roadmap.
 
     Rules: `tool.rules-not-milestone`
+
+### Amended 2026-11-27: every ADR ref names a heading
+
+Open point 1 of #483, grilled 2026-11-27, yes. It amends decision 6's `ref`:
+
+- **An ADR ref is `adr/NNNN#anchor`:** the ADR's number and the GitHub anchor of a heading in it. The anchor is required, so a ref opens at the decision it means.
+- **A PR or an issue** is `#390`, or `web#285` in another isoloop repo. **A release tag** is `vX.Y.Z`.
+- **Each event type takes only the ref kinds in decision 6's table.** `rules:check` fails on any other ref, on an ADR ref with no anchor, and on an anchor the ADR doesn't have.
+
+Rules: `tool.event-refs`
+
+### Clarified 2026-11-27: when `rules:ship` is due
+
+Open point 4 of #483, grilled 2026-11-27, yes. It records decision 13 as built:
+
+- **`rules:check` fails when a `decided` or `proposed` rule's `target` is at or below the packages' version.** A preview such as `0.2.0-next.3` is below `0.2.0`, so previews never trigger it. The version PR that sets `0.2.0` does.
+- **A patch from a `release/0.x` branch** ([ADR 0019](0019-versioning-and-releases.md), decision 5) runs `rules:ship` in that branch's version PR, so its `shipped` event is made on the branch. The event comes to `main` with the backport.
+
+Rules: `tool.rules-ship-due`, `tool.rules-ship-patches`
+
+### Amended 2026-11-27: rules about the repo
+
+Open point 8 of #483, grilled 2026-11-27, yes. It amends decisions 2, 5 and 10:
+
+- **A rule may carry `repo: true`** when it's about how this repo works (its checks, its process, its tooling) rather than the published packages.
+- **A repo rule is `active` from its `built` event,** the PR that put it in force. It has no `since`, no `target` and no `shipped` event, and `rules:ship` skips it.
+- **Its card and the README show "in force since #N"** in place of a version.
+- **`rules:check` fails** when a repo rule has `since`, `target` or a `shipped` event, or is `active` with no `built` event.
+- **This ADR's own `tool.*` rules are repo rules,** in force since #483.
+
+Rules: `tool.repo-rules`, `tool.rule-fields`, `tool.rule-statuses`, `tool.rules-check`
+
+### Clarified 2026-11-27: what counts as a decision
+
+Open point 9 of #483, grilled 2026-11-27, yes. It clarifies decision 9 and the template line in [the index](README.md). The `Rules:` line check (decision 11) reads an ADR's `## Decision` section this way:
+
+- **A numbered `###` heading** (`### 1. …`) is a decision, when the ADR has any.
+- **Otherwise a top-level numbered item** (`12. …` at the start of a line) is one, up to the next item or heading.
+- **Otherwise each `###` section** is one.
+- **Any heading that says "amended"** is an amendment, up to the next heading of the same or a higher level.
+- **A `Rules:` line inside a code fence doesn't count.**
+
+Rules: `tool.rules-lines-sections`
 
 ## Consequences
 
