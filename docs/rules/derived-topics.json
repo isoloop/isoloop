@@ -1,1 +1,140 @@
-[]
+[
+  {
+    "id": "derive.plan-on-topic",
+    "statement": "`topic()` takes an optional `derive:` plan, built with `@isoloop/derive`'s builder, that names its source topics. The derived topic's schema checks the plan's output like any topic's.",
+    "status": "proposed",
+    "experimental": true,
+    "related": ["derive.plan-is-data"],
+    "target": "0.3.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0024#1-a-topic-may-carry-a-plan",
+        "why": "Every app that wants a windowed sum or a filtered stream writes the same headless isolate again."
+      }
+    ]
+  },
+  {
+    "id": "derive.plan-is-data",
+    "statement": "A plan is a serialisable tree of operators, not code. v1's operators are filter, map, window, groupBy and aggregate.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "0.3.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0024#1-a-topic-may-carry-a-plan",
+        "why": "A spec can carry a plan, and a small operator set is easier to check, explain and run in two engines than a query language."
+      }
+    ]
+  },
+  {
+    "id": "derive.not-in-bus-worker",
+    "statement": "Each derived topic is kept by one derive isolate: a headless isolate the kernel spawns and owns, running a fixed engine and no user code. Derivations never run in the bus worker.",
+    "status": "proposed",
+    "experimental": true,
+    "related": ["derive.placement"],
+    "target": "0.3.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0024#2-derivations-never-run-in-the-bus-worker",
+        "why": "Every topic depends on the bus worker, so a heavy derivation there would stall them all."
+      }
+    ]
+  },
+  {
+    "id": "derive.placement",
+    "statement": "A light derive isolate shares a `derive` pool and a heavy one gets its own worker, set per topic.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "0.3.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0024#3-derive-isolates-are-placed-like-other-isolates",
+        "why": "Derive isolates cost a worker each unless they share; the kernel picking a pool goes against ADR 0001 and is still to grill."
+      }
+    ]
+  },
+  {
+    "id": "derive.supervised",
+    "statement": "A blocked or crashed derive isolate is restarted by the supervisor and resumes from its committed offset on each source, while the bus and other topics keep running.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "0.3.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0024#4-supervision-and-replay-as-for-any-isolate",
+        "why": "A blocked derivation stalls only its own topic."
+      }
+    ]
+  },
+  {
+    "id": "derive.source-grants",
+    "statement": "Subscribing to or watching a derived topic needs the subscribe grant on it and on every one of its sources, checked at subscribe time.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "0.3.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0024#5-reading-a-derived-topic-needs-the-grants-on-its-sources",
+        "why": "A derived topic must not be a way to read what the reader couldn't read itself."
+      }
+    ]
+  },
+  {
+    "id": "derive.engine-interface",
+    "statement": "The derive isolate runs a plan through one engine interface. A TypeScript reference engine ships first, with an engine conformance suite.",
+    "status": "proposed",
+    "experimental": true,
+    "related": ["derive.wasm-engine"],
+    "target": "0.3.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0024#6-one-engine-interface-two-engines",
+        "why": "Two engines must give the same results, and the TypeScript one needs only the bus."
+      }
+    ]
+  },
+  {
+    "id": "derive.wasm-engine",
+    "statement": "A Rust engine compiled to WASM runs behind the same interface, and ships only if it does better than the TypeScript engine on the M13 benchmark gate.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "0.3.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0024#6-one-engine-interface-two-engines",
+        "why": "Columnar work with SIMD and threads can beat per-record JavaScript, but only when data and work stay in the engine."
+      }
+    ]
+  },
+  {
+    "id": "derive.devtools-row",
+    "statement": "Devtools shows a row per derived topic, with its plan, its lag behind each source and its engine, and lists derive isolates as the kernel's.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "0.3.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0024#7-devtools-shows-derived-topics",
+        "why": "A developer needs to see why a derived topic is behind."
+      }
+    ]
+  }
+]

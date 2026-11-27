@@ -40,29 +40,43 @@ export const volume = topic('market.volume.v1', {
 
 The plan is data, not code: a serialisable tree of operators. v1's operators are filter, map, window, groupBy and aggregate (join is question 3). It stays a small set, not a query language.
 
+Rules: `derive.plan-on-topic`, `derive.plan-is-data`
+
 ### 2. Derivations never run in the bus worker
 
 The bus only routes records. Each derived topic is kept by one **derive isolate**: a headless isolate the kernel spawns and owns, running a fixed engine instead of user code. It subscribes to the plan's sources, runs the plan and publishes the derived topic.
+
+Rules: `derive.not-in-bus-worker`
 
 ### 3. Derive isolates are placed like other isolates
 
 A light derive isolate shares a `derive` pool; a heavy one gets its own worker, set per topic. Both are recorded as defaults the kernel picks, which ADR 0001's rule doesn't allow today (question 8). The balancer may move them by `busyMs`, which ADR 0017 doesn't allow either (same question).
 
+Rules: `derive.placement`
+
 ### 4. Supervision and replay as for any isolate
 
 A blocked or crashed derive isolate is restarted by the supervisor and resumes from its committed offset on each source. The bus and every other topic keep running, and the derived topic catches up from the log.
+
+Rules: `derive.supervised`
 
 ### 5. Reading a derived topic needs the grants on its sources
 
 An isolate that subscribes to or watches a derived topic needs the subscribe grant on the derived topic and on every one of its sources, checked when it subscribes. A derived topic can't be used to read what the reader couldn't read itself.
 
+Rules: `derive.source-grants`
+
 ### 6. One engine interface, two engines
 
 The derive isolate runs the plan through an engine interface. A TypeScript reference engine ships first, with an engine conformance suite. A Rust engine compiled to WASM runs in the same derive isolate behind the same interface, reusing M5's toolchain, codec and `SharedArrayBuffer` setup. It ships only if it does better than the TypeScript engine on [M13](../plans/m13-benchmark-gate.md), the same rule as M5. Whether to wrap DataFusion, Polars or DuckDB-wasm, or build our own, is question 5.
 
+Rules: `derive.engine-interface`, `derive.wasm-engine`
+
 ### 7. Devtools shows derived topics
 
 A row per derived topic: its plan, its lag behind each source and the engine it runs. Derive isolates appear in the isolate list marked as the kernel's.
+
+Rules: `derive.devtools-row`
 
 ## Consequences
 
