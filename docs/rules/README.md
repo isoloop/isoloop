@@ -42,7 +42,411 @@ No rules yet.
 
 The render bridge: the DOM subset in the worker and what reaches the page. Prefix `dom`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `dom.own-bridge` | Surfaces render through Isoloop's own bridge, `isoloop-dom@1`, with no rendering dependency. | `isoloop-dom@1` | active | since `0.1.0` |
+| `dom.remote-dom` | Shopify Remote DOM behind an internal `RenderBridge`, with records tagged `remote-dom@1`. |  | superseded |  |
+| `dom.no-vdom-reconciler` | The worker doesn't render through a virtual-DOM reconciler of Isoloop's own. |  | rejected |  |
+| `dom.dom-subset` | Isolates with a surface get a DOM subset as `document` and the DOM globals: nodes and elements, tree reads and writes, attributes, `style`, synced form properties, events and the input `instanceof` classes. Headless isolates get none. |  | active | since `0.1.0` |
+| `dom.untrusted-events` | `isTrusted` is always `false` in the worker, including for input the host forwards. |  | active | since `0.1.0` |
+| `dom.records` | A `patch` carries `{ fmt: 'isoloop-dom@1', batch }`, where a batch is an array of plain tuples collected per microtask: `insert`, `move`, `remove`, `text`, `attr`, `prop` and `listen`, referencing nodes by Isoloop's own ids. |  | active | since `0.1.0` |
+| `dom.one-record-moves` | Moving an existing node is one `move` record, without re-serializing it, and the node keeps its identity on the host. |  | active | since `0.1.0` |
+| `dom.listen-records` | Listener registration travels as `listen` records, and the host sends events back as plain event records. Functions never cross the worker boundary. |  | active | since `0.1.0` |
+| `dom.comment-records` | An `insert` subtree can hold comment nodes, which `text` records update and which are inert on the host. A `DocumentFragment` inserts its children in order and needs no record of its own. |  | active | since `0.1.0` |
+| `dom.fmt-exact` | A visual isolate whose `ready.renderFmt` isn't exactly the host's fmt, or a headless one that doesn't report `'none'`, fails with `render_format_mismatch` and isn't restarted. |  | active | since `0.1.0` |
+| `dom.fmt-in-host-build` | Both halves of the render format ship in the host app's build: the worker half comes from the app's isolate bootstrap, and an isolate module renders into the `document` it installed. |  | active | since `0.1.0` |
+| `dom.fmt-bumps` | The fmt changes only when the record shape does, for example to a binary encoding. A faster transport keeps `isoloop-dom@1`. |  | active | since `0.1.0` |
+| `dom.host-applies` | The host applies batches through the compositor only, and keeps `id → Node` and `Node → id` maps (`nodeFor`, `idFor`). |  | active | since `0.1.0` |
+| `dom.sanitising-required` | The host's applier takes a sanitising policy when a bridge is created, with no default, and every tag, attribute, URL and `prop` record goes through it. |  | active | since `0.1.0` |
+| `dom.host-owned-inputs` | The host decides whether a `prop` record for `value` or `checked` is applied: an unforced value waits until the user leaves the input, and a forced one (`ctx.setValue(node, value, { force: true })`) applies at once with the caret at the end. |  | active | since `0.1.0` |
+| `dom.style-cssom` | The host writes a `style` attribute through the element's CSSOM (`el.style.cssText`), never `setAttribute('style', …)`, after the sanitising policy, so surfaces run under `style-src 'self'`. |  | active | since `0.1.1` |
+| `dom.conformance-suite` | Every bridge must pass the conformance suite in `@isoloop/dom/testing` (`runBridgeConformance`), with no known gaps. |  | active | since `0.1.0` |
+| `dom.grows-on-evidence` | The DOM subset gains a member only when a conformance case, an adapter test or a real isolate needs it, and each addition comes with a test. |  | active, repo | in force since [#29](https://github.com/isoloop/isoloop/issues/29) |
+| `dom.subset-additions` | The subset also has event handler properties, `select.options` and its option members, `document.head` (detached), type-only `document.querySelector`, `classList`, `dataset`, `id`, `getElementById`, `contains`, `DocumentFragment` and `Comment`. |  | active | since `0.1.0` |
+| `dom.head-not-rendered` | Elements React 19 hoists into `document.head` aren't rendered. The `patch` names what landed there, and the kernel warns once in dev. |  | active | since `0.1.0` |
+| `dom.tolerated-missing` | Framework reads of members the subset doesn't have, which the frameworks handle as `undefined`, are listed with their reasons in `TOLERATED_MISSING`. |  | active | since `0.1.0` |
+| `dom.not-supported-throws` | Layout reads and other synchronous answers only the page has (`getBoundingClientRect`, `getComputedStyle`, sizes, scrolling, selection) aren't in the worker, and a missing member throws `NotSupportedError`. They stay asynchronous host calls such as `measure`, `focus` and `scrollIntoView`. |  | active | since `0.1.0` |
+| `dom.frameworks` | The adapters support Preact `^10 \|\| ^11` and React `^18 \|\| ^19`, declared as peer dependencies, as well as plain JS. | `preact ^10 \|\| ^11`, `react ^18 \|\| ^19` | active | since `0.1.0` |
+| `dom.majors-in-ci` | CI proves each supported framework major: the catalog pins one exact version per major, the adapter tests and a DOM usage log run once per major, and Dependabot moves each pin within its major. |  | active, repo | in force since [#73](https://github.com/isoloop/isoloop/issues/73) |
+| `dom.vue-adapter` | A Vue `^3` adapter ships after 0.1, in M6 adapters. |  | decided | target `0.6.0` |
+| `dom.svelte-adapter` | A Svelte `^5` adapter (runes; Svelte 4 isn't supported) ships after 0.1, in M6 adapters. |  | decided | target `0.7.0` |
+| `dom.solid-adapter` | A Solid `^1` adapter ships after 0.1, in M6 adapters. |  | decided | target `0.8.0` |
+| `dom.html-parsing` | HTML parsing (`innerHTML`, `insertAdjacentHTML`, `<template>`), `cloneNode` and `importNode` are built in the worker in M6, sending ordinary insert records with no format change. |  | decided | target `0.6.0` |
+| `dom.no-worker-custom-elements` | Custom elements and Shadow DOM aren't available in the worker. An isolate can render elements the page defines, which the host creates on the real DOM through the registry. |  | active | since `0.1.0` |
+| `dom.no-angular` | There's no Angular adapter. |  | rejected |  |
+| `dom.package-entries` | `@isoloop/dom` has three entries, `/worker`, `/host` and `/testing`, and no root entry. Canvas and other output that isn't DOM don't belong in it. |  | active | since `0.1.0` |
+| `dom.no-runtime-deps` | `@isoloop/dom` has no runtime dependencies, not even `protocol`. Node ids are plain numbers it defines, and `/testing` has an optional peer on Vitest. |  | active | since `0.1.0` |
+| `dom.owns-format` | `dom` owns the record types and `ISOLOOP_DOM_FMT`, exported from both `/worker` and `/host`. `protocol` keeps `patch.batch: unknown`. |  | active | since `0.1.0` |
+| `dom.internal-package` | `@isoloop/dom` is on npm because `runtime` and `host` depend on it, but it's documented as internal: apps and adapters never import it, and its API carries no promise beyond the fmt version. |  | active | since `0.1.0` |
+| `dom.legacy-vdom-removed` | The `legacy-vdom` bridge, the proof of concept's renderer kept as a fallback. |  | withdrawn |  |
+
+### `dom.own-bridge`
+
+- **Code:** `packages/dom/src/shared/records.ts`
+- **Related:** `dom.remote-dom`, `dom.no-vdom-reconciler`, `dom.dom-subset`
+- **Why:** The spike showed Remote DOM works but means about 7,000 adopted lines and five gaps to patch, against about 1,450 lines of our own.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0010 · Decision](../adr/0010-own-render-bridge.md#decision) · The spike showed Remote DOM works but means about 7,000 adopted lines and five gaps to patch, against about 1,450 lines of our own.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.remote-dom`
+
+- **Superseded by:** `dom.own-bridge`
+- **Why:** It saved the hardest maintenance work at the start, confined to one module per side.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0006 · Decision](../adr/0006-render-bridge-over-remote-dom.md#decision) · It saved the hardest maintenance work at the start, confined to one module per side.
+- 2026-11-05 · superseded · [ADR 0010 · Decision](../adr/0010-own-render-bridge.md#decision) · The M1 spike costed both options, and our own bridge came out smaller with no gaps to patch.
+
+### `dom.no-vdom-reconciler`
+
+- **Related:** `dom.own-bridge`
+
+History:
+
+- 2026-11-05 · rejected · [ADR 0010 · Alternatives considered](../adr/0010-own-render-bridge.md#alternatives-considered) · Why not extend `legacy-vdom` and skip the worker DOM? Frameworks render into a DOM, so every adapter would need its own reconciler, which is more code than the subset.
+
+### `dom.dom-subset`
+
+- **Code:** `packages/dom/src/worker/dom.ts`
+- **Related:** `dom.grows-on-evidence`, `dom.subset-additions`, `dom.not-supported-throws`
+- **Why:** It covers exactly what the Preact and React adapters call.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0010 · Decision](../adr/0010-own-render-bridge.md#decision) · It covers exactly what the Preact and React adapters call.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.untrusted-events`
+
+- **Code:** `packages/dom/src/worker/`
+- **Why:** The worker can't prove an event came from the user, so code that checks the flag must not trust forwarded input.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0010 · Decision](../adr/0010-own-render-bridge.md#decision) · The worker can't prove an event came from the user, so code that checks the flag must not trust forwarded input.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.records`
+
+- **Code:** `packages/dom/src/shared/records.ts`
+- **Related:** `dom.one-record-moves`, `dom.listen-records`, `dom.comment-records`
+- **Why:** Plain tuples are cheap to copy and easy to inspect, and ids don't shift the way indexes do.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0010 · Decision](../adr/0010-own-render-bridge.md#decision) · Plain tuples are cheap to copy and easy to inspect, and ids don't shift the way indexes do.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.one-record-moves`
+
+- **Related:** `dom.records`
+- **Why:** Keyed reorders stay cheap and keep focus, which the conformance suite checks.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0010 · Decision](../adr/0010-own-render-bridge.md#decision) · Keyed reorders stay cheap and keep focus, which the conformance suite checks.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.listen-records`
+
+- **Related:** `dom.records`
+- **Why:** Our own bridge keeps ADR 0006's event contract.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0006 · Decision](../adr/0006-render-bridge-over-remote-dom.md#decision) · It keeps the protocol copyable, versioned and inspectable in devtools.
+- 2026-11-05 · decided · [ADR 0010 · Decision](../adr/0010-own-render-bridge.md#decision) · Our own bridge keeps ADR 0006's event contract.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.comment-records`
+
+- **Related:** `dom.records`
+- **Why:** The frameworks' DOM usage logs in M3a showed they create comments and fragments.
+
+History:
+
+- 2026-11-07 · decided · [ADR 0010 · Amended in M3a (2026-11-07)](../adr/0010-own-render-bridge.md#amended-in-m3a-2026-11-07) · The frameworks' DOM usage logs in M3a showed they create comments and fragments.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.fmt-exact`
+
+- **Errors and events:** `render_format_mismatch`
+- **Code:** `packages/host/src/kernel/kernel.ts`, `packages/host/src/supervisor/machine.ts`
+- **Related:** `dom.fmt-in-host-build`
+- **Why:** A restart can't change which format the isolate speaks.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0011 · Decision](../adr/0011-dom-package.md#decision) · A restart can't change which format the isolate speaks.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.fmt-in-host-build`
+
+- **Related:** `dom.fmt-exact`
+- **Why:** An isolate built and hosted apart can't bring a different format, so an exact match is enough.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0010 · Decision](../adr/0010-own-render-bridge.md#decision) · An isolate built and hosted apart can't bring a different format, so an exact match is enough.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.fmt-bumps`
+
+- **Related:** `dom.internal-package`
+- **Why:** The transport belongs to `runtime` and `host`; the format is what `dom` owns.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0011 · Decision](../adr/0011-dom-package.md#decision) · The transport belongs to `runtime` and `host`; the format is what `dom` owns.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.host-applies`
+
+- **Code:** `packages/host/src/render/compositor.ts`, `packages/host/src/render/isoloop-dom.ts`
+- **Related:** `dom.sanitising-required`
+- **Why:** One place applies changes, so the frame budget and sanitising can't be skipped.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0010 · Decision](../adr/0010-own-render-bridge.md#decision) · One place applies changes, so the frame budget and sanitising can't be skipped.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.sanitising-required`
+
+- **Code:** `packages/host/src/render/registry.ts`
+- **Related:** `dom.host-applies`, `dom.style-cssom`
+- **Why:** The applier then can't create an element or set an attribute the host's registry didn't allow.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0011 · Decision](../adr/0011-dom-package.md#decision) · The applier then can't create an element or set an attribute the host's registry didn't allow.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.host-owned-inputs`
+
+- **Change it:** `ctx.setValue(node, value, { force: true })`
+- **Code:** `packages/runtime/src/render/render.ts`
+- **Related:** `dom.host-applies`
+- **Why:** An app sometimes has to clear an input the user is in, such as a note box after sending.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0010 · Decision](../adr/0010-own-render-bridge.md#decision) · A render from the worker mustn't overwrite what the user is typing.
+- 2026-11-07 · amended · [ADR 0010 · Amended in M3a (2026-11-07)](../adr/0010-own-render-bridge.md#amended-in-m3a-2026-11-07) · An app sometimes has to clear an input the user is in, such as a note box after sending. Before: The host decides whether a `prop` record for `value` or `checked` is applied, and holds it while the user is in the input.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.style-cssom`
+
+- **Code:** `packages/dom/src/host/applier.ts`
+- **Related:** `dom.sanitising-required`
+- **Why:** CSP's `style-src` governs a style attribute but not CSSOM writes, so pages no longer need `'unsafe-inline'`.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0010 · Amended 2026-11-24: style through the CSSOM](../adr/0010-own-render-bridge.md#amended-2026-11-24-style-through-the-cssom) · CSP's `style-src` governs a style attribute but not CSSOM writes, so pages no longer need `'unsafe-inline'`.
+- 2026-11-24 · built · [#429](https://github.com/isoloop/isoloop/issues/429) · Style through the CSSOM, devtools' page elements included.
+- 2026-11-24 · shipped · [v0.1.1](https://github.com/isoloop/isoloop/releases/tag/v0.1.1) · First released in 0.1.1.
+
+### `dom.conformance-suite`
+
+- **Code:** `packages/dom/src/testing/index.ts`
+- **Related:** `dom.grows-on-evidence`
+- **Why:** With our own bridge, done means the suite passes with no known gaps.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0006 · Decision](../adr/0006-render-bridge-over-remote-dom.md#decision) · One suite that every bridge passes makes a bridge replaceable.
+- 2026-11-05 · amended · [ADR 0010 · Decision](../adr/0010-own-render-bridge.md#decision) · With our own bridge, done means the suite passes with no known gaps. Before: Every bridge, `legacy-vdom` and the Remote DOM bridge, runs one conformance suite in `packages/host/test`.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.grows-on-evidence`
+
+- **Related:** `dom.dom-subset`, `dom.conformance-suite`
+- **Why:** The subset stays bounded by what's used, and the suite keeps it honest.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0010 · Decision](../adr/0010-own-render-bridge.md#decision) · The subset stays bounded by what's used, and the suite keeps it honest.
+- 2026-11-05 · built · [#29](https://github.com/isoloop/isoloop/issues/29) · `@isoloop/dom`, the render bridge `isoloop-dom@1`.
+
+### `dom.subset-additions`
+
+- **Code:** `packages/dom/src/worker/dom.ts`
+- **Related:** `dom.dom-subset`, `dom.tolerated-missing`
+- **Why:** The DOM usage logs and smoke tests per framework major in M3a showed Preact and React call them.
+
+History:
+
+- 2026-11-07 · decided · [ADR 0010 · Amended in M3a (2026-11-07)](../adr/0010-own-render-bridge.md#amended-in-m3a-2026-11-07) · The DOM usage logs and smoke tests per framework major in M3a showed Preact and React call them.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.head-not-rendered`
+
+- **Related:** `dom.subset-additions`
+- **Why:** A surface has no head of its own, and a page's head isn't the isolate's to change.
+
+History:
+
+- 2026-11-07 · decided · [ADR 0010 · Amended in M3a (2026-11-07)](../adr/0010-own-render-bridge.md#amended-in-m3a-2026-11-07) · A surface has no head of its own, and a page's head isn't the isolate's to change.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.tolerated-missing`
+
+- **Code:** `packages/dom/src/testing/index.ts`
+- **Related:** `dom.subset-additions`
+- **Why:** A read the framework survives is recorded, so a new one shows up as a change.
+
+History:
+
+- 2026-11-07 · decided · [ADR 0010 · Amended in M3a (2026-11-07)](../adr/0010-own-render-bridge.md#amended-in-m3a-2026-11-07) · A read the framework survives is recorded, so a new one shows up as a change.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.not-supported-throws`
+
+- **Errors and events:** `NotSupportedError`
+- **Code:** `packages/dom/src/worker/dom.ts`
+- **Related:** `dom.dom-subset`
+- **Why:** Layout reads stay out for the new adapters too, with no fake values, and the limits page lists them.
+
+History:
+
+- 2026-11-06 · decided · [ADR 0010 · Beyond the frameworks](../adr/0010-own-render-bridge.md#beyond-the-frameworks) · The worker has no layout, and a fake value would be worse than an error.
+- 2026-11-16 · clarified · [ADR 0010 · Amended 2026-11-16: adapters after 0.1](../adr/0010-own-render-bridge.md#amended-2026-11-16-adapters-after-01) · Layout reads stay out for the new adapters too, with no fake values, and the limits page lists them. Before: Layout reads and other synchronous answers only the page has aren't in the worker; they stay asynchronous host calls.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.frameworks`
+
+- **Code:** `packages/react/package.json`, `packages/preact/package.json`
+- **Related:** `dom.majors-in-ci`
+- **Why:** Apps bring any release of a supported major.
+
+History:
+
+- 2026-11-06 · decided · [ADR 0010 · Frameworks and versions](../adr/0010-own-render-bridge.md#frameworks-and-versions) · Apps bring any release of a supported major.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.majors-in-ci`
+
+- **Code:** `pnpm-workspace.yaml`, `.github/dependabot.yml`
+- **Related:** `dom.frameworks`
+- **Why:** A release that calls a member the subset lacks shows up as a red update PR, not on `main`.
+
+History:
+
+- 2026-11-06 · decided · [ADR 0010 · Frameworks and versions](../adr/0010-own-render-bridge.md#frameworks-and-versions) · A release that calls a member the subset lacks shows up as a red update PR, not on `main`.
+- 2026-11-07 · built · [#73](https://github.com/isoloop/isoloop/issues/73) · The adapter packages and the per-major test matrix.
+
+### `dom.vue-adapter`
+
+- **Related:** `dom.svelte-adapter`, `dom.solid-adapter`, `dom.html-parsing`
+- **Why:** Planned in M6 adapters: it starts with a spike, because Vue's own renderer may build on the worker's nodes without HTML parsing.
+
+History:
+
+- 2026-11-06 · proposed · [ADR 0010 · Frameworks and versions](../adr/0010-own-render-bridge.md#frameworks-and-versions) · Solid and Svelte compile markup to HTML strings, so they need HTML parsing and `cloneNode` first.
+- 2026-11-16 · decided · [ADR 0010 · Amended 2026-11-16: adapters after 0.1](../adr/0010-own-render-bridge.md#amended-2026-11-16-adapters-after-01) · Planned in M6 adapters: it starts with a spike, because Vue's own renderer may build on the worker's nodes without HTML parsing.
+
+### `dom.svelte-adapter`
+
+- **Related:** `dom.vue-adapter`, `dom.solid-adapter`, `dom.html-parsing`
+- **Why:** Planned in M6 adapters: it comes after Vue, before Solid.
+
+History:
+
+- 2026-11-06 · proposed · [ADR 0010 · Frameworks and versions](../adr/0010-own-render-bridge.md#frameworks-and-versions) · Solid and Svelte compile markup to HTML strings, so they need HTML parsing and `cloneNode` first.
+- 2026-11-16 · decided · [ADR 0010 · Amended 2026-11-16: adapters after 0.1](../adr/0010-own-render-bridge.md#amended-2026-11-16-adapters-after-01) · Planned in M6 adapters: it comes after Vue, before Solid.
+
+### `dom.solid-adapter`
+
+- **Related:** `dom.vue-adapter`, `dom.svelte-adapter`, `dom.html-parsing`
+- **Why:** Planned in M6 adapters: it comes after Svelte, with Solid 2 added when it ships stable.
+
+History:
+
+- 2026-11-06 · proposed · [ADR 0010 · Frameworks and versions](../adr/0010-own-render-bridge.md#frameworks-and-versions) · Solid and Svelte compile markup to HTML strings, so they need HTML parsing and `cloneNode` first.
+- 2026-11-16 · decided · [ADR 0010 · Amended 2026-11-16: adapters after 0.1](../adr/0010-own-render-bridge.md#amended-2026-11-16-adapters-after-01) · Planned in M6 adapters: it comes after Svelte, with Solid 2 added when it ships stable.
+
+### `dom.html-parsing`
+
+- **Why:** The template-compiling frameworks need them, not only libraries.
+
+History:
+
+- 2026-11-06 · proposed · [ADR 0010 · Beyond the frameworks](../adr/0010-own-render-bridge.md#beyond-the-frameworks) · Built when a library the dashboard picks needs it.
+- 2026-11-16 · decided · [ADR 0010 · Amended 2026-11-16: adapters after 0.1](../adr/0010-own-render-bridge.md#amended-2026-11-16-adapters-after-01) · The template-compiling frameworks need them, not only libraries.
+
+### `dom.no-worker-custom-elements`
+
+- **Why:** Defining elements needs a real DOM; the page can define them and the host creates them.
+
+History:
+
+- 2026-11-06 · decided · [ADR 0010 · Frameworks and versions](../adr/0010-own-render-bridge.md#frameworks-and-versions) · Defining elements needs a real DOM; the page can define them and the host creates them.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.no-angular`
+
+- **Related:** `dom.frameworks`
+
+History:
+
+- 2026-11-06 · rejected · [ADR 0010 · Frameworks and versions](../adr/0010-own-render-bridge.md#frameworks-and-versions) · Why not Angular too? It needs a real DOM at runtime.
+
+### `dom.package-entries`
+
+- **Code:** `packages/dom/package.json`
+- **Related:** `dom.internal-package`
+- **Why:** The name says it's a DOM bridge, and each side imports only its half.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0011 · Decision](../adr/0011-dom-package.md#decision) · The name says it's a DOM bridge, and each side imports only its half.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.no-runtime-deps`
+
+- **Code:** `packages/dom/package.json`
+- **Why:** The format has no reason to depend on the rest of the runtime.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0011 · Decision](../adr/0011-dom-package.md#decision) · The format has no reason to depend on the rest of the runtime.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.owns-format`
+
+- **Code:** `packages/dom/src/shared/records.ts`
+- **Related:** `dom.records`
+- **Why:** The format changes in one package, and `protocol` never learns its shape.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0011 · Decision](../adr/0011-dom-package.md#decision) · The format changes in one package, and `protocol` never learns its shape.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.internal-package`
+
+- **Code:** `packages/dom/README.md`
+- **Related:** `dom.fmt-bumps`
+- **Why:** A breaking record change bumps the fmt, so the package's own API needn't be frozen.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0011 · Decision](../adr/0011-dom-package.md#decision) · A breaking record change bumps the fmt, so the package's own API needn't be frozen.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dom.legacy-vdom-removed`
+
+- **Why:** A fallback if Remote DOM blocked progress, and a benchmark baseline.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0006 · Decision](../adr/0006-render-bridge-over-remote-dom.md#decision) · A fallback if Remote DOM blocked progress, and a benchmark baseline.
+- 2026-11-05 · withdrawn · [ADR 0011 · Decision](../adr/0011-dom-package.md#decision) · Deleted in the M1 cleanup once four-loops moved to the new bridge; benches compare against plain DOM instead.
 
 ## Pools
 

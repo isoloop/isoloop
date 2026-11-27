@@ -21,6 +21,8 @@ The proof of concept used neither. It re-sent a whole tree per render and named 
 5. **Bridge conformance suite.** One test suite (`packages/host/test/render-bridge-conformance.ts`) that every bridge must pass: create, update, move and remove nodes and text; keyed list reorders; attribute and URL sanitising; node-id mapping; listener registration; event round-trip; host-owned inputs; styles. `legacy-vdom` and the Remote DOM bridge both run it, and so would any future bridge.
 6. **The spike decides, with exit criteria.** M1 opens with a one-evening Remote DOM spike that must confirm: (a) its mutation records are plain, structured-cloneable data; (b) we can map remote nodes to our own ids; (c) we can intercept listener registration. If any fails, we write a follow-up ADR choosing between patching Remote DOM and building our own bridge. The spike also **estimates the size of an in-house bridge** (worker-side DOM subset plus mutation recording), so that option is costed, not hypothetical.
 
+Rules: `dom.remote-dom`, `dom.listen-records`, `dom.conformance-suite`, `dom.legacy-vdom-removed`
+
 ## Ownership
 
 The maintainer's preference is to own the stack end to end and keep external dependencies to a minimum. Remote DOM is adopted because it saves the hardest maintenance work now, not as a permanent commitment:
