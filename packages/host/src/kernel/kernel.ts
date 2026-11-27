@@ -19,7 +19,9 @@ import {
   type ContractsList,
   type IdleReport,
   type Retention,
+  type OnView,
   type StartPosition,
+  type WatchOptions,
   type TopicRef,
   type TypedRecord,
   type ErrorCode,
@@ -558,6 +560,30 @@ export interface Kernel {
     topic: TopicRef<any, Out, any, any>,
     fn: (r: TypedRecord<Out>) => void,
     opts?: { from?: StartPosition },
+  ): () => void;
+  /**
+   * A watcher skips values; use `subscribe` to get every record.
+   *
+   * Reads a topic's current value per key from the host, not its stream:
+   * `onView` gets a snapshot first, the newest retained value of each key it
+   * watches, then the keys that changed. When several values arrive for one
+   * key between two views, only the newest is passed on. Records with no key
+   * share the key `null`. A key leaves the view when retention removes its
+   * newest record. The host's watches on one topic share one watch on the
+   * bus. After a bus restart the watch carries on; a memory topic the restart
+   * lost comes back empty, with every key it had in `changed`.
+   * @param topic The topic, from the contracts.
+   * @param onView Called with the whole view and the keys that changed; the
+   *   next view waits until it returns or its promise settles.
+   * @param opts The keys to watch. Default: every key.
+   * @returns The function that ends this watch.
+   * @throws `Error` without contracts.
+   * @experimental
+   */
+  watch<Out>(
+    topic: TopicRef<any, Out, any, any>,
+    onView: OnView<Out>,
+    opts?: WatchOptions,
   ): () => void;
   /**
    * Listens to one of the kernel's events.
@@ -1942,6 +1968,12 @@ export function createKernel(config: KernelConfig): Kernel {
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the broker validated the value against the topic's schema
         fn: (r: BusRecord) => fn(r as TypedRecord<never>),
       });
+    },
+
+    watch(topic, onView, opts) {
+      if (!controller) throw new Error('No bus worker: KernelConfig.contracts is not set');
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the broker validated every value against the topic's schema
+      return controller.watch(topic.name, onView as OnView<unknown>, opts);
     },
 
     debug: {

@@ -1,6 +1,8 @@
 /*
- * The isolate's watches (ADR 0023): `ctx.bus.watch`, the current value per
- * key rather than the stream.
+ * Watches (ADR 0023): `ctx.bus.watch` and `kernel.watch`, the current value
+ * per key rather than the stream. Shared by the isolate's bus client and the
+ * host's own bus connection (point 31), as the committer is, so both sides
+ * follow the same rules.
  *
  * - Every local watch on a topic shares one bus watch per port, on the union
  *   of their keys, or every key when any of them is unfiltered (point 11).
@@ -19,13 +21,9 @@
  *   topic the restart lost comes back as a full snapshot, which clears what
  *   it no longer has (point 23).
  */
-import {
-  BusError,
-  type BusToIsolate,
-  type CallResult,
-  type IsolateToBus,
-  type WatchKey,
-} from '@isoloop/protocol';
+import { BusError } from '../errors/bus-error';
+import type { CallResult } from '../errors/errors';
+import type { BusToIsolate, IsolateToBus, WatchKey } from '../messages/bus';
 
 /** `bus.watch`'s options. @experimental */
 export type WatchOptions = {
@@ -85,6 +83,7 @@ type Watched = {
   rewatchQueued: boolean;
 };
 
+/** What a watch book needs from its connection. @internal */
 export type WatchesOptions = {
   send: (msg: IsolateToBus) => void;
   call: (msg: IsolateToBus) => Promise<CallResult>;
@@ -100,6 +99,7 @@ export type WatchesOptions = {
   delivered: () => void;
 };
 
+/** One connection's watches: `bus.watch` on an isolate, `kernel.watch` on the host. @internal */
 export type Watches = {
   watch<Out>(topic: string, onView: OnView<Out>, opts?: WatchOptions): () => void;
   receive(msg: Extract<BusToIsolate, { t: 'view' }>): void;
@@ -109,6 +109,7 @@ export type Watches = {
   takeSeen(): { topic: string; vseq: number }[];
 };
 
+/** Makes the watches of one bus connection. @internal */
 export function createWatches(o: WatchesOptions): Watches {
   const topics = new Map<string, Watched>();
   /** The highest settled view per topic, not yet sent. */
@@ -334,6 +335,7 @@ function sameKeys(
   return true;
 }
 
+/** True for anything with a `then` method. @internal */
 export function isThenable(x: unknown): x is PromiseLike<unknown> {
   return (
     (typeof x === 'object' || typeof x === 'function') &&

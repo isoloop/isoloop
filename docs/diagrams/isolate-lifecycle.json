@@ -89,8 +89,8 @@
         },
         {
           "path": "packages/runtime/src/bus/bus-client.ts",
-          "line": 553,
-          "end_line": 557,
+          "line": 556,
+          "end_line": 560,
           "label": "close awaits the last commits",
           "anchor": "async close() {"
         },
@@ -174,8 +174,8 @@
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1004,
-          "end_line": 1018,
+          "line": 1030,
+          "end_line": 1044,
           "label": "a pool wakes as a whole",
           "anchor": "case 'wake':"
         }
