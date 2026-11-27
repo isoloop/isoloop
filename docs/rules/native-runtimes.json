@@ -1,1 +1,110 @@
-[]
+[
+  {
+    "id": "native.runtime-placement",
+    "statement": "Placement gains a runtime, `'worker'`, `'wasm'` or `'native'`, with `'worker'` as the default. A headless isolate's code and bus API don't change with its runtime, and visual isolates stay in the webview.",
+    "status": "proposed",
+    "experimental": true,
+    "values": ["default: 'worker'"],
+    "related": ["native.three-runtimes"],
+    "target": "2.0.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0025#1-runtime-is-part-of-placement",
+        "why": "Work in a Tauri app's Rust process gets threads, SIMD and native libraries, outside the webview's worker budget."
+      }
+    ]
+  },
+  {
+    "id": "native.derive-first",
+    "statement": "Derive isolates are the first workload for native runtimes, then users' headless JS isolates through the `wasm` runtime, then native sidecars for existing binaries.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "2.0.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0025#2-derive-isolates-first-user-isolates-after",
+        "why": "Derive isolates are system code with a fixed engine and no user code to trust."
+      }
+    ]
+  },
+  {
+    "id": "native.bus-in-core",
+    "statement": "In a Tauri app that uses native runtimes, the bus runs in the Tauri core on M5's engine built natively, with webview isolates attached over Tauri IPC. A webview isolate can't tell whether a producer is native.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "2.0.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0025#3-the-bus-moves-to-the-core-in-a-tauri-app-that-uses-native-runtimes",
+        "why": "Native isolates have no `MessageChannel`; this reopens ADR 0022's rejection of the log engine in the Rust core and is still to grill."
+      }
+    ]
+  },
+  {
+    "id": "native.three-runtimes",
+    "statement": "`worker` is a Web Worker in the webview; `wasm` is a WASM component in wasmtime in the core, which a headless JS isolate reaches unchanged; `native` is a process or thread in the core, for Rust engines and later for sandboxed sidecars.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "2.0.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0025#4-three-runtimes",
+        "why": "Each runtime trades start-up, speed and what code it can run; the `wasm` runtime has no JIT, so it's measured against `worker`."
+      }
+    ]
+  },
+  {
+    "id": "native.rust-supervisor",
+    "statement": "A Rust supervisor in the core runs heartbeats, restarts and replay from M11's pure decisions, and one conformance suite checks it against the TypeScript supervisor.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "2.0.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0025#5-a-rust-supervisor-on-m11s-decisions",
+        "why": "Crash, restart and replay must behave the same wherever an isolate runs."
+      }
+    ]
+  },
+  {
+    "id": "native.capability-handles",
+    "statement": "Outside the webview, a grant becomes a capability handle (filesystem scopes, network, MCP), checked when the handle is created rather than per record.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "2.0.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0025#6-grants-as-capability-handles-outside-the-webview",
+        "why": "It begins a real security boundary, which the webview never was."
+      }
+    ]
+  },
+  {
+    "id": "native.no-untrusted-native",
+    "statement": "No untrusted code runs in a native or WASM runtime until a separate ADR on the security boundary is accepted.",
+    "status": "proposed",
+    "experimental": true,
+    "related": ["native.capability-handles"],
+    "target": "2.0.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0025#6-grants-as-capability-handles-outside-the-webview",
+        "why": "Isoloop isn't a security boundary today; running untrusted code natively would need one."
+      }
+    ]
+  }
+]

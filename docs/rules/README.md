@@ -5774,7 +5774,61 @@ History:
 
 Isolates that run outside a browser worker. Prefix `native`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `native.runtime-placement` | Placement gains a runtime, `'worker'`, `'wasm'` or `'native'`, with `'worker'` as the default. A headless isolate's code and bus API don't change with its runtime, and visual isolates stay in the webview. | `default: 'worker'` | proposed, experimental | target `2.0.0` |
+| `native.derive-first` | Derive isolates are the first workload for native runtimes, then users' headless JS isolates through the `wasm` runtime, then native sidecars for existing binaries. |  | proposed, experimental | target `2.0.0` |
+| `native.bus-in-core` | In a Tauri app that uses native runtimes, the bus runs in the Tauri core on M5's engine built natively, with webview isolates attached over Tauri IPC. A webview isolate can't tell whether a producer is native. |  | proposed, experimental | target `2.0.0` |
+| `native.three-runtimes` | `worker` is a Web Worker in the webview; `wasm` is a WASM component in wasmtime in the core, which a headless JS isolate reaches unchanged; `native` is a process or thread in the core, for Rust engines and later for sandboxed sidecars. |  | proposed, experimental | target `2.0.0` |
+| `native.rust-supervisor` | A Rust supervisor in the core runs heartbeats, restarts and replay from M11's pure decisions, and one conformance suite checks it against the TypeScript supervisor. |  | proposed, experimental | target `2.0.0` |
+| `native.capability-handles` | Outside the webview, a grant becomes a capability handle (filesystem scopes, network, MCP), checked when the handle is created rather than per record. |  | proposed, experimental | target `2.0.0` |
+| `native.no-untrusted-native` | No untrusted code runs in a native or WASM runtime until a separate ADR on the security boundary is accepted. |  | proposed, experimental | target `2.0.0` |
+
+### `native.runtime-placement`
+
+- **Related:** `native.three-runtimes`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0025 · 1. Runtime is part of placement](../adr/0025-native-runtimes.md#1-runtime-is-part-of-placement) · Work in a Tauri app's Rust process gets threads, SIMD and native libraries, outside the webview's worker budget.
+
+### `native.derive-first`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0025 · 2. Derive isolates first, user isolates after](../adr/0025-native-runtimes.md#2-derive-isolates-first-user-isolates-after) · Derive isolates are system code with a fixed engine and no user code to trust.
+
+### `native.bus-in-core`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0025 · 3. The bus moves to the core in a Tauri app that uses native runtimes](../adr/0025-native-runtimes.md#3-the-bus-moves-to-the-core-in-a-tauri-app-that-uses-native-runtimes) · Native isolates have no `MessageChannel`; this reopens ADR 0022's rejection of the log engine in the Rust core and is still to grill.
+
+### `native.three-runtimes`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0025 · 4. Three runtimes](../adr/0025-native-runtimes.md#4-three-runtimes) · Each runtime trades start-up, speed and what code it can run; the `wasm` runtime has no JIT, so it's measured against `worker`.
+
+### `native.rust-supervisor`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0025 · 5. A Rust supervisor on M11's decisions](../adr/0025-native-runtimes.md#5-a-rust-supervisor-on-m11s-decisions) · Crash, restart and replay must behave the same wherever an isolate runs.
+
+### `native.capability-handles`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0025 · 6. Grants as capability handles outside the webview](../adr/0025-native-runtimes.md#6-grants-as-capability-handles-outside-the-webview) · It begins a real security boundary, which the webview never was.
+
+### `native.no-untrusted-native`
+
+- **Related:** `native.capability-handles`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0025 · 6. Grants as capability handles outside the webview](../adr/0025-native-runtimes.md#6-grants-as-capability-handles-outside-the-webview) · Isoloop isn't a security boundary today; running untrusted code natively would need one.
 
 ## Tauri
 
