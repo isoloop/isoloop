@@ -1,6 +1,6 @@
 # ADR 0023: Watchers, a second way to read a topic
 
-- **Status:** Accepted 2026-11-25 (proposed the same day), from the M8 Watchers W0 grilling (Q1–Q30, yes to all). Amended 2026-11-26 (accepted the same day): `kernel.watch` in W1 (point 27), from the [M9 Module Federation example](../plans/m9-module-federation.md) grilling (Q17, Q20).
+- **Status:** Accepted 2026-11-25 (proposed the same day), from the M8 Watchers W0 grilling (Q1–Q30, yes to all). Amended 2026-11-26 (accepted the same day): `kernel.watch` in W1 (point 27), from the [M9 Module Federation example](../plans/m9-module-federation.md) grilling (Q17, Q20). Amended 2026-11-27 (accepted the same day): the last part of a snapshot, a memory topic's `have` after a bus restart and a pending `seen` at a new `watch` (points 13, 18 and 23), from three gaps found while building the bus side (isoloop#476), grilled Q1–Q3, yes to all.
 - **Date:** 2026-11-25
 - **Plan:** [M8 Watchers](../plans/m8-watchers.md). W1 ships in `0.2.0` as `@experimental`; W2 and W3 come in `0.3.0` and `0.4.0` ([releases](../plans/roadmap.md#releases)).
 - **Touches:** [ADR 0005](0005-bus-topology-message-channels.md) (what travels on the bus port), [ADR 0007](0007-bus-worker-supervision.md) (reattach after a bus restart), [ADR 0012](0012-isolates-built-apart.md) (the seam only grows; which host runs which isolate), [ADR 0016](0016-fewer-messages-per-record.md) (the committer, which carries `seen`), [ADR 0020](0020-inspection-feed.md) (new rows in the feed).
@@ -52,8 +52,8 @@ The forces:
 ### On the bus port
 
 13. **Three new messages and an addition to `commits`** (Q4, Q6, Q11), all on the existing bus port:
-    - `watch { topic, keys?, have? }`, isolate → bus. `keys` is the union from point 11. `have` lists `[key, version]` for the keys the client already holds. A second `watch` on a topic replaces the first, so the client sends one when its union of keys changes.
-    - `view { topic, vseq, values, cleared? }`, bus → isolate. `values` is `{ key, version, value }[]` for the keys that changed, `cleared` the keys that were removed. `vseq` counts views to this watch on this connection, from 1 at each `watch`.
+    - `watch { topic, keys?, have? }`, isolate → bus. `keys` is the union from point 11. `have` lists `[key, version]` for the keys the client already holds. A second `watch` on a topic replaces the first, so the client sends one when its union of keys changes. *(Amended 2026-11-27: before sending a new `watch` on a topic, the client drops any `seen` for that topic it hasn't sent yet. `vseq` starts again at 1 with the new watch, so a late `seen` from the old one could otherwise confirm the wrong view. The bus also ignores a `seen` above the last `vseq` it sent.)*
+    - `view { topic, vseq, values, cleared? }`, bus → isolate. `values` is `{ key, version, value }[]` for the keys that changed, `cleared` the keys that were removed. `vseq` counts views to this watch on this connection, from 1 at each `watch`. *(Amended 2026-11-27: `view` also carries `more?: true` on every part of a snapshot but the last, point 18. A view without `more` is complete, so the views after the snapshot, which are one part each, never carry it.)*
     - `unwatch { topic }`, isolate → bus.
     - `commits` gains `seen?: { topic, vseq }[]`: the highest view settled per watch.
 
@@ -67,7 +67,7 @@ The forces:
     - **Clears.** The retained records of a `last-n` or `time` topic are one range, from the oldest retained offset to the tail. A key whose last sent version is below the oldest retained offset, with no newer record in the range read, is cleared in the next view. For a `time` topic, whose retention pass runs once a second with or without appends, the pass marks the watches whose oldest sent version fell out of the range, so a clear goes out without a new record. This costs memory per watch per key, bounded by `keys` and shown in devtools.
     - **Snapshot.** On the first watch of a topic, the bus reads the whole retained log once, newest per key, into a map that points at records the same way. Later watches of the topic within the grace (point 19) read their snapshot from it. That map exists only for snapshots: views never update it.
 17. **At most one view is in flight per watch** (Q4). After sending a view, the bus sends the next only once it has the `seen` for it. So a watcher never gets values faster than it uses them.
-18. **The snapshot isn't paced** (Q20). The first view after a `watch` carries every key the watcher asked for, split into views of at most 512 values each, sent back to back; only the last one waits for `seen`. The client calls `onView` once, after the last part.
+18. **The snapshot isn't paced** (Q20). The first view after a `watch` carries every key the watcher asked for, split into views of at most 512 values each, sent back to back; only the last one waits for `seen`. The client calls `onView` once, after the last part. *(Amended 2026-11-27: the last part is the one without `more`, point 13, so a snapshot of exactly 512 × n values needs no empty part and the client never counts to 512.)*
 19. **The snapshot map is dropped 5 s after the last watch of the topic leaves,** so a remount or a reattach within that time doesn't read the log again.
 20. **The constants are fixed, not settings** (Q4): one view in flight, 512 values per view part, 5 s of grace, 1,000 keys for the dev warning. They're internal. A `KernelConfig.bus` setting comes later only if a measurement asks for one.
 
@@ -82,7 +82,7 @@ The forces:
 
 ### Restart and wake
 
-23. **After a bus restart, the client sends `watch` again with `have`** (Q6). The new bus sends only the keys whose version differs from `have`, and clears those it no longer has. A persistent topic comes back from disk, so usually little changes. A memory topic lost in the restart resets the view to empty: the client clears its values and calls `onView` with every key in `changed`, as `onReset` does for a subscription. The bus doesn't send `reset` for a watch; an empty snapshot is the reset (Q22).
+23. **After a bus restart, the client sends `watch` again with `have`** (Q6). The new bus sends only the keys whose version differs from `have`, and clears those it no longer has. A persistent topic comes back from disk, so usually little changes. A memory topic lost in the restart resets the view to empty: the client clears its values and calls `onView` with every key in `changed`, as `onReset` does for a subscription. The bus doesn't send `reset` for a watch; an empty snapshot is the reset (Q22). *(Amended 2026-11-27: a memory topic's offsets start again from 0 on the new bus, so a version in `have` may name a different record. The new bus therefore ignores `have` for a memory topic: it sends every key it holds as a full snapshot and clears the rest, which is the reset above. The bus decides, since only it knows what it lost.)*
 24. **A woken isolate watches from scratch** (Q21). Waking starts a new worker (ADR 0001), so the client holds nothing and sends `watch` with no `have`; it gets a full snapshot. A watch counts towards waking a suspended headless isolate the way a subscription does: a changed key on a watched topic wakes it, and a view counts as delivered for the idle rule. Waking from a snapshot without replay is W2.
 
 ### Inspection
@@ -146,4 +146,6 @@ The forces:
 - **`kernel.watch` in W1** (Q8). No use case yet. Not taken on 2026-11-25; taken by the 2026-11-26 amendment (points 30 to 34), with the M9 shop as the use case.
 - **The M9 shop's badge as a small isolate from the cart team** instead of `kernel.watch` (M9 grilling, Q17). It works without the amendment, but it puts the header's count in another team's remote only because the host can't watch. Not taken.
 - **The badge reading `cart` with `kernel.subscribe`.** It gets every record of the cart on the main thread to show one number. Not taken.
+- **The last part of a snapshot by convention** (2026-11-27, Q1): a full part of 512 means more follows, with an empty part when the snapshot divides exactly. No new field, but the client would have to know the part size, which point 20 keeps internal. Not taken; `more` says it in the message.
+- **`last: true` on the final part** (2026-11-27, Q1). Every view after the snapshot is a single part, so each would carry `last: true`, or the client would need a case for views that aren't part of a snapshot. Not taken.
 - **A key keeps its last value after retention removes it** (Q3). The watcher would then show values a replay can't, and the equivalence property would need exceptions. Not taken.
