@@ -748,6 +748,14 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.rules-ship-patches` | A patch from a `release/0.x` branch gets its `shipped` events in that branch's version PR, and they come to `main` with the backport. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.repo-rules` | A rule with `repo: true` is about how this repo works, not the published packages. It's `active` from its `built` event, has no `since`, `target` or `shipped` event, and `rules:ship` skips it. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.rules-lines-sections` | Under an ADR's `## Decision`, a decision is a numbered `###` heading when there are any, otherwise a top-level numbered item, otherwise each `###` section. A heading that says "amended" is an amendment, and a `Rules:` line inside a code fence doesn't count. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.ci-docs-only` | On a docs-only pull request, `check` runs in full and `cli-node24`, `browser`, `e2e` and `bench` report success without running their steps. |  | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.ci-docs-only-paths` | A pull request is docs-only when every changed file is under `docs/`, `.changeset/` or `.claude/`, or ends in `.md`. Any other file makes it a full run. | `docs/**`, `**/*.md`, `.changeset/**`, `.claude/**` | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.ci-docs-only-required-checks` | On a docs-only pull request the `e2e` jobs run and skip their steps, so `e2e (chromium)`, `e2e (firefox)` and `e2e (webkit)` still report as required checks. |  | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.ci-docs-only-pr-events` | Only `pull_request` runs can be docs-only. Release dry runs and stage runs, the nightly, pushes and runs by hand always run every job they include. |  | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.ci-nightly` | Every CI job, `bench` included, runs on `main` each night at 03:00 UTC, through `nightly.yml` calling `ci.yml`. | `03:00 UTC daily` | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.ci-nightly-quiet-skip` | A scheduled nightly is skipped when `main` has no commits since the last green nightly. A nightly run by hand always runs. |  | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.ci-nightly-issue` | A failed nightly opens an issue labelled `nightly-failure`, or comments on the open one, with the failed jobs and the commits since the last green nightly. The next green nightly closes it. | `label: nightly-failure` | active, repo | in force since [#507](https://github.com/isoloop/isoloop/issues/507) |
+| `tool.no-ci-paths-ignore` | We don't use `paths-ignore` or a path-filter action to skip CI for docs. |  | rejected, repo |  |
 
 ### `tool.rule-one-fact`
 
@@ -1063,6 +1071,91 @@ History:
 
 - 2026-11-27 · decided · [ADR 0026 · Clarified 2026-11-27: what counts as a decision](../adr/0026-rules-registry.md#clarified-2026-11-27-what-counts-as-a-decision) · The `Rules:` line check has to know which parts of an ADR need a line.
 - 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
+
+### `tool.ci-docs-only`
+
+- **Code:** `.github/workflows/ci.yml`
+- **Related:** `tool.ci-docs-only-paths`, `tool.ci-docs-only-required-checks`, `tool.ci-nightly`
+- **Why:** A docs change can't break runtime code, and the e2e and bench runs cost runner time for files they never read.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · A docs change can't break runtime code, and the e2e and bench runs cost runner time for files they never read.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.ci-docs-only-paths`
+
+- **Code:** `.github/workflows/ci.yml`
+- **Related:** `tool.ci-docs-only`
+- **Why:** An allowlist defaults to the full run, so a kind of file nobody listed never skips the tests.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · An allowlist defaults to the full run, so a kind of file nobody listed never skips the tests.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.ci-docs-only-required-checks`
+
+- **Code:** `.github/workflows/ci.yml`
+- **Related:** `tool.ci-docs-only`
+- **Why:** A matrix job skipped as a whole reports one unexpanded `e2e` check, and the required names would stay pending.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · A matrix job skipped as a whole reports one unexpanded `e2e` check, and the required names would stay pending.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.ci-docs-only-pr-events`
+
+- **Code:** `.github/workflows/ci.yml`
+- **Related:** `tool.ci-docs-only`
+- **Why:** A release run is the last full check before npm, so it must never skip.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · A release run is the last full check before npm, so it must never skip.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.ci-nightly`
+
+- **Code:** `.github/workflows/nightly.yml`
+- **Related:** `tool.ci-nightly-quiet-skip`, `tool.ci-nightly-issue`, `tool.ci-docs-only`
+- **Why:** With docs-only PRs skipping e2e, a daily full run catches flaky tests, browser drift and interactions between PRs merged the same day; it replaces the weekly run.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · With docs-only PRs skipping e2e, a daily full run catches flaky tests, browser drift and interactions between PRs merged the same day; it replaces the weekly run.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.ci-nightly-quiet-skip`
+
+- **Code:** `.github/workflows/nightly.yml`
+- **Related:** `tool.ci-nightly`
+- **Why:** A night with nothing new can only repeat the last result.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · A night with nothing new can only repeat the last result.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.ci-nightly-issue`
+
+- **Code:** `.github/workflows/nightly.yml`
+- **Related:** `tool.ci-nightly`
+- **Why:** GitHub emails a failed scheduled run only to whoever last edited the workflow; an issue is seen by everyone, and the commit range points at the cause.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0009 · Amended 2026-11-27: what runs when](../adr/0009-toolchain.md#amended-2026-11-27-what-runs-when) · GitHub emails a failed scheduled run only to whoever last edited the workflow; an issue is seen by everyone, and the commit range points at the cause.
+- 2026-11-27 · built · [#507](https://github.com/isoloop/isoloop/issues/507) · In force from the PR that built the docs-only skip and the nightly.
+
+### `tool.no-ci-paths-ignore`
+
+- **Related:** `tool.ci-docs-only`
+
+History:
+
+- 2026-11-27 · rejected · [ADR 0009 · Alternatives considered](../adr/0009-toolchain.md#alternatives-considered) · Why not just `paths-ignore`? The workflow wouldn't start, so the required checks would stay pending and the PR couldn't merge; a path-filter action is a dependency for a dozen lines of shell.
 
 ## Derived topics
 
