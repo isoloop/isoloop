@@ -12,7 +12,321 @@ No rules yet.
 
 Beats, timeouts, restarts and failure, for isolates and the bus worker. Prefix `sup`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `sup.heartbeat-interval` | Each worker sends a heartbeat to the host every `heartbeat.everyMs`. | `100 ms` | active | since `0.1.0` |
+| `sup.blocked-after` | A worker with no beat for `blockedAfterMs` marks its isolates `blocked`, and their surfaces show the busy overlay. Nothing is restarted. | `400 ms` | active | since `0.1.0` |
+| `sup.kill-after` | A worker with no beat for `killAfterMs` is terminated, and its isolates crash with reason `unresponsive`. | `10 000 ms` | active | since `0.1.0` |
+| `sup.ready-timeout` | An isolate that sends no `ready` within `readyTimeoutMs` of its spawn crashes with reason `ready_timeout`. | `10 000 ms` | active | since `0.1.0` |
+| `sup.restart-window` | An isolate that crashes after `maxRestarts` restarts within `withinMs` is `failed`: the kernel emits `isolate:failed`, its surface shows the fallback, and the rest of the app keeps running. | `3 restarts`, `60 000 ms` | active | since `0.1.0` |
+| `sup.short-runs` | A crash after a healthy run shorter than 60 s, from `ready` to the last beat, counts toward `maxRestarts` however long the runs took. A crash after a longer run clears the count first. The isolate fails on this rule or the sliding window, whichever is met first. The bus worker follows the same rule. | `60 000 ms healthy run` | active | since `0.1.1` |
+| `sup.healthy-after` | `supervisor.healthyAfterMs` is the healthy run that clears the count of short runs. `withinMs` is the sliding window only, and either may be the larger. It applies to the bus worker too. | `60 000 ms` | decided | target `0.2.0` |
+| `sup.healthy-after-valid` | `healthyAfterMs` must be a positive integer, with no upper limit. Any other value makes `createKernel` throw `invalid_config`. |  | decided | target `0.2.0` |
+| `sup.backoff` | Each restart waits `initialMs × factorⁿ`, capped at `maxMs`, where n is the larger of the window count and the short-run count. *Retry* clears both. | `250 ms`, `× 2`, `max 4 000 ms` | active | since `0.1.0` |
+| `sup.failed-message` | `isolate:failed`'s `message` names the rule that was met, for example "3 restarts in 60000 ms" or "4 crashes, each after less than 60000 ms of healthy running". |  | active | since `0.1.1` |
+| `sup.lag-clock` | The heartbeat kill and the ready timeout measure silence on a lag clock: `performance.now()` minus the total time the host's 50 ms supervision tick fired late. Time in which the host couldn't hear a beat doesn't count. The bus worker's timers use it too. |  | decided | target `0.2.0` |
+| `sup.lag-clock-cap` | A worker silent for 3 × `killAfterMs` of wall-clock time is killed whatever the lag clock says. The ready timeout has the same cap on its own limit, 3 × `readyTimeoutMs`. The factor isn't an option. | `3 × killAfterMs`, `3 × readyTimeoutMs (30 s)` | decided | target `0.2.0` |
+| `sup.lag-clock-scope` | Only the heartbeat kill and the ready timeout use the lag clock. `blockedAfterMs`, the restart window, the healthy run and the backoff stay on wall-clock time. |  | decided | target `0.2.0` |
+| `sup.warm-up` | For `readyTimeoutMs` after an isolate's `ready`, a blocked isolate is killed only after `readyTimeoutMs` without a beat, not `killAfterMs`. |  | superseded |  |
+| `sup.no-sibling-detector` | The supervisor doesn't judge a silent worker against its siblings (holding kills while most workers are silent). |  | rejected |  |
+| `sup.no-cpu-beat` | Workers don't send a beat counted in CPU time. |  | rejected |  |
+| `sup.worker-budget` | When the count of live workers passes the soft budget, the kernel warns once with `workers:budget`. A pool counts as one worker. The budget never refuses a spawn or suspends an isolate. | `32 workers`, `warning only` | active | since `0.1.0` |
+| `sup.spawn-failed` | If the browser fails to create a worker, the isolate crashes with reason `spawn_failed` and gets the usual backoff and restart limit. Before each retry the supervisor suspends every idle suspendable isolate, to free memory. |  | active | since `0.1.0` |
+| `sup.no-device-budget` | The worker budget isn't derived from the device (for example cores × 4). |  | rejected |  |
+| `sup.no-hard-worker-limit` | There is no hard limit on the number of workers. |  | rejected |  |
+| `sup.no-budget-suspend` | Passing the worker budget doesn't suspend isolates. Memory is freed only after a real `spawn_failed`. |  | rejected |  |
+| `sup.hidden-tab` | While `document.hidden` is true, the supervisor doesn't judge hangs: no busy overlay and no kills. Worker errors are still handled. |  | active | since `0.1.0` |
+| `sup.clocks-reset-on-show` | On `visibilitychange` to visible and on the Page Lifecycle `resume` event, every heartbeat clock, the isolates' and the bus worker's, restarts from zero. |  | active | since `0.1.0` |
+| `sup.bus-supervised` | The bus worker sends `beat` on its control port, and the supervisor judges it with the same blocked and kill timeouts as an isolate. The kernel emits `bus:ready { first }`, `bus:crash`, `bus:restart` and `bus:failed`. |  | active | since `0.1.0` |
+| `sup.bus-restart-limit` | The bus worker restarts under the kernel's `supervisor` config, like an isolate. Past the limit the kernel emits `bus:failed`; isolates keep running, and every publish rejects with `bus_unavailable`. | `3 restarts`, `60 000 ms` | active | since `0.1.0` |
+
+### `sup.heartbeat-interval`
+
+- **Change it:** `KernelConfig.heartbeat.everyMs`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.blocked-after`, `sup.kill-after`
+- **Why:** The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+- 2026-11-05 · built · [#15](https://github.com/isoloop/isoloop/issues/15) · The supervisor wired to real workers, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.blocked-after`
+
+- **Change it:** `KernelConfig.heartbeat.blockedAfterMs`
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.kill-after`
+- **Why:** The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+- 2026-11-05 · built · [#12](https://github.com/isoloop/isoloop/issues/12) · The supervisor's state machine, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.kill-after`
+
+- **Change it:** `KernelConfig.heartbeat.killAfterMs`
+- **Errors and events:** `unresponsive`
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.lag-clock`, `sup.restart-window`
+- **Why:** The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+- 2026-11-05 · built · [#12](https://github.com/isoloop/isoloop/issues/12) · The supervisor's state machine, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.ready-timeout`
+
+- **Change it:** `KernelConfig.heartbeat.readyTimeoutMs`
+- **Errors and events:** `ready_timeout`
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.lag-clock`
+- **Why:** The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+- 2026-11-05 · built · [#12](https://github.com/isoloop/isoloop/issues/12) · The supervisor's state machine, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.restart-window`
+
+- **Change it:** `KernelConfig.supervisor.maxRestarts`, `KernelConfig.supervisor.withinMs`
+- **Errors and events:** `isolate:failed`
+- **Code:** `packages/host/src/supervisor/machine.ts`, `packages/host/src/supervisor/timers.ts`
+- **Related:** `sup.short-runs`, `sup.backoff`, `sup.bus-restart-limit`
+- **Why:** The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+- 2026-11-05 · built · [#12](https://github.com/isoloop/isoloop/issues/12) · The supervisor's state machine, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.short-runs`
+
+- **Change it:** `KernelConfig.supervisor.withinMs`
+- **Errors and events:** `isolate:failed`
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.restart-window`, `sup.healthy-after`, `sup.failed-message`
+- **Why:** A crash loop slower than the window never reached `failed`: #390 measured isolates that hung 10 s after each start still restarting after 150 s.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0001 · Restart limit: short runs (amended 2026-11-24)](../adr/0001-one-worker-per-isolate.md#restart-limit-short-runs-amended-2026-11-24) · A crash loop slower than the window never reached `failed`: #390 measured isolates that hung 10 s after each start still restarting after 150 s.
+- 2026-11-24 · built · [#430](https://github.com/isoloop/isoloop/issues/430) · Built on main; backported to release/0.1 in #439.
+- 2026-11-24 · shipped · [v0.1.1](https://github.com/isoloop/isoloop/releases/tag/v0.1.1) · First released in 0.1.1.
+
+### `sup.healthy-after`
+
+- **Change it:** `KernelConfig.supervisor.healthyAfterMs`
+- **Code:** `packages/host/src/supervisor/machine.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.short-runs`, `sup.healthy-after-valid`
+- **Why:** One number was both the window and the healthy run, so an app couldn't widen one without the other. The 0.2 codemod sets it beside an existing `withinMs`.
+
+History:
+
+- 2026-11-26 · decided · [ADR 0001 · Restart limit: healthyAfterMs (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#restart-limit-healthyafterms-amended-2026-11-26) · One number was both the window and the healthy run, so an app couldn't widen one without the other. The 0.2 codemod sets it beside an existing `withinMs`.
+- 2026-11-26 · built · [#466](https://github.com/isoloop/isoloop/issues/466) · Built on main; ships in 0.2.0.
+
+### `sup.healthy-after-valid`
+
+- **Change it:** `KernelConfig.supervisor.healthyAfterMs`
+- **Errors and events:** `invalid_config`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.healthy-after`
+- **Why:** A malformed option fails at start, as other options do.
+
+History:
+
+- 2026-11-26 · decided · [ADR 0001 · Restart limit: healthyAfterMs (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#restart-limit-healthyafterms-amended-2026-11-26) · A malformed option fails at start, as other options do.
+- 2026-11-26 · built · [#466](https://github.com/isoloop/isoloop/issues/466) · Built on main; ships in 0.2.0.
+
+### `sup.backoff`
+
+- **Change it:** `KernelConfig.supervisor.backoff`
+- **Code:** `packages/host/src/supervisor/timers.ts`
+- **Related:** `sup.restart-window`, `sup.short-runs`
+- **Why:** With a second count, the backoff follows whichever count is larger; shipped in 0.1.1.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · The default comes from RFC 0001's kernel config; ADR 0001 kept it when it set where isolates run.
+- 2026-11-05 · built · [#12](https://github.com/isoloop/isoloop/issues/12) · The supervisor's state machine, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+- 2026-11-24 · amended · [ADR 0001 · Restart limit: short runs (amended 2026-11-24)](../adr/0001-one-worker-per-isolate.md#restart-limit-short-runs-amended-2026-11-24) · With a second count, the backoff follows whichever count is larger; shipped in 0.1.1. Before: Each restart waits `initialMs × factorⁿ`, capped at `maxMs`, where n is the restart count.
+
+### `sup.failed-message`
+
+- **Errors and events:** `isolate:failed`
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.short-runs`
+- **Why:** With two rules, a reader needs to know which one failed the isolate.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0001 · Restart limit: short runs (amended 2026-11-24)](../adr/0001-one-worker-per-isolate.md#restart-limit-short-runs-amended-2026-11-24) · With two rules, a reader needs to know which one failed the isolate.
+- 2026-11-24 · built · [#430](https://github.com/isoloop/isoloop/issues/430) · Built on main; backported to release/0.1 in #439.
+- 2026-11-24 · shipped · [v0.1.1](https://github.com/isoloop/isoloop/releases/tag/v0.1.1) · First released in 0.1.1.
+
+### `sup.lag-clock`
+
+- **Code:** `packages/host/src/supervisor/machine.ts`, `packages/host/src/kernel/kernel.ts`, `packages/host/src/bus/controller.ts`
+- **Related:** `sup.lag-clock-cap`, `sup.lag-clock-scope`, `sup.kill-after`, `sup.ready-timeout`
+- **Why:** On a CPU-starved page the host itself is late, so a worker waiting for a CPU looked hung and was killed. The lag clock removed every false kill at the defaults in the spike.
+
+History:
+
+- 2026-11-26 · decided · [ADR 0001 · Heartbeat clock: the host's lag (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#heartbeat-clock-the-hosts-lag-amended-2026-11-26) · On a CPU-starved page the host itself is late, so a worker waiting for a CPU looked hung and was killed. The lag clock removed every false kill at the defaults in the spike.
+- 2026-11-27 · built · [#472](https://github.com/isoloop/isoloop/issues/472) · Built on main; ships in 0.2.0.
+
+### `sup.lag-clock-cap`
+
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.lag-clock`
+- **Why:** A hung worker on a starved page must still be killed, at most 3 times later than on a page that isn't starved.
+
+History:
+
+- 2026-11-26 · decided · [ADR 0001 · Heartbeat clock: the host's lag (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#heartbeat-clock-the-hosts-lag-amended-2026-11-26) · A hung worker on a starved page must still be killed, at most 3 times later than on a page that isn't starved.
+- 2026-11-27 · built · [#472](https://github.com/isoloop/isoloop/issues/472) · Built on main; ships in 0.2.0.
+
+### `sup.lag-clock-scope`
+
+- **Code:** `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.lag-clock`
+- **Why:** The busy overlay and the restart limit keep behaving as they did; the #390 crash loop still fails at the same crash.
+
+History:
+
+- 2026-11-26 · decided · [ADR 0001 · Heartbeat clock: the host's lag (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#heartbeat-clock-the-hosts-lag-amended-2026-11-26) · The busy overlay and the restart limit keep behaving as they did; the #390 crash loop still fails at the same crash.
+- 2026-11-27 · built · [#472](https://github.com/isoloop/isoloop/issues/472) · Built on main; ships in 0.2.0.
+
+### `sup.warm-up`
+
+- **Superseded by:** `sup.lag-clock`
+- **Why:** Plant's restart loop on Firefox CI looked like start-up work killed by a short `killAfterMs`.
+
+History:
+
+- 2026-11-20 · decided · [ADR 0001 · Start-up warm-up (amended 2026-11-20; not built, reopened 2026-11-22; replaced 2026-11-26)](../adr/0001-one-worker-per-isolate.md#start-up-warm-up-amended-2026-11-20-not-built-reopened-2026-11-22-replaced-2026-11-26) · Plant's restart loop on Firefox CI looked like start-up work killed by a short `killAfterMs`.
+- 2026-11-22 · corrected · [ADR 0001 · Start-up warm-up (amended 2026-11-20; not built, reopened 2026-11-22; replaced 2026-11-26)](../adr/0001-one-worker-per-isolate.md#start-up-warm-up-amended-2026-11-20-not-built-reopened-2026-11-22-replaced-2026-11-26) · Never built (#384 closed unmerged), and the loop came from the tests, not start-up. It also weakened the restart limit (#390).
+- 2026-11-22 · reopened · [#389](https://github.com/isoloop/isoloop/issues/389) · What a CPU-starved worker needs went back to its issue.
+- 2026-11-26 · superseded · [ADR 0001 · Heartbeat clock: the host's lag (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#heartbeat-clock-the-hosts-lag-amended-2026-11-26) · Replaced by the lag clock; nothing from #384 is reused.
+
+### `sup.no-sibling-detector`
+
+History:
+
+- 2026-11-26 · rejected · [ADR 0001 · Heartbeat clock: the host's lag (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#heartbeat-clock-the-hosts-lag-amended-2026-11-26) · Why not hold a kill while most workers are silent? Measured, it removed only 0 to 9 % of the false kills and delayed the kill of a hang that hits half the workers or more.
+
+### `sup.no-cpu-beat`
+
+History:
+
+- 2026-11-26 · rejected · [ADR 0001 · Heartbeat clock: the host's lag (amended 2026-11-26)](../adr/0001-one-worker-per-isolate.md#heartbeat-clock-the-hosts-lag-amended-2026-11-26) · Why not count a worker's CPU time instead? A worker that doesn't get a CPU can't send that beat either.
+
+### `sup.worker-budget`
+
+- **Change it:** `KernelConfig.workers.budget`
+- **Errors and events:** `workers:budget`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.no-device-budget`, `sup.no-hard-worker-limit`, `sup.no-budget-suspend`
+- **Why:** The real ceiling depends on the device, so the budget is a hint, not a guarantee.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Worker budget and spawn failures](../adr/0001-one-worker-per-isolate.md#worker-budget-and-spawn-failures) · The real ceiling depends on the device, so the budget is a hint, not a guarantee.
+- 2026-11-05 · built · [#18](https://github.com/isoloop/isoloop/issues/18) · Loader hardening, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.spawn-failed`
+
+- **Errors and events:** `spawn_failed`
+- **Code:** `packages/host/src/kernel/kernel.ts`, `packages/host/src/supervisor/machine.ts`
+- **Related:** `sup.worker-budget`, `sup.restart-window`
+- **Why:** Memory runs out on the device, not at a count Isoloop can know, so a failed spawn is handled like any crash.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Worker budget and spawn failures](../adr/0001-one-worker-per-isolate.md#worker-budget-and-spawn-failures) · Memory runs out on the device, not at a count Isoloop can know, so a failed spawn is handled like any crash.
+- 2026-11-05 · built · [#18](https://github.com/isoloop/isoloop/issues/18) · Loader hardening, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.no-device-budget`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why not scale the budget to the device? Browser-reported figures are coarse or hidden, and the warning would differ per machine.
+
+### `sup.no-hard-worker-limit`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why not refuse spawns past a limit? It fails apps on capable machines and still doesn't protect weak ones.
+
+### `sup.no-budget-suspend`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why not suspend isolates once the budget is passed? It would turn a warning into behaviour.
+
+### `sup.hidden-tab`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.clocks-reset-on-show`
+- **Why:** Background tabs throttle main-thread timers, so beats look late when they aren't.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · What the browser still controls](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls) · Background tabs throttle main-thread timers, so beats look late when they aren't.
+- 2026-11-05 · built · [#15](https://github.com/isoloop/isoloop/issues/15) · The supervisor wired to real workers, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.clocks-reset-on-show`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.hidden-tab`
+- **Why:** Returning to a tab must never kill an isolate for beats missed while it was hidden or frozen.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · What the browser still controls](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls) · Returning to a tab must never kill an isolate for beats missed while it was hidden or frozen.
+- 2026-11-05 · built · [#15](https://github.com/isoloop/isoloop/issues/15) · The supervisor wired to real workers, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.bus-supervised`
+
+- **Errors and events:** `bus:crash`, `bus:restart`
+- **Code:** `packages/host/src/bus/controller.ts`
+- **Related:** `sup.bus-restart-limit`
+- **Why:** The bus worker holds every topic log and offset, so it gets the same supervision as an isolate.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 1. Supervise the bus like an isolate](../adr/0007-bus-worker-supervision.md#1-supervise-the-bus-like-an-isolate) · The bus worker holds every topic log and offset, so it gets the same supervision as an isolate.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller and its supervision, built in M2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `sup.bus-restart-limit`
+
+- **Change it:** `KernelConfig.supervisor`
+- **Errors and events:** `bus:failed`, `bus_unavailable`
+- **Code:** `packages/host/src/bus/controller.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `sup.bus-supervised`, `sup.restart-window`, `sup.short-runs`
+- **Why:** Found while writing the supervision guide (#320): an app that sets `supervisor` sets it for the bus worker too.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 1. Supervise the bus like an isolate](../adr/0007-bus-worker-supervision.md#1-supervise-the-bus-like-an-isolate) · Same limit as an isolate, so a bus that keeps crashing ends in a state the app can show.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller and its supervision, built in M2.
+- 2026-11-20 · clarified · [ADR 0007 · Amended: the restart limit is a default (2026-11-20)](../adr/0007-bus-worker-supervision.md#amended-the-restart-limit-is-a-default-2026-11-20) · Found while writing the supervision guide (#320): an app that sets `supervisor` sets it for the bus worker too. Before: Up to 3 restarts in 60 s, read as a fixed limit.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
 
 ## Bus
 

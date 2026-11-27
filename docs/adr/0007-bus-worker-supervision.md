@@ -27,6 +27,8 @@ We considered two ways to survive that:
 
 The bus worker sends `beat` on its control port. The supervisor tracks it with the same blocked and kill timeouts, and restarts it up to 3 times in 60 s by default (see [the amendment](#amended-the-restart-limit-is-a-default-2026-11-20)). Past the limit the kernel emits `bus:failed`, and isolates keep running with every publish rejected (`bus_unavailable`). The kernel emits `bus:ready { first }`, `bus:crash`, `bus:restart` and `bus:failed`. A contracts module that fails to load also ends in `bus:failed`, but with a `code`, and fails the isolates as well ([ADR 0003](0003-schema-format-standard-schema.md), decision 7).
 
+Rules: `sup.bus-supervised`, `sup.bus-restart-limit`
+
 ### 2. Durability per topic
 
 ```ts
@@ -78,17 +80,25 @@ Every major browser has had sync access handles in normal browsing since 2022 or
 
 "Up to 3 times in 60 s" is the default, not a fixed limit. The bus worker is supervised with the kernel's own `supervisor` config (`maxRestarts`, `withinMs`, `backoff`; `createKernel` hands it to the bus controller in `packages/host/src/kernel.ts`), so an app that sets those sets them for the bus worker too. Found while writing the M4c supervision guide (isoloop#320), which describes the code.
 
+Rules: `sup.bus-restart-limit`
+
 ### Amended: short runs count (2026-11-24)
 
 The bus worker's restart limit follows [ADR 0001](0001-one-worker-per-isolate.md)'s *Restart limit: short runs*: a crash after a healthy run shorter than `withinMs` counts, measured from the bus's `ready` to its last beat, and the sliding window stays as well. The bus has no fallback: when the limit is met it fails as it does today, and isolates get `bus_unavailable` ([#390](https://github.com/isoloop/isoloop/issues/390)).
+
+Rules: `sup.short-runs`
 
 ### Amended: the healthy run is `healthyAfterMs` (2026-11-26)
 
 The healthy run that clears the bus worker's count of short runs is `supervisor.healthyAfterMs`, not `withinMs`, which is the sliding window only ([ADR 0001](0001-one-worker-per-isolate.md), *Restart limit: `healthyAfterMs`*; [#409](https://github.com/isoloop/isoloop/issues/409)). The bus worker reads it from the kernel's `supervisor` config like the other options, with no separate setting; the default, 60 000 ms, keeps today's behaviour.
 
+Rules: `sup.healthy-after`
+
 ### Amended: the heartbeat clock is the host's lag (2026-11-26)
 
 The bus worker's heartbeat kill and ready timeout run on the host's lag clock with a wall-clock cap of 3 × their limit, as isolates' do ([ADR 0001](0001-one-worker-per-isolate.md), *Heartbeat clock: the host's lag*; [#389](https://github.com/isoloop/isoloop/issues/389)); its restart limit stays on wall-clock time.
+
+Rules: `sup.lag-clock`, `sup.lag-clock-cap`
 
 ## Consequences
 
