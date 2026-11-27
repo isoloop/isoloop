@@ -1,5 +1,47 @@
 # @isoloop/bus
 
+## 0.2.0-next.0
+
+### Minor Changes
+
+- 2fb0e40: The bus worker serves watches: the current value per key of a topic, instead of every record. Watches are experimental.
+  
+  - A watch first gets a snapshot, the newest retained value of each key it asks for. After that it gets only the keys that changed, with their newest value, and the next view goes out once the last one is seen.
+  - A key leaves the view when retention removes its newest record. On a compacted topic, keys stay.
+  - A watch needs the subscribe grant for its topic.
+  - With `dev: true`, the bus warns once when a watch of every key holds more than 1,000 keys.
+- de19016: The bus metrics and the devtools panel show watched topics. These figures are experimental.
+  
+  - Each topic row in `BusMetrics` gains `watch` once the topic has had a watch: the watches on it now, the distinct keys they hold, the transport (`'messages'`), and the records appended while each watch was on the topic and the values sent to watches, since the bus worker started. The host's watches are counted with the isolates'.
+  - The devtools bus view lists watched topics under the topics table, with how many of the topic's records each watch showed, in words, such as "showed 1 of every 40 records on the topic".
+- 05e956c: `ctx.bus.watch(topic, onView, { keys? })` reads a topic's current value per key instead of its stream. It is experimental.
+  
+  - `onView(view, changed)` first gets a snapshot, the newest retained value of each key it watches, then the keys that changed. Values in between are skipped, so code that needs every record keeps `subscribe`.
+  - Records with no key share the key `null`. A key leaves the view when retention removes its newest record.
+  - Several watches on one topic share one watch on the bus, and each `onView` gets only its own keys. The next view waits until every `onView` on it has settled.
+  - After a bus restart a watch carries on by itself. A memory topic the restart lost comes back as an empty view.
+  - A large snapshot arrives in parts: every `view` message but the last has `more: true`, and `onView` runs once, after the last.
+  - `createTestContext` gives `ctx.bus.watch`, and `watches()` lists the open ones.
+
+### Patch Changes
+
+- 8fedffd: With the kernel's `dev: true`, the bus now warns in the console, once per topic per isolate, when an isolate subscribes to a topic it already subscribes to. The newer subscription replaces the older one, as before; the warning names the isolate and the topic, since a second `bus.subscribe` on the same topic is the usual cause.
+- 78ebf7f: Several components can now `useTopic` the same topic, and they all update. Every `useTopic` on a topic in one isolate shares one bus subscription: the first to mount subscribes, the last to unmount unsubscribes, and a component that mounts later gets the current value at once. Before, a second `useTopic` on a topic replaced the first, which stopped updating. The first `useTopic`'s `from` sets where the shared subscription starts; a later one with a different `from` gets the shared value, and the console warns once. `useRoute` shares the route topic's subscription the same way. The bus's dev warning for a repeated subscribe names `bus.subscribe`, since `useTopic` no longer causes it.
+- f96ad9b: The bus port gains the messages for watchers. These messages are experimental.
+  
+  - `watch` and `unwatch` go from an isolate to the bus, and `view` from the bus to an isolate. A watcher reads the current value per key instead of the stream.
+  - `commits` gains an optional `seen`, the highest view settled per watch.
+  - The types `WatchKey` and `ViewValue` are new.
+  - `PROTOCOL` stays `{ v: 1, min: 1 }`, since the additions are new message types and an optional field.
+  - `@isoloop/bus` and `@isoloop/runtime` build against the new message types.
+- Updated dependencies [d452be7]
+- Updated dependencies [659eefa]
+- Updated dependencies [de19016]
+- Updated dependencies [f96ad9b]
+- Updated dependencies [05e956c]
+  - @isoloop/protocol@0.2.0-next.0
+  - @isoloop/codec@0.2.0-next.0
+
 ## 0.1.0
 
 The first release of the bus.

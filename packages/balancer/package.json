@@ -1,6 +1,6 @@
 {
   "name": "@isoloop/balancer",
-  "version": "0.1.0",
+  "version": "0.2.0-next.0",
   "description": "Experimental automatic placement for Isoloop: places isolates in worker pools by measured load and quarantines what blocks.",
   "keywords": [
     "isoloop",

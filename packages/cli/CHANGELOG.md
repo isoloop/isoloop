@@ -1,5 +1,33 @@
 # isoloop
 
+## 0.2.0-next.0
+
+### Minor Changes
+
+- 2e45657: Adds `isoloop migrate [version]`, which rewrites a project's source for an Isoloop release that changed an API. It starts from the installed `@isoloop/*` version (or `--from`) and runs each release's step up to the target, by default the newest the CLI knows. It prints the changes as a diff and writes nothing unless `--write` is given. It changes only the code it rewrites, so formatting and comments stay, and code it can't rewrite safely gets a `// isoloop-migrate:` comment. See [Upgrading](https://isoloop.dev/docs/getting-started/#upgrading).
+- d452be7: breaking: `ctx.bus.publish` and `kernel.publish` take the value first and the key in an options object, like `request`, `reply` and `usePublish`: `publish(topic, value, { key? })` instead of `publish(topic, { value, key? })`. `npx isoloop@latest migrate` rewrites the calls it can prove are Isoloop's and marks the ones it can't with a `// isoloop-migrate:` comment; see [From 0.1 to 0.2](https://isoloop.dev/docs/getting-started/#from-01-to-02). An isolate built apart and stamped below 0.2 by `defineIsolate` still gets the old `ctx.bus.publish(topic, { value, key? })` in 0.2, deprecated, with a warning on its first call when the kernel has `dev: true`. `kernel.publish` changes at once. The record on the bus is unchanged.
+- 208e22c: breaking: `supervisor.healthyAfterMs` is the healthy run, from `ready` to the last heartbeat, that clears the count of short runs. `supervisor.withinMs` is now only the sliding window that counts restarts; before, it was both.
+  
+  The default is 60 000 ms, so an app that sets neither behaves as before. An app that set only `withinMs` would now get a 60 000 ms healthy run instead: run `npx isoloop@latest migrate 0.2 --from 0.1 --write`, which sets `healthyAfterMs` to the same expression beside `withinMs` in a `createKernel` config and flags with `// isoloop-migrate:` the configs it can't rewrite ([the codemod](https://github.com/isoloop/isoloop/blob/main/packages/cli/src/migrate/0.2/healthy-after-ms.ts), [the options](https://github.com/isoloop/isoloop/blob/main/docs/guide/supervision.md#configuring-it)).
+  
+  Any value other than a positive integer makes `createKernel` throw `invalid_config`. The bus worker follows it too, and `isolate:failed`'s message quotes it when the short-run limit is met.
+
+### Patch Changes
+
+- bdcb8f1: The `isoloop` CLI now runs on Node 24 LTS: its `engines` is `>=24`, where it was `>=26`. `contracts export`, `skill add` and `mcp` were tested on Node 24.22.
+- 57904d8: `isoloop migrate` to 0.2 now rewrites a `publish` whose second argument is a conditional between two records with the same value (`k === undefined ? { value } : { key: k, value }` becomes `value, k === undefined ? {} : { key: k }`) and marks one it can't rewrite. It treats a receiver ending in `#kernel` or `#bus` (`this.#kernel`) as Isoloop's, and marks a call on a receiver it can't name, such as `this.#k`, instead of leaving it as it is. A value over several lines keeps its indentation when the `value:` wrapper goes.
+- 750b11c: `isoloop migrate` to 0.2 now keeps the comments of a `publish` record it takes apart: a comment on `key` goes into the new options, one on `value` stays beside the value, and any other goes above the call. It lays out the new arguments the way oxfmt and Prettier do, at the width and indent of the nearest formatter config, so a formatted file stays formatted: arguments already one per line stay that way, a call that no longer fits gets its arguments one per line or its options hugged, and a member chain that now fits goes back on one line.
+- Updated dependencies [8fedffd]
+- Updated dependencies [d452be7]
+- Updated dependencies [78ebf7f]
+- Updated dependencies [2fb0e40]
+- Updated dependencies [659eefa]
+- Updated dependencies [de19016]
+- Updated dependencies [f96ad9b]
+- Updated dependencies [05e956c]
+  - @isoloop/bus@0.2.0-next.0
+  - @isoloop/protocol@0.2.0-next.0
+
 ## 0.1.0
 
 The first release of the `isoloop` command line.

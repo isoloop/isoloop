@@ -1,5 +1,9 @@
 # @isoloop/codec
 
+## 0.2.0-next.0
+
+No changes in this release.
+
 ## 0.1.0
 
 The first release. An internal package: app code never imports it, and its API carries no semver promise of its own.

@@ -1,5 +1,38 @@
 # @isoloop/protocol
 
+## 0.2.0-next.0
+
+### Minor Changes
+
+- d452be7: breaking: `ctx.bus.publish` and `kernel.publish` take the value first and the key in an options object, like `request`, `reply` and `usePublish`: `publish(topic, value, { key? })` instead of `publish(topic, { value, key? })`. `npx isoloop@latest migrate` rewrites the calls it can prove are Isoloop's and marks the ones it can't with a `// isoloop-migrate:` comment; see [From 0.1 to 0.2](https://isoloop.dev/docs/getting-started/#from-01-to-02). An isolate built apart and stamped below 0.2 by `defineIsolate` still gets the old `ctx.bus.publish(topic, { value, key? })` in 0.2, deprecated, with a warning on its first call when the kernel has `dev: true`. `kernel.publish` changes at once. The record on the bus is unchanged.
+- 659eefa: `kernel.watch(topic, onView, { keys? })` reads a topic's current value per key from the host, instead of its stream. It is experimental.
+  
+  - It takes the same arguments as `ctx.bus.watch`: `onView(view, changed)` gets a snapshot first, then the keys that changed, and the next view waits until `onView` returns or its promise settles.
+  - The host's watches on one topic share one watch on the bus, on the union of their keys.
+  - After a bus restart a persistent topic keeps its values. A memory topic the restart lost comes back empty, with every key it had in `changed`.
+  - It throws without `KernelConfig.contracts`, as `kernel.subscribe` does.
+  - `@isoloop/host` exports the `OnView` and `WatchOptions` types.
+  - The watch logic moved from `@isoloop/runtime` to `@isoloop/protocol`, so the host and the isolate share it; `ctx.bus.watch` behaves as before.
+- de19016: The bus metrics and the devtools panel show watched topics. These figures are experimental.
+  
+  - Each topic row in `BusMetrics` gains `watch` once the topic has had a watch: the watches on it now, the distinct keys they hold, the transport (`'messages'`), and the records appended while each watch was on the topic and the values sent to watches, since the bus worker started. The host's watches are counted with the isolates'.
+  - The devtools bus view lists watched topics under the topics table, with how many of the topic's records each watch showed, in words, such as "showed 1 of every 40 records on the topic".
+- f96ad9b: The bus port gains the messages for watchers. These messages are experimental.
+  
+  - `watch` and `unwatch` go from an isolate to the bus, and `view` from the bus to an isolate. A watcher reads the current value per key instead of the stream.
+  - `commits` gains an optional `seen`, the highest view settled per watch.
+  - The types `WatchKey` and `ViewValue` are new.
+  - `PROTOCOL` stays `{ v: 1, min: 1 }`, since the additions are new message types and an optional field.
+  - `@isoloop/bus` and `@isoloop/runtime` build against the new message types.
+- 05e956c: `ctx.bus.watch(topic, onView, { keys? })` reads a topic's current value per key instead of its stream. It is experimental.
+  
+  - `onView(view, changed)` first gets a snapshot, the newest retained value of each key it watches, then the keys that changed. Values in between are skipped, so code that needs every record keeps `subscribe`.
+  - Records with no key share the key `null`. A key leaves the view when retention removes its newest record.
+  - Several watches on one topic share one watch on the bus, and each `onView` gets only its own keys. The next view waits until every `onView` on it has settled.
+  - After a bus restart a watch carries on by itself. A memory topic the restart lost comes back as an empty view.
+  - A large snapshot arrives in parts: every `view` message but the last has `more: true`, and `onView` runs once, after the last.
+  - `createTestContext` gives `ctx.bus.watch`, and `watches()` lists the open ones.
+
 ## 0.1.0
 
 The first release. An internal package: app code never imports it, and its API carries no semver promise of its own.

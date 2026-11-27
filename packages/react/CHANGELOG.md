@@ -1,5 +1,33 @@
 # @isoloop/react
 
+## 0.2.0-next.0
+
+### Minor Changes
+
+- bb8f473: `useWatch` reads a topic's current value per key instead of its stream. It is experimental.
+  
+  - `useWatch(topic)` returns a map from key to value; records with no key share the key `null`.
+  - `useWatch(topic, { key })` returns one key's value, or `undefined` while it has none.
+  - When several values arrive for a key between two renders, only the newest is shown, and the next view waits until the render showing this one has committed.
+  - Any number of components can watch one topic; one that mounts later shows the current value at once.
+- 78ebf7f: Several components can now `useTopic` the same topic, and they all update. Every `useTopic` on a topic in one isolate shares one bus subscription: the first to mount subscribes, the last to unmount unsubscribes, and a component that mounts later gets the current value at once. Before, a second `useTopic` on a topic replaced the first, which stopped updating. The first `useTopic`'s `from` sets where the shared subscription starts; a later one with a different `from` gets the shared value, and the console warns once. `useRoute` shares the route topic's subscription the same way. The bus's dev warning for a repeated subscribe names `bus.subscribe`, since `useTopic` no longer causes it.
+
+### Patch Changes
+
+- 0b3b48f: Docs: `useHost` now lists `requestCanvas` among the host calls, and the `maxWorkers` option says its default is `max(2, navigator.hardwareConcurrency - 2)` and that a value you set is raised to 1 if lower.
+- 8fedffd: With the kernel's `dev: true`, the bus now warns in the console, once per topic per isolate, when an isolate subscribes to a topic it already subscribes to. The newer subscription replaces the older one, as before; the warning names the isolate and the topic, since a second `bus.subscribe` on the same topic is the usual cause.
+- d452be7: breaking: `ctx.bus.publish` and `kernel.publish` take the value first and the key in an options object, like `request`, `reply` and `usePublish`: `publish(topic, value, { key? })` instead of `publish(topic, { value, key? })`. `npx isoloop@latest migrate` rewrites the calls it can prove are Isoloop's and marks the ones it can't with a `// isoloop-migrate:` comment; see [From 0.1 to 0.2](https://isoloop.dev/docs/getting-started/#from-01-to-02). An isolate built apart and stamped below 0.2 by `defineIsolate` still gets the old `ctx.bus.publish(topic, { value, key? })` in 0.2, deprecated, with a warning on its first call when the kernel has `dev: true`. `kernel.publish` changes at once. The record on the bus is unchanged.
+- 165b28b: - The docs of `useWatch` and `ctx.bus.watch` now say to use `subscribe` to get every record. `useTopic` shows only the newest value, so it doesn't get every record either.
+  - The docs of `useTopic` say that every record reaches the isolate, and point to `useWatch` for showing the current value per key.
+- Updated dependencies [d452be7]
+- Updated dependencies [659eefa]
+- Updated dependencies [de19016]
+- Updated dependencies [f96ad9b]
+- Updated dependencies [05e956c]
+- Updated dependencies [165b28b]
+  - @isoloop/runtime@0.2.0-next.0
+  - @isoloop/protocol@0.2.0-next.0
+
 ## 0.1.0
 
 The first release of the React adapter, for React 18 and 19.
