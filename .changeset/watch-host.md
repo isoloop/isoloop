@@ -1,7 +1,7 @@
 ---
 '@isoloop/host': minor
 '@isoloop/protocol': minor
-'@isoloop/runtime': patch
+'@isoloop/runtime': minor
 ---
 
 `kernel.watch(topic, onView, { keys? })` reads a topic's current value per key from the host, instead of its stream. It is experimental.

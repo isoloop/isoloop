@@ -83,6 +83,7 @@ type Watched = {
   rewatchQueued: boolean;
 };
 
+/** What a watch book needs from its connection. @internal */
 export type WatchesOptions = {
   send: (msg: IsolateToBus) => void;
   call: (msg: IsolateToBus) => Promise<CallResult>;
@@ -98,6 +99,7 @@ export type WatchesOptions = {
   delivered: () => void;
 };
 
+/** One connection's watches: `bus.watch` on an isolate, `kernel.watch` on the host. @internal */
 export type Watches = {
   watch<Out>(topic: string, onView: OnView<Out>, opts?: WatchOptions): () => void;
   receive(msg: Extract<BusToIsolate, { t: 'view' }>): void;
@@ -107,6 +109,7 @@ export type Watches = {
   takeSeen(): { topic: string; vseq: number }[];
 };
 
+/** Makes the watches of one bus connection. @internal */
 export function createWatches(o: WatchesOptions): Watches {
   const topics = new Map<string, Watched>();
   /** The highest settled view per topic, not yet sent. */
@@ -332,6 +335,7 @@ function sameKeys(
   return true;
 }
 
+/** True for anything with a `then` method. @internal */
 export function isThenable(x: unknown): x is PromiseLike<unknown> {
   return (
     (typeof x === 'object' || typeof x === 'function') &&
