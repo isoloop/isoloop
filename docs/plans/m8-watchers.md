@@ -6,7 +6,7 @@
 
 **Depends on:** 0.1 ([M4](m4-devtools-release.md)). `bus.watch` and `useWatch` add to the isolate seam, which [ADR 0019](../adr/0019-versioning-and-releases.md) allows only in a minor. Its phases ship across three minors (the [releases table](roadmap.md#releases)): W1 in `0.2.0`, W2 in `0.3.0` with the other bus work, and W3 in `0.4.0` next to [M5 Shared-memory engine](m5-shared-memory-engine.md).
 
-**Status:** proposed 2026-11-21 in a design exploration; W0 grilled 2026-11-25 (Q1–Q30, yes to all). [ADR 0023](../adr/0023-watchers.md) accepted 2026-11-25; W1 can start. Tasks 2 to 5b merged 2026-11-27 (#475, #476, #478, #480, #481); the gaps they found are settled in the ADR's three 2026-11-27 amendments.
+**Status:** proposed 2026-11-21 in a design exploration; W0 grilled 2026-11-25 (Q1–Q30, yes to all). [ADR 0023](../adr/0023-watchers.md) accepted 2026-11-25; W1 can start. Tasks 2 to 8 merged 2026-11-27 (#475, #476, #478, #480, #481, #486, #485, #487); the gaps they found are settled in the ADR's four 2026-11-27 amendments. Next: tasks 9 and 10 on a `0.2.0-next.N`.
 
 ## Phases
 
