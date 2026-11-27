@@ -709,7 +709,531 @@ No rules yet.
 
 Version numbers, what a release may change, and how a version ships. Prefix `ver`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `ver.project-name` | The project is Isoloop. Its packages are published under the `@isoloop/*` npm scope, and the CLI as the unscoped `isoloop`. | `@isoloop/*`, `isoloop` | active | since `0.1.0` |
+| `ver.no-federa-name` | The packages aren't published under the working name Federa. |  | rejected |  |
+| `ver.name-prefixes` | System topics are named `isoloop.*`, for example `isoloop.route.v1`, and the host's surface element is `<iso-surface>`. | `isoloop.*`, `<iso-surface>` | active | since `0.1.0` |
+| `ver.one-version` | Every `@isoloop/*` package and the `isoloop` CLI share one version, through one Changesets `fixed` group. |  | active | since `0.1.0` |
+| `ver.app-versions` | Each app in `isoloop/web` (`plant-v*`, `markets-v*`, `processor-v*`, `site-v*`) has its own version, apart from the library's, and the maintainer pushes its tags. |  | active, repo | in force since [#229](https://github.com/isoloop/isoloop/issues/229) |
+| `ver.protocol-unversioned` | The host-to-worker protocol (`PROTOCOL { v, min }`) may change in any release. |  | active | since `0.1.0` |
+| `ver.previews` | Previews are `x.y.z-next.N` versions under npm `next`, made in Changesets pre mode `next`. Releases are plain `x.y.z` under `latest`. | `next`, `latest` | active, repo | in force since [#221](https://github.com/isoloop/isoloop/issues/221) |
+| `ver.pre-mode-counter` | In pre mode a version PR moves only the `-next.N` counter, whatever the changesets' bump types. |  | active, repo | in force since [#221](https://github.com/isoloop/isoloop/issues/221) |
+| `ver.minor-on-0x` | On 0.x a minor may contain anything: breaking changes, and additions to the isolate seam (`IsolateContext`, `defineIsolate`, the DOM subset, the adapter hooks). |  | active | since `0.1.0` |
+| `ver.patch-on-0x` | On 0.x a patch holds fixes plus compatible additions outside the isolate seam: the host API, `KernelConfig` and new packages. |  | active | since `0.1.0` |
+| `ver.semver-from-1` | From 1.0 the versions are plain semver: a major breaks, a minor adds, the isolate seam included, and a patch fixes. |  | decided | target `1.0.0` |
+| `ver.experimental` | An `@experimental` API may change or be removed in any minor, before and after 1.0. |  | active | since `0.1.0` |
+| `ver.experimental-marked` | Each `@experimental` API is marked `@experimental` in its TSDoc, and a change to it is called out in the changelog. |  | active | since `0.1.0` |
+| `ver.experimental-exit` | An API leaves `@experimental` through a decision recorded in its ADR. From then on it follows the minor and patch rules. |  | active, repo | in force since [#229](https://github.com/isoloop/isoloop/issues/229) |
+| `ver.patch-branch` | A patch to the current release during a preview cycle comes from a `release/0.x` branch, cut from the latest `v0.x.y` tag only when a fix is needed. |  | active, repo | in force since [#420](https://github.com/isoloop/isoloop/issues/420) |
+| `ver.fix-main-first` | A fix goes to `main` first. Its backport to the release branch is its own PR, with its own regression test. |  | active, repo | in force since [#396](https://github.com/isoloop/isoloop/issues/396) |
+| `ver.small-backports` | Only a small, reviewable backport goes to a release branch. A larger fix ships in the next minor, brought forward if it's urgent. |  | active, repo | in force since [#396](https://github.com/isoloop/isoloop/issues/396) |
+| `ver.release-branch-admitted` | A release branch can stage only once it's admitted: added to the `npm` environment by its exact name, with a ruleset of its own. `release.yml` accepts `main` and that branch by exact name. | `main`, `release/0.1` | active, repo | in force since [#420](https://github.com/isoloop/isoloop/issues/420) |
+| `ver.release-branch-lifetime` | One release branch exists at a time. It's deleted when the next minor takes `latest`, keeps its tags, and is never merged back into `main`. |  | active, repo | in force since [#396](https://github.com/isoloop/isoloop/issues/396) |
+| `ver.no-older-line-patch` | No patch is released for an older line. `release.yml` refuses a version that would move `latest` or `next` back. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.no-standing-branches` | There's no standing `release/0.x` branch for every minor. |  | rejected |  |
+| `ver.tag-per-version` | Every published version has an annotated tag `v<version>` on the commit it was built from, made by the `finish` run after the publish. Pushing a tag starts nothing. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.no-tag-first` | A release isn't started by pushing its tag. |  | rejected |  |
+| `ver.github-releases` | Each release from 0.1.0 on gets a GitHub Release, made by `finish`; previews get none. Its text is `.github/releases/<version>.md` where that file exists, and the changelog sections otherwise. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.release-workflow` | Every version, preview or release, is published by one workflow, `release.yml`. It's started by hand, it's a dry run unless told otherwise, and the npm dist-tag comes from the version. | `dry run by default` | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.stage-approve-finish` | A version is staged by `release.yml`, then the maintainer approves each of the 13 packages on npmjs.com with 2FA, then a `finish` run checks every package's version, dist-tag and provenance before it tags. | `13 packages`, `2FA approval` | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.approval-order` | The maintainer approves the staged packages in dependency order: protocol, codec, dom and vite; then bus and runtime; then host, react and preact; then balancer, devtools, webmcp and the `isoloop` CLI. None is approved until all 13 are staged. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.stage-only-trust` | Each package trusts only `release.yml` in the `npm` environment, allowed to stage and not to publish or change dist-tags. Tokens are disallowed, and there's no fallback publish. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.no-direct-publish` | Packages aren't published directly from a GitHub environment, for releases or previews. |  | rejected |  |
+| `ver.no-cli-approval` | Staged packages are approved in the browser, not with the npm CLI. |  | rejected |  |
+| `ver.pages-by-hand` | GitHub Pages isn't part of a release. It serves a redirect to isoloop.dev, and `pages.yml` is run by hand when that changes. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.no-major-below-1` | The changeset check fails a changeset that asks for a `major` bump while the version is below 1.0.0, unless the PR has the `release-1.0` label. | `label: release-1.0` | active, repo | in force since [#230](https://github.com/isoloop/isoloop/issues/230) |
+| `ver.version-pr-passes` | A PR whose diff only consumes changesets passes the changeset check without the `no-changeset` label. The check reads the diff, not the branch name. |  | active, repo | in force since [#230](https://github.com/isoloop/isoloop/issues/230) |
+| `ver.no-mixed-versions` | `release.yml` stages only when every package has the same version: a `-next.N` in pre mode, or a plain `x.y.z` out of it. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
+| `ver.old-versions-deprecated` | Every `0.0.0*` version of each `@isoloop/*` package is deprecated on npm, not unpublished. |  | active | since `0.1.0` |
+| `ver.latest-only` | Only the version on npm `latest` is supported. `next` previews are never supported. | `latest only` | active | since `0.1.0` |
+| `ver.security-advisory` | A security bug in an unsupported version is fixed in `latest` and published as a GitHub security advisory that names the affected range and the fixed version. |  | active | since `0.1.0` |
+| `ver.deprecate-known-bug` | A version range is deprecated on npm, with the message "Upgrade to latest", only for a known security or data-loss bug. |  | active | since `0.1.0` |
+| `ver.no-support-window` | The previous minor gets no support window on 0.x. |  | rejected |  |
+| `ver.breaking-listed` | Each minor's changesets name its breaking changes and how to migrate. The steward checks it. |  | active, repo | in force since [#396](https://github.com/isoloop/isoloop/issues/396) |
+| `ver.codemod-rule` | A breaking change to a stable API ships with a codemod that migrates it, in the same release, or it doesn't ship. Stable means every export the API check compares, except `@internal` ones. |  | active, repo | in force since [#462](https://github.com/isoloop/isoloop/issues/462) |
+| `ver.codemod-gate` | A changeset whose summary starts with `breaking:` fails the changeset check unless the PR adds codemod fixtures under `packages/cli/src/migrate/<version>/fixtures/`. |  | active, repo | in force since [#462](https://github.com/isoloop/isoloop/issues/462) |
+| `ver.migrate-command` | `npx isoloop migrate` reads the installed `@isoloop/*` version and applies each codemod up to the latest; `npx isoloop migrate 0.2` names the target. It's a dry run that prints the diff unless given `--write`. |  | decided | target `0.2.0` |
+| `ver.migrate-comments` | A behaviour change with no syntax to rewrite gets an `// isoloop-migrate:` comment where the code uses it, and a migration section in the guide. |  | decided | target `0.2.0` |
+| `ver.codemod-parser` | Codemods parse TypeScript and JSX with `oxc-parser`, behind Isoloop's own `parse` and `edit` interface with conformance tests, and rewrite by text edits so the user's formatting is kept. |  | decided | target `0.2.0` |
+| `ver.experimental-codemods` | A change to an `@experimental` API gets a codemod when the change is mechanical, and a migration note otherwise. |  | active, repo | in force since [#434](https://github.com/isoloop/isoloop/issues/434) |
+| `ver.codemods-on-real-apps` | `isoloop/web`'s plant-bench runs the codemods on every run branch that needs them, and a codemod that fails there blocks the release. |  | decided, repo |  |
+
+### `ver.project-name`
+
+- **Related:** `ver.no-federa-name`, `ver.name-prefixes`
+- **Why:** An isolated event loop per unit is what the runtime gives, visual or headless, and the name was free on npm, as an npm scope and as a GitHub org.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0004 · Decision](../adr/0004-npm-name.md#decision) · An isolated event loop per unit is what the runtime gives, visual or headless, and the name was free on npm, as an npm scope and as a GitHub org.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.no-federa-name`
+
+- **Related:** `ver.project-name`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0004 · Context](../adr/0004-npm-name.md#context) · Why not keep Federa? The `@federa` npm scope belongs to another maintainer, so `@federa/host` couldn't be published and npm searches would mix us with an unrelated project.
+
+### `ver.name-prefixes`
+
+- **Code:** `packages/host/src/render/compositor.ts`
+- **Related:** `ver.project-name`
+- **Why:** One prefix per kind of name, taken from the project's name.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0004 · Decision](../adr/0004-npm-name.md#decision) · One prefix per kind of name, taken from the project's name.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.one-version`
+
+- **Code:** `.changeset/config.json`
+- **Related:** `ver.no-mixed-versions`
+- **Why:** The CLI joins the group, so one number names a build across every package.
+
+History:
+
+- 2026-11-05 · decided · [ADR 0011 · Decision](../adr/0011-dom-package.md#decision) · `runtime` and `host` must always speak the same render format, so they're released together.
+- 2026-11-17 · amended · [ADR 0019 · 1. Three kinds of version](../adr/0019-versioning-and-releases.md#1-three-kinds-of-version) · The CLI joins the group, so one number names a build across every package. Before: Every `@isoloop/*` package shares one version.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.app-versions`
+
+- **Why:** The apps deploy on their own schedule, so tying them to the library's version would say nothing.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 1. Three kinds of version](../adr/0019-versioning-and-releases.md#1-three-kinds-of-version) · The apps deploy on their own schedule, so tying them to the library's version would say nothing.
+- 2026-11-17 · built · [#229](https://github.com/isoloop/isoloop/issues/229) · In force from the ADR's PR.
+
+### `ver.protocol-unversioned`
+
+- **Why:** Both ends ship in one build, so no released version ever talks to another.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 1. Three kinds of version](../adr/0019-versioning-and-releases.md#1-three-kinds-of-version) · Both ends ship in one build, so no released version ever talks to another.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.previews`
+
+- **Code:** `.changeset/pre.json`, `scripts/release/rules.ts`
+- **Related:** `ver.pre-mode-counter`
+- **Why:** `0.0.0-next.<sha>` didn't sort by time and led to no release.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 2. The road to 1.0](../adr/0019-versioning-and-releases.md#2-the-road-to-10) · `0.0.0-next.<sha>` didn't sort by time and led to no release.
+- 2026-11-17 · built · [#221](https://github.com/isoloop/isoloop/issues/221) · Changesets went into pre mode `next`, with the version step and the changeset check.
+
+### `ver.pre-mode-counter`
+
+- **Related:** `ver.previews`
+- **Why:** That's how Changesets pre mode counts, so previews of one minor stay in order.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 2. The road to 1.0](../adr/0019-versioning-and-releases.md#2-the-road-to-10) · That's how Changesets pre mode counts, so previews of one minor stay in order.
+- 2026-11-17 · built · [#221](https://github.com/isoloop/isoloop/issues/221) · Changesets went into pre mode `next`.
+
+### `ver.minor-on-0x`
+
+- **Related:** `ver.patch-on-0x`, `ver.codemod-rule`
+- **Why:** The isolate check compares only `major.minor`, so a seam member added in a patch would pass the check on an older host and then fail.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 3. What a minor and a patch may contain on 0.x](../adr/0019-versioning-and-releases.md#3-what-a-minor-and-a-patch-may-contain-on-0x) · The isolate check compares only `major.minor`, so a seam member added in a patch would pass the check on an older host and then fail.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.patch-on-0x`
+
+- **Related:** `ver.minor-on-0x`
+- **Why:** Host-side additions don't need the isolate check, so they needn't wait for a minor.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 3. What a minor and a patch may contain on 0.x](../adr/0019-versioning-and-releases.md#3-what-a-minor-and-a-patch-may-contain-on-0x) · Host-side additions don't need the isolate check, so they needn't wait for a minor.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.semver-from-1`
+
+- **Related:** `ver.no-major-below-1`
+- **Why:** From 1.0 the isolate check compares majors, so a minor may add to the seam.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 3. What a minor and a patch may contain on 0.x](../adr/0019-versioning-and-releases.md#3-what-a-minor-and-a-patch-may-contain-on-0x) · From 1.0 the isolate check compares majors, so a minor may add to the seam.
+
+### `ver.experimental`
+
+- **Related:** `ver.experimental-marked`, `ver.experimental-codemods`
+- **Why:** Tying 1.0 to every new API settling would hold 1.0 back on a browser shipping WebMCP and on the balancer's design.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 4. @experimental](../adr/0019-versioning-and-releases.md#4-experimental) · Tying 1.0 to every new API settling would hold 1.0 back on a browser shipping WebMCP and on the balancer's design.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.experimental-marked`
+
+- **Related:** `ver.experimental`
+- **Why:** A promise that may change in any minor has to be visible where people read the API.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 4. @experimental](../adr/0019-versioning-and-releases.md#4-experimental) · A promise that may change in any minor has to be visible where people read the API.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.experimental-exit`
+
+- **Related:** `ver.experimental`
+- **Why:** Leaving experimental is a promise to users, so it's decided on the record.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 4. @experimental](../adr/0019-versioning-and-releases.md#4-experimental) · Leaving experimental is a promise to users, so it's decided on the record.
+- 2026-11-17 · built · [#229](https://github.com/isoloop/isoloop/issues/229) · In force from the ADR's PR.
+
+### `ver.patch-branch`
+
+- **Code:** `scripts/release/rules.ts`
+- **Related:** `ver.fix-main-first`, `ver.release-branch-admitted`, `ver.release-branch-lifetime`, `ver.no-standing-branches`
+- **Why:** Pre mode applies to the whole repo, so `main` can't release a patch while it previews the next minor.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · Pre mode applies to the whole repo, so `main` can't release a patch while it previews the next minor.
+- 2026-11-24 · built · [#420](https://github.com/isoloop/isoloop/issues/420) · `release.yml` releases from `release/0.1` as well as `main`, for 0.1.1.
+
+### `ver.fix-main-first`
+
+- **Related:** `ver.patch-branch`, `ver.small-backports`
+- **Why:** A fix that skips `main` comes back as a regression in the next minor.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · A fix that skips `main` comes back as a regression in the next minor.
+- 2026-11-23 · built · [#396](https://github.com/isoloop/isoloop/issues/396) · In force from the amendment's PR.
+
+### `ver.small-backports`
+
+- **Related:** `ver.fix-main-first`
+- **Why:** Backports are made by hand, and a large one is a second change nobody tested on `main`.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · Backports are made by hand, and a large one is a second change nobody tested on `main`.
+- 2026-11-23 · built · [#396](https://github.com/isoloop/isoloop/issues/396) · In force from the amendment's PR.
+
+### `ver.release-branch-admitted`
+
+- **Code:** `scripts/release/rules.ts`, `.github/workflows/release.yml`
+- **Related:** `ver.patch-branch`
+- **Why:** A pattern such as `release/*` would also match version-PR branches, which no ruleset protects.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · A pattern such as `release/*` would also match version-PR branches, which no ruleset protects.
+- 2026-11-24 · built · [#420](https://github.com/isoloop/isoloop/issues/420) · `RELEASE_BRANCHES` lists `main` and `release/0.1`.
+
+### `ver.release-branch-lifetime`
+
+- **Related:** `ver.patch-branch`
+- **Why:** Only the latest release is supported, so an older line needs no branch.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · Only the latest release is supported, so an older line needs no branch.
+- 2026-11-23 · built · [#396](https://github.com/isoloop/isoloop/issues/396) · In force from the amendment's PR.
+
+### `ver.no-older-line-patch`
+
+- **Code:** `scripts/release/rules.ts`
+- **Related:** `ver.latest-only`
+- **Why:** Once 0.2.0 is `latest`, a 0.1.x must not take that dist-tag back.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · Once 0.2.0 is `latest`, a 0.1.x must not take that dist-tag back.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · The stage run checks each package's current dist-tags before it stages.
+
+### `ver.no-standing-branches`
+
+- **Related:** `ver.patch-branch`
+
+History:
+
+- 2026-11-23 · rejected · [ADR 0019 · Alternatives considered](../adr/0019-versioning-and-releases.md#alternatives-considered) · Why not keep a branch per minor? It costs a ruleset, CI, a Changesets state and hand cherry-picks every week, for a line users are told to leave.
+
+### `ver.tag-per-version`
+
+- **Code:** `scripts/release/finish.ts`, `.github/workflows/release.yml`
+- **Related:** `ver.release-workflow`, `ver.no-tag-first`
+- **Why:** The tags ruleset forbids moving a tag, so a tag made before a rejected stage would stay on the wrong commit.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · One tag per version answers which commit a build came from.
+- 2026-11-22 · amended · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · The tags ruleset forbids moving a tag, so a tag made before a rejected stage would stay on the wrong commit. Before: The Prerelease workflow tagged previews after publishing, and a release tag pushed by the maintainer started the release.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · Staged releases from `release.yml`, with `finish` making the tag.
+
+### `ver.no-tag-first`
+
+- **Related:** `ver.tag-per-version`
+
+History:
+
+- 2026-11-22 · rejected · [ADR 0019 · Alternatives considered](../adr/0019-versioning-and-releases.md#alternatives-considered) · Why not tag first and let the tag start the release? A tag can't be moved or deleted, so a rejected stage would leave the version's tag on the wrong commit for good.
+
+### `ver.github-releases`
+
+- **Code:** `scripts/release/notes.ts`, `.github/releases/0.1.0.md`
+- **Why:** 0.1.0's changelogs would repeat every preview's entries, so a release can carry its own text.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · Previews are for this project and `isoloop/web`, and their tag and changelogs are enough.
+- 2026-11-22 · amended · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · 0.1.0's changelogs would repeat every preview's entries, so a release can carry its own text. Before: Each release from 0.1.0 on gets a GitHub Release; previews get none.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · `finish` makes the Release.
+
+### `ver.release-workflow`
+
+- **Code:** `.github/workflows/release.yml`
+- **Related:** `ver.stage-approve-finish`, `ver.tag-per-version`
+- **Why:** One path to audit, and previews rehearse the path a release takes.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · One path to audit, and previews rehearse the path a release takes.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · Staged releases from `release.yml`.
+
+### `ver.stage-approve-finish`
+
+- **Code:** `.github/workflows/release.yml`, `scripts/release/finish.ts`
+- **Related:** `ver.approval-order`, `ver.stage-only-trust`
+- **Why:** A publish then needs the maintainer's 2FA, which an agent or a job holding GitHub credentials doesn't have.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · A publish then needs the maintainer's 2FA, which an agent or a job holding GitHub credentials doesn't have.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · Staged releases from `release.yml`.
+
+### `ver.approval-order`
+
+- **Code:** `scripts/release/rules.ts`
+- **Related:** `ver.stage-approve-finish`
+- **Why:** Each approval moves a dist-tag at once, so this order keeps what's on npm installable at every step.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · Each approval moves a dist-tag at once, so this order keeps what's on npm installable at every step.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · `APPROVAL_ORDER` holds the order, and the stage summary follows it.
+
+### `ver.stage-only-trust`
+
+- **Related:** `ver.stage-approve-finish`, `ver.no-direct-publish`, `ver.no-cli-approval`
+- **Why:** npm accepts a publish that matches any one trust entry, so the gate holds only if it's the only way in.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · npm accepts a publish that matches any one trust entry, so the gate holds only if it's the only way in.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · Staged releases from `release.yml`.
+
+### `ver.no-direct-publish`
+
+- **Related:** `ver.stage-only-trust`
+
+History:
+
+- 2026-11-22 · rejected · [ADR 0019 · Alternatives considered](../adr/0019-versioning-and-releases.md#alternatives-considered) · Why not publish from a protected environment and skip the approvals? Whoever holds the maintainer's GitHub credentials, as agents do, can change the environment and publish.
+
+### `ver.no-cli-approval`
+
+- **Related:** `ver.stage-only-trust`
+
+History:
+
+- 2026-11-22 · rejected · [ADR 0019 · Alternatives considered](../adr/0019-versioning-and-releases.md#alternatives-considered) · Why not approve 13 packages faster from the CLI? Agents share that shell's npm session, and npm can skip 2FA for 5 minutes after a prompt.
+
+### `ver.pages-by-hand`
+
+- **Code:** `.github/workflows/pages.yml`
+- **Why:** The redirect doesn't change with a release, and the `github-pages` environment refuses deploys from tags.
+
+History:
+
+- 2026-11-22 · decided · [ADR 0019 · 6. Tags and GitHub Releases](../adr/0019-versioning-and-releases.md#6-tags-and-github-releases) · The redirect doesn't change with a release, and the `github-pages` environment refuses deploys from tags.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · Staged releases from `release.yml`, with no Pages step.
+
+### `ver.no-major-below-1`
+
+- **Code:** `scripts/ci/changeset-check.ts`, `.github/workflows/changeset.yml`
+- **Related:** `ver.minor-on-0x`, `ver.semver-from-1`
+- **Why:** On 0.x a breaking change is a minor, so a major is a mistake until 1.0's previews start.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 7. Guards in CI](../adr/0019-versioning-and-releases.md#7-guards-in-ci) · On 0.x a breaking change is a minor, so a major is a mistake until 1.0's previews start.
+- 2026-11-17 · built · [#230](https://github.com/isoloop/isoloop/issues/230) · Changeset guards for majors and version PRs.
+
+### `ver.version-pr-passes`
+
+- **Code:** `scripts/ci/changeset-check.ts`
+- **Why:** A version PR has no changeset of its own by design.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 7. Guards in CI](../adr/0019-versioning-and-releases.md#7-guards-in-ci) · A version PR has no changeset of its own by design.
+- 2026-11-17 · built · [#230](https://github.com/isoloop/isoloop/issues/230) · Changeset guards for majors and version PRs.
+
+### `ver.no-mixed-versions`
+
+- **Code:** `scripts/release/packages.ts`
+- **Related:** `ver.one-version`
+- **Why:** Releases go through the same workflow as previews, so the check covers both.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 7. Guards in CI](../adr/0019-versioning-and-releases.md#7-guards-in-ci) · Packages in one fixed group must never reach npm at different versions.
+- 2026-11-22 · amended · [ADR 0019 · 7. Guards in CI](../adr/0019-versioning-and-releases.md#7-guards-in-ci) · Releases go through the same workflow as previews, so the check covers both. Before: The preview workflow stages only when every package has the same `-next.N` version.
+- 2026-11-22 · built · [#373](https://github.com/isoloop/isoloop/issues/373) · Staged releases from `release.yml`.
+
+### `ver.old-versions-deprecated`
+
+- **Why:** Unpublishing would break old lockfiles, and npm limits it anyway.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0019 · 8. The versions before this ADR](../adr/0019-versioning-and-releases.md#8-the-versions-before-this-adr) · Unpublishing would break old lockfiles, and npm limits it anyway.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.latest-only`
+
+- **Code:** `SECURITY.md`
+- **Related:** `ver.no-older-line-patch`, `ver.security-advisory`, `ver.no-support-window`
+- **Why:** On 0.x a minor may break anything, so a second supported line would mean backports to code users were told to leave.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 9. What is supported (amended 2026-11-23)](../adr/0019-versioning-and-releases.md#9-what-is-supported-amended-2026-11-23) · On 0.x a minor may break anything, so a second supported line would mean backports to code users were told to leave.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.security-advisory`
+
+- **Code:** `SECURITY.md`
+- **Related:** `ver.latest-only`, `ver.deprecate-known-bug`
+- **Why:** Users of an old line still need to learn they're affected and where the fix is.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 9. What is supported (amended 2026-11-23)](../adr/0019-versioning-and-releases.md#9-what-is-supported-amended-2026-11-23) · Users of an old line still need to learn they're affected and where the fix is.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.deprecate-known-bug`
+
+- **Code:** `SECURITY.md`
+- **Related:** `ver.security-advisory`
+- **Why:** Deprecating every superseded minor would warn on every install for no known risk.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 9. What is supported (amended 2026-11-23)](../adr/0019-versioning-and-releases.md#9-what-is-supported-amended-2026-11-23) · Deprecating every superseded minor would warn on every install for no known risk.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `ver.no-support-window`
+
+- **Related:** `ver.latest-only`
+
+History:
+
+- 2026-11-23 · rejected · [ADR 0019 · Alternatives considered](../adr/0019-versioning-and-releases.md#alternatives-considered) · Why not support the previous minor for a while? On 0.x a minor may break anything. The question comes back at 1.0.
+
+### `ver.breaking-listed`
+
+- **Why:** Users who must upgrade to stay supported need to know what breaks.
+
+History:
+
+- 2026-11-23 · decided · [ADR 0019 · 9. What is supported (amended 2026-11-23)](../adr/0019-versioning-and-releases.md#9-what-is-supported-amended-2026-11-23) · Users who must upgrade to stay supported need to know what breaks.
+- 2026-11-23 · built · [#396](https://github.com/isoloop/isoloop/issues/396) · In force from the amendment's PR.
+
+### `ver.codemod-rule`
+
+- **Related:** `ver.codemod-gate`, `ver.migrate-command`, `ver.experimental-codemods`
+- **Why:** Moving the web apps to 0.1.0 meant migrating each API change by hand.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · Moving the web apps to 0.1.0 meant migrating each API change by hand.
+- 2026-11-26 · built · [#462](https://github.com/isoloop/isoloop/issues/462) · `isoloop migrate`, the codemod gate and the parser interface.
+
+### `ver.codemod-gate`
+
+- **Code:** `scripts/ci/changeset-check.ts`
+- **Related:** `ver.codemod-rule`
+- **Why:** The rule holds only if CI holds a breaking change to it.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · The rule holds only if CI holds a breaking change to it.
+- 2026-11-26 · built · [#462](https://github.com/isoloop/isoloop/issues/462) · `isoloop migrate`, the codemod gate and the parser interface.
+
+### `ver.migrate-command`
+
+- **Change it:** `--write`
+- **Code:** `packages/cli/src/migrate/run.ts`
+- **Related:** `ver.codemod-rule`, `ver.migrate-comments`, `ver.codemod-parser`
+- **Why:** Users get each breaking change's migration from one command, in order.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · Users get each breaking change's migration from one command, in order.
+- 2026-11-26 · built · [#462](https://github.com/isoloop/isoloop/issues/462) · `isoloop migrate`, the codemod gate and the parser interface.
+
+### `ver.migrate-comments`
+
+- **Code:** `packages/cli/src/migrate/`
+- **Related:** `ver.migrate-command`
+- **Why:** A codemod can't rewrite behaviour, but it can point at every place that depends on it.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · A codemod can't rewrite behaviour, but it can point at every place that depends on it.
+- 2026-11-26 · built · [#462](https://github.com/isoloop/isoloop/issues/462) · `isoloop migrate`, the codemod gate and the parser interface.
+
+### `ver.codemod-parser`
+
+- **Code:** `packages/cli/src/migrate/parser.ts`, `packages/cli/src/migrate/edit.ts`
+- **Related:** `ver.migrate-command`
+- **Why:** It comes from the same project as the repo's oxlint and oxfmt, needs no printer, and can be swapped for TypeScript 7's own API once that's stable.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · It comes from the same project as the repo's oxlint and oxfmt, needs no printer, and can be swapped for TypeScript 7's own API once that's stable.
+- 2026-11-26 · built · [#462](https://github.com/isoloop/isoloop/issues/462) · `isoloop migrate`, the codemod gate and the parser interface.
+
+### `ver.experimental-codemods`
+
+- **Related:** `ver.experimental`, `ver.codemod-rule`
+- **Why:** Experimental APIs may change in any minor, but a mechanical rewrite still costs users nothing.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · Experimental APIs may change in any minor, but a mechanical rewrite still costs users nothing.
+- 2026-11-24 · built · [#434](https://github.com/isoloop/isoloop/issues/434) · In force from the amendment's PR.
+
+### `ver.codemods-on-real-apps`
+
+- **Related:** `ver.codemod-rule`
+- **Why:** Fixtures prove a codemod on small cases; real apps prove it on code nobody wrote for it.
+
+History:
+
+- 2026-11-24 · decided · [ADR 0019 · 10. A breaking change ships with a codemod (amended 2026-11-24)](../adr/0019-versioning-and-releases.md#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24) · Fixtures prove a codemod on small cases; real apps prove it on code nobody wrote for it.
 
 ## Toolchain & layout
 
