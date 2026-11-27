@@ -1,5 +1,15 @@
 # @isoloop/vite
 
+## 0.2.0-next.0
+
+### Minor Changes
+
+- 75ada9c: `crossOriginIsolated` in `isoloop()` and `headersFor()` now also takes `'credentialless'`: the dev and preview servers send COOP `same-origin` with COEP `credentialless` instead of `require-corp`. Cross-origin `no-cors` requests then load without cookies, so third-party images and scripts without a `Cross-Origin-Resource-Policy` header aren't blocked. Chromium 96 and Firefox 119 on desktop isolate the page under it; Safari and Firefox for Android ignore the value, so there the page isn't cross-origin isolated. `true` sends `require-corp`, as before. `'credentialless'` is experimental and may change before 1.0.
+
+### Patch Changes
+
+- abf56ab: The host writes the `style` an isolate renders through the element's CSSOM (`el.style.cssText`) instead of `setAttribute('style', …)`, and the devtools panel styles its own page elements the same way. A page with surfaces now works under `style-src 'self'`, with no `'unsafe-inline'`: before, the browser dropped those styles and logged a violation for each. `devCsp()` still allows `'unsafe-inline'` in `style-src`, for the `<style>` elements Vite's dev server injects; its TSDoc and the hosting guide say so.
+
 ## 0.1.0
 
 The first release of the Vite plugin.
