@@ -604,7 +604,279 @@ History:
 
 Topics, publishing, subscribing, requests and how records reach a reader. Prefix `bus`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `bus.direct-ports` | Each isolate has its own `MessageChannel` port to the bus worker, and its publishes, subscriptions, deliveries and commits travel on it. No record crosses the main thread, except the records the host publishes or subscribes to itself. |  | active | since `0.1.0` |
+| `bus.grants-enforced` | The kernel hands an isolate's grants from its manifest to the bus worker when it attaches the isolate, and the bus worker enforces them. An isolate can't widen its own grants. |  | active | since `0.1.0` |
+| `bus.offsets-kept` | An isolate keeps its committed offsets when it stops, restarts or is suspended. |  | active | since `0.1.0` |
+| `bus.host-subscriptions` | Each `kernel.subscribe` is its own bus connection, named `isoloop:host:<n>`, that may subscribe to every topic and publish to none. Unsubscribing detaches it and drops its offsets. |  | active | since `0.1.0` |
+| `bus.reserved-ids` | Isolate ids that start with `isoloop:` belong to the kernel, and `spawn` rejects them. |  | active | since `0.1.0` |
+| `bus.no-main-thread-routing` | We don't route records through a bus bridge on the main thread. |  | rejected |  |
+| `bus.no-broadcast-channel` | We don't carry bus traffic on a `BroadcastChannel`. |  | rejected |  |
+| `bus.no-shared-worker` | The bus worker is a dedicated worker, not a `SharedWorker`. |  | rejected |  |
+| `bus.combined-commits` | A subscriber's settled offsets go to the bus together, in one `commits` message per port per commit interval, for isolates and the host alike. There's no per-record `commit` message. | `one `commits` per port per interval` | active | since `0.1.0` |
+| `bus.commit-interval` | The commit interval defaults to 100 ms and takes an integer from 0 to 1,000 ms, where `0` sends pending commits at the end of each task. Any other value makes `createKernel` throw. | `100 ms`, `0–1,000 ms`, `0 = every task` | active | since `0.1.0` |
+| `bus.commit-early` | A subscription sends its commits before the interval ends once its uncommitted records reach half its credit. The broker's credit is 1,000 records delivered and not committed. | `credit 1,000`, `early at 500` | active | since `0.1.0` |
+| `bus.commits-on-shutdown` | On a graceful stop, restart or suspend, and when it closes, the bus client sends its pending commits and waits for the broker's answer, within the shutdown grace. |  | active | since `0.1.0` |
+| `bus.no-commits-after-reattach` | After a bus restart, the bus client sends no commits on the new port before its subscriptions. A persistent topic can then deliver up to one commit interval of records again. |  | active | since `0.1.0` |
+| `bus.settled` | A record is settled when its handler returns. A handler that throws marks its subscription stuck, and its commit stops at the record before. |  | active | since `0.1.0` |
+| `bus.redelivery-window` | Delivery is at least once. An isolate that crashes or is killed without a graceful stop can get up to one commit interval of records it already handled again when it restarts; a group member that crashes leaves as many for the others. | `up to one interval (100 ms by default)` | active | since `0.1.0` |
+| `bus.group-commit-seq` | Every delivery to a subscription carries a sequence number, counted from 1 at each `subscribe`. A consumer group's commit covers only records at or below its offset that also came in deliveries at or below its sequence, so it never covers a record redelivered after it. |  | active | since `0.1.0` |
+| `bus.group-resume` | A consumer group that has committed resumes from its committed offset, whatever `from` says. `from` applies only before the group's first commit; a member joining a group that has members starts where the group is. |  | active | since `0.1.0` |
+| `bus.manual-commit` | With `autoCommit: false`, `commit(record)` settles that record and every record delivered before it on the subscription. |  | active | since `0.1.0` |
+| `bus.old-connection-commits` | A record delivered on an earlier connection, before a bus restart or a new `subscribe`, commits nothing when its handler settles it. It comes back through redelivery. |  | active | since `0.1.0` |
+| `bus.partial-delivery` | A group member that settles the first records of a delivery and then stops keeps those records committed: its commit carries how many records of the next delivery are settled. |  | active | since `0.1.0` |
+| `bus.no-attempt-limit` | A record that crashes every member before it's settled comes back to each of them until the kernel gives up on all of them. There is no limit on delivery attempts. |  | active | since `0.1.0` |
+| `bus.no-port-batching` | Messages sent on one port in one task aren't batched into one message. |  | rejected |  |
+| `bus.no-fire-and-forget-publish` | A `publish` to a memory topic doesn't resolve as soon as it's sent with only failures reported later: it waits for the bus's result, like any publish. |  | rejected |  |
+
+### `bus.direct-ports`
+
+- **Code:** `packages/host/src/bus/controller.ts`
+- **Related:** `bus.grants-enforced`, `bus.host-subscriptions`, `bus.no-main-thread-routing`
+- **Why:** Routing records through the main thread would clone each one twice on the way in and twice more on the way out, and the main thread should only draw.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0005 · Decision](../adr/0005-bus-topology-message-channels.md#decision) · Routing records through the main thread would clone each one twice on the way in and twice more on the way out, and the main thread should only draw.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.grants-enforced`
+
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `bus.direct-ports`
+- **Why:** The isolate is the code being contained, so the check has to sit on the other side of the port.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0005 · Decision](../adr/0005-bus-topology-message-channels.md#decision) · The isolate is the code being contained, so the check has to sit on the other side of the port.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.offsets-kept`
+
+- **Code:** `packages/host/src/bus/controller.ts`
+- **Related:** `bus.combined-commits`
+- **Why:** A restarted or woken isolate resumes where it left off instead of replaying or skipping records.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0005 · Decision](../adr/0005-bus-topology-message-channels.md#decision) · A restarted or woken isolate resumes where it left off instead of replaying or skipping records.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.host-subscriptions`
+
+- **Code:** `packages/host/src/bus/controller.ts`
+- **Related:** `bus.reserved-ids`, `bus.direct-ports`
+- **Why:** The host reads records it asked for over its own port, without a bridge on the main thread for everyone else.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0005 · Decision](../adr/0005-bus-topology-message-channels.md#decision) · The host reads records it asked for over its own port, without a bridge on the main thread for everyone else.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.reserved-ids`
+
+- **Errors and events:** `invalid_manifest`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `bus.host-subscriptions`
+- **Why:** The host's own bus connections use that prefix, so an isolate can't take one of their names.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0005 · Decision](../adr/0005-bus-topology-message-channels.md#decision) · The host's own bus connections use that prefix, so an isolate can't take one of their names.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.no-main-thread-routing`
+
+- **Related:** `bus.direct-ports`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0005 · Alternatives considered](../adr/0005-bus-topology-message-channels.md#alternatives-considered) · Why not keep the bus bridge on the main thread, as the RFC had it? The wiring is simpler, but every record would cost main-thread time.
+
+### `bus.no-broadcast-channel`
+
+- **Related:** `bus.grants-enforced`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0005 · Alternatives considered](../adr/0005-bus-topology-message-channels.md#alternatives-considered) · Why not a BroadcastChannel? It has no identity per isolate, so no grants, and every listener gets every message.
+
+### `bus.no-shared-worker`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0005 · Alternatives considered](../adr/0005-bus-topology-message-channels.md#alternatives-considered) · Why not a SharedWorker, which survives across tabs? A bus shared across tabs isn't a goal, and Safari's support has been patchy.
+
+### `bus.combined-commits`
+
+- **Change it:** `KernelConfig.bus.commitIntervalMs`
+- **Code:** `packages/protocol/src/topics/commits.ts`, `packages/runtime/src/bus/bus-client.ts`, `packages/host/src/bus/controller.ts`
+- **Related:** `bus.commit-interval`, `bus.commit-early`, `bus.redelivery-window`
+- **Why:** Most of the CPU Isoloop adds goes into moving messages between threads, at a fixed price per port message; combining commits cut port messages by 20% on the plant dashboard.
+
+History:
+
+- 2026-11-11 · decided · [ADR 0016 · Combined commits](../adr/0016-fewer-messages-per-record.md#combined-commits) · Most of the CPU Isoloop adds goes into moving messages between threads, at a fixed price per port message; combining commits cut port messages by 20% on the plant dashboard.
+- 2026-11-11 · built · [#166](https://github.com/isoloop/isoloop/issues/166) · Subscribers commit together, once per commit interval.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.commit-interval`
+
+- **Change it:** `KernelConfig.bus.commitIntervalMs`
+- **Errors and events:** `invalid_config`
+- **Code:** `packages/protocol/src/topics/commits.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `bus.combined-commits`
+- **Why:** 250 ms saved about 5 ms/s more for a redelivery window 2.5 times longer, and the cap keeps the window after a crash under a second.
+
+History:
+
+- 2026-11-11 · decided · [ADR 0016 · Combined commits](../adr/0016-fewer-messages-per-record.md#combined-commits) · 250 ms saved about 5 ms/s more for a redelivery window 2.5 times longer, and the cap keeps the window after a crash under a second.
+- 2026-11-11 · built · [#166](https://github.com/isoloop/isoloop/issues/166) · The interval and its check came with combined commits.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.commit-early`
+
+- **Code:** `packages/protocol/src/topics/commits.ts`
+- **Related:** `bus.combined-commits`
+- **Why:** A busy subscription must never pause on credit because of the interval.
+
+History:
+
+- 2026-11-11 · decided · [ADR 0016 · Combined commits](../adr/0016-fewer-messages-per-record.md#combined-commits) · A busy subscription must never pause on credit because of the interval.
+- 2026-11-11 · built · [#166](https://github.com/isoloop/isoloop/issues/166) · The early send came with combined commits.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.commits-on-shutdown`
+
+- **Code:** `packages/runtime/src/bus/bus-client.ts`
+- **Related:** `bus.combined-commits`, `bus.offsets-kept`
+- **Why:** The host's detach travels on another channel and can overtake commits that were only sent, so waiting is what makes a graceful stop lose nothing.
+
+History:
+
+- 2026-11-11 · decided · [ADR 0016 · Combined commits](../adr/0016-fewer-messages-per-record.md#combined-commits) · The host's detach travels on another channel and can overtake commits that were only sent, so waiting is what makes a graceful stop lose nothing.
+- 2026-11-11 · built · [#166](https://github.com/isoloop/isoloop/issues/166) · The waiting shutdown came with combined commits.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.no-commits-after-reattach`
+
+- **Code:** `packages/runtime/src/bus/bus-client.ts`
+- **Related:** `bus.redelivery-window`, `bus.old-connection-commits`
+- **Why:** The broker accepts a commit only for a topic the connection subscribes to, and the window is the same as after a crash, so it needs no extra protocol.
+
+History:
+
+- 2026-11-11 · decided · [ADR 0016 · Combined commits](../adr/0016-fewer-messages-per-record.md#combined-commits) · The broker accepts a commit only for a topic the connection subscribes to, and the window is the same as after a crash, so it needs no extra protocol.
+- 2026-11-11 · built · [#166](https://github.com/isoloop/isoloop/issues/166) · Came with combined commits.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.settled`
+
+- **Code:** `packages/runtime/src/bus/bus-client.ts`
+- **Related:** `bus.combined-commits`, `bus.manual-commit`
+- **Why:** Combining commits changes when offsets are sent, not what counts as done.
+
+History:
+
+- 2026-11-11 · decided · [ADR 0016 · Combined commits](../adr/0016-fewer-messages-per-record.md#combined-commits) · Combining commits changes when offsets are sent, not what counts as done.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.redelivery-window`
+
+- **Related:** `bus.combined-commits`, `bus.no-commits-after-reattach`
+- **Why:** The accepted cost of combining commits: the window grows from one record to one interval, about 100 ms.
+
+History:
+
+- 2026-11-11 · decided · [ADR 0016 · Combined commits](../adr/0016-fewer-messages-per-record.md#combined-commits) · The accepted cost of combining commits: the window grows from one record to one interval, about 100 ms.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.group-commit-seq`
+
+- **Code:** `packages/bus/src/broker/broker.ts`, `packages/protocol/src/topics/commits.ts`
+- **Related:** `bus.combined-commits`, `bus.partial-delivery`, `bus.group-resume`
+- **Why:** A cumulative commit could cover a record redelivered to a member before its handler ran, and if the member then stopped, nobody got the record again (#211).
+
+History:
+
+- 2026-11-17 · decided · [ADR 0016 · Group commits carry a delivery sequence (amended 2026-11-17)](../adr/0016-fewer-messages-per-record.md#group-commits-carry-a-delivery-sequence-amended-2026-11-17) · A cumulative commit could cover a record redelivered to a member before its handler ran, and if the member then stopped, nobody got the record again (#211).
+- 2026-11-17 · built · [#224](https://github.com/isoloop/isoloop/issues/224) · Group commits carry a delivery seq.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.group-resume`
+
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `bus.group-commit-seq`
+- **Why:** An emptied group rejoining with `from: 'earliest'` replayed the whole topic: the File processor handled 117 files twice.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0016 · Group commits carry a delivery sequence (amended 2026-11-17)](../adr/0016-fewer-messages-per-record.md#group-commits-carry-a-delivery-sequence-amended-2026-11-17) · An emptied group rejoining with `from: 'earliest'` replayed the whole topic: the File processor handled 117 files twice.
+- 2026-11-17 · built · [#224](https://github.com/isoloop/isoloop/issues/224) · Came with the delivery seq fix.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.manual-commit`
+
+- **Code:** `packages/runtime/src/bus/bus-client.ts`
+- **Related:** `bus.settled`, `bus.group-commit-seq`
+- **Why:** Records settle in the order they arrived; counting each by-hand commit as one record would stop a member that commits only some records from ever completing a delivery.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0016 · Group commits carry a delivery sequence (amended 2026-11-17)](../adr/0016-fewer-messages-per-record.md#group-commits-carry-a-delivery-sequence-amended-2026-11-17) · Records settle in the order they arrived; counting each by-hand commit as one record would stop a member that commits only some records from ever completing a delivery.
+- 2026-11-17 · built · [#224](https://github.com/isoloop/isoloop/issues/224) · Decided while building the delivery seq fix.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.old-connection-commits`
+
+- **Code:** `packages/runtime/src/bus/bus-client.ts`
+- **Related:** `bus.no-commits-after-reattach`, `bus.group-commit-seq`
+- **Why:** A sequence number from another connection would cover the wrong deliveries.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0016 · Group commits carry a delivery sequence (amended 2026-11-17)](../adr/0016-fewer-messages-per-record.md#group-commits-carry-a-delivery-sequence-amended-2026-11-17) · A sequence number from another connection would cover the wrong deliveries.
+- 2026-11-17 · built · [#224](https://github.com/isoloop/isoloop/issues/224) · Decided while building the delivery seq fix.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.partial-delivery`
+
+- **Code:** `packages/bus/src/broker/broker.ts`, `packages/protocol/src/topics/commits.ts`
+- **Related:** `bus.group-commit-seq`, `bus.no-attempt-limit`
+- **Why:** A batch went back to the group whole, so a file that crashed its processor came back to the next one, and two processors crashed in turn until the kernel gave up on both, losing about 480 files a run.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0016 · A partly settled delivery keeps what it settled (amended 2026-11-18, M3j)](../adr/0016-fewer-messages-per-record.md#a-partly-settled-delivery-keeps-what-it-settled-amended-2026-11-18-m3j) · A batch went back to the group whole, so a file that crashed its processor came back to the next one, and two processors crashed in turn until the kernel gave up on both, losing about 480 files a run.
+- 2026-11-18 · built · [#256](https://github.com/isoloop/isoloop/issues/256) · A group member keeps what it settled of a partly handled delivery.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.no-attempt-limit`
+
+- **Related:** `bus.partial-delivery`, `bus.redelivery-window`
+- **Why:** That's at-least-once delivery; a dead-letter topic that sets such a record aside is a separate idea, in would-like.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0016 · A partly settled delivery keeps what it settled (amended 2026-11-18, M3j)](../adr/0016-fewer-messages-per-record.md#a-partly-settled-delivery-keeps-what-it-settled-amended-2026-11-18-m3j) · That's at-least-once delivery; a dead-letter topic that sets such a record aside is a separate idea, in would-like.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bus.no-port-batching`
+
+- **Related:** `bus.combined-commits`
+
+History:
+
+- 2026-11-11 · rejected · [ADR 0016 · Not taken](../adr/0016-fewer-messages-per-record.md#not-taken) · Why not batch everything a port sends in a task? It was built (#167) and measured: port messages fell only 3–5% and no CPU figure moved, because most messages are one record going to several isolates, each on its own port.
+
+### `bus.no-fire-and-forget-publish`
+
+- **Related:** `bus.combined-commits`
+
+History:
+
+- 2026-11-11 · rejected · [ADR 0016 · Not taken](../adr/0016-fewer-messages-per-record.md#not-taken) · Why does a publish to a memory topic wait for an answer? Answering only on failure would save an estimated 5–8 ms/s, not enough to change what awaiting `publish` means or to move rejections away from its `catch`.
 
 ## Durability
 
