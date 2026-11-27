@@ -24,7 +24,324 @@ No rules yet.
 
 What survives a bus crash or a reload, and where it's stored. Prefix `dur`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `dur.per-topic` | Each topic sets its durability. `memory` keeps the log in the bus worker's memory only; `persistent` also writes it to segment files in the Origin Private File System (OPFS). | `default: memory` | active | since `0.1.0` |
+| `dur.group-commit` | Appends to persistent topics are written in batches, every 5 ms or 256 records. A `publish` is acknowledged only after its batch is flushed, and committed offsets are flushed the same way. | `5 ms`, `256 records` | active | since `0.1.0` |
+| `dur.log-storage` | The `LogEngine` is the broker's only interface to the log. Durability is a `LogStorage` the engine writes through: `MemoryStorage` or `OpfsStorage`. |  | active | since `0.1.0` |
+| `dur.evict-replay` | Old segments of a persistent topic can be evicted from memory and read back from disk on replay, so the topic can hold more than fits in memory. |  | active | since `0.1.0` |
+| `dur.codec` | Records of persistent topics are encoded with `@isoloop/codec`, in the format `isoloop-codec@1`. The codec has no dependency. |  | active | since `0.1.0` |
+| `dur.codec-one-encoding` | Every value has exactly one encoding in `isoloop-codec@1`, fixed by a byte-layout test. Changing the format means a new version that reads the old one. |  | active | since `0.1.0` |
+| `dur.codec-types` | A persistent topic accepts objects, arrays, strings, numbers, booleans, `null`, `undefined`, `bigint`, `Date`, `Map`, `Set`, typed arrays and `ArrayBuffer`. A `publish` of a function, a symbol, a class instance or a cycle rejects with `not_encodable`. Memory topics don't check. |  | active | since `0.1.0` |
+| `dur.no-codec-library` | The codec isn't a MessagePack or CBOR library. |  | rejected |  |
+| `dur.reattach` | After a bus crash, isolates keep running. The kernel gives each a new bus port with `reattach` as soon as the new bus worker is booted, before it reports `ready`, and the new bus buffers each port's publishes and subscriptions while it loads. |  | active | since `0.1.0` |
+| `dur.resume-committed` | After a bus restart, a subscription to a persistent topic resumes after its committed offset, with no gap, whatever `from` it asked for. One that never committed starts at its `from`. |  | active | since `0.1.0` |
+| `dur.memory-reset` | After a bus restart, a memory topic answers each subscription with `reset { topic, reason: 'bus_restart' }`. Adapters clear their topic state and replay from `earliest`; a plain `subscribe` gets its `onReset` callback. |  | active | since `0.1.0` |
+| `dur.on-reset-restart` | An isolate whose manifest sets `bus: { onReset: 'restart' }` is restarted by the supervisor on a reset, instead of handling it. | `default: 'reset'` | active | since `0.1.0` |
+| `dur.publish-buffer` | While the bus restarts, an isolate's `BusClient` buffers its publishes, up to 1,000 unanswered calls, then sends them after its subscriptions. Past the limit a publish rejects with `bus_unavailable`. | `1 000 calls` | active | since `0.1.0` |
+| `dur.dedupe` | On a persistent topic, every publish and request carries `(producer, epoch, seq)`. A re-send whose `seq` the bus already has, among the producer's last 1,000 on that topic, is answered with the original offset and not appended again. Memory topics skip the check. | `last 1 000 seqs` | active | since `0.1.0` |
+| `dur.host-resend` | `kernel.publish` calls the old bus never answered are sent again on the new bus, with the host as the producer. Calls made while no bus is running wait for the new one, up to 1,000. | `1 000 calls` | active | since `0.1.0` |
+| `dur.safe-mode` | If the bus crashes a second time during or right after loading from OPFS, the new bus worker sets the newest segment of each persistent topic aside, renamed and not deleted, and starts from the one before. The kernel emits `bus:recovered { quarantined }`. |  | active | since `0.1.0` |
+| `dur.one-tab` | The first tab takes the `isoloop-bus` Web Lock and uses OPFS. Other tabs on the same origin run every topic in memory, and the kernel emits `bus:durability_degraded` with `reason: 'another_tab'`. |  | active | since `0.1.0` |
+| `dur.no-sync-access` | Where sync access handles are missing or the files can't be opened (as in Firefox's and Safari's private windows), persistent topics behave as memory topics. The bus reports `ready.storage: 'memory'`, and `bus:durability_degraded` carries `no_sync_access` or `open_failed`. |  | active | since `0.1.0` |
+| `dur.tab-own-bus` | Each tab runs its own bus worker. Tabs don't share a bus. |  | active | since `0.1.0` |
+| `dur.quota` | The bus reports OPFS usage in its metrics. The kernel emits `bus:quota` once usage reaches 80 % of the quota, and when storage is full, publishes to persistent topics reject with `quota_exceeded` while memory topics carry on. | `80 %` | active | since `0.1.0` |
+| `dur.flush-on-freeze` | On the Page Lifecycle `freeze` event and on `pagehide`, the kernel asks the bus to flush persistent topics at once. |  | active | since `0.1.0` |
+| `dur.survives-reload` | Persistent topics survive a page reload and a discarded tab. Memory topics don't. |  | active | since `0.1.0` |
+| `dur.no-replicas` | The bus worker has no replicas. |  | rejected |  |
+| `dur.no-indexeddb` | Persistent topics aren't stored in IndexedDB. |  | rejected |  |
+| `dur.no-main-thread-mirror` | The log isn't mirrored on the main thread. |  | rejected |  |
+| `dur.no-snapshots` | Persistent topics are a write-ahead log, not periodic snapshots. |  | rejected |  |
+
+### `dur.per-topic`
+
+- **Change it:** topic `durability`
+- **Code:** `packages/bus/src/storage/opfs.ts`
+- **Related:** `dur.group-commit`, `dur.survives-reload`
+- **Why:** Held only in memory, every log and offset is lost when the bus worker crashes. OPFS gives dedicated workers synchronous file access, which suits append-only segments.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 2. Durability per topic](../adr/0007-bus-worker-supervision.md#2-durability-per-topic) · Held only in memory, every log and offset is lost when the bus worker crashes. OPFS gives dedicated workers synchronous file access, which suits append-only segments.
+- 2026-11-07 · built · [#98](https://github.com/isoloop/isoloop/issues/98) · The bus worker keeps persistent topics in OPFS, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.group-commit`
+
+- **Code:** `packages/bus/src/storage/opfs.ts`
+- **Related:** `dur.per-topic`
+- **Why:** Batching keeps writes cheap without acknowledging a record that isn't on disk.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 2. Durability per topic](../adr/0007-bus-worker-supervision.md#2-durability-per-topic) · Batching keeps writes cheap without acknowledging a record that isn't on disk.
+- 2026-11-07 · built · [#89](https://github.com/isoloop/isoloop/issues/89) · Segments and group commit, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.log-storage`
+
+- **Code:** `packages/bus/src/engine/types.ts`, `packages/bus/src/storage/opfs.ts`
+- **Why:** Storage plugs in under the engine, so adding OPFS changed nothing above it.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 3. Storage layer under the engine](../adr/0007-bus-worker-supervision.md#3-storage-layer-under-the-engine) · Storage plugs in under the engine, so adding OPFS changed nothing above it.
+- 2026-11-07 · built · [#89](https://github.com/isoloop/isoloop/issues/89) · `OpfsStorage` with segments and group commit, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.evict-replay`
+
+- **Code:** `packages/bus/src/storage/opfs.ts`
+- **Related:** `dur.per-topic`
+- **Why:** A durable log shouldn't be capped by the bus worker's memory.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 3. Storage layer under the engine](../adr/0007-bus-worker-supervision.md#3-storage-layer-under-the-engine) · A durable log shouldn't be capped by the bus worker's memory.
+- 2026-11-07 · built · [#105](https://github.com/isoloop/isoloop/issues/105) · Eviction and replay from disk, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.codec`
+
+- **Code:** `packages/codec/src/codec/format.ts`
+- **Related:** `dur.codec-one-encoding`, `dur.codec-types`, `dur.no-codec-library`
+- **Why:** It was the fastest or within 1.42× of the fastest library in every engine, with the smallest records and a 3.1 KB gzipped bundle.
+
+History:
+
+- 2026-11-07 · decided · [ADR 0014 · Decision](../adr/0014-own-codec.md#decision) · It was the fastest or within 1.42× of the fastest library in every engine, with the smallest records and a 3.1 KB gzipped bundle.
+- 2026-11-07 · built · [#74](https://github.com/isoloop/isoloop/issues/74) · The codec's core types, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.codec-one-encoding`
+
+- **Code:** `packages/codec/src/codec/format.ts`
+- **Related:** `dur.codec`
+- **Why:** Files on disk must stay readable, so the format can't drift.
+
+History:
+
+- 2026-11-07 · decided · [ADR 0014 · Decision](../adr/0014-own-codec.md#decision) · Files on disk must stay readable, so the format can't drift.
+- 2026-11-07 · built · [#74](https://github.com/isoloop/isoloop/issues/74) · The codec's core types, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.codec-types`
+
+- **Errors and events:** `not_encodable`
+- **Code:** `packages/codec/src/codec/format.ts`, `packages/bus/src/broker/broker.ts`
+- **Related:** `dur.codec`
+- **Why:** The codec's type list settled: the other structured-clone types are in, and cycles fail.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · Consequences](../adr/0007-bus-worker-supervision.md#consequences) · Topic values must be structured-clone data the codec can write.
+- 2026-11-07 · amended · [ADR 0014 · Decision](../adr/0014-own-codec.md#decision) · The codec's type list settled: the other structured-clone types are in, and cycles fail. Before: A persistent topic accepts structured-clone data without functions, DOM nodes or class instances.
+- 2026-11-07 · built · [#84](https://github.com/isoloop/isoloop/issues/84) · The codec covers the other structured-clone types, and the broker rejects `not_encodable`.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.no-codec-library`
+
+History:
+
+- 2026-11-07 · rejected · [ADR 0014 · Alternatives considered](../adr/0014-own-codec.md#alternatives-considered) · Why not use msgpackr or cbor-x? No library was more than 2× faster (at most 1.42×), and ours is smaller on the wire and in the bundle.
+
+### `dur.reattach`
+
+- **Code:** `packages/host/src/bus/controller.ts`
+- **Related:** `dur.resume-committed`, `dur.memory-reset`, `dur.publish-buffer`
+- **Why:** Written down as built in `controller.ts`, so isolates don't wait on the restore.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · A bus crash should be a short pause, not a restart of every isolate.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller and its supervision, built in M2.
+- 2026-11-13 · clarified · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · Written down as built in `controller.ts`, so isolates don't wait on the restore. Before: The kernel gives every running isolate a new bus port via `reattach`, with no word on when.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.resume-committed`
+
+- **Code:** `packages/runtime/src/bus/bus-client.ts`, `packages/bus/src/broker/broker.ts`
+- **Related:** `dur.reattach`
+- **Why:** A reattached `from: 'earliest'` subscription first replayed the whole log; the committed offset wins.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · A persistent topic survives the crash, so a reader picks up where it left off.
+- 2026-11-07 · clarified · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · A reattached `from: 'earliest'` subscription first replayed the whole log; the committed offset wins. Before: Persistent topics resume after the committed offset.
+- 2026-11-07 · built · [#118](https://github.com/isoloop/isoloop/issues/118) · A reattached subscription to a persistent topic resumes after its committed offset.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.memory-reset`
+
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `dur.reattach`, `dur.on-reset-restart`
+- **Why:** The old log is gone, and a reset is cheaper than restarting every isolate.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · The old log is gone, and a reset is cheaper than restarting every isolate.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller and its supervision, built in M2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.on-reset-restart`
+
+- **Change it:** manifest `bus.onReset`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `dur.memory-reset`
+- **Why:** Some isolates can't rebuild their state from a replay.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · Some isolates can't rebuild their state from a replay.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller and its supervision, built in M2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.publish-buffer`
+
+- **Errors and events:** `bus_unavailable`
+- **Code:** `packages/runtime/src/bus/bus-client.ts`
+- **Related:** `dur.dedupe`, `dur.host-resend`
+- **Why:** Publishes in flight across a restart are sent again, not lost.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · Publishes in flight across a restart are sent again, not lost.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller and its supervision, built in M2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.dedupe`
+
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `dur.publish-buffer`
+- **Why:** The old bus may have flushed a record before it crashed. Rejecting the re-send wouldn't stop the duplicate, since an app that retries writes it again.
+
+History:
+
+- 2026-11-07 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · The old bus may have flushed a record before it crashed. Rejecting the re-send wouldn't stop the duplicate, since an app that retries writes it again.
+- 2026-11-07 · built · [#116](https://github.com/isoloop/isoloop/issues/116) · Re-sent publishes are deduplicated on persistent topics, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.host-resend`
+
+- **Code:** `packages/host/src/bus/controller.ts`
+- **Related:** `dur.dedupe`
+- **Why:** Deduplication makes the re-send safe, so the host stops rejecting.
+
+History:
+
+- 2026-11-06 · decided · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · Recorded as built in M2.
+- 2026-11-07 · amended · [ADR 0007 · 4. Reattach, not restart, after a bus crash](../adr/0007-bus-worker-supervision.md#4-reattach-not-restart-after-a-bus-crash) · Deduplication makes the re-send safe, so the host stops rejecting. Before: `kernel.publish` calls the old bus never answered reject with `bus_unavailable`, since the host can't tell whether they were appended.
+- 2026-11-07 · built · [#116](https://github.com/isoloop/isoloop/issues/116) · Re-sent publishes are deduplicated on persistent topics, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.safe-mode`
+
+- **Errors and events:** `bus:recovered`
+- **Code:** `packages/bus/src/server/server.ts`, `packages/bus/src/storage/safe-mode.ts`
+- **Why:** A crash right after loading most likely comes from a persisted record.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 5. Safe mode against crash loops](../adr/0007-bus-worker-supervision.md#5-safe-mode-against-crash-loops) · A crash right after loading most likely comes from a persisted record.
+- 2026-11-07 · built · [#106](https://github.com/isoloop/isoloop/issues/106) · Safe mode, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.one-tab`
+
+- **Errors and events:** `bus:durability_degraded`
+- **Code:** `packages/bus/src/storage/lock.ts`
+- **Related:** `dur.no-sync-access`, `dur.tab-own-bus`
+- **Why:** Sync access handles are exclusive, so only one tab can write the files.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 6. One tab owns the files](../adr/0007-bus-worker-supervision.md#6-one-tab-owns-the-files) · Sync access handles are exclusive, so only one tab can write the files.
+- 2026-11-07 · built · [#107](https://github.com/isoloop/isoloop/issues/107) · One tab owns the files, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.no-sync-access`
+
+- **Errors and events:** `bus:durability_degraded`
+- **Code:** `packages/bus/src/server/server.ts`
+- **Related:** `dur.one-tab`, `dur.no-indexeddb`
+- **Why:** Every major browser has had sync access handles in normal browsing since 2022 or 2023, so a second engine would only serve private windows and old browsers.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 6. One tab owns the files](../adr/0007-bus-worker-supervision.md#6-one-tab-owns-the-files) · Without sync access handles, the bus needs somewhere else to put persistent topics.
+- 2026-11-07 · amended · [ADR 0007 · 6. One tab owns the files](../adr/0007-bus-worker-supervision.md#6-one-tab-owns-the-files) · Every major browser has had sync access handles in normal browsing since 2022 or 2023, so a second engine would only serve private windows and old browsers. Before: Where sync access handles are missing, persistent topics are stored in IndexedDB.
+- 2026-11-07 · built · [#110](https://github.com/isoloop/isoloop/issues/110) · Memory with `bus:durability-degraded` where sync access handles are missing, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.tab-own-bus`
+
+- **Related:** `dur.one-tab`, `dur.no-replicas`
+- **Why:** Sharing a bus across tabs is out of scope for v1.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · 6. One tab owns the files](../adr/0007-bus-worker-supervision.md#6-one-tab-owns-the-files) · Sharing a bus across tabs is out of scope for v1.
+- 2026-11-05 · built · [#44](https://github.com/isoloop/isoloop/issues/44) · The host's bus controller, built in M2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.quota`
+
+- **Errors and events:** `bus:quota`, `quota_exceeded`
+- **Code:** `packages/host/src/kernel/kernel.ts`, `packages/bus/src/broker/broker.ts`
+- **Why:** OPFS quota and eviction apply to the origin, so the app needs to hear before writes fail.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0007 · Consequences](../adr/0007-bus-worker-supervision.md#consequences) · OPFS quota and eviction apply to the origin, so the app needs to hear before writes fail.
+- 2026-11-07 · built · [#108](https://github.com/isoloop/isoloop/issues/108) · Quota, `bus:quota` at 80 % and `quota_exceeded` when full, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.flush-on-freeze`
+
+- **Code:** `packages/host/src/bus/controller.ts`, `packages/bus/src/server/server.ts`
+- **Related:** `dur.survives-reload`
+- **Why:** A frozen or closing tab may never run again, so nothing waits for the next group commit.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · What the browser still controls](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls) · A frozen or closing tab may never run again, so nothing waits for the next group commit.
+- 2026-11-07 · built · [#112](https://github.com/isoloop/isoloop/issues/112) · Flush on freeze, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.survives-reload`
+
+- **Related:** `dur.per-topic`, `dur.flush-on-freeze`
+- **Why:** A browser may discard a tab, so state that must outlive it goes in a persistent topic.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · What the browser still controls](../adr/0001-one-worker-per-isolate.md#what-the-browser-still-controls) · A browser may discard a tab, so state that must outlive it goes in a persistent topic.
+- 2026-11-07 · built · [#98](https://github.com/isoloop/isoloop/issues/98) · The bus worker keeps persistent topics in OPFS, built in M2b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `dur.no-replicas`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0007 · Context](../adr/0007-bus-worker-supervision.md#context) · Why not run follower bus workers, like Kafka replicas? They share the page's browser process, so they die with the leader; a record or memory pressure that crashes the leader crashes them too; and they double every append and the memory.
+
+### `dur.no-indexeddb`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0007 · Alternatives considered](../adr/0007-bus-worker-supervision.md#alternatives-considered) · Why not IndexedDB, as RFC 0001 planned? It's slower for append-heavy logs and asynchronous only; OPFS with sync handles fits a log better. It stayed as the fallback until the 2026-11-07 amendment.
+
+### `dur.no-main-thread-mirror`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0007 · Alternatives considered](../adr/0007-bus-worker-supervision.md#alternatives-considered) · Why not keep a copy where the host is? It puts every record back on the main thread, against ADR 0005.
+
+### `dur.no-snapshots`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0007 · Alternatives considered](../adr/0007-bus-worker-supervision.md#alternatives-considered) · Why not snapshot now and then? Writes are cheaper, but records since the last snapshot are lost. It could come later as an extra `durability: 'snapshot'` mode.
 
 ## Contracts & schemas
 
