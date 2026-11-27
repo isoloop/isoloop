@@ -43,6 +43,8 @@ Staging:
 - **Visual pools (2026-11-09):** [ADR 0015](0015-visual-pools.md) lets visual isolates join a pool, alone or with headless members: one `isoloop-dom` document per worker and one render root per member. Built in [M2d](../plans/m2d-visual-pools.md), behind its own gate.
 - **An opt-in balancer (accepted 2026-11-16, [ADR 0017](0017-opt-in-balancer.md)):** the runtime still never pools isolates on its own, and the kernel has no placement policy. An app may opt in to `@isoloop/balancer`, a separate library that picks `pool` for the isolates spawned through it, from each member's measured `busyMs`, using the same `spawn`, `stop` and `pool` a developer uses by hand, in the `balancer-` pool names the host reserves for it (`reserved_pool`; one balancer per kernel). Placement stays the host's choice: opting in is that choice. The balancer's worker cap is its own option, so the kernel's budget below is unchanged.
 
+Rules: `pool.opt-in`, `pool.shared-fate`, `pool.frozen-builtins`, `pool.protected-properties`, `pool.no-ses-allowlist`
+
 Nothing in the public API exposes worker identity:
 
 - `Supervisor`, `Compositor` and the bus key everything by `isolateId`, never by worker.
@@ -60,6 +62,8 @@ Supporting rules:
 - **Replay:** the isolate resubscribes from its committed offsets and replays what it missed (a subscription that asked for `from: 'latest'` resumes from `committed` after a wake, so nothing published while it slept is skipped; `earliest` stays `earliest`), for memory and persistent topics alike. Losses are signalled, never silent: retention (`last-n` or `time`) dropping unread records arrives as `deliver.gap`, and a bus crash wiping a memory topic arrives as `reset` (ADR 0007). The kernel warns when a suspendable isolate subscribes to a `last-n` or `time` topic; the warning comes from the bus metrics, so it arrives within about a second of the subscribe.
 - **Pools** suspend only as a whole, when every member is suspendable and idle; otherwise the pool never suspends and registration warns that the setting has no effect. Any member's wake condition wakes the pool.
 - Built in M2 ([task 12b](../plans/m2-bus.md#12b-opt-in-suspension)).
+
+Rules: `pool.suspend-whole`
 
 ### Worker budget and spawn failures
 
@@ -105,6 +109,8 @@ Decided for the 0.1.1 patch ([plan](../plans/0.1.1-patch.md), decision 5; [#390]
 **Each row of #390's table** gets a unit test on the machine with a synthetic clock, and the rows measured in a browser get a browser test that reaches `failed`. On the defaults, an isolate that hangs 10 s after each start fails on its 4th crash, about 4 × (10 s + `killAfterMs` 10 s) plus backoff after it started.
 
 **Interaction with #389.** A Firefox worker starved by the page ([#389](https://github.com/isoloop/isoloop/issues/389)) looks like a hang. Under the window alone, pages in #389's runs recovered only because their crashes didn't fit in the window. Under this rule they count. Before this code merges, #389's starvation setup runs on it at the defaults and at `killAfterMs: 2000` (the plan's T7). If pages reach `failed` at the defaults, the rule waits for 0.2 and this amendment is marked not in effect.
+
+Rules: `pool.crash-counts`
 
 ### Restart limit: `healthyAfterMs` (amended 2026-11-26)
 
@@ -201,6 +207,8 @@ Isoloop's guarantees stop where the browser's tab policy starts. Background tabs
 - Supervision gains a group case in M2c: heartbeats are per worker, and a pool restart replays every member.
 - **Not in effect** (the warm-up wasn't built, corrected 2026-11-22): an isolate that really is stuck in a loop just after `ready` (or after a restart) is killed after `readyTimeoutMs` rather than `killAfterMs`. With the defaults (10 s each) nothing changes; with plant's 2 s threshold, a kill in the first 10 s after `ready` waits 10 s. A block in that window, such as plant's stress block right after load, shows the busy overlay but doesn't restart the isolate until the window closes (amended 2026-11-20).
 
+Rules: `pool.shared-globals`, `pool.grants-union`
+
 ## Alternatives considered
 
 - **Own worker only, pools never:** simplest, but leaves no answer for apps with many small headless isolates (ADR 0008) beyond merging them by hand.
@@ -214,3 +222,5 @@ Isoloop's guarantees stop where the browser's tab policy starts. Background tabs
 - **Raising plant's `killAfterMs` to 2.5–3 s** instead of a library rule (2026-11-20): keeps the stress block restarting a pool, but leaves little margin on the runner, and every app with a short threshold would meet the same loop on a slow device. (Corrected 2026-11-22: that loop's cause was the tests; see *Start-up warm-up*.)
 - **A longer threshold only in E2E builds** (2026-11-20): makes CI pass while hiding what a slow device hits; rejected.
 - **Hard worker limit:** fails apps on capable machines and still doesn't protect weak ones, since the real limit depends on the device. Rejected in favour of a warning.
+
+Rules: `pool.no-heuristic-pooling`
