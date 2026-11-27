@@ -119,6 +119,16 @@ Other devices and engines tell a different story:
 
 The full figures, for every dashboard and placement, are on [Benchmarks](https://isoloop.dev/benchmarks/). Every recorded run, in both directions, is in [`isoloop/web`'s plant comparison](https://github.com/isoloop/web/blob/9b50967b0971871ec9671d7dce8d115eb16f6d19/apps/dashboards/plant/comparison/README.md).
 
+## A watcher skips values
+
+A [watcher](watchers.md) (`useWatch`, `ctx.bus.watch`, `kernel.watch`, `@experimental`) shows the newest value per key, and that has costs of its own:
+
+- **Values in between are skipped,** with no error. A sparkline, a sum or a count built on a watcher comes out wrong. Use `subscribe` for those.
+- **The second value after a quiet spell can be late,** by up to one commit interval (100 ms by default). From the third value of a burst on, views follow the paint rate.
+- **An unfiltered watch holds every retained key,** in the bus worker and in the isolate. Retention bounds it, and with `dev: true` the bus warns past 1,000 keys. Pass `keys` to watch fewer.
+- **It needs a 0.2 host.** An isolate built with 0.2 fails on a 0.1 host with `runtime_too_old`, before it runs.
+- **Every page carries the watch code,** whether or not it calls `kernel.watch` ([bundle size](bundle-size.md)).
+
 ## Browsers and the first paint
 
 - **Supported browsers:** Chrome 108, Firefox 114 and Safari 16.4 or later. `createKernel` checks module workers, `MessageChannel`, adopted stylesheets and the origin private file system first, and throws a `KernelError` with code `unsupported_browser` naming what's missing. Catch it and show a plain-HTML version of the page.

@@ -1,5 +1,5 @@
 {
-  "$comment": "Which code each guide covers (M4c decision 21). paths: source a PR may change that the guide describes; a PR touching one without the guide gets a notice. exports: public exports per entry point that the guide documents. referenceOnly: public exports documented only in the generated API reference. Upkeep: .claude/skills/docs/SKILL.md. pending: exports no guide covers yet, grouped by the M4c task that will (or \"freeze\", decided at the API freeze); it only shrinks and is gone by M4c's done-when (decisions 37–40).",
+  "$comment": "Which code each guide covers (M4c decision 21). paths: source a PR may change that the guide describes; a PR touching one without the guide gets a notice. exports: public exports per entry point that the guide documents. referenceOnly: public exports documented only in the generated API reference. Upkeep: .claude/skills/docs/SKILL.md. pending: exports no guide covers yet, grouped by the M4c task that will (or \"freeze\", decided at the API freeze); it only shrinks and is gone by M4c's done-when (decisions 37\u201340).",
   "guides": {
     "agents": {
       "paths": [
@@ -227,6 +227,18 @@
         ]
       }
     },
+    "watchers": {
+      "paths": [
+        "packages/bus/src/broker/watch.ts",
+        "packages/protocol/src/topics/watches.ts",
+        "packages/react/src/hooks/watch.ts",
+        "packages/preact/src/hooks/watch.ts"
+      ],
+      "exports": {
+        "@isoloop/preact": ["UseWatchOptions", "useWatch"],
+        "@isoloop/react": ["UseWatchOptions", "useWatch"]
+      }
+    },
     "dev-tools": {
       "paths": [
         "packages/devtools/src/",
@@ -275,8 +287,6 @@
       "servePoolFixture",
       "trackUsage"
     ],
-    "@isoloop/preact": ["UseWatchOptions", "useWatch"],
-    "@isoloop/react": ["UseWatchOptions", "useWatch"],
     "@isoloop/vite": ["BuildManifest"]
   }
 }
