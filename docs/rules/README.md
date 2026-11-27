@@ -5710,4 +5710,83 @@ No rules yet.
 
 Isoloop inside a Tauri app. Prefix `tauri`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `tauri.package` | `@isoloop/tauri` is an `@experimental` npm package, with a Rust crate, `isoloop-tauri`, as its Tauri plugin. Both are versioned with the other packages. |  | proposed, experimental | target `0.4.0` |
+| `tauri.kernel-respond` | `kernel.respond(topic, handler)` lets the host answer a requestable topic, with the topic's schemas, grants, timeouts and `no_responder`. It adds no grant and doesn't change the isolate seam. |  | proposed, experimental | target `0.4.0` |
+| `tauri.respond-crosses-main-thread` | Records of the topics the host responds to cross the main thread, and only those. |  | proposed, experimental | target `0.4.0` |
+| `tauri.expose-commands` | `exposeCommands(kernel, { topic: command })` answers each topic by `invoke`-ing its command. Isoloop's grant on the topic and Tauri's capability on the command both guard each call, and a command not listed can't be reached through the bus. |  | proposed, experimental | target `0.4.0` |
+| `tauri.native-storage` | `TauriStorage` is a third `LogStorage`, `kind: 'native'`, that writes the same `isoloop-codec@1` segment bytes as `OpfsStorage` and passes the same storage conformance suite. |  | proposed, experimental | target `0.4.0` |
+| `tauri.native-group-commit` | The Rust side writes `TauriStorage` segments under the app's data folder with the same group commit as OPFS, so a persistent publish is acked only once it's on disk. | `5 ms`, `256 records` | proposed, experimental | target `0.4.0` |
+| `tauri.native-reads-log` | Native code can read and replay a topic's log without the webview running. It can't write to it. |  | proposed, experimental | target `0.4.0` |
+| `tauri.storage-off-main-thread` | The bus worker reaches `TauriStorage` without going through the main thread, over a transport the M12 spike picks: a custom URI scheme with a token only the bus gets, or Tauri's IPC endpoint. A relay through the host is the fallback only if both fail. |  | proposed, experimental | target `0.4.0` |
+| `tauri.storage-opt-in` | `OpfsStorage` keeps working in Tauri, and an app opts in to `TauriStorage` in its kernel config. |  | proposed, experimental | target `0.4.0` |
+| `tauri.config-helper` | `@isoloop/tauri` ships the `tauri.conf.json` fragment for COOP and COEP and the CSP `connect-src` its storage needs, with a guide that lists each OS webview's support as measured. |  | proposed, experimental | target `0.4.0` |
+
+### `tauri.package`
+
+History:
+
+- 2026-11-18 · proposed · [ADR 0022 · 1. @isoloop/tauri, an @experimental package, built in M12](../adr/0022-tauri.md#1-isolooptauri-an-experimental-package-built-in-m12) · A Tauri app is a web page in the system webview; the package adds what a tab can't have: native storage and commands.
+
+### `tauri.kernel-respond`
+
+- **Change it:** `kernel.respond`
+- **Related:** `tauri.respond-crosses-main-thread`, `tauri.expose-commands`
+
+History:
+
+- 2026-11-18 · proposed · [ADR 0022 · 2. kernel.respond: the host answers requestable topics](../adr/0022-tauri.md#2-kernelrespond-the-host-answers-requestable-topics) · Tauri's `invoke` needs `window`, and today nothing on the host can answer a request; it also serves other main-thread-only APIs.
+
+### `tauri.respond-crosses-main-thread`
+
+History:
+
+- 2026-11-18 · proposed · [ADR 0022 · 2. kernel.respond: the host answers requestable topics](../adr/0022-tauri.md#2-kernelrespond-the-host-answers-requestable-topics) · It's a host consumer the app chose, like `kernel.subscribe`.
+
+### `tauri.expose-commands`
+
+- **Change it:** `exposeCommands`
+- **Related:** `tauri.kernel-respond`
+
+History:
+
+- 2026-11-18 · proposed · [ADR 0022 · 3. Native commands as requestable topics](../adr/0022-tauri.md#3-native-commands-as-requestable-topics) · Requestable topics already give schemas, grants, timeouts and `no_responder`, without a new host call in the seam.
+
+### `tauri.native-storage`
+
+- **Related:** `tauri.native-group-commit`, `tauri.storage-off-main-thread`
+
+History:
+
+- 2026-11-18 · proposed · [ADR 0022 · 4. TauriStorage: durable topics on the app's disk](../adr/0022-tauri.md#4-tauristorage-durable-topics-on-the-apps-disk) · OPFS lives in the webview's profile: it has a quota, the user can clear it, and native code can't read it.
+
+### `tauri.native-group-commit`
+
+History:
+
+- 2026-11-18 · proposed · [ADR 0022 · 4. TauriStorage: durable topics on the app's disk](../adr/0022-tauri.md#4-tauristorage-durable-topics-on-the-apps-disk) · The engine above must not tell the two storages apart.
+
+### `tauri.native-reads-log`
+
+History:
+
+- 2026-11-18 · proposed · [ADR 0022 · 4. TauriStorage: durable topics on the app's disk](../adr/0022-tauri.md#4-tauristorage-durable-topics-on-the-apps-disk) · A native backend gets the app's history; writing from Rust would need the broker's validation and offsets there.
+
+### `tauri.storage-off-main-thread`
+
+History:
+
+- 2026-11-18 · proposed · [ADR 0022 · 4. TauriStorage: durable topics on the app's disk](../adr/0022-tauri.md#4-tauristorage-durable-topics-on-the-apps-disk) · No record crosses the main thread (ADR 0005); a relay would need that ADR amended.
+
+### `tauri.storage-opt-in`
+
+History:
+
+- 2026-11-18 · proposed · [ADR 0022 · 4. TauriStorage: durable topics on the app's disk](../adr/0022-tauri.md#4-tauristorage-durable-topics-on-the-apps-disk) · Isolates and apps written for the web run in Tauri as they are.
+
+### `tauri.config-helper`
+
+History:
+
+- 2026-11-18 · proposed · [ADR 0022 · 5. A config helper and a doc page](../adr/0022-tauri.md#5-a-config-helper-and-a-doc-page) · Cross-origin isolation costs a Tauri app nothing, since it loads only its own assets.
