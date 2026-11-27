@@ -3,11 +3,14 @@
  * from its latest metrics, each topic's rates, head offset and retained
  * count, each subscription's lag (head − cursor) and credit, and the
  * publishes the bus rejected, by error code, since its worker started.
+ * Watched topics get a second table: their watches, the keys they hold, and
+ * how many values each watch showed (ADR 0023, point 25).
  * The panel's own feed doesn't go through the bus (devtools decision 5), so
  * none of these figures include it.
  */
 import type { BusMetrics, InspectBus } from '@isoloop/protocol';
 import type { JSX } from 'preact';
+import { shown } from './format';
 
 const rate = (n: number): string => (n >= 10 ? String(Math.round(n)) : n.toFixed(1));
 
@@ -50,6 +53,51 @@ function Topics(props: { metrics: BusMetrics }) {
             <td class="dt-num" data-retained={t.retained}>
               {t.retained}
             </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function Watches(props: { metrics: BusMetrics }) {
+  const rows = props.metrics.topics.flatMap((t) =>
+    t.watch ? [{ topic: t.topic, w: t.watch }] : [],
+  );
+  if (rows.length === 0) return null;
+  return (
+    <table class="dt-table" data-view="watches">
+      <thead>
+        <tr>
+          <th>Watched topic</th>
+          <th class="dt-num" title="Watches on the topic now, from isolates and the host">
+            Watches
+          </th>
+          <th class="dt-num" title="Distinct keys the watches hold now">
+            Keys
+          </th>
+          <th title="Values each watch got against the records appended, since the bus worker started">
+            Shown
+          </th>
+          <th title="How views reach the watches">Transport</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(({ topic, w }) => (
+          <tr key={topic} data-watched={topic}>
+            <td>
+              <code>{topic}</code>
+            </td>
+            <td class="dt-num" data-watches={w.watches}>
+              {w.watches}
+            </td>
+            <td class="dt-num" data-live-keys={w.liveKeys}>
+              {w.liveKeys}
+            </td>
+            <td data-records={w.records} data-values={w.values}>
+              {shown(w)}
+            </td>
+            <td>{w.transport}</td>
           </tr>
         ))}
       </tbody>
@@ -129,7 +177,12 @@ export function BusView(props: { bus: InspectBus; sub: BusSub }): JSX.Element {
       </p>
       {m ? (
         <>
-          {sub === 'topics' ? <Topics metrics={m} /> : null}
+          {sub === 'topics' ? (
+            <>
+              <Topics metrics={m} />
+              <Watches metrics={m} />
+            </>
+          ) : null}
           {sub === 'subscriptions' ? <Subscriptions metrics={m} /> : null}
           {sub === 'rejected' ? (
             <>

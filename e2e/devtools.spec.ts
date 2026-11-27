@@ -164,6 +164,30 @@ test.describe('devtools: bus view (M4b task 9)', () => {
     await expect(bus.locator('[data-rejected="invalid"]')).toContainText('1');
   });
 
+  test("shows a watched topic's watches, keys and values shown (M8 Watchers W1)", async ({
+    page,
+  }) => {
+    const bus = page.locator('[data-isoloop-devtools] [data-view="bus"]');
+    await expect(bus.locator('[data-bus-state]')).toHaveAttribute('data-bus-state', 'running');
+    await page.evaluate(async () => {
+      // The first view, the snapshot, says the bus has the watch.
+      await new Promise<void>((resolve) => {
+        window.kernel.watch({ name: 'feed.v1' }, () => resolve());
+      });
+      // The host's watch counts with an isolate's (ADR 0023, point 34).
+      await Promise.all(
+        [1, 2, 3, 4].map((value) => window.kernel.publish({ name: 'feed.v1' }, value)),
+      );
+    });
+    // Metrics come about once a second.
+    const watched = bus.locator('tr[data-watched="feed.v1"]');
+    await expect(watched.locator('[data-watches]')).toHaveText('1');
+    await expect(watched.locator('[data-records]')).not.toHaveAttribute('data-records', '0');
+    await expect(watched.locator('[data-records]')).toContainText(
+      /^showed (every value|1 of every [\d.]+ values)$/,
+    );
+  });
+
   test('arrow keys move between the tabs', async ({ page }) => {
     const busTab = page.locator('[data-isoloop-devtools] [data-tab="bus"]');
     await busTab.focus();
