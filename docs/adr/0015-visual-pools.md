@@ -33,6 +33,8 @@ What the frameworks reference was checked in the versions we support (React DOM 
 
 **E. `ShadowRealm`.** Separate globals per member would solve this cleanly, but the proposal is at Stage 2.7 ([tc39/proposal-shadowrealm](https://github.com/tc39/proposal-shadowrealm)), with prototyping in Chromium ([Intent to Prototype](https://groups.google.com/a/chromium.org/g/blink-dev/c/xcfT92S2Xno)) and an open WebKit bug ([283289](https://bugs.webkit.org/show_bug.cgi?id=283289)). It hasn't shipped in any browser, workers included. Noted as the long-term option.
 
+Rules: `pool.no-build-rebinding`, `pool.no-global-switch`, `pool.no-document-per-member`, `pool.no-shadowrealm`
+
 ## Decision
 
 1. **Visual isolates may join a pool (option D).** `pools_headless_only` goes away. A pool can hold visual members, headless members, or both (mixed pools, as the plant dashboard's `machine` placement needs). Placement stays the host manifest's choice alone (ADR 0001). *(Amended 2026-11-16, [ADR 0017](0017-opt-in-balancer.md): the host may delegate that choice to the opt-in `@isoloop/balancer`, which places through the kernel API in pool names reserved for it; the kernel itself still never pools on its own.)*
@@ -59,6 +61,8 @@ What the frameworks reference was checked in the versions we support (React DOM 
     - the pooled p95 is more than twice the own-worker p95 **and** more than 50 ms.
 
 ADR 0001's staging note and ADR 0010's point 2 point here.
+
+Rules: `pool.opt-in`, `pool.one-document`, `pool.records-per-member`, `pool.no-cross-member-move`, `pool.host-applier`, `pool.events-per-member`, `pool.shared-dom`, `pool.mixed-frameworks`, `pool.attributed-errors`, `pool.stop-member`, `pool.stopped-callbacks`, `pool.built-apart`, `pool.portal-root`
 
 ## Gate result (2026-11-09)
 

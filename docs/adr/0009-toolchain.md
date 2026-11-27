@@ -1,6 +1,6 @@
 # ADR 0009: Toolchain: pnpm, TypeScript 7, OXC, Vite 8
 
-- **Status:** Accepted
+- **Status:** Accepted. Amended 2026-11-27 for what CI runs when: docs-only pull requests run only `check`, and a nightly replaces the weekly run (*What runs when*, below; grilled Q1–Q7, yes to all). Rule 12's job count corrected the same day.
 - **Date:** 2026-11-04
 - **Answers:** which tools M0 sets up, and the rules around them. The plan had assumed ESLint, Prettier, Vite library mode and pnpm 10.
 
@@ -44,6 +44,8 @@ Checked on the npm registry, 2026-11-04:
 | E2E | **Playwright**: Chromium, Firefox and WebKit. |
 | Benches | **Playwright** for browser benches (`bench/click-to-paint`, `bench/throughput`), run in Chromium, Firefox and WebKit. Node benches run with Vitest (`pnpm bench`). |
 
+Rules: `tool.pnpm-workspaces`, `tool.node-version`, `tool.typescript`, `tool.oxc-lint-format`, `tool.tsdown-builds`, `tool.test-runners`
+
 ### Rules
 
 1. **Tools are only called through root scripts.** CI, docs and contributors run `pnpm format`, `lint`, `typecheck`, `test`, `build`, `e2e` and `check`, never a tool binary directly. `pnpm check` runs the format check, lint, typecheck and unit tests, to run before pushing. Swapping a tool means editing one script, and CI is the conformance test that the swap changed nothing. No git hooks: CI is the only gate.
@@ -67,7 +69,23 @@ Checked on the npm registry, 2026-11-04:
 9. **Supply chain.** pnpm's `minimumReleaseAge: 4320` (3 days) rejects versions younger than that. Lifecycle scripts stay blocked, which is pnpm's default, and the few packages that need one are allow-listed by name. Playwright browsers are installed by an explicit `pnpm exec playwright install`. `strictPeerDependencies: true`. GitHub Actions are pinned by commit SHA, with the tag in a comment.
 10. **No corepack.** `packageManager: "pnpm@12.16.1"` pins the version. Contributors install pnpm's standalone binary, and `pnpm self-update` maintains the pin. CI uses `pnpm/action-setup`, which reads the same field.
 11. **Editor config is committed for VS Code:** `.vscode/settings.json` (workspace TypeScript, oxc as the formatter, format on save, oxlint diagnostics) and `.vscode/extensions.json`. `CONTRIBUTING.md` has a short note for other editors.
-12. **CI runs on Ubuntu only, in four jobs.** `check` runs the format check, lint, typecheck, unit tests and build. `browser` runs Vitest browser mode on Chromium. `e2e` runs a Chromium/Firefox/WebKit matrix against the built example and uploads traces on failure. `bench` runs the browser benches in all three engines. `browser`, `e2e` and `bench` only start after `check` passes, and install browsers through one local action (`.github/actions/install-browsers`), with time limits, retries and caches. Pages deploys from `main` only.
+12. **CI runs on Ubuntu only, in five jobs** (corrected 2026-11-27: it said four, from before `cli-node24`). `check` runs the format check, lint, typecheck, unit tests and build. `cli-node24` runs the CLI's tests and the built CLI on Node 24, beside `check`. `browser` runs Vitest browser mode on Chromium. `e2e` runs a Chromium/Firefox/WebKit matrix against the built example and uploads traces on failure. `bench` runs the browser benches in all three engines. `browser`, `e2e` and `bench` only start after `check` passes, and install browsers through one local action (`.github/actions/install-browsers`), with time limits, retries and caches. Pages deploys from `main` only.
+
+Rules: `tool.root-scripts`, `tool.no-git-hooks`, `tool.isolated-declarations`, `tool.source-condition`, `tool.dependency-rules`, `tool.lint-errors-only`, `tool.format-settings`, `tool.browser-baseline`, `tool.unsupported-browser`, `tool.exact-pins`, `tool.dependabot`, `tool.supply-chain`, `tool.no-corepack`, `tool.vscode-config`, `tool.ci-jobs`
+
+### Amended 2026-11-27: what runs when
+
+Until this amendment every pull request ran every job, and the full set also ran weekly. A PR that changed only docs, such as the rules backfill's sixteen PRs, ran e2e in three engines and the benches for files those jobs never read.
+
+- **A docs-only pull request skips the jobs after `check`.** It's docs-only when every changed file is under `docs/`, `.changeset/` or `.claude/`, or ends in `.md`. Any other file makes it a full run, so a kind of file nobody thought of never skips the tests.
+- **`check` always runs in full,** because the docs, the rules registry and the API reference are checked there.
+- **`cli-node24`, `browser`, `e2e` and `bench` still report success.** `browser`, `e2e (chromium)`, `e2e (firefox)` and `e2e (webkit)` are required checks. A matrix job skipped as a whole reports one unexpanded `e2e` check, and the required names would stay pending, so the `e2e` jobs run and skip their steps.
+- **Only `pull_request` runs can be docs-only.** Release dry runs and stage runs, the nightly, pushes and runs by hand always run everything. The check is a `git diff --name-only` against the PR's base in a `changes` job, with no third-party action.
+- **A nightly replaces the weekly run.** `nightly.yml` calls `ci.yml` on `main` at 03:00 UTC, so every job runs, `bench` included. It skips the night when `main` has no commits since the last green nightly.
+- **A failed nightly is an issue.** It opens one labelled `nightly-failure`, or comments on the open one, with the failed jobs and the commits since the last green nightly. The next green nightly closes it. Only the reporting job may write issues.
+- **Pushes to `main` and `release/0.1` don't change:** `check` and `cli-node24`.
+
+Rules: `tool.ci-docs-only`, `tool.ci-docs-only-paths`, `tool.ci-docs-only-required-checks`, `tool.ci-docs-only-pr-events`, `tool.ci-nightly`, `tool.ci-nightly-quiet-skip`, `tool.ci-nightly-issue`, `tool.no-ci-paths-ignore`
 
 ### Pre-agreed fallback
 
@@ -102,8 +120,12 @@ Checked on the npm registry, 2026-11-04:
 - **`vite-plugin-dts` / Vite library mode:** the plugin depends on TypeScript's JS API, which TS 7 lacks for now, and tsdown does the same job on the same Rolldown core. Vite stays for apps.
 - **TypeScript project references, or building before checking:** references need `composite` and declaration emit just to type check, which duplicates tsdown. Building first makes every check wait for a build and points errors at `dist`. The source condition avoids both.
 - **A `prepack` script to strip the source condition:** our own code for what `publishConfig.exports` already does.
+- **`paths-ignore` on the workflow, for docs-only PRs** (amended 2026-11-27): the workflow wouldn't start at all, so the required checks would stay pending and the PR couldn't merge. A path-filter action from the marketplace would work, but it's a dependency for a dozen lines of shell.
 - **NX, turbo, Vite+:** caching and task graphs pay off in big monorepos; here they'd mostly add config, or a layer between us and each tool. Revisit if CI time becomes a problem.
 - **Git hooks (husky, lefthook):** one more dependency, they slow every commit, and `--no-verify` skips them anyway. `pnpm check` plus CI cover the same ground.
 - **Caret ranges and Renovate:** caret ranges let 0.x tools change behaviour without a PR. Renovate is another app to install and configure, where Dependabot is built into GitHub.
 - **Testing old browser versions (BrowserStack, Sauce Labs):** a paid external service, for a risk that the build target and the feature check mostly cover.
 - **`mitata` or another bench harness:** one more dependency, where `vitest bench` is already there.
+
+Rules: `tool.no-eslint`, `tool.no-task-runner`
+

@@ -33,24 +33,48 @@ The proposal had three decisions: combined commits; memory-topic publishes answe
 ### Combined commits
 
 1. **A new `commits` message** on the bus port, isolate → bus: `commits { offsets: { topic: string; offset: number }[] }`. Each entry is the highest settled offset of one subscription, the same value a `commit` carried.
+
+   Rules: `bus.combined-commits`
+
 2. **The bus client sends at most one `commits` per port per commit interval** (point 7; 100 ms by default). It holds the latest settled offset per subscription and sends them together. It sends early:
    - when any subscription's uncommitted count reaches half its credit, so a busy subscription never pauses because of the interval;
    - on `shutdown`, for every reason (`stop`, `restart`, `suspend`). It **waits for the broker's answer** before it acknowledges, bounded by the shutdown grace. The host's `detach` reaches the bus worker on another channel and can overtake commits that were only sent, so sending isn't enough. Waiting is what makes a graceful stop or a suspend lose nothing;
    - on the bus client's own close path, also waiting for the answer.
+
+   Rules: `bus.combined-commits`, `bus.commit-early`, `bus.commits-on-shutdown`
+
 3. **After a bus restart** (ADR 0007, step 4), the client **doesn't send commits first on the new port.** The broker accepts a commit only for a topic the connection already subscribes to, and on a new port commits would arrive before the subscriptions. So a persistent topic can redeliver up to one interval of records after a bus restart. That's the same at-least-once window as after a crash (point 6), and it needs no further protocol change. Accepting commits before `subscribe`, or carrying the last offset in `subscribe`, were the alternatives (see [Alternatives considered](#alternatives-considered)).
+
+   Rules: `bus.no-commits-after-reattach`
+
 4. **What counts as settled is unchanged.** A record is settled when its handler returns. A handler that throws marks the subscription stuck, and the commit stops at the record before it.
+
+   Rules: `bus.settled`
+
 5. **Host subscriptions do the same:** one `commits` per host port per commit interval, or earlier at half the credit.
+
+   Rules: `bus.combined-commits`
+
 6. **The single `commit` message is removed, not kept beside `commits`.** Both ends of the bus port come from one build: the bootstrap, which creates the bus client, ships with the host, and ADR 0012 lists the host ↔ worker protocol as free to change in any release.
+
+   Rules: `bus.combined-commits`
+
 7. **The cost:**
    - A crashed isolate, or a worker killed without a graceful shutdown, can have up to one interval (~100 ms) of handled records delivered again on restart. Delivery is at-least-once already; the window grows from one record to one interval.
    - A group member that crashes leaves up to one interval more for the group's redelivery.
    - After a bus restart, a persistent topic can redeliver up to one interval of records (point 3).
    - The commit lag in `BusMetrics.subscriptions` is coarser by up to one interval.
+
+   Rules: `bus.redelivery-window`
+
 8. **The interval is one kernel setting: `KernelConfig.bus.commitIntervalMs`.**
    - **Default 100 ms.** 250 ms was measured too (point 9). It saves about 5 ms/s more for a 2.5× longer redelivery window, so the default stays 100 ms.
    - **Range:** an integer from 0 to 1,000. `0` means every task: pending commits are sent at the end of each task that settled a record. Anything else makes `createKernel` throw `invalid_config`. The cap keeps the redelivery window after a crash under a second.
    - **Per kernel, not per subscription.** The interval is one timer per port, covering every subscription on it. The per-isolate `bus` options are on the manifest (`IsolateManifest.bus`), so this new block takes the same name.
    - **Who uses it:** the kernel passes it to each isolate in `init`, and host ports read it directly. The bus worker doesn't need it: it only receives commits, whenever they arrive.
+
+   Rules: `bus.commit-interval`
+
 9. **Measured** (PR #166 before merge; benchmark server, Chromium, 4 cores at 2.0 GHz, 4 interleaved runs, with the plant's metrics-sampler fix), `matched` at 5 kHz:
 
    | | Port messages/s | Messaging work, ms/s | Renderer total, ms/s |
@@ -61,6 +85,8 @@ The proposal had three decisions: combined commits; memory-topic publishes answe
 
    Messaging work is the browser's port delivery plus Isoloop's messaging code. It's down 8–14 ms/s, beyond the run-to-run spread; the renderer total moves within it. `one` and 1 kHz show the same pattern (16–24% fewer messages). It keeps every feature and cuts messages clearly, so it passes the rule. A commit costs about a third of an average message. Most of the messaging cost is in deliveries and publishes, which this decision doesn't touch.
 
+   Rules: `bus.combined-commits`
+
 ### Group commits carry a delivery sequence (amended 2026-11-17)
 
 Found by the processor example (isoloop/web#130) and reproduced in `packages/bus/src/groups-commit-loss.test.ts` ([investigation](../investigations/group-commit-loss.md), [#211](https://github.com/isoloop/isoloop/issues/211)).
@@ -68,18 +94,37 @@ Found by the processor example (isoloop/web#130) and reproduced in `packages/bus
 **The bug.** A commit is cumulative: "everything I hold up to offset N is settled". In a consumer group that assumes a member receives offsets in rising order, and redelivery breaks it. When a member leaves, its uncommitted records go to the others before anything new, so a member can be handed a record whose offset is *lower* than records it has already settled. Its next commit then covers that record before the handler has run. That happens within one interval (the committer already holds a higher offset), or when a commit that was already in flight arrives after the reassignment. The broker drops the entry, and the group's offset moves past it. If that member then stops before it gets to the record (a balancer move does exactly this), nobody gets it again. The design's promise, "a member that leaves hands its uncommitted records to the others", is broken.
 
 10. **Every `deliver` carries a `seq`:** `deliver { topic, records, gap?, seq }`. It counts the deliveries to one subscription on one connection, from 1 at each `subscribe`. The broker records, on each group entry, the `seq` of the delivery it went out in, including when the entry is redelivered to another member.
+
+    Rules: `bus.group-commit-seq`
+
 11. **Every commit entry carries a `seq` too:** `commits { offsets: { topic, offset, seq }[] }`. `seq` is the highest delivery whose records, and those of every earlier delivery on that subscription, are all settled. The committer tracks it beside the highest settled offset. What counts as settled is unchanged (point 4).
+
+    Rules: `bus.group-commit-seq`
+
 12. **A group commit covers only entries with `offset ≤ N` and `seq ≤ S`.** A record redelivered after the commit's deliveries has a higher `seq`, so neither the in-order case nor the crossing can cover it. Records of a delivery that's only partly settled are covered once the whole delivery is. A subscription that isn't in a group keeps the offset rule: its deliveries are always in order, so `seq` never changes the answer there, and its commit lag is unchanged.
+
+    Rules: `bus.group-commit-seq`
+
 13. **What it costs and keeps:**
     - One integer per `deliver` and one per commit entry. Commits stay combined, one `commits` per port per interval, so point 9's message counts stand.
     - Host subscriptions share the committer and get the same rule.
     - Redelivery stays at-least-once: this removes the loss, not the duplicates. A group member that crashes still leaves up to one interval of handled records for the others (point 7).
     - `seq` is per connection and isn't stored. After a bus restart (ADR 0007), a reattaching connection starts again at 1, and the client still sends no commits first on the new port (point 3).
     - `PROTOCOL` stays `{ v: 1, min: 1 }`: both ends of the bus port come from one build (point 6), and `ctx.bus` doesn't change.
+
+    Rules: `bus.group-commit-seq`, `bus.redelivery-window`
+
 14. **A group that has committed resumes from its committed offset, whatever `from` says.** Until now a group that every member had left and that rejoined with `from: 'earliest'` started at the topic's tail and replayed it (the processor did 117 files twice). Now `from` applies only when the group has no committed offset yet: on its first join, or after its offsets were dropped with the topic. Its committed offset is kept, as before, under the consumer id `group:<name>`. `from` on a member joining a group that already has members changes nothing either way: the member takes records from where the group is. The design's "Subscriptions and consumers" and "Groups" paragraphs and the bus guide say so, and that group members don't need `from: 'committed'` for this.
 
+    Rules: `bus.group-resume`
+
 15. **A by-hand `commit(record)` settles that record and every record delivered before it on the subscription** (decided while building the fix, [#224](https://github.com/isoloop/isoloop/pull/224)). Records settle in the order they arrived, so with `autoCommit: false` a commit means "everything up to here is done", as it did before the amendment. The `seq` it sends is that of the latest delivery the commit completes. The alternative was counting each by-hand commit as one record. Then a member that commits only some records would never complete a delivery, its `seq` would stop moving, and its group entries would pause at the credit limit. An isolate that keeps several records in flight after its handler returns must commit the last record whose earlier arrivals are all done.
+
+    Rules: `bus.manual-commit`
+
 16. **A record from an old connection commits nothing** (also #224). A record delivered before a bus restart (ADR 0007), or to a subscription since replaced by a new `subscribe`, carries a `seq` from that connection or subscription. If its handler settles it afterwards, the client drops the commit. That follows point 3 (no commits sent first on a new port), and a `seq` from another connection would cover the wrong deliveries. The record comes back through redelivery, which is at-least-once anyway. Offsets the host carries over to a new port go out with `seq: 0`, which never covers a group entry.
+
+    Rules: `bus.old-connection-commits`
 
 ### A partly settled delivery keeps what it settled (amended 2026-11-18, M3j)
 
@@ -93,7 +138,12 @@ Found by the M3j bench run of the File processor (isoloop/web, `@isoloop/*@0.1.0
     - **The committer keeps the furthest point:** a whole delivery is further than any part of it, and the highest offset is kept as before.
     - **Own subscriptions** already cover by offset, so nothing changes for them.
     - **The cost** is one more integer in an entry, only while a delivery is partly settled. `PROTOCOL` stays `{ v: 1, min: 1 }`, as in point 13.
+
+    Rules: `bus.partial-delivery`
+
 18. **A record that crashes every member before it's settled still comes back to each of them** until the kernel gives up on all of them. That's at-least-once delivery with no limit on attempts, and point 17 doesn't change it. A dead-letter topic, which would set a record aside after a number of failed attempts, is in [would-like](../would-like.md).
+
+    Rules: `bus.no-attempt-limit`
 
 ## Not taken
 
@@ -106,6 +156,8 @@ Found by the M3j bench run of the File processor (isoloop/web, `@isoloop/*@0.1.0
   - **What it was:** a memory-topic `publish` resolving once sent; a rejection coming back as a `rejected` message to `onError`; `{ ack: true }` for today's behaviour; persistent topics always waiting; and a cumulative `acked` about every interval to keep the re-send after a bus restart (ADR 0007, step 5) and the 1,000-unanswered back-pressure.
   - **Why not:** it would remove about 345 `result`s a second in `matched`. Decision 1 measured about 8–14 ms/s for about 600 fewer messages, which puts this at roughly 5–8 ms/s, an estimate from that rate, not a measurement. That saving doesn't justify changing what awaiting `publish` means, moving rejections away from the call's `catch`, and changing the ADR 0012 seam (`ctx.bus.publish`). Under the rule, a weakened feature needs a saving to match.
   - ADR 0003, decision 10 and the ADR 0012 seam stay as they are.
+
+Rules: `bus.no-port-batching`, `bus.no-fire-and-forget-publish`
 
 ### What remains of the messaging cost
 

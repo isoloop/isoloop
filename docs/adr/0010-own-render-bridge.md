@@ -26,6 +26,9 @@ The maintainer's preference is to own the stack and keep dependencies to a minim
 ## Decision
 
 1. **We write our own render bridge, `isoloop-dom@1`, with no dependency.** It is small and covers exactly what the Preact and React adapters need. Remote DOM isn't used.
+
+   Rules: `dom.own-bridge`
+
 2. **The worker side is a DOM subset**, installed as `document` and the DOM globals only in isolates that have a surface. In a pooled worker there is still one document, with one render root per visual member ([ADR 0015](0015-visual-pools.md), 2026-11-09). It provides:
    - **Documents and nodes:** `document.createElement`, `createElementNS` (SVG namespace only), `createTextNode`; `Node`, `Element`, `HTMLElement`, `SVGElement`, `Text`.
    - **Tree reads:** `parentNode`, `firstChild`, `lastChild`, `nextSibling`, `childNodes`, `children`, `nodeType`, `nodeName`, `localName`, `tagName`, `namespaceURI`, `ownerDocument`, `nodeValue`, `textContent`, `data`.
@@ -35,6 +38,9 @@ The maintainer's preference is to own the stack and keep dependencies to a minim
    - **Synced properties:** `value`, `checked`, `selected`, plus `defaultValue`, `defaultChecked`, `name` and `type`, which map to attributes.
    - **Events:** `EventTarget` with `addEventListener`, `removeEventListener` and `dispatchEvent` (capture and bubble, inside the worker); `Event`. `isTrusted` is always `false` in the worker, including for events the host forwards: the worker can't forge it, and code that checks it must not treat forwarded input as trusted.
    - **`instanceof` classes:** `HTMLInputElement`, `HTMLTextAreaElement`, `HTMLSelectElement`, `HTMLIFrameElement`.
+
+   Rules: `dom.dom-subset`, `dom.untrusted-events`
+
 3. **Records keep ADR 0006's contracts.** A `patch` envelope carries `{ fmt: 'isoloop-dom@1', batch }`. A batch is an array of plain tuples, one per change, collected per microtask:
    - `insert(parentId, node, beforeId | null)`, where `node` is a new subtree;
    - `move(parentId, nodeId, beforeId | null)`, so an existing node moves in **one record**, without re-serializing it, and keeps its identity on the host;
@@ -44,10 +50,24 @@ The maintainer's preference is to own the stack and keep dependencies to a minim
    Node ids are ours, assigned when a node is created. Records reference nodes and siblings by id, not by index.
 
    Both halves of the fmt ship in the host app's build: the worker starts from the app's `workers.isolateBootstrap`, which holds the worker half, and only then imports the isolate module. An isolate built and hosted separately (from a CDN, say) carries only its own code and adapter and renders into the `document` the bootstrap installed, so it can't bring a different fmt. That's why an exact fmt match ([ADR 0011](0011-dom-package.md), decision 8) is enough; a range is needed only if the bootstrap is ever loaded from the isolate's origin.
+
+   Rules: `dom.records`, `dom.one-record-moves`, `dom.listen-records`, `dom.fmt-in-host-build`
+
 4. **The host side** applies batches through the compositor only. It keeps `id → Node` and `Node → id` (`nodeFor`, `idFor`). Every tag, attribute and URL passes the component registry first (sanitising, I9). Host-owned inputs (design §4.6) decide whether a `prop` record for `value` or `checked` is applied.
+
+   Rules: `dom.host-applies`, `dom.host-owned-inputs`
+
 5. **Package layout:** `@isoloop/dom`, see [ADR 0011](0011-dom-package.md).
+
+   Rules: `dom.package-entries`
+
 6. **Done means the conformance suite passes** (M1 task 4b, `@isoloop/dom/testing` per [ADR 0011](0011-dom-package.md)) **with no known gaps**, and Preact and React render into the subset in a framework smoke test per adapter (M3).
+
+   Rules: `dom.conformance-suite`
+
 7. **It grows only on evidence.** A member is added when a conformance case, an adapter test or a real isolate needs it, and each addition comes with a test. `legacy-vdom` was deleted after M1; benchmarks compare against plain single-threaded DOM (design §9).
+
+   Rules: `dom.grows-on-evidence`, `dom.legacy-vdom-removed`
 
 ### Amended in M3a (2026-11-07)
 
@@ -67,6 +87,8 @@ The maintainer's preference is to own the stack and keep dependencies to a minim
 
    Reads the frameworks make of members the subset doesn't have, and handle being `undefined`, are listed with their reasons in `TOLERATED_MISSING` (`@isoloop/dom/testing`). Examples: `moveBefore` and `getRootNode`, used when present; `documentMode`, for old IE.
 
+Rules: `dom.comment-records`, `dom.host-owned-inputs`, `dom.subset-additions`, `dom.head-not-rendered`, `dom.tolerated-missing`
+
 ### Frameworks and versions
 
 - **v1 (0.1) supports plain JS, Preact `^10 || ^11` and React `^18 || ^19`.** The adapters declare those ranges as `peerDependencies`, so apps bring any release of a supported major.
@@ -75,6 +97,8 @@ The maintainer's preference is to own the stack and keep dependencies to a minim
 - **Solid and Svelte come after 0.1, Vue is a later evaluation**. All three compile markup to HTML strings, parse them once in a `<template>` and copy them with `cloneNode(true)` or `importNode`, so they need group 2's HTML parsing plus `cloneNode` first. *(Amended 2026-11-16: all three are planned after 0.1 in [M6](../plans/m6-adapters.md), with a Vue spike first; see [below](#amended-2026-11-16-adapters-after-01).)*
 - **Web Components:** an isolate can render elements the **page** defines; the host creates them on the real DOM through the registry. Defining custom elements in the worker stays out.
 - **Angular** stays out of scope (it needs a real DOM at runtime).
+
+Rules: `dom.frameworks`, `dom.majors-in-ci`, `dom.no-worker-custom-elements`, `dom.no-angular`
 
 ### Amended 2026-11-16: adapters after 0.1
 
@@ -86,6 +110,8 @@ Decided in a roadmap grilling; planned as the [M6 initiative](../plans/m6-adapte
 4. **No change to the `isoloop-dom@1` format.** Parsing and cloning happen in the worker and send ordinary insert records; the parser is our own, forgiving and sized for well-formed compiler output. Anything that needs a new host record goes to a new ADR.
 5. **Layout reads stay in group 3.** Vue's `<Transition>` and Svelte's transitions read layout and call `element.animate`. Missing members keep throwing `NotSupportedError`, with no fake values, and the docs list them on the "What Isoloop can't hide" page.
 
+Rules: `dom.vue-adapter`, `dom.svelte-adapter`, `dom.solid-adapter`, `dom.html-parsing`, `dom.not-supported-throws`
+
 ### Amended 2026-11-24: `style` through the CSSOM
 
 Decided for the 0.1.1 patch ([plan](../plans/0.1.1-patch.md), decision 10; [#357](https://github.com/isoloop/isoloop/issues/357)); grilled on 2026-11-24 (yes to all).
@@ -96,6 +122,8 @@ Decided for the 0.1.1 patch ([plan](../plans/0.1.1-patch.md), decision 10; [#357
 4. **The protocol is unchanged.** The worker still records `style` as one attribute (decision 2), so `isoloop-dom@1` and its records stay as they are, and a worker built on 0.1.0 renders the same on a 0.1.1 host.
 5. **Host code of our own uses the CSSOM too.** The compositor sets `style.display` as a property, and the panel's own rendering goes through the same applier. `connectDevtools` wrote `style` on the page's elements (the panel's surface and fallback box) with `setAttribute`; that moved to `style.cssText` in the same change (#429). *(Corrected 2026-11-24: this point first said all of it already used the CSSOM.)*
 6. **Tested in all three browsers under a strict policy:** an e2e page with `style-src 'self'` renders a surface whose isolate sets `style` both through `el.style` and as an attribute, checks the computed style, and fails on any `securitypolicyviolation` event. The hosting guide's policy table drops the `'unsafe-inline'` row for surfaces. The guide's production policy is `style-src 'self'` for every page, surfaces included. `devCsp()` in `@isoloop/vite` keeps `'unsafe-inline'` in `style-src`, because Vite's dev server injects imported CSS as `<style>` elements, and its TSDoc says so. The devtools panel is on the strict e2e page, so it's covered too.
+
+Rules: `dom.style-cssom`
 
 ### Beyond the frameworks
 
@@ -111,6 +139,8 @@ Preact and React need only the list above, but the libraries apps use with them 
 
 Also not built: namespaces other than HTML and SVG, custom elements and Shadow DOM in the worker, hydration and server rendering, and Remote DOM's `RemoteElement` and function proxying. Canvas arrives through `requestCanvas` as an `OffscreenCanvas`.
 
+Rules: `dom.not-supported-throws`, `dom.html-parsing`
+
 ## Consequences
 
 - **No rendering dependency.** The kernel depends on nothing but its own packages, and the wire format, ids, events and sanitising are ours end to end.
@@ -125,3 +155,6 @@ Also not built: namespaces other than HTML and SVG, custom elements and Shadow D
 - **Remote DOM as decided in ADR 0006:** it works (all three gate questions came back "yes"), but means about 7,000 adopted lines, five gaps to patch, a deprecated receiver, and the replacement project still ahead of us.
 - **Remote DOM's polyfill only, with our own records:** removes the receiver question but keeps the largest part of the dependency (about 4,270 lines) and the `style`, property and class gaps.
 - **Extend `legacy-vdom` with keyed diffing:** no DOM in the worker, but frameworks render into a DOM, so every adapter would need its own virtual-DOM reconciler. That's more code than the subset.
+
+Rules: `dom.no-vdom-reconciler`
+
