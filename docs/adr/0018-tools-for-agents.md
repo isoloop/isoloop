@@ -65,6 +65,8 @@ const quote = topic({
 - **The host makes the JSON Schema from the contract it already has.** `TopicShape` carries the topic's Standard Schema as `schema`. The host reads it only to make JSON Schema and never validates with it. The helpers live in `@isoloop/protocol`, because the host may not import the bus and both depend on protocol. They're `@internal`, and the bus re-exports them for the CLI. They still appear in protocol's published `.d.ts`, and [M4d](../plans/m4d-release.md)'s API freeze tidies that up.
 - **`tool` and `schema` stay on the host.** Neither is part of `topicConfigOf`, so the bus and its contracts-mismatch check don't see it: the bus never acts on it, and a differing `tool` doesn't break delivery. Transports only run on the host.
 
+Rules: `agent.tool-field`, `agent.tool-needs-reply`, `agent.tool-hints`, `agent.tool-name`, `agent.tool-schemas`, `agent.tool-host-only`
+
 ### 2. The app opts in: `agents.expose`
 
 ```ts
@@ -82,6 +84,8 @@ createKernel({
   - `timeoutMs`, the `agents.timeoutMs` to pass to `kernel.request`, because a transport can't read the kernel's config;
   - `topic`, the `TopicRef` to call, so a transport needs no lookup by name and `kernel.request` keeps taking a `TopicRef` only.
 
+Rules: `agent.expose-app-only`, `agent.kernel-tools`
+
 ### 3. The kernel checks at start
 
 `createKernel` throws `KernelError('not_exposable')`, naming the topic, when an `expose` pattern matches a topic that:
@@ -90,6 +94,8 @@ createKernel({
 - has a schema (topic or `reply`) without `~standard.jsonSchema`, or is `unchecked`. An agent needs a real input schema. This is stricter than `isoloop contracts export`, which still writes an `unchecked` topic as `{}` and flags it (ADR 0003, decision 21).
 
 A pattern that matches no topic warns once through a kernel event, `agents:unmatched`, named like `workers:budget`, so devtools can show it. The JSON Schemas are made once, at start.
+
+Rules: `agent.start-check`, `agent.unmatched-warning`
 
 ### 4. `kernel.request`
 
@@ -107,6 +113,8 @@ kernel.request(topic, value, { key?, timeoutMs?, signal?, via? }): Promise<ROut>
 - **The record carries `req: { from: 'host', id, via? }`.** `from` is the bus's existing host producer id (`HOST_PRODUCER`), the same as for `kernel.publish`, so one id means the main thread; the M4a grilling first said `'kernel'`. `via` is a short string the caller sets: `'mcp'` and `'webmcp'` for the two transports here, `'builder'` later. A handler can refuse agent calls or log them. An isolate's own `bus.request` never sets `via`. `via` is self-declared: a label for logging and policy between cooperating code on one page, never something to authorize with (see Consequences). The values are a closed list, `RequestVia`. Any other value rejects with `invalid`, so a typo can't slip through, and a new transport first adds its value to the protocol.
 - **Protocol:** a new `HostToBus` `request` envelope (its answer comes as `result`, like the host's `publish`), and the optional `via` on `BusRecord.req`. Nothing else in the protocol changes. Both are additions, so isolates built against an older protocol keep working ([ADR 0012](0012-isolates-built-apart.md)'s floor is unchanged).
 
+Rules: `agent.kernel-request`, `agent.request-errors`, `agent.request-timeout-default`, `agent.request-via`
+
 ### 5. A call waits for a restart, up to the timeout
 
 The request record is in the topic's log, so an isolate that restarts within the timeout gets the call when it resubscribes, and replies. Agent calls time out after `agents.timeoutMs` (10 s by default): long enough for a restart and catch-up, short enough not to look broken.
@@ -120,13 +128,19 @@ The request record is in the topic's log, so an isolate that restarts within the
 - **Both transports pass it on as they pass every `BusError`.** The dev MCP answers the tool call with `isError` and the text `dropped: <message>` (`#settle` in `packages/cli/src/mcp/server.ts`). `@isoloop/webmcp` rejects `execute` with the `BusError`, so a Firefox agent sees the message and a Chromium agent sees "Tool execution failed", as in decision 8's table.
 - **The Agents guide says to size a tool's topic's retention for its largest burst** of calls, since retention caps how many calls can wait at once.
 
+Rules: `agent.request-errors`, `agent.agent-timeout`, `agent.restart-wait`, `agent.dropped`
+
 ### 6. `no_responder` at once
 
 Before sending any `kernel.request`, agent or not, the host checks for at least one isolate that could answer: its grants allow subscribing to the topic, and its state is anything but `stopped` or `failed` (so `loading`, `running`, `blocked`, `crashed`, `restarting` and `suspended` all count, since each can still answer within the timeout). If there's none (every such isolate has given up with `failed` or was stopped, or none was spawned), the call fails at once with `no_responder` instead of waiting out the timeout. This only reads grants and states the host already has; the bus doesn't change. A positive check doesn't promise that a reply will come, so the timeout still applies. An isolate's own `bus.request` doesn't get this check: that would need the bus to know which isolates could answer, and it's in [would-like](../would-like.md).
 
+Rules: `agent.no-responder`
+
 ### 7. Tool handlers must be idempotent by `req.id`
 
 A crash after a handler's side effect but before its reply delivers the record again, as for any handler (the bus guide's rule, at-least-once delivery). For a `consequential` tool that means doing the work twice, so its handler must check `req.id` first. The docs and the markets example show how. De-duplication in the bus is in [would-like](../would-like.md).
+
+Rules: `agent.idempotent-handlers`
 
 ### 8. Two transports, each in its own entry
 
@@ -169,6 +183,8 @@ Both are ordinary clients of `kernel.tools()` and `kernel.request()`. Neither is
 - Chromium's `toolcancel` names only the tool (`toolName`), so it aborts every call of that tool in flight.
 
 Firefox's WebMCP is behind prefs and not shipped, so this follows it the way the rest of the package follows Chromium's flag: `@experimental`, until [M7](../plans/m7-webmcp-stable.md).
+
+Rules: `agent.dev-mcp-entry`, `agent.dev-mcp-pairing`, `agent.dev-mcp-build-guard`, `agent.dev-mcp-write`, `agent.webmcp-connect`, `agent.webmcp-lookup`, `agent.webmcp-hints-when-true`, `agent.webmcp-duplicate-name`, `agent.webmcp-cancel`, `agent.webmcp-stays-registered`
 
 ## Consequences
 
