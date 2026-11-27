@@ -2,6 +2,10 @@
 
 What was decided and shipped, by date, newest first. The order ahead is in the [roadmap](roadmap.md), and each milestone's status in the [plans index](README.md#milestones). Until 2026-11-25 this was one paragraph in the plans index; it was split into dates with its wording kept.
 
+## 2026-11-27
+
+- A rules registry was grilled (Q1–Q31, yes to all) and written up as [ADR 0026](../adr/0026-rules-registry.md) (Proposed): what holds today, one fact per rule, in `docs/rules/`, with each rule's history of decisions and amendments, checked in CI and shown on a local board. It's internal tooling, not a milestone, and runs beside M8 Watchers W1.
+
 ## 2026-11-26
 
 - The remaining `0.2` issues were grilled (Q1–Q19, yes to all):
