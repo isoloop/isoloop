@@ -803,6 +803,11 @@ export class Broker {
         reply({ ok: true, value: null });
         return;
       }
+      case 'watch':
+      case 'unwatch':
+        // M8 Watchers W1 task 3 replaces this placeholder
+        reply(fail('unsupported', `${msg.t} is not handled by this bus yet`));
+        return;
       case 'commits': {
         // Each entry stands alone (ADR 0016, decision 1): one that fails
         // doesn't stop the others. With an id, the reply is the first failure.

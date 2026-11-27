@@ -349,6 +349,9 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
         }
         return;
       }
+      case 'view':
+        // M8 Watchers W1 task 4 replaces this placeholder
+        return;
       default: {
         const never: never = msg;
         return never;

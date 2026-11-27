@@ -74,6 +74,20 @@ export type PublishId = { epoch?: number; seq?: number };
  */
 export type StartPosition = 'latest' | 'earliest' | 'committed';
 
+/**
+ * A watched key: a record's key, or `null` for records published without
+ * one (ADR 0023, point 3).
+ * @experimental
+ */
+export type WatchKey = string | null;
+
+/**
+ * One changed key in a {@link BusToIsolate} `view`: its newest retained
+ * value, and `version`, that record's offset (ADR 0023, point 5).
+ * @experimental
+ */
+export type ViewValue = { key: WatchKey; version: number; value: unknown };
+
 /** Bus port: isolate → bus worker. */
 export type IsolateToBus =
   /** With `id` set, the broker replies with `result`. */
@@ -89,10 +103,17 @@ export type IsolateToBus =
    * with `offset ≤ offset` and `seq ≤ seq` (ADR 0016, points 11–12), and
    * the first `partial` records of delivery `seq + 1`, when it's partly
    * settled (point 17).
+   *
+   * `seen` (ADR 0023, point 13) is the highest `view` settled per watch,
+   * from `vseq`. It rides on a `commits` the port sends anyway.
+   * @experimental `seen`
    */
   | Envelope<
       'commits',
-      { offsets: { topic: string; offset: number; seq: number; partial?: number }[] }
+      {
+        offsets: { topic: string; offset: number; seq: number; partial?: number }[];
+        seen?: { topic: string; vseq: number }[];
+      }
     >
   /**
    * `bus.request`: appended like a publish, with `req` set on the record. `id`
@@ -104,7 +125,23 @@ export type IsolateToBus =
       { topic: string; key?: string; value: unknown; timeoutMs: number } & PublishId
     >
   /** Answers the request record at `offset`. With `id` set, the responder gets `result`. */
-  | Envelope<'reply', { topic: string; offset: number; value: unknown }>;
+  | Envelope<'reply', { topic: string; offset: number; value: unknown }>
+  /**
+   * Watch a topic: the current value per key, not the stream (ADR 0023,
+   * points 1 and 13). `keys` is the union of the keys the isolate's watches
+   * on the topic want; absent means every key. `have` lists `[key, version]`
+   * for the keys the client already holds, sent on reattach after a bus
+   * restart so the bus sends only what differs. A second `watch` on a topic
+   * replaces the first. Needs the subscribe grant for the topic, and a
+   * refused watch gets a `forbidden` `result`, as a refused `subscribe` does.
+   * @experimental
+   */
+  | Envelope<
+      'watch',
+      { topic: string; keys?: readonly WatchKey[]; have?: readonly [WatchKey, number][] }
+    >
+  /** Ends the port's watch on a topic (ADR 0023, point 13). @experimental */
+  | Envelope<'unwatch', { topic: string }>;
 
 /** Bus port: bus worker → isolate. */
 export type BusToIsolate =
@@ -119,7 +156,21 @@ export type BusToIsolate =
     >
   /** A memory topic was lost in a bus restart (ADR 0007). */
   | Envelope<'reset', { topic: string; reason: 'bus_restart' }>
-  | Envelope<'result', CallResult>;
+  | Envelope<'result', CallResult>
+  /**
+   * The keys of a watched topic that changed (ADR 0023, points 13 and 15 to
+   * 18). `values` holds the newest value per changed key, `cleared` the keys
+   * retention removed. `vseq` counts the views to this watch on this
+   * connection, from 1 at each `watch`. The first view after a `watch` is
+   * sent in parts of at most 512 values, each with its own `vseq`; only the
+   * last waits for `seen`. After a bus restart that lost a memory topic, the
+   * bus sends no `reset`: an empty snapshot is the reset (point 23).
+   * @experimental
+   */
+  | Envelope<
+      'view',
+      { topic: string; vseq: number; values: ViewValue[]; cleared?: readonly WatchKey[] }
+    >;
 
 export const ISOLATE_TO_BUS: MessageTypes<IsolateToBus> = {
   publish: true,
@@ -128,12 +179,15 @@ export const ISOLATE_TO_BUS: MessageTypes<IsolateToBus> = {
   commits: true,
   request: true,
   reply: true,
+  watch: true,
+  unwatch: true,
 };
 
 export const BUS_TO_ISOLATE: MessageTypes<BusToIsolate> = {
   deliver: true,
   reset: true,
   result: true,
+  view: true,
 };
 
 export const isIsolateToBus: (x: unknown) => x is IsolateToBus =

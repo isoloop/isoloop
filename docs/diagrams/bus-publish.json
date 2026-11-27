@@ -78,8 +78,8 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 853,
-          "end_line": 878,
+          "line": 858,
+          "end_line": 883,
           "label": "forbidden, unknown_topic, too_large",
           "anchor": "const system = isSystemTopic(name);"
         }
@@ -96,8 +96,8 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 895,
-          "end_line": 926,
+          "line": 900,
+          "end_line": 931,
           "label": "validate, then drain in order",
           "anchor": "this.#enqueue(name, topic, pending, validate(topic.def.schema, value));"
         }
@@ -114,15 +114,15 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 849,
-          "end_line": 852,
+          "line": 854,
+          "end_line": 857,
           "label": "counted by error code",
           "anchor": "const settle = (r: CallResult): void => {"
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1031,
-          "end_line": 1055,
+          "line": 1036,
+          "end_line": 1060,
           "label": "invalid, not_encodable",
           "anchor": "#check(name: string, r: Validated | undefined, persistent = false): CallResult {"
         }
@@ -139,8 +139,8 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 928,
-          "end_line": 938,
+          "line": 933,
+          "end_line": 943,
           "label": "a re-send gets its old offset",
           "anchor": "#finish(name: string, topic: Topic, p: Pending): void {"
         }
@@ -181,15 +181,15 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 939,
-          "end_line": 967,
+          "line": 944,
+          "end_line": 972,
           "label": "check, quota, append, fan out",
           "anchor": "const checked = this.#check(name, p.result, topic.def.durability === 'persistent');"
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1059,
-          "end_line": 1070,
+          "line": 1064,
+          "end_line": 1075,
           "label": "persistent: ack after flush",
           "anchor": "/** Acknowledged once its batch is on disk (ADR 0007, decision 2). */"
         }
@@ -214,8 +214,8 @@
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1449,
-          "end_line": 1459,
+          "line": 1454,
+          "end_line": 1464,
           "label": "evicted records paged in",
           "anchor": "#pump(sub: Subscription): void {"
         }
@@ -232,8 +232,8 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1427,
-          "end_line": 1471,
+          "line": 1432,
+          "end_line": 1476,
           "label": "deliver under credit",
           "anchor": "#deliver(sub: Subscription, records: BusRecord[], gap?: { from: number; to: number }): number {"
         },
@@ -256,8 +256,8 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1473,
-          "end_line": 1491,
+          "line": 1478,
+          "end_line": 1496,
           "label": "by key hash or round-robin",
           "anchor": "/** The member a record goes to: by key hash, or round-robin when keyless. */"
         }
@@ -274,16 +274,16 @@
       "sources": [
         {
           "path": "packages/protocol/src/messages/bus.ts",
-          "line": 83,
-          "end_line": 88,
+          "line": 97,
+          "end_line": 102,
           "label": "commits",
           "anchor": "* Each entry is the highest settled offset of one subscription on this port",
           "anchor_offset": 1
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1325,
-          "end_line": 1341,
+          "line": 1330,
+          "end_line": 1346,
           "label": "commit per subscription",
           "anchor": "#commit("
         }
