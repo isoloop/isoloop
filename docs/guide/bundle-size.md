@@ -28,10 +28,10 @@ Read this when you're checking what Isoloop costs in bytes, or keeping an isolat
 | Script, loaded by URL | Minified | Gzipped |
 | --- | --- | --- |
 | The bus worker | 64.4 KB | 22.1 KB |
-| The isolate worker | 42.7 KB | 14.9 KB |
+| The isolate worker | 47.1 KB | 16.5 KB |
 | The devtools panel | 13.1 KB | 5.5 KB |
 
-These are Isoloop `0.1.0-next.11` built with Vite 8.3.7 (Rolldown 1.2.18), minified, with React and Preact left out, on 2026-11-21, and the React and Preact isolates on `main` at `0.1.0` with Vite 8.3.8 on 2026-11-26, and the bus worker the same way on 2026-11-27 ([bench/bundle-size](../../bench/bundle-size/README.md)). Sizes don't depend on the machine. CI checks each one against a budget, so a change that grows one says why.
+These are Isoloop `0.1.0-next.11` built with Vite 8.3.7 (Rolldown 1.2.18), minified, with React and Preact left out, on 2026-11-21, and the React and Preact isolates on `main` at `0.1.0` with Vite 8.3.8 on 2026-11-26, and the bus worker and the isolate worker the same way on 2026-11-27 ([bench/bundle-size](../../bench/bundle-size/README.md)). Sizes don't depend on the machine. CI checks each one against a budget, so a change that grows one says why.
 
 ## Keep your bundles small
 

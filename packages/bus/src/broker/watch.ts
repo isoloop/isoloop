@@ -356,16 +356,20 @@ export class WatchBook {
       );
     }
     if (!snapshot && values.length === 0 && cleared.length === 0) return;
-    // The snapshot goes out in parts, back to back; only the last waits for
-    // `seen` (point 18). A later view is one message.
+    // The snapshot goes out in parts, back to back; every part but the last
+    // has `more`, and only the last waits for `seen` (points 13 and 18). A
+    // later view is one message.
     const size = snapshot ? VIEW_PART : Math.max(values.length, 1);
     let i = 0;
     do {
       const part = values.slice(i, i + size);
-      const p =
-        i === 0 && cleared.length > 0
-          ? { topic: w.topic, vseq: ++w.vseq, values: part, cleared }
-          : { topic: w.topic, vseq: ++w.vseq, values: part };
+      const p: Extract<BusToIsolate, { t: 'view' }>['p'] = {
+        topic: w.topic,
+        vseq: ++w.vseq,
+        values: part,
+      };
+      if (i === 0 && cleared.length > 0) p.cleared = cleared;
+      if (i + size < values.length) p.more = true;
       w.watcher.port.post({ v: 1, t: 'view', p });
       i += size;
     } while (i < values.length);

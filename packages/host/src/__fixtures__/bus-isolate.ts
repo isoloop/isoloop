@@ -1,6 +1,6 @@
 // Headless test isolate on the real runtime and BusClient. Typed
 // structurally: host may not import @isoloop/runtime.
-import { count, report } from './contracts';
+import { count, report, saved } from './contracts';
 
 type Rec = { offset: number; value: unknown };
 type Ctx = {
@@ -9,6 +9,10 @@ type Ctx = {
   bus: {
     publish(topic: unknown, value: unknown): Promise<void>;
     subscribe(topic: unknown, fn: (r: Rec) => void, opts?: { from?: string }): () => void;
+    watch(
+      topic: unknown,
+      onView: (view: ReadonlyMap<string | null, unknown>, changed: ReadonlySet<unknown>) => void,
+    ): () => void;
   };
 };
 
@@ -40,6 +44,22 @@ export default {
         { from: 'committed' },
       );
       send();
+      return;
+    }
+    if (mode(ctx.config) === 'watcher') {
+      // Watches a memory topic and a persistent one, and reports each view.
+      const views: Record<string, [string | null, unknown][]> = {};
+      let calls = 0;
+      for (const [name, topic] of [
+        ['count.v1', count],
+        ['saved.v1', saved],
+      ] as const) {
+        ctx.bus.watch(topic, (view) => {
+          views[name] = [...view];
+          calls++;
+          send({ views: { ...views }, calls });
+        });
+      }
       return;
     }
     if (mode(ctx.config) === 'publisher') {

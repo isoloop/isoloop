@@ -264,16 +264,30 @@ describe('watch', () => {
     const iso = connect(broker, 'A', all);
     await iso.call('watch', { topic: 'prices.v1' });
     const parts = views(iso, 'prices.v1');
-    expect(parts.map((p) => [p.vseq, p.values.length])).toEqual([
-      [1, VIEW_PART],
-      [2, VIEW_PART],
-      [3, 10],
+    expect(parts.map((p) => [p.vseq, p.values.length, p.more])).toEqual([
+      [1, VIEW_PART, true],
+      [2, VIEW_PART, true],
+      [3, 10, undefined],
     ]);
     await pub('prices.v1', 'k0', -1);
     await seen(iso, 'prices.v1', 2);
     expect(views(iso, 'prices.v1')).toHaveLength(3);
     await seen(iso, 'prices.v1', 3);
+    // A view after the snapshot is one part, without `more`.
     expect(lastView(iso, 'prices.v1')).toMatchObject({ vseq: 4, values: [{ key: 'k0' }] });
+    expect(lastView(iso, 'prices.v1')?.more).toBeUndefined();
+  });
+
+  it('ends a snapshot of exactly 512 × n values on a full part without more', async () => {
+    const { broker, pubMany } = setup();
+    await pubMany('prices.v1', VIEW_PART * 2, (i) => `k${i}`);
+    const iso = connect(broker, 'A', all);
+    await iso.call('watch', { topic: 'prices.v1' });
+    const parts = views(iso, 'prices.v1');
+    expect(parts.map((p) => [p.vseq, p.values.length, p.more])).toEqual([
+      [1, VIEW_PART, true],
+      [2, VIEW_PART, undefined],
+    ]);
   });
 
   it('reads a later watch’s snapshot from the map while the grace lasts', async () => {

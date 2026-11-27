@@ -26,6 +26,6 @@
   "app:vanilla isolate": 2048,
   "script:@isoloop/bus/worker": 69632,
   "script:@isoloop/devtools/panel": 14336,
-  "script:@isoloop/runtime/bootstrap": 45568,
-  "script:@isoloop/runtime/worker": 46080
+  "script:@isoloop/runtime/bootstrap": 50176,
+  "script:@isoloop/runtime/worker": 50688
 }

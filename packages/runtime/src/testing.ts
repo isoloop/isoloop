@@ -12,7 +12,7 @@ import {
   type TopicRef,
   type TypedRecord,
 } from '@isoloop/protocol';
-import type { BusClient, SubscribeOptions } from './bus/bus-client';
+import type { BusClient, OnView, SubscribeOptions, WatchOptions } from './bus/bus-client';
 import type { HostApi } from './isolate/host-calls';
 import type { IsolateContext, IsolateRoot } from './isolate/vanilla';
 
@@ -20,6 +20,12 @@ type Sub = {
   topic: string;
   fn: (r: TypedRecord<unknown>) => void | Promise<void>;
   opts: SubscribeOptions;
+};
+
+type Watch = {
+  topic: string;
+  keys: ReadonlySet<string | null> | undefined;
+  onView: OnView<unknown>;
 };
 
 /** `createTestContext`'s options. */
@@ -42,14 +48,22 @@ export type TestContext = {
   readonly ctx: IsolateContext;
   /** What `ctx.reportError` got, in order. */
   readonly errors: { error: unknown; fatal: boolean }[];
-  /** Delivers a record to every subscription on `topic`, in order. */
+  /**
+   * Delivers a record to every subscription on `topic`, in order, and passes
+   * its value to every watch of its key (`null` without a key) as one view.
+   */
   emit: (topic: string, value: unknown, key?: string) => void;
-  /** Runs `onReset` of every subscription on `topic`, as when a bus restart loses a memory topic. */
+  /**
+   * Runs `onReset` of every subscription on `topic`, and empties its watches'
+   * views, as when a bus restart loses a memory topic.
+   */
   reset: (topic: string) => void;
   /** Every `publish`, in order. */
   readonly published: { topic: string; key?: string; value: unknown }[];
   /** Open subscriptions, by topic and start position. */
   subscriptions: () => { topic: string; from: string }[];
+  /** Open watches, by topic and keys (`undefined` for every key). @experimental */
+  watches: () => { topic: string; keys: (string | null)[] | undefined }[];
   /** Runs the `onShutdown` handlers, as the runtime does on `stop`. `reason` defaults to `'stop'`. */
   shutdown: (reason?: ShutdownReason) => Promise<void>;
 };
@@ -66,6 +80,16 @@ const ZERO: Rect = { x: 0, y: 0, width: 0, height: 0 };
  */
 export function createTestContext(o: TestContextOptions = {}): TestContext {
   const subs = new Set<Sub>();
+  const watches = new Set<Watch>();
+  /** The newest value per key of each topic emitted to, for watches. */
+  const latest = new Map<string, Map<string | null, unknown>>();
+  const viewOf = (w: Watch): Map<string | null, unknown> => {
+    const all = latest.get(w.topic) ?? new Map<string | null, unknown>();
+    if (!w.keys) return new Map(all);
+    const view = new Map<string | null, unknown>();
+    for (const k of w.keys) if (all.has(k)) view.set(k, all.get(k));
+    return view;
+  };
   const published: TestContext['published'] = [];
   const shutdownFns: ((reason: ShutdownReason) => void | Promise<void>)[] = [];
   const errors: TestContext['errors'] = [];
@@ -118,6 +142,24 @@ export function createTestContext(o: TestContextOptions = {}): TestContext {
     },
     reply: () => Promise.resolve(),
     commit: () => {},
+    watch<Out>(topic: TopicRef<any, Out, any, any>, onView: OnView<Out>, wo: WatchOptions = {}) {
+      const w: Watch = {
+        topic: topic.name,
+        keys: wo.keys ? new Set(wo.keys) : undefined,
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the test emits the topic's values
+        onView: onView as OnView<unknown>,
+      };
+      watches.add(w);
+      // The snapshot: what was emitted so far, after the caller has the unwatch.
+      queueMicrotask(() => {
+        if (!watches.has(w)) return;
+        const view = viewOf(w);
+        void w.onView(view, new Set(view.keys()));
+      });
+      return () => {
+        watches.delete(w);
+      };
+    },
   };
 
   const host: HostApi = {
@@ -190,11 +232,27 @@ export function createTestContext(o: TestContextOptions = {}): TestContext {
         ...(key === undefined ? {} : { key }),
       };
       for (const s of subs) if (s.topic === topic) void s.fn(rec);
+      const k = key ?? null;
+      let values = latest.get(topic);
+      if (!values) latest.set(topic, (values = new Map<string | null, unknown>()));
+      values.set(k, value);
+      for (const w of watches) {
+        if (w.topic === topic && (!w.keys || w.keys.has(k))) void w.onView(viewOf(w), new Set([k]));
+      }
     },
     reset(topic) {
       for (const s of subs) if (s.topic === topic) s.opts.onReset?.();
+      const lost = latest.get(topic);
+      latest.delete(topic);
+      for (const w of watches) {
+        if (w.topic !== topic) continue;
+        const changed = new Set([...(lost?.keys() ?? [])].filter((k) => !w.keys || w.keys.has(k)));
+        if (changed.size > 0) void w.onView(viewOf(w), changed);
+      }
     },
     subscriptions: () => [...subs].map((s) => ({ topic: s.topic, from: s.opts.from ?? 'latest' })),
+    watches: () =>
+      [...watches].map((w) => ({ topic: w.topic, keys: w.keys ? [...w.keys] : undefined })),
     async shutdown(reason = 'stop') {
       await Promise.allSettled(shutdownFns.map(async (fn) => fn(reason)));
     },

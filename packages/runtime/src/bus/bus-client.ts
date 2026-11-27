@@ -24,21 +24,29 @@
  *   every publish the old bus never answered, in order.
  *   Each publish and request carries `(epoch, seq)`, so a persistent topic
  *   doesn't append a re-send the old bus already wrote (ADR 0007, step 5).
+ * - `watch` reads the current value per key instead of the stream; its
+ *   views and their `seen` are in `watches.ts` (ADR 0023). `seen` rides on
+ *   the same `commits`.
  */
 import {
   BusError,
   createCommitter,
+  DEFAULT_COMMIT_INTERVAL_MS,
   deliveryPoints,
   isBusToIsolate,
   type BusRecord,
   type BusToIsolate,
   type CallResult,
+  type CommitOffsets,
   type CommitPoint,
   type IsolateToBus,
   type StartPosition,
   type TopicRef,
   type TypedRecord,
 } from '@isoloop/protocol';
+import { createWatches, isThenable, type OnView, type WatchOptions } from './watches';
+
+export type { OnView, WatchOptions } from './watches';
 
 /** `bus.request`'s options. @experimental */
 export type RequestOptions = {
@@ -141,6 +149,29 @@ export interface BusClient {
    * @experimental
    */
   commit(record: TypedRecord<unknown>): void;
+  /**
+   * A watcher skips values; use `useTopic` or `subscribe` to get every record.
+   *
+   * Reads a topic's current value per key, not its stream: `onView` gets a
+   * snapshot first, the newest retained value of each key it watches, then
+   * the keys that changed. When several values arrive for one key between
+   * two views, only the newest is passed on. Records with no key share the
+   * key `null`. A key leaves the view when retention removes its newest
+   * record. Several watches on one topic share one watch on the bus, so
+   * each component can have its own. Needs the subscribe grant for the
+   * topic; a refused watch is reported as a non-fatal error.
+   * @param topic The topic, from the contracts.
+   * @param onView Called with the whole view and the keys that changed; the
+   *   next view waits until it returns or its promise settles.
+   * @param opts The keys to watch. Default: every key.
+   * @returns The function that ends this watch.
+   * @experimental
+   */
+  watch<Out>(
+    topic: TopicRef<any, Out, any, any>,
+    onView: OnView<Out>,
+    opts?: WatchOptions,
+  ): () => void;
 }
 
 export type BusClientOptions = {
@@ -248,10 +279,47 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
     });
   };
 
-  const committer = createCommitter({
-    send: (offsets) => {
-      send({ v: 1, t: 'commits', p: { offsets } });
+  /** Sends a `commits` with these offsets and every `seen` still pending. */
+  const sendCommits = (offsets: CommitOffsets): void => {
+    clearSeenTimer();
+    const seen = watches.takeSeen();
+    if (offsets.length === 0 && seen.length === 0) return;
+    send({ v: 1, t: 'commits', p: seen.length > 0 ? { offsets, seen } : { offsets } });
+  };
+  const intervalMs = o.commitIntervalMs ?? DEFAULT_COMMIT_INTERVAL_MS;
+  let seenTimer: ReturnType<typeof setTimeout> | undefined;
+  let seenQueued = false;
+  const clearSeenTimer = (): void => {
+    if (seenTimer !== undefined) clearTimeout(seenTimer);
+    seenTimer = undefined;
+    seenQueued = false;
+  };
+  const watches = createWatches({
+    send,
+    call: (msg) => call(msg),
+    now,
+    onError: (err) => o.onError?.(err),
+    intervalMs,
+    flushNow: () => sendCommits(committer.take() ?? []),
+    flushSoon: () => {
+      // At most one `commits` per interval: with the committer's, when it has offsets.
+      if (intervalMs === 0) {
+        if (seenQueued) return;
+        seenQueued = true;
+        queueMicrotask(() => {
+          if (seenQueued) sendCommits(committer.take() ?? []);
+        });
+        return;
+      }
+      seenTimer ??= setTimeout(() => sendCommits(committer.take() ?? []), intervalMs);
     },
+    delivered: () => {
+      lastDelivery = now();
+    },
+  });
+
+  const committer = createCommitter({
+    send: sendCommits,
     ...(o.commitIntervalMs === undefined ? {} : { intervalMs: o.commitIntervalMs }),
     ...(o.credit === undefined ? {} : { credit: o.credit }),
   });
@@ -350,7 +418,7 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
         return;
       }
       case 'view':
-        // M8 Watchers W1 task 4 replaces this placeholder
+        watches.receive(msg);
         return;
       default: {
         const never: never = msg;
@@ -440,6 +508,10 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
       if (d === undefined) throw new Error('commit: this record was not delivered to this isolate');
       commit(d);
     },
+
+    watch(topic, onView, opts) {
+      return watches.watch(topic.name, onView, opts);
+    },
   };
 
   return {
@@ -453,8 +525,8 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
       listen(next);
       const unanswered = [...pending.values()];
       for (const p of unanswered) {
-        if (p.msg.t !== 'subscribe') continue;
-        // Superseded by the subscribe sent below.
+        if (p.msg.t !== 'subscribe' && p.msg.t !== 'watch') continue;
+        // Superseded by the subscribe or watch sent below.
         pending.delete(p.msg.id);
         p.settle({ ok: true, value: null });
       }
@@ -467,26 +539,22 @@ export function createBusClient(first: MessagePort, o: BusClientOptions = {}): B
       // duplicates there; a persistent topic answers what it already holds
       // by its id.
       committer.take();
+      clearSeenTimer();
       for (const sub of subs.values()) {
         sub.queue.length = 0;
         // A new connection numbers its deliveries from 1 again (ADR 0016, point 13).
         sub.highest = -1;
         sendSubscribe(sub);
       }
-      for (const p of unanswered) if (p.msg.t !== 'subscribe') send(p.msg);
+      // Watches again with `have`: the new bus sends only what differs (ADR 0023, point 23).
+      watches.reattach();
+      for (const p of unanswered) if (p.msg.t !== 'subscribe' && p.msg.t !== 'watch') send(p.msg);
     },
     async close() {
       const offsets = committer.take();
       committer.dispose();
+      clearSeenTimer();
       if (offsets) await call({ v: 1, t: 'commits', p: { offsets } });
     },
   };
-}
-
-function isThenable(x: unknown): x is PromiseLike<unknown> {
-  return (
-    (typeof x === 'object' || typeof x === 'function') &&
-    x !== null &&
-    typeof (x as { then?: unknown }).then === 'function'
-  );
 }

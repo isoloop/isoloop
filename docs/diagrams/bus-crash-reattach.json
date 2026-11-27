@@ -29,8 +29,8 @@
         },
         {
           "path": "packages/runtime/src/bus/bus-client.ts",
-          "line": 448,
-          "end_line": 477,
+          "line": 520,
+          "end_line": 549,
           "label": "reattach in order",
           "anchor": "reattach(next) {"
         }
