@@ -29,8 +29,8 @@
         },
         {
           "path": "packages/runtime/src/bus/bus-client.ts",
-          "line": 445,
-          "end_line": 474,
+          "line": 448,
+          "end_line": 477,
           "label": "reattach in order",
           "anchor": "reattach(next) {"
         }
@@ -95,8 +95,8 @@
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1213,
-          "end_line": 1216,
+          "line": 1218,
+          "end_line": 1221,
           "label": "one reset per memory topic",
           "anchor": "if (conn.reset && !conn.reset.has(name) && !this.#durable(name)) {"
         }

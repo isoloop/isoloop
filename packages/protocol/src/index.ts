@@ -38,6 +38,8 @@ export type {
   RecordReq,
   RequestVia,
   StartPosition,
+  ViewValue,
+  WatchKey,
 } from './messages/bus';
 export {
   DEFAULT_COMMIT_INTERVAL_MS,
