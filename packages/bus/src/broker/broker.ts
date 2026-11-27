@@ -18,7 +18,7 @@ import {
 } from '@isoloop/protocol';
 import type { AppendId, LogEngine, NewRecord } from '../engine/types';
 import { estimateSize } from './size';
-import { WatchBook } from './watch';
+import { WatchBook, type WatchStats } from './watch';
 import {
   copySeed,
   mapRecord,
@@ -140,6 +140,8 @@ export type BrokerStats = {
   subscriptions: { consumer: string; topic: string; lag: number; credit: number }[];
   /** Rejected publishes and requests, by error code. */
   rejected: Partial<Record<ErrorCode, number>>;
+  /** Topics watched now or since the broker started (ADR 0023, point 25). */
+  watches: WatchStats[];
 };
 
 type Validated = StandardSchemaV1.Result<unknown> | { thrown: unknown };
@@ -441,6 +443,7 @@ export class Broker {
       })),
       subscriptions,
       rejected: { ...this.#rejected },
+      watches: this.#watches.stats(),
     };
   }
 

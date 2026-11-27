@@ -34,6 +34,11 @@ type HarnessKernel = {
     fn: (r: { offset: number; key?: string; value: unknown; producer: string }) => void,
     opts?: { from?: 'latest' | 'earliest' | 'committed' },
   ): () => void;
+  watch(
+    topic: { name: string },
+    onView: (view: ReadonlyMap<string | null, unknown>) => void,
+    opts?: { keys?: (string | null)[] },
+  ): () => void;
   publish(topic: { name: string }, value: unknown, opts?: { key?: string }): Promise<void>;
   /** `kernel.watch` (ADR 0023), as far as the watchers E2E reads it. */
   watch(

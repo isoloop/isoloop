@@ -73,8 +73,8 @@
       "sources": [
         {
           "path": "packages/bus/src/server/server.ts",
-          "line": 411,
-          "end_line": 418,
+          "line": 420,
+          "end_line": 427,
           "label": "the bus beats",
           "anchor": "const startBeat = (everyMs: number): void => {"
         }
@@ -88,15 +88,15 @@
       "sources": [
         {
           "path": "packages/bus/src/server/server.ts",
-          "line": 482,
-          "end_line": 510,
+          "line": 493,
+          "end_line": 521,
           "label": "boot: lock, OPFS or memory",
           "anchor": "const boot = async (p: Extract<HostToBus, { t: 'boot' }>['p']): Promise<void> => {"
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1290,
-          "end_line": 1293,
+          "line": 1293,
+          "end_line": 1296,
           "label": "one reset per memory topic",
           "anchor": "if (conn.reset && !conn.reset.has(name) && !this.#durable(name)) {"
         }

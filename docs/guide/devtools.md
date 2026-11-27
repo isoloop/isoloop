@@ -71,10 +71,12 @@ A control that fails shows its error under the table.
 ## Bus view
 
 The Bus tab shows the bus's state and how many times it has restarted. Once the first metrics have arrived (about once a second), it also has three tabs of its own:
-- **Topics:** records and bytes a second, the head (the next offset to be written), and how many records the topic still retains.
+- **Topics:** records and bytes a second, the head (the next offset to be written), and how many records the topic still retains. Watched topics get a second table, described below.
 - **Subscriptions:** each consumer's lag (head minus its cursor), and its credit (records that may still be delivered before its next commit).
 - **Rejected publishes:** counts by error code, since the bus worker started. A bus restart starts them again from zero.
 - **Storage:** the origin's storage use, while the bus keeps files.
+
+Under the topics, a second table lists each topic that has had a watch. It shows the watches on it now (from isolates and the host together) and the distinct keys they hold. It also says, in words, how many of the topic's records each watch showed, such as "showed 1 of every 40 records on the topic". That compares every record appended to the topic while a watch was on it, keys the watch doesn't read included, with the values sent after the watch's first view, counted from the bus worker's start. These figures are experimental.
 
 The panel reads the feed on a port of its own, not through the bus, so none of these figures include it. Arrow keys move between the tabs.
 

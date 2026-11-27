@@ -21,6 +21,24 @@ export type Watcher = {
   readonly port: { post(msg: BusToIsolate): void };
 };
 
+/**
+ * A watched topic's figures for the metrics sample (ADR 0023, point 25).
+ * `records` and `values` count since the bus worker started.
+ *
+ * @internal
+ */
+export type WatchStats = {
+  topic: string;
+  /** Watches on the topic now, from isolates and the host alike. */
+  watches: number;
+  /** Distinct keys the topic's watches hold now. */
+  liveKeys: number;
+  /** Records appended while each watch was on the topic, summed over the watches. */
+  records: number;
+  /** Values sent to watches in views after their snapshot. */
+  values: number;
+};
+
 /** @internal */
 export type WatchBookOptions = {
   engine: LogEngine;
@@ -58,6 +76,8 @@ type Watch = {
   building: Build | undefined;
   paging: boolean;
   warned: boolean;
+  /** The topic's head when the watch started: `records` counts from here (point 25). */
+  startHead: number;
 };
 
 /** A view in progress: the newest record per key read so far. */
@@ -98,6 +118,12 @@ export class WatchBook {
   readonly #dev: boolean;
   readonly #topics = new Map<string, TopicWatches>();
   readonly #byWatcher = new Map<Watcher, Map<string, Watch>>();
+  /**
+   * Per topic, kept after its last watch leaves: the counters behind
+   * `WatchStats`. `records` holds only the watches that ended; a live watch's
+   * share is read from the head at sample time, so an append counts nothing.
+   */
+  readonly #counts = new Map<string, { records: number; values: number }>();
 
   constructor(opts: WatchBookOptions) {
     this.#engine = opts.engine;
@@ -120,6 +146,7 @@ export class WatchBook {
   ): void {
     const old = this.#byWatcher.get(watcher)?.get(topic);
     if (old) this.#remove(old, false);
+    this.#count(topic);
     let tw = this.#topics.get(topic);
     if (!tw) {
       tw = { watches: new Set(), snap: undefined, gen: 0, tail: this.#engine.tail(topic) };
@@ -139,6 +166,7 @@ export class WatchBook {
       building: undefined,
       paging: false,
       warned: false,
+      startHead: this.#engine.head(topic),
     };
     tw.watches.add(w);
     tw.gen++;
@@ -190,6 +218,33 @@ export class WatchBook {
     for (const w of tw.watches) this.#note(w);
   }
 
+  /** The figures of every topic watched now or since the bus worker started. */
+  stats(): WatchStats[] {
+    const out: WatchStats[] = [];
+    for (const [topic, c] of this.#counts) {
+      const keys = new Set<WatchKey>();
+      let watches = 0;
+      let records = c.records;
+      const head = this.#engine.head(topic);
+      for (const w of this.#topics.get(topic)?.watches ?? []) {
+        watches++;
+        records += head - w.startHead;
+        for (const k of w.sent.keys()) keys.add(k);
+      }
+      out.push({ topic, watches, liveKeys: keys.size, records, values: c.values });
+    }
+    return out;
+  }
+
+  #count(topic: string): { records: number; values: number } {
+    let c = this.#counts.get(topic);
+    if (!c) {
+      c = { records: 0, values: 0 };
+      this.#counts.set(topic, c);
+    }
+    return c;
+  }
+
   /**
    * The retention pass ran on `topic`. When it moved the tail, each watch
    * looks for keys that fell out, so a clear goes out with no new record
@@ -221,7 +276,8 @@ export class WatchBook {
     if (mine?.get(w.topic) === w) mine.delete(w.topic);
     const tw = this.#topics.get(w.topic);
     if (!tw) return;
-    tw.watches.delete(w);
+    if (tw.watches.delete(w))
+      this.#count(w.topic).records += this.#engine.head(w.topic) - w.startHead;
     if (!graceful || tw.watches.size > 0) return;
     const gen = ++tw.gen;
     this.#timers.set(() => {
@@ -356,6 +412,9 @@ export class WatchBook {
       );
     }
     if (!snapshot && values.length === 0 && cleared.length === 0) return;
+    // The ratio compares records with values that followed them: a snapshot's
+    // values were appended before the watch, so they aren't counted.
+    if (!snapshot) this.#count(w.topic).values += values.length;
     // The snapshot goes out in parts, back to back; every part but the last
     // has `more`, and only the last waits for `seen` (points 13 and 18). A
     // later view is one message.

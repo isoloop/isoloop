@@ -77,6 +77,7 @@ export type {
   SeedEvent,
   TapToBus,
   TopicConfig,
+  TopicWatchMetrics,
 } from './messages/control';
 export { checks, systemSchema, systemTopic } from './topics/system-topics';
 export type { Check, SystemSchema, SystemTopicDef } from './topics/system-topics';
