@@ -95,8 +95,8 @@
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1218,
-          "end_line": 1221,
+          "line": 1290,
+          "end_line": 1293,
           "label": "one reset per memory topic",
           "anchor": "if (conn.reset && !conn.reset.has(name) && !this.#durable(name)) {"
         }

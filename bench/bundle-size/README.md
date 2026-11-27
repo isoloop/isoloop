@@ -61,10 +61,10 @@ Recorded 2026-11-21: Isoloop `0.1.0-next.11`, Vite 8.3.7 (Rolldown 1.2.18), mini
 | app · React isolate | 3.2 KB | 1.6 KB | 3.5 KB |
 | app · Preact isolate | 3.5 KB | 1.8 KB | 4.0 KB |
 | app · vanilla isolate | 1.5 KB | 843 B | 2.0 KB |
-| script · @isoloop/bus/worker | 58.8 KB | 20.4 KB | 62.0 KB |
+| script · @isoloop/bus/worker | 64.4 KB | 22.1 KB | 68.0 KB |
 | script · @isoloop/devtools/panel | 13.1 KB | 5.5 KB | 14.0 KB |
 | script · @isoloop/runtime/bootstrap | 42.3 KB | 14.7 KB | 44.5 KB |
 | script · @isoloop/runtime/worker | 42.7 KB | 14.9 KB | 45.0 KB |
 <!-- table:end -->
 
-The React and Preact isolate rows and budgets were measured again on 2026-11-26, on `main` at `0.1.0` with Vite 8.3.8, when `useTopic` began sharing one subscription per topic (#410): 2.7 KB to 3.2 KB for React and 2.9 KB to 3.5 KB for Preact, minified. The other rows are from 2026-11-21.
+The React and Preact isolate rows and budgets were measured again on 2026-11-26, on `main` at `0.1.0` with Vite 8.3.8, when `useTopic` began sharing one subscription per topic (#410): 2.7 KB to 3.2 KB for React and 2.9 KB to 3.5 KB for Preact, minified. The bus worker row and budget were measured again on 2026-11-27, on `main` at `0.1.0` with Vite 8.3.8, when the bus worker began serving watches (M8 Watchers W1): 59.3 KB to 64.4 KB minified, 20.6 KB to 22.1 KB gzipped, against `main` measured the same day. The other rows are from 2026-11-21.

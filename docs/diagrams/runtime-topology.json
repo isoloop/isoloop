@@ -293,8 +293,8 @@
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 1036,
-          "end_line": 1060,
+          "line": 1080,
+          "end_line": 1104,
           "label": "persistent values must encode",
           "anchor": "#check(name: string, r: Validated | undefined, persistent = false): CallResult {"
         }
@@ -310,15 +310,15 @@
       "sources": [
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 845,
-          "end_line": 901,
+          "line": 888,
+          "end_line": 944,
           "label": "publish gates",
           "anchor": "#publish("
         },
         {
           "path": "packages/bus/src/broker/broker.ts",
-          "line": 933,
-          "end_line": 972,
+          "line": 976,
+          "end_line": 1015,
           "label": "dedup, check, append, fan out",
           "anchor": "#finish(name: string, topic: Topic, p: Pending): void {"
         },
