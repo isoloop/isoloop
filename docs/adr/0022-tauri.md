@@ -32,6 +32,8 @@ The forces:
 
 One npm package, plus one Rust crate (`isoloop-tauri`, a Tauri plugin), versioned with the rest under [ADR 0019](0019-versioning-and-releases.md). The package follows ADR 0021's layout. It ships in `0.4.0`, after [M11 Pure kernel core](../plans/m11-pure-kernel-core.md) (a Tauri host is a second shell around the kernel's decisions) and beside M5, so it can reuse M5's Rust code for the segment format (decision 4) and its cross-origin isolated test setup. That's reuse, not a block: if M5's engine doesn't ship, M12 writes the segment code in Rust itself, on the M2b segment layout.
 
+Rules: `tauri.package`
+
 ### 2. `kernel.respond`: the host answers requestable topics
 
 A new public, `@experimental` host API, the mirror of an isolate answering a request:
@@ -46,9 +48,13 @@ const off = kernel.respond(readFile, async (req, { signal }) => {
 - **It reuses what requests already have:** the topic's input and `reply` schemas, grants on topic patterns, timeouts, `no_responder` (ADR 0018). It adds no grant and changes nothing in the isolate seam: isolates call `bus.request` as today.
 - **Records for these topics cross the main thread.** That's a host consumer the app chose, as `kernel.subscribe` is, and only for the topics it responds to.
 
+Rules: `tauri.kernel-respond`, `tauri.respond-crosses-main-thread`
+
 ### 3. Native commands as requestable topics
 
 `@isoloop/tauri` gives `exposeCommands(kernel, { topic: command })`, which calls `kernel.respond` for each pair and `invoke`s the command. Two layers then guard every call: Isoloop's grant on the topic, then Tauri's capability on the command. A command not listed can't be reached through the bus.
+
+Rules: `tauri.expose-commands`
 
 ### 4. `TauriStorage`: durable topics on the app's disk
 
@@ -60,9 +66,13 @@ A third `LogStorage`, `kind: 'native'`, next to `MemoryStorage` and `OpfsStorage
 - **The bus worker reaches it without the main thread.** Records must not cross it (ADR 0005), so the transport is decided by the spike (decision 6). The candidates are a custom URI scheme the plugin registers, fetched from the bus worker with a token the host passes only to the bus at start, or Tauri's own IPC endpoint fetched directly. A relay through the host is the fallback only if both fail, and it would need an amendment to ADR 0005.
 - **Opt-in.** `OpfsStorage` keeps working in Tauri; an app picks `TauriStorage` in its kernel config.
 
+Rules: `tauri.native-storage`, `tauri.native-group-commit`, `tauri.native-reads-log`, `tauri.storage-off-main-thread`, `tauri.storage-opt-in`
+
 ### 5. A config helper and a doc page
 
 `@isoloop/tauri` ships the `tauri.conf.json` fragment for COOP/COEP and the CSP `connect-src` the storage needs. A guide page says what each OS's webview supports (OffscreenCanvas, OPFS sync handles, memory figures) as measured in the spike, not as assumed.
+
+Rules: `tauri.config-helper`
 
 ### 6. A spike first, with exit criteria
 

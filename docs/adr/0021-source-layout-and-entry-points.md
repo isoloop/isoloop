@@ -49,11 +49,15 @@ Moves can also break things silently:
   - the devtools entry, which finds `./panel.js` next to itself
 - **dom keeps its entries in its four folders** (`src/worker/index.ts` and the rest), as ADR 0011 decided.
 
+Rules: `tool.entries-at-top`
+
 ### 2. Everything else lives in an area
 
 - **An area** is a folder directly under `src/`, named for a concept from the [system design](../design/system-design.md), such as `kernel`, `supervisor`, `render`, `broker` or `contracts`. Area names are kebab-case. Areas are one level deep; only `__fixtures__/` may nest.
 - **Never a folder by kind:** no `utils`, `helpers`, `lib`, `common`, `misc` or `types`. dom's `shared/` names a role, the code both halves use, as ADR 0011 decided.
 - **Every package follows this,** the small ones too. codec, vite, balancer and cli get one area each.
+
+Rules: `tool.areas`
 
 ### 3. No barrels inside a package
 
@@ -62,6 +66,8 @@ Moves can also break things silently:
 - **The bus entry stops exporting the `@internal` names no other package imports.**
 - **One entry per published subpath stays.** Those entries are the frozen API, and the API check, `docs:check`, `map.json` and the reference generator all read them. They cost apps nothing, because tsdown bundles each into one file.
 
+Rules: `tool.no-barrels`
+
 ### 4. Tests and fixtures
 
 - **A test sits next to the code it tests.** A scenario test that drives a package through its entry sits in the area it exercises. Host's kernel scenarios (pools, suspension, stop and spawn, grants and the like) live in `src/kernel/`.
@@ -69,6 +75,8 @@ Moves can also break things silently:
 - **`test/`** at the package root holds helpers that tests import, such as fakes, shared suites and the balancer's simulated kernel. It holds no test files.
 - **Tests and fixtures may use a relative path to reach another package's scripts,** to start a real worker.
 - **Shipped code never uses a relative path to leave its package.** It imports other packages by name, under the dependency rules of ADR 0009 rule 4.
+
+Rules: `tool.tests-next-to-code`, `tool.no-relative-escape`
 
 ### 5. Moving files
 
@@ -81,6 +89,8 @@ Moves can also break things silently:
 - **History docs keep the paths of their day:** ADRs, plans, posts and investigations.
 - **Living docs follow the code:** the system design, the guides and `map.json`, the diagrams, the READMEs, `CONTRIBUTING.md` and the skills.
 - **No living doc carries a folder map.** It would drift, and the tree shows the layout anyway. Decision 9 records the map as it was accepted.
+
+Rules: `tool.moves-keep-names`, `tool.docs-paths`
 
 ### 6. The tree-shaking contract
 
@@ -95,6 +105,8 @@ Moves can also break things silently:
 - **An app pays for what it imports.** Unused exports drop out of every entry.
 - **Everything the kernel does ships with `createKernel`,** because its features are methods of one object. That comes from the API's shape, not from a tree-shaking fault.
 
+Rules: `tool.esm-only`, `tool.side-effects`
+
 ### 7. Bundle budgets
 
 - **`bench/bundle-size` bundles through Vite's own `build()`,** so its numbers are what a Vite 8 app gets. It reports minified and gzipped sizes and asserts the minified ones.
@@ -104,6 +116,8 @@ Moves can also break things silently:
   - the four scripts
 - **Each budget is its size at acceptance plus 5%, rounded up to the next 0.5 KB.** A PR that crosses one raises it in the same PR and says why in its description.
 - **The recorded table lives in `bench/bundle-size/README.md`.** It names the Isoloop, Vite and Rolldown versions and the date, and the bundle-size guide links it.
+
+Rules: `tool.bundle-budgets`
 
 ### 8. Enforcement
 
@@ -132,6 +146,8 @@ A `pending` list of packages not yet moved only shrinks, and the last move delet
 When a `no-changeset` PR changes the dist JS beyond tsdown's source-path comments, the API check says so in its job summary. It's a notice, not a failure, since a refactor may change output on purpose.
 
 There's no custom lint rule. oxlint's JS plugins are alpha and outside semver, and oxlint is bumped every week.
+
+Rules: `tool.layout-lint`, `tool.layout-test`
 
 ### 9. The layout at acceptance
 
