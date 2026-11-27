@@ -204,7 +204,7 @@ Isoloop's guarantees stop where the browser's tab policy starts. Background tabs
 - On `freeze` and `pagehide` the kernel asks the bus to flush persistent topics immediately (M2b).
 - Work that must continue with no tab open needs a Service Worker or a server; that is out of scope.
 
-Rules: `sup.hidden-tab`, `sup.clocks-reset-on-show`
+Rules: `sup.hidden-tab`, `sup.clocks-reset-on-show`, `dur.flush-on-freeze`, `dur.survives-reload`
 
 ## Consequences
 

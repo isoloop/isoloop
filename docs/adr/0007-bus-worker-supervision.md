@@ -21,6 +21,8 @@ We considered two ways to survive that:
   - Replication makes sense later only for a different goal: a bus shared **across tabs**.
 - **A durable log** in the browser's Origin Private File System (OPFS). Accepted. Dedicated workers get synchronous file access (`createSyncAccessHandle`), which suits append-only log segments.
 
+Rules: `dur.no-replicas`
+
 ## Decision
 
 ### 1. Supervise the bus like an isolate
@@ -39,9 +41,13 @@ topic('ticks.v1',      { retention: { kind: 'last-n', n: 500 } });   // durabili
 - **`memory`** (default): the log lives in the bus worker's memory only.
 - **`persistent`**: appends also go to OPFS segment files, batched (group commit every 5 ms or 256 records). A `publish` is acknowledged after its batch is flushed. Committed offsets of persistent topics are flushed the same way.
 
+Rules: `dur.per-topic`, `dur.group-commit`
+
 ### 3. Storage layer under the engine
 
 The `LogEngine` stays the broker's only interface. Durability is a `LogStorage` the engine writes through: `MemoryStorage` in M2, and `OpfsStorage` in milestone M2b. Records are encoded to bytes with one binary codec, shared with the M5 shared-memory engine. Old segments can be evicted from memory and read back from disk on replay, so a persistent topic can hold more than fits in memory.
+
+Rules: `dur.log-storage`, `dur.evict-replay`
 
 ### 4. Reattach, not restart, after a bus crash
 
@@ -60,9 +66,13 @@ The `LogEngine` stays the broker's only interface. Durability is a `LogStorage` 
 
 Since M2b, persistent topics resume as step 3 says. Memory topics, and persistent ones running in memory because of a fallback in decision 6, still get the reset: better than restarting every isolate, and the same code path.
 
+Rules: `dur.reattach`, `dur.resume-committed`, `dur.memory-reset`, `dur.on-reset-restart`, `dur.publish-buffer`, `dur.dedupe`, `dur.host-resend`
+
 ### 5. Safe mode against crash loops
 
 If the bus crashes again during or right after loading from OPFS, a persisted record is the likely cause. On the second such crash, the new bus worker sets the newest segment of each persistent topic aside (renamed, not deleted) and starts from the previous one. The kernel emits `bus:recovered { quarantined }` so the host can report it.
+
+Rules: `dur.safe-mode`
 
 ### 6. One tab owns the files
 
@@ -75,6 +85,8 @@ Sync access handles are exclusive, so the first tab takes a Web Lock (`isoloop-b
 - `open-failed`: `getDirectory()` or opening the files throws, as in Firefox's and Safari's private windows.
 
 Every major browser has had sync access handles in normal browsing since 2022 or 2023, so a second storage engine would serve only private windows and old browsers ([investigation](../investigations/opfs-support.md)). IndexedDB storage moves to [would-like](../would-like.md). It comes back if a major browser turns out to lack sync access in normal browsing.
+
+Rules: `dur.one-tab`, `dur.no-sync-access`, `dur.tab-own-bus`
 
 ### Amended: the restart limit is a default (2026-11-20)
 
@@ -108,9 +120,13 @@ Rules: `sup.lag-clock`, `sup.lag-clock-cap`
 - OPFS quota and eviction apply. The bus reports usage in its metrics and emits `bus:quota` near the limit.
 - More code than memory-only with a full restart: storage, codec, segment compaction and safe mode. Hence its own milestone.
 
+Rules: `dur.codec-types`, `dur.quota`
+
 ## Alternatives considered
 
 - **Replicated bus workers:** see Context; same failure domain, correlated failures, double the cost.
 - **Mirror the log on the main thread:** puts every record back on the main thread, against ADR 0005.
 - **IndexedDB** (the RFC's plan): transactional and widely available, but slower for append-heavy logs and asynchronous only. OPFS with sync handles fits a log better. It was the fallback where sync handles are missing until the 2026-11-07 amendment to decision 6, which uses memory instead.
 - **Periodic snapshots instead of a write-ahead log:** cheaper writes, but records since the last snapshot are lost. That could come later as an extra `durability: 'snapshot'` mode.
+
+Rules: `dur.no-indexeddb`, `dur.no-main-thread-mirror`, `dur.no-snapshots`
