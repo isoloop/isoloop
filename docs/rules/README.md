@@ -6,7 +6,279 @@ What holds in Isoloop today, one fact per rule, with every decision that touched
 
 What an isolate is, how it starts and stops, and the worker it runs in. Prefix `iso`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `iso.unit` | An isolate is a manifest plus a code bundle, running in a worker, supervised, with the topics it's granted. Visual and headless code are the same kind of isolate. |  | active | since `0.1.0` |
+| `iso.api-names` | The host starts and controls isolates with `kernel.spawn(manifest)`, `kernel.stop(id)`, `kernel.restart(id)` and `kernel.isolates()`. An isolate module exports `defineIsolate({ start(ctx) { … } })`, or an adapter's `defineIsolate(Component)`, and runs on `@isoloop/runtime`. |  | active | since `0.1.0` |
+| `iso.own-worker` | Each isolate runs in its own dedicated module worker unless its manifest names a pool. | `default: own worker` | active | since `0.1.0` |
+| `iso.placement-host` | Placement is set in the host's manifest alone. Isolate code is the same in its own worker and in a pool, and an isolate module can't ask for a pool or refuse one. |  | active | since `0.1.0` |
+| `iso.no-worker-identity` | Nothing in the public API exposes which worker an isolate runs in. The supervisor, the compositor and the bus key everything by isolate id. |  | active | since `0.1.0` |
+| `iso.surface-optional` | `surface` is an optional manifest field: the host element an isolate renders into. An isolate without one is headless. |  | active | since `0.1.0` |
+| `iso.headless-no-dom` | A headless isolate starts with `renderFmt: 'none'`: no DOM subset is installed and `ctx.root` is `undefined`. It never reaches the compositor, and a `patch` it posts is dropped and counted. |  | active | since `0.1.0` |
+| `iso.headless-no-surface-calls` | In a headless isolate, the host calls `measure`, `focus`, `scrollIntoView` and `requestCanvas` reject with `no_surface`. `navigate` still works. |  | active | since `0.1.0` |
+| `iso.headless-same-supervision` | A headless isolate gets the same supervision, heartbeats, bus access and replay as a visual one. When it crashes there's no fallback UI; the host sees `isolate:crash` and `isolate:failed`. |  | active | since `0.1.0` |
+| `iso.no-pane` | The unit isn't a pane with a `headless: true` flag. |  | rejected |  |
+| `iso.no-actor` | Isolates aren't actors: there's no mailbox per isolate and no addressing by isolate id. |  | rejected |  |
+| `iso.suspend-opt-in` | `manifest.suspend` is `'never'`, `'when-idle'` or `{ whenIdle: { afterMs } }`. `'never'` means Isoloop never suspends the isolate, in a hidden tab or anywhere else; `'when-idle'` waits 60 s. | `default: 'never'`, `60 000 ms` | active | since `0.1.0` |
+| `iso.suspend-idle` | An isolate is idle when it has no visible surface, nothing was delivered for `afterMs`, it holds no `ctx.keepAwake()`, and no host call or acknowledged-pending publish is in flight. Off-screen, `display: none` and hidden-tab surfaces count as not visible; headless isolates are never visible. |  | active | since `0.1.0` |
+| `iso.keep-awake` | `ctx.keepAwake()` keeps an isolate from being suspended until its release function is called. A hold has no time limit; devtools lists each with its age and where it was taken, and with `KernelConfig.dev` the console warns once a hold passes 10 minutes. | `warn after 10 min (dev)` | active | since `0.1.0` |
+| `iso.suspend-steps` | Suspending an isolate runs its `shutdown` with the usual grace, detaches it from the bus keeping its offsets, then terminates the worker. A suspended member of a consumer group leaves the group, so the group rebalances. |  | active | since `0.1.0` |
+| `iso.wake` | A suspended visual isolate wakes when its surface becomes visible. A suspended headless isolate wakes when a record arrives on a topic it subscribes to, or a request does while it's the last member of its group. Either wakes on `kernel.resume(id)`. |  | active | since `0.1.0` |
+| `iso.wake-queue` | Wakes go through a queue that starts at most 4 workers at a time, visible surfaces first in on-screen order, then headless isolates. Until an isolate renders, its surface shows the frozen snapshot of its last frame. | `4 at a time` | active | since `0.1.0` |
+| `iso.wake-on-bus-restart` | A bus restart wakes every suspended headless isolate: they resubscribe, replay and suspend again once idle. Suspended visual isolates aren't woken and catch up when shown. |  | active | since `0.1.0` |
+| `iso.wake-replay` | On waking, an isolate resubscribes from its committed offsets and replays what it missed. A subscription that asked for `from: 'latest'` resumes from `committed`, so nothing published while it slept is skipped. Losses arrive as `deliver.gap` or `reset`, never silently. |  | active | since `0.1.0` |
+| `iso.suspend-retention-warning` | The kernel warns when a suspendable isolate subscribes to a `last-n` or `time` topic, within about a second of the subscribe. |  | active | since `0.1.0` |
+| `iso.no-auto-suspend` | Isolates aren't suspended automatically, even when every subscription is durable. |  | rejected |  |
+| `iso.no-snapshot-api` | There's no snapshot API for a suspended isolate's state. |  | rejected |  |
+| `iso.no-wake-every-record` | A record doesn't wake suspended visual isolates. |  | rejected |  |
+
+### `iso.unit`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.surface-optional`, `iso.own-worker`
+- **Why:** Much of what's worth isolating draws nothing: state managers, sync engines, calculators. RFC 0001's "pane" made them fake an empty pane.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · Much of what's worth isolating draws nothing: state managers, sync engines, calculators. RFC 0001's "pane" made them fake an empty pane.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.api-names`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`, `packages/runtime/src/isolate/vanilla.ts`
+- **Related:** `iso.unit`
+- **Why:** The names follow from the isolate being the unit.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · The names follow from the isolate being the unit.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.own-worker`
+
+- **Change it:** manifest `pool`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.placement-host`, `iso.no-worker-identity`
+- **Why:** Thread isolation is the main promise: a blocked or crashed isolate affects only itself.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · Thread isolation is the main promise: a blocked or crashed isolate affects only itself.
+- 2026-11-05 · built · [#15](https://github.com/isoloop/isoloop/issues/15) · The supervisor wired to real workers, built in M1.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.placement-host`
+
+- **Change it:** manifest `pool`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.own-worker`
+- **Why:** Moving an isolate between placements is a config change, and the host decides what shares a worker.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · Moving an isolate between placements is a config change, and the host decides what shares a worker.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.no-worker-identity`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.own-worker`
+- **Why:** So pools could come later without breaking the API.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Decision](../adr/0001-one-worker-per-isolate.md#decision) · So pools could come later without breaking the API.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.surface-optional`
+
+- **Change it:** manifest `surface`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.unit`, `iso.headless-no-dom`, `iso.headless-no-surface-calls`
+- **Why:** Headless isolates are first-class, not visual ones with an empty pane.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · Headless isolates are first-class, not visual ones with an empty pane.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.headless-no-dom`
+
+- **Code:** `packages/runtime/src/isolate/vanilla.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.surface-optional`
+- **Why:** A smaller, faster start for code that draws nothing.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · A smaller, faster start for code that draws nothing.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.headless-no-surface-calls`
+
+- **Errors and events:** `no_surface`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.surface-optional`
+- **Why:** `requestCanvas` shipped in M3a, so only headless isolates reject it.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · There's no element to measure, focus or draw on.
+- 2026-11-05 · built · [#31](https://github.com/isoloop/isoloop/issues/31) · The host calls `measure`, `focus` and `scrollIntoView`, built in M1.
+- 2026-11-07 · amended · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · `requestCanvas` shipped in M3a, so only headless isolates reject it. Before: `measure`, `focus` and `scrollIntoView` reject with `no_surface` in a headless isolate, and `requestCanvas` rejects with `unsupported` in every isolate.
+- 2026-11-07 · built · [#96](https://github.com/isoloop/isoloop/issues/96) · `requestCanvas`, an `OffscreenCanvas` for canvas isolates.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.headless-same-supervision`
+
+- **Errors and events:** `isolate:crash`, `isolate:failed`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Why:** Headless code gets every guarantee visual code does.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0008 · Decision](../adr/0008-isolates-and-surfaces.md#decision) · Headless code gets every guarantee visual code does.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.no-pane`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0008 · Alternatives considered](../adr/0008-isolates-and-surfaces.md#alternatives-considered) · Why not keep RFC 0001's pane and add a flag? The word would mislead for half the use cases.
+
+### `iso.no-actor`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0008 · Alternatives considered](../adr/0008-isolates-and-surfaces.md#alternatives-considered) · Why not the actor model, which fits the supervision? Actor semantics, a mailbox per actor and addressing by id, are what the topic-based bus deliberately avoids.
+
+### `iso.suspend-opt-in`
+
+- **Change it:** manifest `suspend`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.suspend-idle`, `iso.suspend-steps`, `iso.wake`
+- **Why:** A worker per isolate costs memory, so an app can let idle isolates go; isolates that keep state in memory must opt in knowingly.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · A worker per isolate costs memory, so an app can let idle isolates go; isolates that keep state in memory must opt in knowingly.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.suspend-idle`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.suspend-opt-in`, `iso.keep-awake`
+- **Why:** Suspending must never cut off work that's still going on.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Suspending must never cut off work that's still going on.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.keep-awake`
+
+- **Change it:** `ctx.keepAwake()`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.suspend-idle`
+- **Why:** An isolate in the middle of work it can't see from the bus needs a way to say so.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · An isolate in the middle of work it can't see from the bus needs a way to say so.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.suspend-steps`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.no-snapshot-api`, `iso.wake-replay`
+- **Why:** Suspension rebuilds from the log, so the isolate gets a chance to commit and to publish what it wants kept.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Suspension rebuilds from the log, so the isolate gets a chance to commit and to publish what it wants kept.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.wake`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.wake-queue`, `iso.wake-on-bus-restart`, `iso.no-wake-every-record`
+- **Why:** Each kind wakes when it has something to do.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Each kind wakes when it has something to do.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.wake-queue`
+
+- **Change it:** `KernelConfig.suspend.maxConcurrentWakes`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.wake`
+- **Why:** Waking many isolates at once would stall the page they're waking for.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Waking many isolates at once would stall the page they're waking for.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.wake-on-bus-restart`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.wake`
+- **Why:** The new bus has no record of the subscriptions the suspended isolates were waiting on.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · The new bus has no record of the subscriptions the suspended isolates were waiting on.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.wake-replay`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.suspend-steps`, `iso.suspend-retention-warning`
+- **Why:** Suspension rebuilds from the log, for memory and persistent topics alike.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Suspension rebuilds from the log, for memory and persistent topics alike.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.suspend-retention-warning`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `iso.wake-replay`
+- **Why:** Retention may drop records before a sleeping isolate reads them; the warning comes from the bus metrics.
+
+History:
+
+- 2026-11-03 · decided · [ADR 0001 · Suspension (opt-in)](../adr/0001-one-worker-per-isolate.md#suspension-opt-in) · Retention may drop records before a sleeping isolate reads them; the warning comes from the bus metrics.
+- 2026-11-05 · built · [#49](https://github.com/isoloop/isoloop/issues/49) · Opt-in suspension, built in M2 (task 12b).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `iso.no-auto-suspend`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why not suspend on its own when nothing would be lost from the log? Restarts become hard to predict, and isolates with in-memory state would lose it silently.
+
+### `iso.no-snapshot-api`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why not save and restore state on suspend? It's a second source of state next to the log; an isolate publishes what it wants kept to a compacted topic on shutdown instead.
+
+### `iso.no-wake-every-record`
+
+History:
+
+- 2026-11-03 · rejected · [ADR 0001 · Alternatives considered](../adr/0001-one-worker-per-isolate.md#alternatives-considered) · Why not wake every suspended isolate on any record? It wakes hidden visual isolates for records nobody can see; they catch up from the log when shown.
 
 ## Supervision
 

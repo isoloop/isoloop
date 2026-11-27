@@ -1,1 +1,553 @@
-[]
+[
+  {
+    "id": "iso.unit",
+    "statement": "An isolate is a manifest plus a code bundle, running in a worker, supervised, with the topics it's granted. Visual and headless code are the same kind of isolate.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.surface-optional", "iso.own-worker"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0008#decision",
+        "why": "Much of what's worth isolating draws nothing: state managers, sync engines, calculators. RFC 0001's \"pane\" made them fake an empty pane."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.api-names",
+    "statement": "The host starts and controls isolates with `kernel.spawn(manifest)`, `kernel.stop(id)`, `kernel.restart(id)` and `kernel.isolates()`. An isolate module exports `defineIsolate({ start(ctx) { … } })`, or an adapter's `defineIsolate(Component)`, and runs on `@isoloop/runtime`.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts", "packages/runtime/src/isolate/vanilla.ts"],
+    "since": "0.1.0",
+    "related": ["iso.unit"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0008#decision",
+        "why": "The names follow from the isolate being the unit."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.own-worker",
+    "statement": "Each isolate runs in its own dedicated module worker unless its manifest names a pool.",
+    "status": "active",
+    "values": ["default: own worker"],
+    "knob": "manifest `pool`",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.placement-host", "iso.no-worker-identity"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#decision",
+        "why": "Thread isolation is the main promise: a blocked or crashed isolate affects only itself."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#15",
+        "why": "The supervisor wired to real workers, built in M1."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.placement-host",
+    "statement": "Placement is set in the host's manifest alone. Isolate code is the same in its own worker and in a pool, and an isolate module can't ask for a pool or refuse one.",
+    "status": "active",
+    "knob": "manifest `pool`",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.own-worker"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#decision",
+        "why": "Moving an isolate between placements is a config change, and the host decides what shares a worker."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.no-worker-identity",
+    "statement": "Nothing in the public API exposes which worker an isolate runs in. The supervisor, the compositor and the bus key everything by isolate id.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.own-worker"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#decision",
+        "why": "So pools could come later without breaking the API."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.surface-optional",
+    "statement": "`surface` is an optional manifest field: the host element an isolate renders into. An isolate without one is headless.",
+    "status": "active",
+    "knob": "manifest `surface`",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.unit", "iso.headless-no-dom", "iso.headless-no-surface-calls"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0008#decision",
+        "why": "Headless isolates are first-class, not visual ones with an empty pane."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.headless-no-dom",
+    "statement": "A headless isolate starts with `renderFmt: 'none'`: no DOM subset is installed and `ctx.root` is `undefined`. It never reaches the compositor, and a `patch` it posts is dropped and counted.",
+    "status": "active",
+    "code": ["packages/runtime/src/isolate/vanilla.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.surface-optional"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0008#decision",
+        "why": "A smaller, faster start for code that draws nothing."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.headless-no-surface-calls",
+    "statement": "In a headless isolate, the host calls `measure`, `focus`, `scrollIntoView` and `requestCanvas` reject with `no_surface`. `navigate` still works.",
+    "status": "active",
+    "errors": ["no_surface"],
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.surface-optional"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0008#decision",
+        "why": "There's no element to measure, focus or draw on."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#31",
+        "why": "The host calls `measure`, `focus` and `scrollIntoView`, built in M1."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-07",
+        "ref": "adr/0008#decision",
+        "why": "`requestCanvas` shipped in M3a, so only headless isolates reject it.",
+        "prev": "`measure`, `focus` and `scrollIntoView` reject with `no_surface` in a headless isolate, and `requestCanvas` rejects with `unsupported` in every isolate."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#96",
+        "why": "`requestCanvas`, an `OffscreenCanvas` for canvas isolates."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.headless-same-supervision",
+    "statement": "A headless isolate gets the same supervision, heartbeats, bus access and replay as a visual one. When it crashes there's no fallback UI; the host sees `isolate:crash` and `isolate:failed`.",
+    "status": "active",
+    "errors": ["isolate:crash", "isolate:failed"],
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0008#decision",
+        "why": "Headless code gets every guarantee visual code does."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.no-pane",
+    "statement": "The unit isn't a pane with a `headless: true` flag.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0008#alternatives-considered",
+        "why": "Why not keep RFC 0001's pane and add a flag? The word would mislead for half the use cases."
+      }
+    ]
+  },
+  {
+    "id": "iso.no-actor",
+    "statement": "Isolates aren't actors: there's no mailbox per isolate and no addressing by isolate id.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0008#alternatives-considered",
+        "why": "Why not the actor model, which fits the supervision? Actor semantics, a mailbox per actor and addressing by id, are what the topic-based bus deliberately avoids."
+      }
+    ]
+  },
+  {
+    "id": "iso.suspend-opt-in",
+    "statement": "`manifest.suspend` is `'never'`, `'when-idle'` or `{ whenIdle: { afterMs } }`. `'never'` means Isoloop never suspends the isolate, in a hidden tab or anywhere else; `'when-idle'` waits 60 s.",
+    "status": "active",
+    "values": ["default: 'never'", "60 000 ms"],
+    "knob": "manifest `suspend`",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.suspend-idle", "iso.suspend-steps", "iso.wake"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#suspension-opt-in",
+        "why": "A worker per isolate costs memory, so an app can let idle isolates go; isolates that keep state in memory must opt in knowingly."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#49",
+        "why": "Opt-in suspension, built in M2 (task 12b)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.suspend-idle",
+    "statement": "An isolate is idle when it has no visible surface, nothing was delivered for `afterMs`, it holds no `ctx.keepAwake()`, and no host call or acknowledged-pending publish is in flight. Off-screen, `display: none` and hidden-tab surfaces count as not visible; headless isolates are never visible.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.suspend-opt-in", "iso.keep-awake"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#suspension-opt-in",
+        "why": "Suspending must never cut off work that's still going on."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#49",
+        "why": "Opt-in suspension, built in M2 (task 12b)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.keep-awake",
+    "statement": "`ctx.keepAwake()` keeps an isolate from being suspended until its release function is called. A hold has no time limit; devtools lists each with its age and where it was taken, and with `KernelConfig.dev` the console warns once a hold passes 10 minutes.",
+    "status": "active",
+    "values": ["warn after 10 min (dev)"],
+    "knob": "`ctx.keepAwake()`",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.suspend-idle"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#suspension-opt-in",
+        "why": "An isolate in the middle of work it can't see from the bus needs a way to say so."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#49",
+        "why": "Opt-in suspension, built in M2 (task 12b)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.suspend-steps",
+    "statement": "Suspending an isolate runs its `shutdown` with the usual grace, detaches it from the bus keeping its offsets, then terminates the worker. A suspended member of a consumer group leaves the group, so the group rebalances.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.no-snapshot-api", "iso.wake-replay"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#suspension-opt-in",
+        "why": "Suspension rebuilds from the log, so the isolate gets a chance to commit and to publish what it wants kept."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#49",
+        "why": "Opt-in suspension, built in M2 (task 12b)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.wake",
+    "statement": "A suspended visual isolate wakes when its surface becomes visible. A suspended headless isolate wakes when a record arrives on a topic it subscribes to, or a request does while it's the last member of its group. Either wakes on `kernel.resume(id)`.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.wake-queue", "iso.wake-on-bus-restart", "iso.no-wake-every-record"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#suspension-opt-in",
+        "why": "Each kind wakes when it has something to do."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#49",
+        "why": "Opt-in suspension, built in M2 (task 12b)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.wake-queue",
+    "statement": "Wakes go through a queue that starts at most 4 workers at a time, visible surfaces first in on-screen order, then headless isolates. Until an isolate renders, its surface shows the frozen snapshot of its last frame.",
+    "status": "active",
+    "values": ["4 at a time"],
+    "knob": "`KernelConfig.suspend.maxConcurrentWakes`",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.wake"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#suspension-opt-in",
+        "why": "Waking many isolates at once would stall the page they're waking for."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#49",
+        "why": "Opt-in suspension, built in M2 (task 12b)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.wake-on-bus-restart",
+    "statement": "A bus restart wakes every suspended headless isolate: they resubscribe, replay and suspend again once idle. Suspended visual isolates aren't woken and catch up when shown.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.wake"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#suspension-opt-in",
+        "why": "The new bus has no record of the subscriptions the suspended isolates were waiting on."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#49",
+        "why": "Opt-in suspension, built in M2 (task 12b)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.wake-replay",
+    "statement": "On waking, an isolate resubscribes from its committed offsets and replays what it missed. A subscription that asked for `from: 'latest'` resumes from `committed`, so nothing published while it slept is skipped. Losses arrive as `deliver.gap` or `reset`, never silently.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.suspend-steps", "iso.suspend-retention-warning"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#suspension-opt-in",
+        "why": "Suspension rebuilds from the log, for memory and persistent topics alike."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#49",
+        "why": "Opt-in suspension, built in M2 (task 12b)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.suspend-retention-warning",
+    "statement": "The kernel warns when a suspendable isolate subscribes to a `last-n` or `time` topic, within about a second of the subscribe.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["iso.wake-replay"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#suspension-opt-in",
+        "why": "Retention may drop records before a sleeping isolate reads them; the warning comes from the bus metrics."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#49",
+        "why": "Opt-in suspension, built in M2 (task 12b)."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "iso.no-auto-suspend",
+    "statement": "Isolates aren't suspended automatically, even when every subscription is durable.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0001#alternatives-considered",
+        "why": "Why not suspend on its own when nothing would be lost from the log? Restarts become hard to predict, and isolates with in-memory state would lose it silently."
+      }
+    ]
+  },
+  {
+    "id": "iso.no-snapshot-api",
+    "statement": "There's no snapshot API for a suspended isolate's state.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0001#alternatives-considered",
+        "why": "Why not save and restore state on suspend? It's a second source of state next to the log; an isolate publishes what it wants kept to a compacted topic on shutdown instead."
+      }
+    ]
+  },
+  {
+    "id": "iso.no-wake-every-record",
+    "statement": "A record doesn't wake suspended visual isolates.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0001#alternatives-considered",
+        "why": "Why not wake every suspended isolate on any record? It wakes hidden visual isolates for records nobody can see; they catch up from the log when shown."
+      }
+    ]
+  }
+]
