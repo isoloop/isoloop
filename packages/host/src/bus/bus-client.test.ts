@@ -1,17 +1,31 @@
 // The isolate BusClient on the real runtime and bus worker (plan m2-bus task 9).
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import list, { count, report } from '../__fixtures__/contracts';
+import list, { count, report, saved } from '../__fixtures__/contracts';
 import { createKernel, type Kernel, type KernelEvents } from '../index';
 
 const worker = (path: string): string =>
   `${new URL(path, import.meta.url).href}?worker_file&type=module`;
 const src = new URL('../__fixtures__/bus-isolate.ts', import.meta.url).href;
 
-type Seen = { id: string; values?: unknown[]; failed?: number };
+type Seen = {
+  id: string;
+  values?: unknown[];
+  failed?: number;
+  views?: Record<string, [string | null, unknown][]>;
+  calls?: number;
+};
 
 const kernels: Kernel[] = [];
 afterEach(async () => {
   await Promise.all(kernels.splice(0).map((k) => k.destroy()));
+  // The watch test writes a persistent topic to this origin's OPFS: start every test empty.
+  const origin = await navigator.storage.getDirectory();
+  await vi.waitUntil(() =>
+    origin.removeEntry('isoloop', { recursive: true }).then(
+      () => true,
+      (e: unknown) => e instanceof DOMException && e.name === 'NotFoundError',
+    ),
+  );
 });
 
 function setup(commitIntervalMs?: number) {
@@ -94,5 +108,54 @@ describe('BusClient', () => {
     expect(values).toEqual(values.map((_, i) => first + i));
     expect(first).toBeGreaterThan(0);
     expect(reports.some((r) => (r.failed ?? 0) > 0)).toBe(false);
+  });
+
+  it('watches across a bus restart: a persistent topic keeps its values, a memory topic resets to empty (ADR 0023)', async () => {
+    const { kernel, reports, log } = setup();
+    const ready = log('isolate:ready');
+    const busReady = log('bus:ready');
+    kernel.spawn({ id: 'W', src, grants: ALL, config: { mode: 'watcher' } });
+    await vi.waitUntil(() => ready.length === 1);
+    await kernel.publish(count, 1, { key: 'a' });
+    await kernel.publish(count, 2, { key: 'b' });
+    await kernel.publish(saved, 3, { key: 'a' });
+    await kernel.publish(saved, 4, { key: 'a' });
+    const last = (): Seen | undefined => {
+      for (let i = reports.length - 1; i >= 0; i--) if (reports[i]?.id === 'W') return reports[i];
+      return undefined;
+    };
+    await vi.waitUntil(
+      () =>
+        last()?.views?.['count.v1']?.length === 2 && last()?.views?.['saved.v1']?.[0]?.[1] === 4,
+      { timeout: 3000 },
+    );
+    expect(last()?.views).toEqual({
+      'count.v1': [
+        ['a', 1],
+        ['b', 2],
+      ],
+      'saved.v1': [['a', 4]],
+    });
+
+    kernel.debug.crashBus();
+    await vi.waitUntil(() => busReady.length === 2, { timeout: 3000 });
+    // The memory topic was lost: its view is empty. The persistent one is as it was.
+    await vi.waitUntil(() => last()?.views?.['count.v1']?.length === 0, { timeout: 3000 });
+    expect(last()?.views?.['saved.v1']).toEqual([['a', 4]]);
+
+    // Both read on from the new bus.
+    await kernel.publish(count, 5, { key: 'c' });
+    await kernel.publish(saved, 6, { key: 'b' });
+    await vi.waitUntil(
+      () => last()?.views?.['count.v1']?.length === 1 && last()?.views?.['saved.v1']?.length === 2,
+      { timeout: 3000 },
+    );
+    expect(last()?.views).toEqual({
+      'count.v1': [['c', 5]],
+      'saved.v1': [
+        ['a', 4],
+        ['b', 6],
+      ],
+    });
   });
 });

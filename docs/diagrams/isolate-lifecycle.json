@@ -89,8 +89,8 @@
         },
         {
           "path": "packages/runtime/src/bus/bus-client.ts",
-          "line": 478,
-          "end_line": 482,
+          "line": 553,
+          "end_line": 557,
           "label": "close awaits the last commits",
           "anchor": "async close() {"
         },

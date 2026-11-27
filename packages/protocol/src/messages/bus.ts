@@ -162,14 +162,22 @@ export type BusToIsolate =
    * 18). `values` holds the newest value per changed key, `cleared` the keys
    * retention removed. `vseq` counts the views to this watch on this
    * connection, from 1 at each `watch`. The first view after a `watch` is
-   * sent in parts of at most 512 values, each with its own `vseq`; only the
-   * last waits for `seen`. After a bus restart that lost a memory topic, the
+   * sent in parts of at most 512 values, each with its own `vseq`; every part
+   * but the last has `more: true`, and only the last waits for `seen`. A view
+   * without `more` is complete, so the views after the snapshot, one part
+   * each, never carry it. After a bus restart that lost a memory topic, the
    * bus sends no `reset`: an empty snapshot is the reset (point 23).
    * @experimental
    */
   | Envelope<
       'view',
-      { topic: string; vseq: number; values: ViewValue[]; cleared?: readonly WatchKey[] }
+      {
+        topic: string;
+        vseq: number;
+        values: ViewValue[];
+        cleared?: readonly WatchKey[];
+        more?: true;
+      }
     >;
 
 export const ISOLATE_TO_BUS: MessageTypes<IsolateToBus> = {

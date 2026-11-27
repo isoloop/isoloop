@@ -71,6 +71,7 @@ interface BusClient {
   request<In, ROut>(topic: TopicRef<In, any, any, ROut>, value: In, opts?: RequestOptions): Promise<ROut>;
   reply(record: TypedRecord<unknown>, value: unknown): Promise<void>;
   commit(record: TypedRecord<unknown>): void;
+  watch<Out>(topic: TopicRef<any, Out, any, any>, onView: OnView<Out>, opts?: WatchOptions): () => void;
 }
 ```
 
@@ -81,6 +82,7 @@ interface BusClient {
 | `request()` | **Experimental.** Appends a request record to a topic with a `reply` schema and waits for the first valid reply. |
 | `reply()` | **Experimental.** Answers a request record delivered to this isolate. |
 | `commit()` | **Experimental.** Commits a record by hand, for `autoCommit: false`: that record and every one delivered before it on its subscription count as settled. |
+| `watch()` | **Experimental.** A watcher skips values; use `useTopic` or `subscribe` to get every record. Reads a topic's current value per key, not its stream: `onView` gets a snapshot first, the newest retained value of each key it watches, then the keys that changed. When several values arrive for one key between two views, only the newest is passed on. Records with no key share the key `null`. A key leaves the view when retention removes its newest record. Several watches on one topic share one watch on the bus, so each component can have its own. Needs the subscribe grant for the topic; a refused watch is reported as a non-fatal error. |
 
 **Guides:** [Writing isolates](../guide/isolates.md).
 
@@ -236,6 +238,19 @@ interface IsolateRoot {
 
 **Guides:** [Writing isolates](../guide/isolates.md).
 
+### `OnView`
+
+**Experimental.**
+
+Called with each view of a watched topic: `view` holds the current value
+per key the watch reads, `changed` the keys added, updated or cleared since
+the last call. Treat both as read-only. The next view waits until this
+returns, or until its promise settles.
+
+```ts nocheck
+type OnView<Out> = (view: ReadonlyMap<string | null, Out>, changed: ReadonlySet<string | null>) => void | Promise<void>;
+```
+
 ### `RequestOptions`
 
 **Experimental.**
@@ -303,6 +318,22 @@ type SubscribeOptions = {
 
 **Guides:** [Writing isolates](../guide/isolates.md).
 
+### `WatchOptions`
+
+**Experimental.**
+
+`bus.watch`'s options.
+
+```ts nocheck
+type WatchOptions = {
+  keys?: readonly (string | null)[];
+};
+```
+
+| Field | Description |
+| --- | --- |
+| `keys?` | Watch only these keys; `null` is the key of records with no key. Default: every key the topic retains. |
+
 ## `@isoloop/runtime/testing`
 
 ### `createTestContext`
@@ -346,6 +377,10 @@ type TestContext = {
     topic: string;
     from: string;
   }[];
+  watches: () => {
+    topic: string;
+    keys: (string | null)[] | undefined;
+  }[];
   shutdown: (reason?: ShutdownReason) => Promise<void>;
 };
 ```
@@ -354,10 +389,11 @@ type TestContext = {
 | --- | --- |
 | `ctx` | The context to pass to `start(ctx)`, or to render a component with. |
 | `errors` | What `ctx.reportError` got, in order. |
-| `emit` | Delivers a record to every subscription on `topic`, in order. |
-| `reset` | Runs `onReset` of every subscription on `topic`, as when a bus restart loses a memory topic. |
+| `emit` | Delivers a record to every subscription on `topic`, in order, and passes its value to every watch of its key (`null` without a key) as one view. |
+| `reset` | Runs `onReset` of every subscription on `topic`, and empties its watches' views, as when a bus restart loses a memory topic. |
 | `published` | Every `publish`, in order. |
 | `subscriptions` | Open subscriptions, by topic and start position. |
+| `watches` | **Experimental.** Open watches, by topic and keys (`undefined` for every key). |
 | `shutdown` | Runs the `onShutdown` handlers, as the runtime does on `stop`. `reason` defaults to `'stop'`. |
 
 **Guides:** [Testing isolates and contracts](../guide/testing.md).
