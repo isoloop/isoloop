@@ -5698,7 +5698,77 @@ History:
 
 Topics defined by a plan over other topics. Prefix `derive`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `derive.plan-on-topic` | `topic()` takes an optional `derive:` plan, built with `@isoloop/derive`'s builder, that names its source topics. The derived topic's schema checks the plan's output like any topic's. |  | proposed, experimental | target `0.3.0` |
+| `derive.plan-is-data` | A plan is a serialisable tree of operators, not code. v1's operators are filter, map, window, groupBy and aggregate. |  | proposed, experimental | target `0.3.0` |
+| `derive.not-in-bus-worker` | Each derived topic is kept by one derive isolate: a headless isolate the kernel spawns and owns, running a fixed engine and no user code. Derivations never run in the bus worker. |  | proposed, experimental | target `0.3.0` |
+| `derive.placement` | A light derive isolate shares a `derive` pool and a heavy one gets its own worker, set per topic. |  | proposed, experimental | target `0.3.0` |
+| `derive.supervised` | A blocked or crashed derive isolate is restarted by the supervisor and resumes from its committed offset on each source, while the bus and other topics keep running. |  | proposed, experimental | target `0.3.0` |
+| `derive.source-grants` | Subscribing to or watching a derived topic needs the subscribe grant on it and on every one of its sources, checked at subscribe time. |  | proposed, experimental | target `0.3.0` |
+| `derive.engine-interface` | The derive isolate runs a plan through one engine interface. A TypeScript reference engine ships first, with an engine conformance suite. |  | proposed, experimental | target `0.3.0` |
+| `derive.wasm-engine` | A Rust engine compiled to WASM runs behind the same interface, and ships only if it does better than the TypeScript engine on the M13 benchmark gate. |  | proposed, experimental | target `0.3.0` |
+| `derive.devtools-row` | Devtools shows a row per derived topic, with its plan, its lag behind each source and its engine, and lists derive isolates as the kernel's. |  | proposed, experimental | target `0.3.0` |
+
+### `derive.plan-on-topic`
+
+- **Related:** `derive.plan-is-data`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0024 · 1. A topic may carry a plan](../adr/0024-derived-topics.md#1-a-topic-may-carry-a-plan) · Every app that wants a windowed sum or a filtered stream writes the same headless isolate again.
+
+### `derive.plan-is-data`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0024 · 1. A topic may carry a plan](../adr/0024-derived-topics.md#1-a-topic-may-carry-a-plan) · A spec can carry a plan, and a small operator set is easier to check, explain and run in two engines than a query language.
+
+### `derive.not-in-bus-worker`
+
+- **Related:** `derive.placement`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0024 · 2. Derivations never run in the bus worker](../adr/0024-derived-topics.md#2-derivations-never-run-in-the-bus-worker) · Every topic depends on the bus worker, so a heavy derivation there would stall them all.
+
+### `derive.placement`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0024 · 3. Derive isolates are placed like other isolates](../adr/0024-derived-topics.md#3-derive-isolates-are-placed-like-other-isolates) · Derive isolates cost a worker each unless they share; the kernel picking a pool goes against ADR 0001 and is still to grill.
+
+### `derive.supervised`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0024 · 4. Supervision and replay as for any isolate](../adr/0024-derived-topics.md#4-supervision-and-replay-as-for-any-isolate) · A blocked derivation stalls only its own topic.
+
+### `derive.source-grants`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0024 · 5. Reading a derived topic needs the grants on its sources](../adr/0024-derived-topics.md#5-reading-a-derived-topic-needs-the-grants-on-its-sources) · A derived topic must not be a way to read what the reader couldn't read itself.
+
+### `derive.engine-interface`
+
+- **Related:** `derive.wasm-engine`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0024 · 6. One engine interface, two engines](../adr/0024-derived-topics.md#6-one-engine-interface-two-engines) · Two engines must give the same results, and the TypeScript one needs only the bus.
+
+### `derive.wasm-engine`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0024 · 6. One engine interface, two engines](../adr/0024-derived-topics.md#6-one-engine-interface-two-engines) · Columnar work with SIMD and threads can beat per-record JavaScript, but only when data and work stay in the engine.
+
+### `derive.devtools-row`
+
+History:
+
+- 2026-11-25 · proposed · [ADR 0024 · 7. Devtools shows derived topics](../adr/0024-derived-topics.md#7-devtools-shows-derived-topics) · A developer needs to see why a derived topic is behind.
 
 ## Native runtimes
 
