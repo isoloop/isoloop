@@ -1943,7 +1943,568 @@ History:
 
 The opt-in balancer's placement, quarantine and moves. Prefix `bal`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `bal.opt-in` | `@isoloop/balancer` is a library on the main thread that an app opts in to with `createBalancer(kernel, options)`. Without it, nothing about placement changes. |  | active, experimental | since `0.1.0` |
+| `bal.own-pools` | The balancer places only isolates spawned through `balancer.spawn`, whose manifest names no pool, into pools it owns: `balancer-1`, `balancer-2` and so on, and the quarantine pools `balancer-quarantine-1` and up. It never moves an isolate started with `kernel.spawn`. |  | active, experimental | since `0.1.0` |
+| `bal.reserved-prefix` | The host reserves every pool name that starts with `balancer-`: a plain `kernel.spawn` into one throws, and a kernel takes only one balancer. |  | active | since `0.1.0` |
+| `bal.hold` | `balancer.hold(id)` returns a release function; while held, an isolate is never moved, and a trigger that would move it waits for the release. |  | active, experimental | since `0.1.0` |
+| `bal.measure-loads` | `balancer.measure(id)` returns an isolate's load averaged over the last 3 s. An app-supplied `loads` store keeps measured loads across reloads; the balancer writes each one back at most every 10 s, and only when it changed by 5 points or more. | `3 s average`, `every 10 s`, `5 points` | active, experimental | since `0.1.0` |
+| `bal.busy-ms` | Each isolate's heartbeat reports `busyMs`: the time its worker spent running that isolate's code in the last interval, per member in a pool. Snapshots from `kernel.isolates()` carry it too. |  | active | since `0.1.0` |
+| `bal.attribution` | In every worker, the runtime wraps `setTimeout`, `setInterval`, `requestAnimationFrame`, `queueMicrotask`, `requestIdleCallback` and message listeners on ports members create, before any member loads, and bills each callback to the member that registered it. The wrapped functions behave like the native ones. |  | active | since `0.1.0` |
+| `bal.framework-attribution` | React renders are timed through a minimal `__REACT_DEVTOOLS_GLOBAL_HOOK__` the runtime installs, and Preact renders through its public `options` hooks, then billed to the members whose roots they touched. |  | active | since `0.1.0` |
+| `bal.shared-split` | Time spent on a task shared by several members is split equally among them. Work no wrapper can trace, such as garbage collection or promise continuations, is no member's time and shows only in `lagMs`. |  | active | since `0.1.0` |
+| `bal.timing-always-on` | The busy-time timing always runs, in every worker, with no switch. |  | active | since `0.1.0` |
+| `bal.unexplained-lag` | When a pool lags but its members' busy time adds up to less than 50 % of the interval, the balancer bisects instead of picking by busy time. After any move it checks that the pool's lag fell, and moves the next member if not. | `50 %` | active, experimental | since `0.1.0` |
+| `bal.beat-event` | The kernel emits `isolate:beat { id, pool?, lagMs, busyMs, at }` for each member on every heartbeat, only while something listens. |  | active | since `0.1.0` |
+| `bal.decision-cadence` | The balancer feeds every beat into a 3 s window per pool and member, and decides every 500 ms. | `3 s window`, `500 ms` | active, experimental | since `0.1.0` |
+| `bal.second-spike` | A heartbeat lag over 100 ms is a spike, blamed on the member with the highest busy time. A first spike is only reported, with a `spike` event; a second within 60 s sends the member to the quarantine. A member's own fatal error quarantines it at once. | `100 ms`, `60 s` | active, experimental | since `0.1.0` |
+| `bal.sustained` | A pool whose lag stays over 50 ms across the 3 s window moves its heaviest member to a balancer pool with room. | `50 ms`, `3 s` | active, experimental | since `0.1.0` |
+| `bal.full` | A pool whose members' busy time adds up to 80 % of a core or more over the 3 s window moves its heaviest member, whatever the lag, with the move reason `full`. | `80 %` | active, experimental | since `0.1.0` |
+| `bal.backlog-trigger` | `balancer.report(id, { backlog })` reports an isolate's pending work. An isolate whose fresh backlog is above zero and has risen over two 10 s windows in a row, since its last move, moves to a pool of its own if the cap allows, else to the least loaded pool that fits; at most one backlog move per fresh window across the balancer. | `10 s windows`, `2 rising windows` | active, experimental | since `0.1.0` |
+| `bal.behind-event` | When an isolate that's behind already has a pool to itself, or there's no pool or worker to give it, the balancer emits `behind` instead, at most every 30 s per isolate, and its placement shows `behind: true`. | `every 30 s` | active, experimental | since `0.1.0` |
+| `bal.reported-busy` | `balancer.report(id, { busyMs })` takes a running total of the work the app measured; the balancer uses the larger of its 3 s difference and the heartbeat's busy time. A total with nothing new for 10 s is ignored. | `stale after 10 s` | active, experimental | since `0.1.0` |
+| `bal.crash-quarantine` | When a pool restarts after a member's error, that member goes to the quarantine. |  | active, experimental | since `0.1.0` |
+| `bal.failed` | A member the kernel gave up on becomes `failed`: it leaves its pool's load, the quarantine and any bisect, a `failed` event reports it, and no move restarts it. |  | active, experimental | since `0.1.0` |
+| `bal.bisect` | When the supervisor kills a pool with no known culprit, the balancer sends half its members to the quarantine on restart and repeats with whichever half blocks again. It starts only when the quarantine is empty or the cap leaves room for a new quarantine pool, and a bisect is forgotten 60 s after its last trigger. | `forgotten after 60 s` | active, experimental | since `0.1.0` |
+| `bal.alone-spike` | A member that spikes while alone in its pool isn't moved unless it has offended before, and nothing joins that pool for 30 s. | `30 s` | active, experimental | since `0.1.0` |
+| `bal.predicted-load` | An isolate joins or moves into a pool only if the pool's load plus its own stays under 60 %. If no balancer pool fits, it gets a new pool if the cap allows; otherwise it stays where it is and its placement reports `atCap`. | `60 %` | active, experimental | since `0.1.0` |
+| `bal.unmeasured-quarantine` | An isolate with no measured load starts in the quarantine and leaves once it has 3 s of samples, except members a bisect moved there, which stay until the bisect ends. | `3 s` | active, experimental | since `0.1.0` |
+| `bal.cap` | The balancer's `maxWorkers`, by default `max(2, cores − 2)`, counts only its own workers: its `balancer-N` pools and quarantine workers beyond the first. The first quarantine pool is allowed on top. The kernel's worker budget doesn't change. | `max(2, cores − 2)` | active, experimental | since `0.1.0` |
+| `bal.cap-claimed` | A pool counts toward `maxWorkers` from the moment a move claims it, before its worker runs. |  | active, experimental | since `0.1.0` |
+| `bal.load-only` | Placement uses load only; which topics an isolate reads isn't an input. |  | active, experimental | since `0.1.0` |
+| `bal.quarantine-split` | The quarantine is one shared pool, `balancer-quarantine-1`. When it goes over budget with more than one member, its heaviest member gets a quarantine worker of its own if the cap allows. |  | active, experimental | since `0.1.0` |
+| `bal.backlog-outranks` | When a member with a rising backlog has nowhere to go, quarantine pools beyond the first fold into the first, with the move reason `room`, and for 10 s no new quarantine pool takes a worker. A fold goes like with like: offenders join offenders, and members that never offended never join one. | `10 s` | active, experimental | since `0.1.0` |
+| `bal.leave-quarantine` | An offender leaves the quarantine after a quiet window with no spike and no crash, whatever its load, to wherever the placement rule finds room; with no room anywhere it stays, flagged `atCap`. |  | active, experimental | since `0.1.0` |
+| `bal.repeat-offenders` | An offender's quiet window is 30, 60 and then 120 s for its first three offences, and the fourth keeps it apart. It loses one offence for each quiet window it completes, and the window never exceeds 2 minutes. | `30, 60, 120 s`, `4th offence: kept apart`, `cap 2 min` | active, experimental | since `0.1.0` |
+| `bal.move-is-restart` | A move is `stop`, then `spawn` with the same id and the new pool. State comes back from the log within the topics' retention, and a visual isolate gets a fresh surface. |  | active, experimental | since `0.1.0` |
+| `bal.cooldown` | After a move, both pools get 30 s with at most one move each, and need fresh over-budget evidence gathered after it before they move anything again. | `30 s` | active, experimental | since `0.1.0` |
+| `bal.moves-that-help` | A move happens only when it's predicted to end its trigger, so that the source pool drops back under its threshold. |  | active, experimental | since `0.1.0` |
+| `bal.move-budget` | An isolate moves at most 3 times in 5 minutes for load or to leave the quarantine. Quarantine and bisect moves aren't limited but count toward the 3, and a never-measured isolate's first way out of the quarantine doesn't count. | `3 moves in 5 min` | active, experimental | since `0.1.0` |
+| `bal.arrived` | After a move, an `arrived { id, from, to, reason, costMs }` event reports the time from the stop to the isolate's first beat in its new place. |  | active, experimental | since `0.1.0` |
+| `bal.pack` | A balancer pool whose members have all been steady for 60 s empties into the fullest other pool that stays under 40 % with it, one member per pack and one pack per minute across the balancer, to free a worker. A member or pool with a rising backlog, a hold or a recent spike is left alone. Packing is on by default. | `60 s steady`, `under 40 %`, `1 pack a minute` | active, experimental | since `0.1.0` |
+| `bal.no-kernel-policy` | The kernel has no placement policy such as `pool: 'auto'`. |  | rejected |  |
+| `bal.no-profiler` | React render time doesn't come from `<Profiler>`. |  | rejected |  |
+| `bal.no-spawn-grant` | The balancer isn't an isolate with a grant to spawn and stop. |  | rejected |  |
+| `bal.no-bus-backlog` | The balancer doesn't read backlogs from the bus; the app reports them. |  | rejected |  |
+| `bal.no-quarantine-all-killed` | A killed pool's members aren't all sent to the quarantine. |  | rejected |  |
+
+### `bal.opt-in`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.own-pools`, `bal.no-kernel-policy`
+- **Why:** A heavy widget placed by hand in a shared pool slows its neighbours, but the runtime must not pool isolates on its own (ADR 0001).
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 1. An opt-in, host-side balancer](../adr/0017-opt-in-balancer.md#1-an-opt-in-host-side-balancer) · A heavy widget placed by hand in a shared pool slows its neighbours, but the runtime must not pool isolates on its own (ADR 0001).
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.own-pools`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.opt-in`, `bal.reserved-prefix`
+- **Why:** Apps keep full control of the isolates they place themselves.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 1. An opt-in, host-side balancer](../adr/0017-opt-in-balancer.md#1-an-opt-in-host-side-balancer) · Apps keep full control of the isolates they place themselves.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.reserved-prefix`
+
+- **Errors and events:** `reserved_pool`, `balancer_exists`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `bal.own-pools`
+- **Why:** No app code can place an isolate into a balancer pool by hand, and one balancer can't be confused by another.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 1. An opt-in, host-side balancer](../adr/0017-opt-in-balancer.md#1-an-opt-in-host-side-balancer) · No app code can place an isolate into a balancer pool by hand, and one balancer can't be confused by another.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.hold`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.move-is-restart`
+- **Why:** An editor drawer must not lose the widget it's editing to a move.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 1. An opt-in, host-side balancer](../adr/0017-opt-in-balancer.md#1-an-opt-in-host-side-balancer) · An editor drawer must not lose the widget it's editing to a move.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.measure-loads`
+
+- **Change it:** `loads` option
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.unmeasured-quarantine`
+- **Why:** Measured loads survive a reload without the balancer owning a topic.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 1. An opt-in, host-side balancer](../adr/0017-opt-in-balancer.md#1-an-opt-in-host-side-balancer) · Measured loads survive a reload without the balancer owning a topic.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.busy-ms`
+
+- **Code:** `packages/runtime/src/pools/busy.ts`, `packages/host/src/kernel/kernel.ts`
+- **Related:** `bal.attribution`, `bal.beat-event`
+- **Why:** Pool members all share one `lagMs`, so only time spent per member can name the heavy one; it costs no new messages.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 2. busyMs, a public load signal per member](../adr/0017-opt-in-balancer.md#2-busyms-a-public-load-signal-per-member) · Pool members all share one `lagMs`, so only time spent per member can name the heavy one; it costs no new messages.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.attribution`
+
+- **Code:** `packages/runtime/src/pools/busy.ts`
+- **Related:** `bal.framework-attribution`, `bal.shared-split`, `bal.busy-ms`
+- **Why:** Pool members call the shared timers directly and React renders in its scheduler's tasks, so without wrapping the heavy member would look light.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · How work is attributed to a member (decided 2026-11-16)](../adr/0017-opt-in-balancer.md#how-work-is-attributed-to-a-member-decided-2026-11-16) · Pool members call the shared timers directly and React renders in its scheduler's tasks, so without wrapping the heavy member would look light.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.framework-attribution`
+
+- **Code:** `packages/runtime/src/pools/busy.ts`
+- **Related:** `bal.attribution`, `bal.no-profiler`
+- **Why:** Production React builds don't call `<Profiler>`'s `onRender`, and Preact's internals are mangled.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · How work is attributed to a member (decided 2026-11-16)](../adr/0017-opt-in-balancer.md#how-work-is-attributed-to-a-member-decided-2026-11-16) · Production React builds don't call `<Profiler>`'s `onRender`, and Preact's internals are mangled.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.shared-split`
+
+- **Related:** `bal.unexplained-lag`, `bal.reported-busy`
+- **Why:** `busyMs` is a placement guide, not a profiler.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · How work is attributed to a member (decided 2026-11-16)](../adr/0017-opt-in-balancer.md#how-work-is-attributed-to-a-member-decided-2026-11-16) · `busyMs` is a placement guide, not a profiler.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.timing-always-on`
+
+- **Related:** `bal.attribution`
+- **Why:** One code path measures every placement; it becomes a kernel option only if its cost shows beyond the measurement's spread.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · How work is attributed to a member (decided 2026-11-16)](../adr/0017-opt-in-balancer.md#how-work-is-attributed-to-a-member-decided-2026-11-16) · One code path measures every placement; it becomes a kernel option only if its cost shows beyond the measurement's spread.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.unexplained-lag`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.bisect`, `bal.reported-busy`
+- **Why:** The app can report busy time the wrapping misses, so the balancer bisects only when neither figure explains the lag.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · How work is attributed to a member (decided 2026-11-16)](../adr/0017-opt-in-balancer.md#how-work-is-attributed-to-a-member-decided-2026-11-16) · It bounds the cost of a wrong attribution.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-17 · amended · [ADR 0017 · How work is attributed to a member (decided 2026-11-16)](../adr/0017-opt-in-balancer.md#how-work-is-attributed-to-a-member-decided-2026-11-16) · The app can report busy time the wrapping misses, so the balancer bisects only when neither figure explains the lag. Before: The 50 % rule counted the beat's `busyMs` only.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.beat-event`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `bal.decision-cadence`, `bal.busy-ms`
+- **Why:** Polling `kernel.isolates()` missed the beat that carried a spike; the event counts every beat once, and apps without a listener pay nothing.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · Polling `kernel.isolates()` missed the beat that carried a spike; the event counts every beat once, and apps without a listener pay nothing.
+- 2026-11-16 · built · [#202](https://github.com/isoloop/isoloop/issues/202) · Every beat through isolate:beat; maxWorkers counts its own pools.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.decision-cadence`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.beat-event`
+- **Why:** The window is fed by the beat event instead of polling.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · A short window catches spikes and sustained load without reacting to every beat.
+- 2026-11-16 · amended · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · The window is fed by the beat event instead of polling. Before: The balancer read `kernel.isolates()` every 100 ms.
+- 2026-11-16 · built · [#202](https://github.com/isoloop/isoloop/issues/202) · Every beat through isolate:beat; maxWorkers counts its own pools.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.second-spike`
+
+- **Change it:** `spike.lagMs`
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.crash-quarantine`, `bal.alone-spike`
+- **Why:** A one-off block is over before the balancer sees it, and in the File processor most quarantines protected no one.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · A long task blocks every member of its pool.
+- 2026-11-17 · amended · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · A one-off block is over before the balancer sees it, and in the File processor most quarantines protected no one. Before: A single spike sent the member to the quarantine at once.
+- 2026-11-17 · built · [#214](https://github.com/isoloop/isoloop/issues/214) · Backlog, fewer moves, a second spike, packing back (M3i).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.sustained`
+
+- **Change it:** `sustained.lagMs`
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.full`, `bal.predicted-load`
+- **Why:** A steady heavy member slows its neighbours without any single long task.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · A steady heavy member slows its neighbours without any single long task.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.full`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.sustained`, `bal.predicted-load`
+- **Why:** Heavy tasks that yield often keep the lag low while a pool at 88 % starves its members.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · Heavy tasks that yield often keep the lag low while a pool at 88 % starves its members.
+- 2026-11-16 · built · [#203](https://github.com/isoloop/isoloop/issues/203) · A full-pool trigger; quiet is enough to leave quarantine.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.backlog-trigger`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.behind-event`, `bal.reported-busy`
+- **Why:** Single-window rises kept moving processors through five minutes of calm.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · One pool did 44 of 50 files a second and its queue grew while no lag or load trigger fired.
+- 2026-11-17 · built · [#214](https://github.com/isoloop/isoloop/issues/214) · Backlog, fewer moves, a second spike, packing back (M3i).
+- 2026-11-18 · amended · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · Single-window rises kept moving processors through five minutes of calm. Before: An isolate was behind when its latest fresh report was higher than one taken at least 10 s before it.
+- 2026-11-18 · built · [#238](https://github.com/isoloop/isoloop/issues/238) · Free first way out of quarantine, packing whole pools, two-window backlog (M3j).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.behind-event`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.backlog-trigger`
+- **Why:** The app can see a backlog the balancer can't fix.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · The app can see a backlog the balancer can't fix.
+- 2026-11-17 · built · [#214](https://github.com/isoloop/isoloop/issues/214) · Backlog, fewer moves, a second spike, packing back (M3i).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.reported-busy`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.shared-split`, `bal.unexplained-lag`
+- **Why:** Work that resumes after `await` measured 0 to 8 % of a core while its pool fell behind, and counting promise continuations needs `AsyncContext`.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · Work that resumes after `await` measured 0 to 8 % of a core while its pool fell behind, and counting promise continuations needs `AsyncContext`.
+- 2026-11-17 · built · [#234](https://github.com/isoloop/isoloop/issues/234) · Reported busy time, packing on a steady backlog, offence decay, own-pool bisects, failed isolates (M3j).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.crash-quarantine`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.second-spike`, `bal.bisect`
+- **Why:** The member that crashed is the known culprit.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · The member that crashed is the known culprit.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.failed`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.bisect`
+- **Why:** A given-up member still counted in loads and bisects, and a later move silently restarted it with a fresh crash count.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · A given-up member still counted in loads and bisects, and a later move silently restarted it with a fresh crash count.
+- 2026-11-17 · built · [#234](https://github.com/isoloop/isoloop/issues/234) · Reported busy time, packing on a steady backlog, offence decay, own-pool bisects, failed isolates (M3j).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.bisect`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.unexplained-lag`, `bal.no-quarantine-all-killed`
+- **Why:** Bisects at the cap kept adding suspects to one quarantine pool, where a poison file got the worker killed until the kernel gave up on every member.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · A member that blocks until its pool is killed never sends the beat that names it; bisecting takes about log₂(n) restarts and never quarantines every healthy widget.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-17 · amended · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · Bisects at the cap kept adding suspects to one quarantine pool, where a poison file got the worker killed until the kernel gave up on every member. Before: A bisect started whenever a pool was killed with no known culprit.
+- 2026-11-17 · built · [#234](https://github.com/isoloop/isoloop/issues/234) · Reported busy time, packing on a steady backlog, offence decay, own-pool bisects, failed isolates (M3j).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.alone-spike`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.second-spike`
+- **Why:** Moving it can't spare anyone.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 3. When the balancer acts](../adr/0017-opt-in-balancer.md#3-when-the-balancer-acts) · Moving it can't spare anyone.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.predicted-load`
+
+- **Change it:** `headroom.loadPct`
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.full`, `bal.cap`
+- **Why:** Placement stops adding at 60 % and moving starts at 80 %; the gap keeps pools from flapping.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 4. Where it places](../adr/0017-opt-in-balancer.md#4-where-it-places) · Placement stops adding at 60 % and moving starts at 80 %; the gap keeps pools from flapping.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.unmeasured-quarantine`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.measure-loads`, `bal.move-budget`
+- **Why:** A new widget's weight is unknown until it runs, and the quarantine never slows a healthy pool.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 4. Where it places](../adr/0017-opt-in-balancer.md#4-where-it-places) · A new widget's weight is unknown until it runs, and the quarantine never slows a healthy pool.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.cap`
+
+- **Change it:** `maxWorkers`
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.cap-claimed`, `bal.predicted-load`
+- **Why:** A page with about 13 workers left the balancer at its cap from the start, so a steady heavy widget was never separated.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 4. Where it places](../adr/0017-opt-in-balancer.md#4-where-it-places) · The balancer gets its own allowance, in its own options.
+- 2026-11-16 · amended · [ADR 0017 · 4. Where it places](../adr/0017-opt-in-balancer.md#4-where-it-places) · A page with about 13 workers left the balancer at its cap from the start, so a steady heavy widget was never separated. Before: The cap counted every live worker on the page.
+- 2026-11-16 · built · [#202](https://github.com/isoloop/isoloop/issues/202) · Every beat through isolate:beat; maxWorkers counts its own pools.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.cap-claimed`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.cap`
+- **Why:** Two moves in one decision each took the worker a fold had freed, one past the cap.
+
+History:
+
+- 2026-11-19 · decided · [ADR 0017 · 4. Where it places](../adr/0017-opt-in-balancer.md#4-where-it-places) · Two moves in one decision each took the worker a fold had freed, one past the cap.
+- 2026-11-19 · built · [#279](https://github.com/isoloop/isoloop/issues/279) · The cap counts claimed pools; the fold goes like with like (M3j).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.load-only`
+
+- **Related:** `bal.predicted-load`
+- **Why:** Delivery is per member, so grouping isolates by topic saves nothing.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 4. Where it places](../adr/0017-opt-in-balancer.md#4-where-it-places) · Delivery is per member, so grouping isolates by topic saves nothing.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.quarantine-split`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.backlog-outranks`, `bal.cap`
+- **Why:** Suspects can slow each other there but never a healthy pool, and the number of quarantine workers stays bounded.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 5. The quarantine](../adr/0017-opt-in-balancer.md#5-the-quarantine) · Suspects can slow each other there but never a healthy pool, and the number of quarantine workers stays bounded.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.backlog-outranks`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.quarantine-split`, `bal.backlog-trigger`
+- **Why:** The two pools can hold the halves of a bisect with no offenders, and an offenders-only fold left the second its worker.
+
+History:
+
+- 2026-11-19 · decided · [ADR 0017 · 5. The quarantine](../adr/0017-opt-in-balancer.md#5-the-quarantine) · Two crashed processors in two quarantine pools held the last worker while six healthy processors shared one and fell behind.
+- 2026-11-19 · amended · [ADR 0017 · 5. The quarantine](../adr/0017-opt-in-balancer.md#5-the-quarantine) · The two pools can hold the halves of a bisect with no offenders, and an offenders-only fold left the second its worker. Before: Only a quarantine pool holding offenders folded into the first.
+- 2026-11-19 · built · [#268](https://github.com/isoloop/isoloop/issues/268) · A rising backlog outranks a second quarantine worker (M3j).
+- 2026-11-19 · built · [#279](https://github.com/isoloop/isoloop/issues/279) · The cap counts claimed pools; the fold goes like with like (M3j).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.leave-quarantine`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.repeat-offenders`
+- **Why:** The load bar kept steady heavy members in the quarantine for good.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 5. The quarantine](../adr/0017-opt-in-balancer.md#5-the-quarantine) · Heavy but well-behaved members are the full-pool trigger's business, not the quarantine's.
+- 2026-11-16 · amended · [ADR 0017 · 5. The quarantine](../adr/0017-opt-in-balancer.md#5-the-quarantine) · The load bar kept steady heavy members in the quarantine for good. Before: A member left only once its load was under 20 %.
+- 2026-11-16 · built · [#203](https://github.com/isoloop/isoloop/issues/203) · A full-pool trigger; quiet is enough to leave quarantine.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.repeat-offenders`
+
+- **Change it:** `quarantine.steadyMs`, `quarantine.maxReturns`
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.leave-quarantine`
+- **Why:** After 60 s of faults and 60 s of calm, most processors were still waiting out doubled windows.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 5. The quarantine](../adr/0017-opt-in-balancer.md#5-the-quarantine) · Repeat offenders stay away from healthy pools for longer.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-17 · amended · [ADR 0017 · 5. The quarantine](../adr/0017-opt-in-balancer.md#5-the-quarantine) · After 60 s of faults and 60 s of calm, most processors were still waiting out doubled windows. Before: Offences never decayed, and the window kept doubling.
+- 2026-11-17 · built · [#234](https://github.com/isoloop/isoloop/issues/234) · Reported busy time, packing on a steady backlog, offence decay, own-pool bisects, failed isolates (M3j).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.move-is-restart`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.cooldown`, `bal.arrived`
+- **Why:** There's no new kernel primitive; a make-before-break move is in would-like.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 6. Moves and hysteresis](../adr/0017-opt-in-balancer.md#6-moves-and-hysteresis) · There's no new kernel primitive; a make-before-break move is in would-like.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.cooldown`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.move-budget`
+- **Why:** The signals are noisy, and the cooldown bounds how often the balancer acts.
+
+History:
+
+- 2026-11-16 · decided · [ADR 0017 · 6. Moves and hysteresis](../adr/0017-opt-in-balancer.md#6-moves-and-hysteresis) · The signals are noisy, and the cooldown bounds how often the balancer acts.
+- 2026-11-16 · built · [#196](https://github.com/isoloop/isoloop/issues/196) · @isoloop/balancer, experimental auto placement (M3h).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.moves-that-help`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.move-budget`
+- **Why:** Moves that didn't help repeated work and kept files waiting: p95 latency was 16 to 18 s.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0017 · 6. Moves and hysteresis](../adr/0017-opt-in-balancer.md#6-moves-and-hysteresis) · Moves that didn't help repeated work and kept files waiting: p95 latency was 16 to 18 s.
+- 2026-11-17 · built · [#214](https://github.com/isoloop/isoloop/issues/214) · Backlog, fewer moves, a second spike, packing back (M3i).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.move-budget`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.moves-that-help`, `bal.cooldown`
+- **Why:** A processor's boot exit used up its budget, keeping it in the quarantine for about 250 s.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0017 · 6. Moves and hysteresis](../adr/0017-opt-in-balancer.md#6-moves-and-hysteresis) · Each move restarts the isolate and repeats the work it held.
+- 2026-11-17 · built · [#214](https://github.com/isoloop/isoloop/issues/214) · Backlog, fewer moves, a second spike, packing back (M3i).
+- 2026-11-18 · amended · [ADR 0017 · 6. Moves and hysteresis](../adr/0017-opt-in-balancer.md#6-moves-and-hysteresis) · A processor's boot exit used up its budget, keeping it in the quarantine for about 250 s. Before: Every move out of the quarantine counted toward the budget.
+- 2026-11-18 · built · [#238](https://github.com/isoloop/isoloop/issues/238) · Free first way out of quarantine, packing whole pools, two-window backlog (M3j).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.arrived`
+
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.move-is-restart`
+- **Why:** The `move` event fires before the cost is known.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0017 · 6. Moves and hysteresis](../adr/0017-opt-in-balancer.md#6-moves-and-hysteresis) · The `move` event fires before the cost is known.
+- 2026-11-17 · built · [#214](https://github.com/isoloop/isoloop/issues/214) · Backlog, fewer moves, a second spike, packing back (M3i).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.pack`
+
+- **Change it:** `pack.enabled`
+- **Code:** `packages/balancer/src/balancer/balancer.ts`
+- **Related:** `bal.predicted-load`, `bal.move-budget`
+- **Why:** Two pools of four processors at about 16 % each never packed, since neither had a member alone.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0017 · 7. Packing back (added 2026-11-17, M3i)](../adr/0017-opt-in-balancer.md#7-packing-back-added-2026-11-17-m3i) · After faults, the balancer kept as many workers as a worker per processor.
+- 2026-11-17 · amended · [ADR 0017 · 7. Packing back (added 2026-11-17, M3i)](../adr/0017-opt-in-balancer.md#7-packing-back-added-2026-11-17-m3i) · A consumer group rarely has a backlog of exactly 0, so no member ever packed. Before: A member packed only while its backlog was zero.
+- 2026-11-17 · built · [#214](https://github.com/isoloop/isoloop/issues/214) · Backlog, fewer moves, a second spike, packing back (M3i).
+- 2026-11-17 · built · [#234](https://github.com/isoloop/isoloop/issues/234) · Reported busy time, packing on a steady backlog, offence decay, own-pool bisects, failed isolates (M3j).
+- 2026-11-18 · amended · [ADR 0017 · 7. Packing back (added 2026-11-17, M3i)](../adr/0017-opt-in-balancer.md#7-packing-back-added-2026-11-17-m3i) · Two pools of four processors at about 16 % each never packed, since neither had a member alone. Before: Only a member alone in its pool packed.
+- 2026-11-18 · built · [#238](https://github.com/isoloop/isoloop/issues/238) · Free first way out of quarantine, packing whole pools, two-window backlog (M3j).
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `bal.no-kernel-policy`
+
+- **Related:** `bal.opt-in`
+
+History:
+
+- 2026-11-16 · rejected · [ADR 0017 · Alternatives considered](../adr/0017-opt-in-balancer.md#alternatives-considered) · Why not let the kernel place isolates? Every app would pay for it, and the kernel would gain behaviour ADR 0001 rejected.
+
+### `bal.no-profiler`
+
+- **Related:** `bal.framework-attribution`
+
+History:
+
+- 2026-11-16 · rejected · [ADR 0017 · Alternatives considered](../adr/0017-opt-in-balancer.md#alternatives-considered) · Why not use `<Profiler>`'s `onRender`? Production builds don't call it.
+
+### `bal.no-spawn-grant`
+
+- **Related:** `bal.opt-in`
+
+History:
+
+- 2026-11-16 · rejected · [ADR 0017 · Alternatives considered](../adr/0017-opt-in-balancer.md#alternatives-considered) · Why not run the balancer as an isolate? A grant to spawn and stop needs a security design of its own.
+
+### `bal.no-bus-backlog`
+
+- **Related:** `bal.backlog-trigger`
+
+History:
+
+- 2026-11-17 · rejected · [ADR 0017 · Alternatives considered](../adr/0017-opt-in-balancer.md#alternatives-considered) · Why not read a consumer group's lag from the bus? It needs a new public bus API or a protocol change.
+
+### `bal.no-quarantine-all-killed`
+
+- **Related:** `bal.bisect`
+
+History:
+
+- 2026-11-16 · rejected · [ADR 0017 · Alternatives considered](../adr/0017-opt-in-balancer.md#alternatives-considered) · Why not quarantine the whole pool? It converges at once but moves every healthy widget.
 
 ## Agents & tools
 

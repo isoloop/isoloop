@@ -50,6 +50,8 @@ M3i added `report(id, { backlog })`, the reasons `backlog` and `pack`, and the e
 - **No new grant.** Spawning and stopping stay host powers. A headless isolate holding a spawn grant was considered and not taken, since a grant to spawn and stop needs its own security design.
 - **The kernel stays free of policy.** Without the balancer, nothing about placement changes.
 
+Rules: `bal.opt-in`, `bal.own-pools`, `bal.reserved-prefix`, `bal.hold`, `bal.measure-loads`
+
 ### 2. `busyMs`, a public load signal per member
 
 Each member's `IdleReport` gains `busyMs`: the time the worker spent running that member's code in the last heartbeat interval. A pool reports it per member in `members[id]`, and an own worker in `idle`. `IsolateSnapshot` gains `busyMs`. It's public, so M4's devtools can show it.
@@ -82,6 +84,8 @@ The runtime by itself sees only the callbacks it dispatches: bus deliveries, hos
    - **With a reported busy time** (amended 2026-11-17, M3j): the 50 % rule counts each member's larger figure, the beat's or the app's (decision 3), so the balancer bisects only when the reported time can't explain the lag either.
 6. **Always on, with no switch.** M3h's measurement includes the overhead with the balancer on and off. If the cost shows beyond the round spread, the timing becomes a kernel option, off by default and turned on by `createBalancer`.
 7. **Known limits:** promise continuations, other libraries' own schedulers, and the equal split are approximations. Work that the wrapping can't trace is no member's time, and shows up only in `lagMs`. `AsyncContext` (would-like, under Rendering) would close part of this gap once browsers ship it. `busyMs` is a placement guide, not a profiler. **For work it misses,** the app can report its own measured busy time (amended 2026-11-17, M3j) (decision 3). In M3i's measurement each File processor resumed its work after `await` and measured 0 to 8 % of a core, so no full-pool trigger fired.
+
+Rules: `bal.busy-ms`, `bal.attribution`, `bal.framework-attribution`, `bal.shared-split`, `bal.timing-always-on`, `bal.unexplained-lag`
 
 ### 3. When the balancer acts
 
@@ -127,6 +131,8 @@ The thresholds, windows and the cap are options with these defaults. Fixed const
 - a bisect forgotten 60 s after its last trigger;
 - `kernel.pools()` read with each decision, for members and pools the balancer didn't place.
 
+Rules: `bal.beat-event`, `bal.decision-cadence`, `bal.second-spike`, `bal.sustained`, `bal.full`, `bal.backlog-trigger`, `bal.behind-event`, `bal.reported-busy`, `bal.crash-quarantine`, `bal.failed`, `bal.bisect`, `bal.alone-spike`
+
 ### 4. Where it places
 
 - **Predicted load.** An isolate joins or moves into a pool only if the pool's load plus its own stays under 60 % (`headroom`). If no balancer pool passes, it gets a new pool if the cap allows. Otherwise it stays where it is, and its placements report `atCap` ("over budget, at worker cap"). A move never lands in a pool that would then be over budget.
@@ -135,6 +141,8 @@ The thresholds, windows and the cap are options with these defaults. Fixed const
 - **Why only its own workers** (amended 2026-11-16, replacing "counts every live worker on the page"): plant's interactive page already runs about 13 workers (the bus, 8 data pools, fleet, the drawer and the manual pools). Counted against `cores − 2`, that left the balancer at its cap from the start on almost any machine, so a steady heavy widget was never separated. An allowance of its own keeps it useful on a busy page; the app decides how much of the machine it gets.
 - **The cap counts claimed pools** (amended 2026-11-19, M3j): a pool counts toward `maxWorkers` from the moment a move claims it, before its worker runs. On `0.1.0-next.4`, in every Chromium fault run, a `full` move and a `backlog` move took the worker the fold freed in one decision, each in a new pool, one past the cap.
 - **Load only.** Topic affinity isn't an input while delivery is per member. It's in would-like for when one delivery per pool worker exists.
+
+Rules: `bal.predicted-load`, `bal.unmeasured-quarantine`, `bal.cap`, `bal.cap-claimed`, `bal.load-only`
 
 ### 5. The quarantine
 
@@ -150,6 +158,8 @@ One shared pool, `balancer-quarantine-1`, outside normal placement. Suspects can
 - **Leaving to be packed:** quarantine members leave as above; packing back (decision 7) applies to them only once they're in a balancer pool, and never to a `kept-apart` member.
   - (amended 2026-11-17, M3j): packing also counts a quarantine pool whose only members are free to leave as a source, so leaving can free the quarantine's worker. Each such member joins a balancer pool that fits, as for any pack.
 
+Rules: `bal.quarantine-split`, `bal.backlog-outranks`, `bal.leave-quarantine`, `bal.repeat-offenders`
+
 ### 6. Moves and hysteresis
 
 - **A move is `stop`, then `spawn`,** with the same id and the new `pool`. State comes back from the log within the topics' retention, and a visual isolate gets a fresh surface. The gap is visible, and M3h measures it. There's no new kernel primitive; a make-before-break `move()` is in would-like.
@@ -162,6 +172,8 @@ One shared pool, `balancer-quarantine-1`, outside normal placement. Suspects can
 - **Each move's cost** is measured from the stop to the first beat in the new place (amended 2026-11-17, M3i). `move` fires before that's known, so the cost comes in a second event that follows it: `on('arrived', { id, from, to, reason, costMs })`. A member stopped or moved again before its first beat never arrives.
 - **Why:** in M3h's measurement with faults, the balancer's p95 latency was 16 to 18 s, from files waiting through moves, and each move repeated the work the stopped processor held.
 
+Rules: `bal.move-is-restart`, `bal.cooldown`, `bal.moves-that-help`, `bal.move-budget`, `bal.arrived`
+
 ### 7. Packing back (added 2026-11-17, M3i)
 
 - **When:** a member alone in its pool that has been steady for 60 s joins another balancer pool. Steady means no spike, crash, sustained or full trigger, and no growing backlog. The lightest such member goes first, into the fullest pool that fits.
@@ -173,6 +185,8 @@ One shared pool, `balancer-quarantine-1`, outside normal placement. Suspects can
 - **Whole pools** (amended 2026-11-18, M3j): "a member alone in its pool" becomes "a pool whose members are all steady and packable". The lightest such pool empties into the fullest other pool that stays under 40 % with all of it, one member per pack (its lightest first), and a merge under way is finished before another starts. A pool of one is the case above. Never a pool with a held, `kept-apart` or out-of-budget member. In the same local run, the calm ended with two pools of 4 processors at about 16 % each, which never packed, since neither had a member alone.
 - **On by default,** visual isolates included. `pack: { enabled: false }` turns it off.
 - **Why:** after faults in M3h's measurement, the balancer kept 4 workers on Chromium and 9 on Firefox, as many as a worker per processor.
+
+Rules: `bal.pack`
 
 ## Consequences
 
@@ -208,3 +222,5 @@ One shared pool, `balancer-quarantine-1`, outside normal placement. Suspects can
 - **The kernel counting promise continuations** (2026-11-17, M3j): it would close the gap at the source, but carrying the member across `await` needs `AsyncContext`. Not taken until browsers ship it; in would-like. The app's own report covers it meanwhile.
 - **Not counting a pool kill against members that didn't cause it** (2026-11-17, M3j): every member does restart when its worker is killed, so the count is right, and changing it is a kernel change. Not taken: the balancer stops gathering suspects in one quarantine pool instead.
 - **Quarantining every member of a killed pool:** converges at once, but punishes healthy widgets with a move each. Not taken in favour of bisecting.
+
+Rules: `bal.no-kernel-policy`, `bal.no-profiler`, `bal.no-spawn-grant`, `bal.no-bus-backlog`, `bal.no-quarantine-all-killed`
