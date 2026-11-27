@@ -29,8 +29,8 @@
         },
         {
           "path": "packages/runtime/src/bus/bus-client.ts",
-          "line": 520,
-          "end_line": 549,
+          "line": 523,
+          "end_line": 552,
           "label": "reattach in order",
           "anchor": "reattach(next) {"
         }
@@ -44,22 +44,22 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 343,
-          "end_line": 385,
+          "line": 377,
+          "end_line": 419,
           "label": "new bus, safe mode, reattach",
           "anchor": "worker = w;"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1473,
-          "end_line": 1481,
+          "line": 1499,
+          "end_line": 1507,
           "label": "ready again: wake headless",
           "anchor": "ready: (first) => {"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1523,
-          "end_line": 1534,
+          "line": 1549,
+          "end_line": 1560,
           "label": "a new port per isolate",
           "anchor": "reattach: (id) => {"
         }
