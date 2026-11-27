@@ -51,7 +51,7 @@ The forces:
    - **`superseded`:** replaced by the rule in `supersededBy`.
 
    "Merged but not released" is a `built` event, not a status.
-6. **Events.** Each has a `type`, a `date` (`YYYY-MM-DD`), a `ref` and a one-line `why`:
+6. **Events.** Twelve types. Each has a `type`, a `date` (`YYYY-MM-DD`), a `ref` and a one-line `why`:
 
    | Type | Means | `ref` |
    | --- | --- | --- |
@@ -66,6 +66,7 @@ The forces:
    | `removed` | taken out with no replacement | ADR section |
    | `rejected` | an alternative we said no to | ADR section |
    | `withdrawn` | an accepted rule taken back | ADR section |
+| `superseded` | replaced by another rule, named in `supersededBy` | ADR section |
 
    `clarified` and `amended` also need `prev`: the old wording or behaviour, so the rule as it was can be read without opening the ADR. A `ref` is something a reader can open on GitHub: an ADR file and heading anchor, a PR, an issue or a release tag. Grilling notes and agent memory are never a source.
 
@@ -119,7 +120,7 @@ The forces:
     - an ADR `ref` names a file or heading anchor that doesn't exist;
     - a `Rules:` line in an ADR names an unknown id;
     - a `clarified` or `amended` event has no `prev`;
-    - the status doesn't match the fields and events: `active` needs `since` and a `shipped` event; `decided` and `proposed` need `target`; `withdrawn`, `rejected` and `superseded` need their own event, and `superseded` also needs `supersededBy`;
+    - the status doesn't match the fields and events: `active` needs `since` and a `shipped` event; `decided` and `proposed` need `target`; `withdrawn`, `rejected` and `superseded` need their own event, and `superseded` also needs `supersededBy`, an id that exists;
     - a `code` path doesn't exist;
     - `docs/rules/README.md` isn't what `rules:build` would write.
 
@@ -128,7 +129,9 @@ The forces:
     - a PR that changes `docs/adr/**` must change `docs/rules/**`, unless it has the `no-rules` label. That label is for edits that change no fact (typos, links), and an agent may add it, like `no-changeset`;
     - it fails if an id or alias on `main` is missing from the PR.
 
-    Until the backfill is done, the first rule applies only to ADRs that already have `Rules:` lines.
+    - every decision and amendment in an ADR numbered 0026 or higher has a `Rules:` line, from the start.
+
+    Until the backfill is done, the pairing applies to older ADRs only once they have `Rules:` lines.
 12. **Who writes rules.** Whoever changes an ADR updates its rules in the same PR. CI catches a registry left untouched. The steward's instructions gain one line, so it catches a registry that says something different from the ADR: "rules that don't match what the ADR says are a must-fix".
 13. **`pnpm rules:ship <version>`** runs in the version PR. Each rule whose `target` is that version becomes `active`: `since` is set, a `shipped` event is added with the tag's date, and `target` is removed. `rules:check` fails a version PR that leaves such a rule `decided`. Version PRs then carry edits beyond the changesets, so they take the `no-changeset` label. The backfill runs it for `0.1.0` and `0.1.1` to create the existing `shipped` events.
 
@@ -146,7 +149,7 @@ The forces:
 16. **The backfill.**
     1. One infrastructure PR after this ADR is accepted: the schema, `check.ts`, `build.ts`, `board.html`, `concepts.json`, an empty file per concept, `rules.yml`, the `ci.yml` step, the `AGENTS.md` line (decision 17) and the steward line.
     2. Then one PR per concept. A fork writes its rules and adds the `Rules:` lines to the ADRs. The maintainer reviews each PR on its own, and it's squash-merged.
-    3. Supervision, Durability and Versioning & releases go first, then the others in the guide's order. Withdrawn ADR 0013 counts, as a withdrawn rule. This ADR's own rules go in `tool`.
+    3. Supervision, Durability and Versioning & releases go first, then the others in the guide's order. Withdrawn ADR 0013 counts, as a withdrawn rule. This ADR's own rules go in `tool`, and its `Rules:` lines are added in the infrastructure PR, since decision 11 holds it to them.
 17. **`AGENTS.md`** gains one rule: "For what holds today, read `docs/rules/README.md`; an ADR change updates `docs/rules/` in the same PR."
 18. **Scope.** Only this repo's ADRs. The web and social repos could get their own registry later, with the same format and tooling.
 19. **No milestone.** It runs beside the milestones (now M8 Watchers W1), every PR takes `no-changeset`, and it isn't on the roadmap.
