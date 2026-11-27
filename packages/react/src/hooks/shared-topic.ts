@@ -69,3 +69,122 @@ export function addReader<Out>(
     if (topics.get(topic.name) === shared) topics.delete(topic.name);
   };
 }
+
+/*
+ * One `bus.watch` per (isolate, topic, key), shared by every `useWatch` that
+ * reads it (ADR 0023, points 8 and 21). The entry keeps the current view, so
+ * a component that mounts later renders it at once. A view counts as settled,
+ * and its `seen` can go, once every reader has committed a render of it.
+ */
+
+/** A watch's view in the shared store; `gen` counts its views from 1. */
+export type WatchSnap = { gen: number; view: ReadonlyMap<string | null, unknown> };
+
+/** One component reading a watch: `committed` is the `gen` its last commit showed. */
+export type WatchReader = { notify: () => void; committed: number };
+
+/** `{ key }` reads one key, `null` for records with no key; `undefined` reads them all. */
+export type WatchSpec = { key: string | null } | undefined;
+
+type WatchEntry = {
+  snap: WatchSnap | undefined;
+  readers: Set<WatchReader>;
+  /** The newest view not yet settled, and the promise `onView` returned for it. */
+  pending: { gen: number; resolve: () => void } | undefined;
+  unwatch: () => void;
+};
+
+const watchesByBus = new WeakMap<BusClient, Map<string, WatchEntry>>();
+
+const entryName = (topic: string, spec: WatchSpec): string =>
+  spec === undefined ? `${topic}\u0000*` : `${topic}\u0000${JSON.stringify(spec.key)}`;
+
+function watchEntry(bus: BusClient, topic: string, spec: WatchSpec): WatchEntry | undefined {
+  return watchesByBus.get(bus)?.get(entryName(topic, spec));
+}
+
+/** Resolves the pending view once every reader has committed it, or none is left. */
+function settleIfCommitted(e: WatchEntry): void {
+  const p = e.pending;
+  if (!p) return;
+  for (const r of e.readers) if (r.committed < p.gen) return;
+  e.pending = undefined;
+  p.resolve();
+}
+
+/** The current view of `topic` for `spec`, or `undefined` before the first one. */
+export function watchSnapshot(
+  bus: BusClient,
+  topic: TopicRef<any, any, any, any>,
+  spec: WatchSpec,
+): WatchSnap | undefined {
+  return watchEntry(bus, topic.name, spec)?.snap;
+}
+
+/**
+ * Adds a reader of `topic` for `spec`, notified after every view. The first
+ * reader watches; the last one out unwatches. Returns the function that
+ * removes the reader.
+ */
+export function addWatchReader(
+  bus: BusClient,
+  topic: TopicRef<any, any, any, any>,
+  spec: WatchSpec,
+  reader: WatchReader,
+): () => void {
+  const entries = watchesByBus.get(bus) ?? new Map<string, WatchEntry>();
+  watchesByBus.set(bus, entries);
+  const name = entryName(topic.name, spec);
+  let e = entries.get(name);
+  if (!e) {
+    const entry: WatchEntry = {
+      snap: undefined,
+      readers: new Set(),
+      pending: undefined,
+      unwatch: () => {},
+    };
+    entry.unwatch = bus.watch(
+      topic,
+      (view) => {
+        // The runtime waits for this view to settle before the next one, so
+        // nothing is pending here.
+        entry.snap = { gen: (entry.snap?.gen ?? 0) + 1, view };
+        const gen = entry.snap.gen;
+        const settled = new Promise<void>((resolve) => {
+          entry.pending = { gen, resolve };
+        });
+        for (const r of entry.readers) r.notify();
+        settleIfCommitted(entry);
+        return settled;
+      },
+      spec === undefined ? {} : { keys: [spec.key] },
+    );
+    entries.set(name, (e = entry));
+  }
+  const shared = e;
+  shared.readers.add(reader);
+  return () => {
+    if (!shared.readers.delete(reader)) return;
+    if (shared.readers.size > 0) {
+      settleIfCommitted(shared);
+      return;
+    }
+    shared.pending?.resolve();
+    shared.pending = undefined;
+    shared.unwatch();
+    if (entries.get(name) === shared) entries.delete(name);
+  };
+}
+
+/** A reader committed a render showing `gen`: the pending view may now be settled. */
+export function commitWatch(
+  bus: BusClient,
+  topic: TopicRef<any, any, any, any>,
+  spec: WatchSpec,
+  reader: WatchReader,
+  gen: number,
+): void {
+  reader.committed = Math.max(reader.committed, gen);
+  const e = watchEntry(bus, topic.name, spec);
+  if (e?.readers.has(reader)) settleIfCommitted(e);
+}
