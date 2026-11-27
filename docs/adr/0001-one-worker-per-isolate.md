@@ -48,6 +48,8 @@ Nothing in the public API exposes worker identity:
 - `Supervisor`, `Compositor` and the bus key everything by `isolateId`, never by worker.
 - Bus traffic already travels over one `MessageChannel` per isolate (ADR 0005), so the port identifies the isolate. A pooled worker holds one port per isolate it hosts; only the isolate port between host and worker needs to carry an isolate id.
 
+Rules: `sup.heartbeat-interval`, `sup.blocked-after`, `sup.kill-after`, `sup.ready-timeout`, `sup.restart-window`, `sup.backoff`
+
 Supporting rules:
 
 ### Suspension (opt-in)
@@ -65,6 +67,8 @@ Supporting rules:
 
 - The `Supervisor` counts live workers (a pool counts as one) and emits a devtools warning when the count passes a configurable soft budget, fixed at 32 by default; devtools shows the device's reported cores and memory next to it. The budget never changes behaviour: it doesn't refuse spawns or trigger suspension. The real ceiling depends on the device, so it is a hint, not a guarantee.
 - If the browser fails to create a worker, that isolate crashes with reason `spawn-failed`: normal backoff and restart limit, ending in `failed` with the fallback UI, while the rest of the app keeps running. Before each retry the supervisor suspends every idle suspendable isolate to free memory.
+
+Rules: `sup.worker-budget`, `sup.spawn-failed`
 
 ### Start-up warm-up (amended 2026-11-20; not built, reopened 2026-11-22; replaced 2026-11-26)
 
@@ -84,6 +88,8 @@ For `heartbeat.readyTimeoutMs` after an isolate's `ready` (10 s by default), a b
 - **Why:** an isolate sends `ready` before its `start()` runs (`startIsolate` in `packages/runtime/src/bootstrap.ts`), so mounting, subscribing and the first replay all happen after the supervisor has moved it to `running`, where the kill check applies (the `blocked` branch of `tick` in `packages/host/src/supervisor/machine.ts`). Nothing protected that start-up work. The plant dashboard sets `killAfterMs` to 2 s so its 3 s stress block restarts a pool (M3d decision 9; `apps/dashboards/plant/src/isoloop/kernel.ts` in isoloop/web). On the 4-vCPU GitHub runner in Firefox, its `widgets` pool (72 members under the default `matched` placement) went more than 2 s without a beat while mounting and replaying, so it was killed at 6–7 s. Each restart mounted and replayed again and was killed again about 3.5 s later. In the last 200 CI runs, that broke 7 of the 69 plant Firefox PR jobs, 4 of them on both attempts. Each failing attempt logged 144–216 crash events; every passing attempt logged none. A slow real device can enter the same loop.
 - **Applies to** own workers and pools alike. The window is the supervisor's, judged per isolate like every other heartbeat rule.
 - **Open question for this review:** heartbeats are per worker, but the window above starts at each member's own `ready`. In a pool, members start one after another in the same event loop, so a member whose window has closed can be killed while a later member's `start()` holds the loop, and the pool's shared fate then restarts everyone. The same happens when one member restarts alone (its own fatal error) inside a running pool. Recommendation: a pool member's window lasts until `readyTimeoutMs` after the latest `ready` on its worker, so the whole pool stays in warm-up while any member is starting. The alternative is to keep the window per member and accept that a pool can still loop if its members start more than `readyTimeoutMs` apart.
+
+Rules: `sup.warm-up`
 
 ### Restart limit: short runs (amended 2026-11-24)
 
@@ -106,6 +112,8 @@ Decided for the 0.1.1 patch ([plan](../plans/0.1.1-patch.md), decision 5; [#390]
 
 **Interaction with #389.** A Firefox worker starved by the page ([#389](https://github.com/isoloop/isoloop/issues/389)) looks like a hang. Under the window alone, pages in #389's runs recovered only because their crashes didn't fit in the window. Under this rule they count. Before this code merges, #389's starvation setup runs on it at the defaults and at `killAfterMs: 2000` (the plan's T7). If pages reach `failed` at the defaults, the rule waits for 0.2 and this amendment is marked not in effect.
 
+Rules: `sup.short-runs`, `sup.backoff`, `sup.failed-message`
+
 ### Restart limit: `healthyAfterMs` (amended 2026-11-26)
 
 Decided for 0.2 ([#409](https://github.com/isoloop/isoloop/issues/409)); grilled on 2026-11-26 (Q3, Q11–Q13, yes to all).
@@ -124,6 +132,8 @@ Decided for 0.2 ([#409](https://github.com/isoloop/isoloop/issues/409)); grilled
 **Tests.** The #390 slow-crash-loop cases pass on the default unchanged, and again with a `healthyAfterMs` shorter and longer than `withinMs`, each reaching `failed` (or not) by the count it sets. `invalid_config` gets a case per malformed value.
 
 **Interaction with #389.** None in the rule. A starved worker's crash still counts as a short run; telling starved from hung is #389's own decision.
+
+Rules: `sup.healthy-after`, `sup.healthy-after-valid`
 
 ### Heartbeat clock: the host's lag (amended 2026-11-26)
 
@@ -184,6 +194,8 @@ Decided for 0.2 ([#389](https://github.com/isoloop/isoloop/issues/389)); grilled
 - **A CPU-time beat** (option (c) in the spike). Not built: a worker that doesn't run can't send it.
 - **Real low-end devices,** which weren't measured.
 
+Rules: `sup.lag-clock`, `sup.lag-clock-cap`, `sup.lag-clock-scope`, `sup.warm-up`, `sup.no-sibling-detector`, `sup.no-cpu-beat`
+
 ### What the browser still controls
 
 Isoloop's guarantees stop where the browser's tab policy starts. Background tabs throttle main-thread timers (to about once a second, or once a minute after a few minutes in Chrome); Memory Saver and mobile browsers may freeze a tab, pausing its workers; a tab may be discarded, losing memory topics (persistent topics survive). So:
@@ -191,6 +203,8 @@ Isoloop's guarantees stop where the browser's tab policy starts. Background tabs
 - While `document.hidden` is true the supervisor doesn't judge hangs: no busy overlay, no kills. Worker errors are still handled. On `visibilitychange` to visible and on the Page Lifecycle `resume` event, every heartbeat clock (isolates and bus) restarts from zero, so returning to a tab never kills an isolate for beats missed while hidden or frozen. A worker stuck in a loop in a hidden tab is detected after the user returns, within the normal limits.
 - On `freeze` and `pagehide` the kernel asks the bus to flush persistent topics immediately (M2b).
 - Work that must continue with no tab open needs a Service Worker or a server; that is out of scope.
+
+Rules: `sup.hidden-tab`, `sup.clocks-reset-on-show`, `dur.flush-on-freeze`, `dur.survives-reload`
 
 ## Consequences
 
@@ -214,3 +228,5 @@ Isoloop's guarantees stop where the browser's tab policy starts. Background tabs
 - **Raising plant's `killAfterMs` to 2.5–3 s** instead of a library rule (2026-11-20): keeps the stress block restarting a pool, but leaves little margin on the runner, and every app with a short threshold would meet the same loop on a slow device. (Corrected 2026-11-22: that loop's cause was the tests; see *Start-up warm-up*.)
 - **A longer threshold only in E2E builds** (2026-11-20): makes CI pass while hiding what a slow device hits; rejected.
 - **Hard worker limit:** fails apps on capable machines and still doesn't protect weak ones, since the real limit depends on the device. Rejected in favour of a warning.
+
+Rules: `sup.no-device-budget`, `sup.no-hard-worker-limit`, `sup.no-budget-suspend`
