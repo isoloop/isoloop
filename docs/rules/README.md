@@ -3578,7 +3578,293 @@ History:
 
 The inspection feed and the devtools panel. Prefix `insp`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `insp.kernel-inspect` | `kernel.inspect()` returns an `Inspector` with `snapshot()`, `on()`, `tap()`, `records()` and `close()`. It reads the kernel's existing events and getters, and every open inspector shares one feed. |  | active, experimental | since `0.1.0` |
+| `insp.one-format` | Every inspection message is plain, structured-cloneable data, the same whether it reaches the host, an isolate over the `inspect` port, or the dev MCP's WebSocket. |  | active, experimental | since `0.1.0` |
+| `insp.snapshot` | `snapshot()` gives the isolates as `kernel.isolates()` has them, the pools as `kernel.pools()` has them, the bus's state, restart count and last `bus:metrics`, and the recent events. |  | active, experimental | since `0.1.0` |
+| `insp.event-coalescing` | After the snapshot, `on` delivers isolate state, crashes, supervisor events, `bus:*` lifecycle events, `workers:budget` and `agents:unmatched` at once. Beats per isolate and `bus:metrics` are coalesced to about one a second. | `~1 per second` | active, experimental | since `0.1.0` |
+| `insp.metrics-head-retained` | `BusMetrics` carries each topic's head offset and retained record count. |  | active, experimental | since `0.1.0` |
+| `insp.tap` | `tap({ topics, maxPerSec })` copies matching records onto a dedicated port as they're appended, capped at `maxPerSec`. A tap isn't a consumer: it has no cursor, credit or commits, and it doesn't appear in `bus:metrics`. The kernel reopens it after a bus restart. | `default 50/s` | active, experimental | since `0.1.0` |
+| `insp.tap-skipped` | Records over a tap's `maxPerSec` are counted as skipped, not queued, and the count reaches the reader through `onSkipped(count)` at most once a second, on the host's and the isolate's inspector. |  | active, experimental | since `0.1.0` |
+| `insp.records-read` | `records(topic, { last })` returns the last `last` records still retained, at most 100. | `at most 100` | active, experimental | since `0.1.0` |
+| `insp.value-previews` | In a tap and a read, each record's value is a text preview cut to 2,048 characters, with the value's estimated size in bytes. | `2,048 characters` | active, experimental | since `0.1.0` |
+| `insp.memory-from-host` | Memory per isolate comes from the host's `performance.measureUserAgentSpecificMemory()`, called while a reader listens, at most every 5 s, and only when the page is cross-origin isolated. Elsewhere, and in Firefox and Safari, there's no figure. | `at most every 5 s`, `Chromium, cross-origin isolated` | active, experimental | since `0.1.0` |
+| `insp.worker-url-fragment` | The kernel adds `#isoloop-worker=N` to each worker started from the `@isoloop/runtime/worker` entry, so memory can be attributed by URL. Workers that share a URL get no figure, and pool members share their worker's. |  | active, experimental | since `0.1.0` |
+| `insp.block` | `block { ms }` makes an isolate's worker busy-loop for `ms`, capped at 10 s. Only the `inspect` port and the host's `Inspector` can send it, and on a pooled isolate it blocks the whole worker. | `at most 10 000 ms` | active, experimental | since `0.1.0` |
+| `insp.recent-events` | The kernel keeps a ring buffer of the last 200 supervisor and bus events from the moment it starts, inspected or not, and `snapshot()` includes it. | `200 events` | active, experimental | since `0.1.0` |
+| `insp.inspect-grant` | `grants.inspect: true` gives an isolate the inspection feed and its controls. Spawning an isolate with it into a pool fails with `invalid_config`. |  | active, experimental | since `0.1.0` |
+| `insp.inspect-port` | The `inspect` port goes from the host to the isolate on the isolate's own channel, never through the bus, so it keeps working while the bus restarts and never counts in the bus figures. |  | active, experimental | since `0.1.0` |
+| `insp.controls` | The inspector carries `restart(id)`, `kill(id)` and `block(id, ms)`, on the host's `Inspector` and on `ctx.inspector`. `kill` ends the isolate's worker as a crash. The controls reject after `close()`, and nothing gates them in production. |  | active, experimental | since `0.1.0` |
+| `insp.ctx-inspector` | `ctx.inspector` is defined only when the isolate holds `inspect: true`, and `undefined` otherwise. It mirrors the host's `Inspector`, with every call that crosses the port asynchronous. |  | active, experimental | since `0.1.0` |
+| `insp.additive-format` | `InspectMessage`, `InspectSnapshot` and the port's control messages live in `@isoloop/protocol` with a `v`, and only grow. Readers ignore what they don't know. |  | active, experimental | since `0.1.0` |
+| `insp.devtools-panel` | `connectDevtools(kernel, options)` from `@isoloop/devtools` spawns the panel as a visual isolate with the `inspect` grant, in its own worker. Importing it is the opt-in, production builds included. |  | active, experimental | since `0.1.0` |
+| `insp.devtools-skipped-header` | The devtools panel's Messages tab header shows a tap's cap and the records skipped since the tab opened, as `50/s cap · N skipped`. |  | active, experimental | since `0.1.0` |
+| `insp.no-host-subscription` | The inspection feed doesn't read records through a host subscription. |  | rejected |  |
+| `insp.no-feed-on-bus` | The inspection feed doesn't travel over bus topics such as `isoloop.inspect.*`. |  | rejected |  |
+| `insp.no-control-grant` | There's no separate grant for kill, block and restart. |  | rejected |  |
+| `insp.no-block-as-suspend` | `block` doesn't suspend delivery; it's a real busy loop. |  | rejected |  |
+
+### `insp.kernel-inspect`
+
+- **Change it:** `kernel.inspect()`
+- **Code:** `packages/host/src/inspect/inspect.ts`
+- **Related:** `insp.one-format`
+- **Why:** Each reader would otherwise build its own snapshot and message format.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 1. kernel.inspect() returns an Inspector](../adr/0020-inspection-feed.md#1-kernelinspect-returns-an-inspector) · Each reader would otherwise build its own snapshot and message format.
+- 2026-11-18 · built · [#247](https://github.com/isoloop/isoloop/issues/247) · The inspection feed, M4b task 2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.one-format`
+
+- **Code:** `packages/protocol/src/`
+- **Why:** One format for every reader: the panel, the dev MCP and a later extension.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 1. kernel.inspect() returns an Inspector](../adr/0020-inspection-feed.md#1-kernelinspect-returns-an-inspector) · One format for every reader: the panel, the dev MCP and a later extension.
+- 2026-11-18 · built · [#247](https://github.com/isoloop/isoloop/issues/247) · M4b task 2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.snapshot`
+
+- **Code:** `packages/host/src/inspect/inspect.ts`
+- **Related:** `insp.recent-events`
+- **Why:** A reader starts from the current state, then follows events.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 2. What the feed carries](../adr/0020-inspection-feed.md#2-what-the-feed-carries) · A reader starts from the current state, then follows events.
+- 2026-11-18 · built · [#247](https://github.com/isoloop/isoloop/issues/247) · M4b task 2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.event-coalescing`
+
+- **Code:** `packages/host/src/inspect/inspect.ts`
+- **Why:** Beats and metrics arrive too often to draw each one.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 2. What the feed carries](../adr/0020-inspection-feed.md#2-what-the-feed-carries) · Beats and metrics arrive too often to draw each one.
+- 2026-11-18 · built · [#247](https://github.com/isoloop/isoloop/issues/247) · M4b task 2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.metrics-head-retained`
+
+- **Code:** `packages/protocol/src/messages/control.ts`
+- **Why:** The panel's bus view shows how far each topic has gone and how much it keeps.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 2. What the feed carries](../adr/0020-inspection-feed.md#2-what-the-feed-carries) · The panel's bus view shows how far each topic has gone and how much it keeps.
+- 2026-11-18 · built · [#248](https://github.com/isoloop/isoloop/issues/248) · Head and retained count, M4b task 3.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.tap`
+
+- **Code:** `packages/bus/src/server/tap.ts`, `packages/host/src/inspect/inspect.ts`, `packages/protocol/src/messages/control.ts`
+- **Related:** `insp.tap-skipped`
+- **Why:** A host subscription counts as a consumer and takes part in credit, so the devtools would change what they measure.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 3. Records: a tap and a read, outside the consumer figures](../adr/0020-inspection-feed.md#3-records-a-tap-and-a-read-outside-the-consumer-figures) · A host subscription counts as a consumer and takes part in credit, so the devtools would change what they measure.
+- 2026-11-18 · built · [#248](https://github.com/isoloop/isoloop/issues/248) · The tap and read, M4b task 3.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.tap-skipped`
+
+- **Change it:** `tap({ onSkipped })`
+- **Code:** `packages/host/src/inspect/inspect.ts`, `packages/runtime/src/isolate/inspector.ts`
+- **Why:** The isolate side dropped the counts, so a reader couldn't tell a quiet topic from one over the cap.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 3. Records: a tap and a read, outside the consumer figures](../adr/0020-inspection-feed.md#3-records-a-tap-and-a-read-outside-the-consumer-figures) · A tap must never build a backlog.
+- 2026-11-19 · amended · [ADR 0020 · 6. The inspect grant and its port](../adr/0020-inspection-feed.md#6-the-inspect-grant-and-its-port) · The isolate side dropped the counts, so a reader couldn't tell a quiet topic from one over the cap. Before: Records over the cap are counted as skipped, not queued.
+- 2026-11-19 · built · [#276](https://github.com/isoloop/isoloop/issues/276) · `onSkipped`, the ADR 0020 amendment.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.records-read`
+
+- **Code:** `packages/protocol/src/messages/control.ts`, `packages/host/src/inspect/inspect.ts`
+- **Why:** It serves the dev MCP's `isoloop_records` and a log opened on a quiet topic.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 3. Records: a tap and a read, outside the consumer figures](../adr/0020-inspection-feed.md#3-records-a-tap-and-a-read-outside-the-consumer-figures) · It serves the dev MCP's `isoloop_records` and a log opened on a quiet topic.
+- 2026-11-18 · built · [#248](https://github.com/isoloop/isoloop/issues/248) · M4b task 3.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.value-previews`
+
+- **Code:** `packages/protocol/src/messages/control.ts`
+- **Why:** A devtools view never holds a large record twice.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 3. Records: a tap and a read, outside the consumer figures](../adr/0020-inspection-feed.md#3-records-a-tap-and-a-read-outside-the-consumer-figures) · A devtools view never holds a large record twice.
+- 2026-11-18 · built · [#248](https://github.com/isoloop/isoloop/issues/248) · M4b task 3.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.memory-from-host`
+
+- **Code:** `packages/host/src/inspect/memory.ts`
+- **Related:** `insp.worker-url-fragment`
+- **Why:** Chromium has `performance.memory` only on the main thread, not in workers (#251).
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 4. Block in the runtime, and memory measured by the host](../adr/0020-inspection-feed.md#4-block-in-the-runtime-and-memory-measured-by-the-host) · Memory per isolate is what a developer reaches for when a dashboard feels heavy.
+- 2026-11-18 · amended · [ADR 0020 · 4. Block in the runtime, and memory measured by the host](../adr/0020-inspection-feed.md#4-block-in-the-runtime-and-memory-measured-by-the-host) · Chromium has `performance.memory` only on the main thread, not in workers (#251). Before: Each isolate's beat carries `heapBytes` from `performance.memory`.
+- 2026-11-18 · built · [#259](https://github.com/isoloop/isoloop/issues/259) · Memory per isolate, M4b task 5b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.worker-url-fragment`
+
+- **Code:** `packages/host/src/kernel/loader.ts`
+- **Why:** Every isolate starts from the same bootstrap URL; a fragment on the bootstrap itself evaluated it twice.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 4. Block in the runtime, and memory measured by the host](../adr/0020-inspection-feed.md#4-block-in-the-runtime-and-memory-measured-by-the-host) · Every isolate starts from the same bootstrap URL; a fragment on the bootstrap itself evaluated it twice.
+- 2026-11-18 · built · [#259](https://github.com/isoloop/isoloop/issues/259) · M4b task 5b.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.block`
+
+- **Code:** `packages/runtime/src/bootstrap.ts`, `packages/protocol/src/messages/isolate.ts`
+- **Related:** `insp.no-block-as-suspend`
+- **Why:** A developer can watch containment work: the heartbeat goes late, the supervisor acts, the page keeps running.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 4. Block in the runtime, and memory measured by the host](../adr/0020-inspection-feed.md#4-block-in-the-runtime-and-memory-measured-by-the-host) · A developer can watch containment work: the heartbeat goes late, the supervisor acts, the page keeps running.
+- 2026-11-18 · built · [#251](https://github.com/isoloop/isoloop/issues/251) · `block { ms }`, M4b task 4.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.recent-events`
+
+- **Code:** `packages/host/src/inspect/inspect.ts`
+- **Why:** A reader that connects after a crash still sees the crash; that's the first thing an agent asks about.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 5. Recent events, kept from the start](../adr/0020-inspection-feed.md#5-recent-events-kept-from-the-start) · A reader that connects after a crash still sees the crash; that's the first thing an agent asks about.
+- 2026-11-18 · built · [#247](https://github.com/isoloop/isoloop/issues/247) · M4b task 2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.inspect-grant`
+
+- **Change it:** manifest `grants.inspect`
+- **Errors and events:** `invalid_config`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Why:** A pool merges its members' grants, so the capability would reach every member.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 6. The inspect grant and its port](../adr/0020-inspection-feed.md#6-the-inspect-grant-and-its-port) · A pool merges its members' grants, so the capability would reach every member.
+- 2026-11-18 · built · [#255](https://github.com/isoloop/isoloop/issues/255) · The inspect grant, M4b task 5.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.inspect-port`
+
+- **Code:** `packages/host/src/kernel/kernel.ts`, `packages/runtime/src/isolate/inspector.ts`
+- **Related:** `insp.no-feed-on-bus`
+- **Why:** The panel must keep working while the bus restarts.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 6. The inspect grant and its port](../adr/0020-inspection-feed.md#6-the-inspect-grant-and-its-port) · The panel must keep working while the bus restarts.
+- 2026-11-18 · built · [#255](https://github.com/isoloop/isoloop/issues/255) · M4b task 5.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.controls`
+
+- **Code:** `packages/host/src/inspect/inspect.ts`, `packages/runtime/src/isolate/inspector.ts`
+- **Related:** `insp.no-control-grant`
+- **Why:** The dev MCP's page side needed to kill and block from the host.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 6. The inspect grant and its port](../adr/0020-inspection-feed.md#6-the-inspect-grant-and-its-port) · Mounting the devtools is the app's choice, and any page code can already busy-loop or crash an isolate.
+- 2026-11-18 · amended · [ADR 0020 · 6. The inspect grant and its port](../adr/0020-inspection-feed.md#6-the-inspect-grant-and-its-port) · The dev MCP's page side needed to kill and block from the host. Before: The `inspect` port carries restart, kill and block.
+- 2026-11-18 · built · [#255](https://github.com/isoloop/isoloop/issues/255) · M4b task 5.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.ctx-inspector`
+
+- **Code:** `packages/runtime/src/isolate/inspector.ts`
+- **Why:** A panel checks once at start, and one optional object reads better than methods spread across `ctx.host`.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 6. The inspect grant and its port](../adr/0020-inspection-feed.md#6-the-inspect-grant-and-its-port) · A panel checks once at start, and one optional object reads better than methods spread across `ctx.host`.
+- 2026-11-18 · built · [#255](https://github.com/isoloop/isoloop/issues/255) · M4b task 5.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.additive-format`
+
+- **Code:** `packages/protocol/src/`
+- **Why:** An older panel, dev MCP or extension keeps working against a newer kernel.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 7. A versioned, additive message format](../adr/0020-inspection-feed.md#7-a-versioned-additive-message-format) · An older panel, dev MCP or extension keeps working against a newer kernel.
+- 2026-11-18 · built · [#247](https://github.com/isoloop/isoloop/issues/247) · M4b task 2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.devtools-panel`
+
+- **Change it:** `connectDevtools`
+- **Code:** `packages/devtools/src/index.ts`
+- **Why:** A devtools crash or hang never touches the app, and the panel restarts like any isolate.
+
+History:
+
+- 2026-11-18 · decided · [ADR 0020 · 6. The inspect grant and its port](../adr/0020-inspection-feed.md#6-the-inspect-grant-and-its-port) · A devtools crash or hang never touches the app, and the panel restarts like any isolate.
+- 2026-11-19 · built · [#265](https://github.com/isoloop/isoloop/issues/265) · `@isoloop/devtools` and the panel isolate, M4b task 7.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.devtools-skipped-header`
+
+- **Code:** `packages/devtools/src/views/messages-view.tsx`
+- **Related:** `insp.tap-skipped`
+- **Why:** The Log tab was renamed Messages (#328).
+
+History:
+
+- 2026-11-19 · decided · [ADR 0020 · 6. The inspect grant and its port](../adr/0020-inspection-feed.md#6-the-inspect-grant-and-its-port) · A reader must be able to tell a quiet topic from one over the cap.
+- 2026-11-19 · built · [#276](https://github.com/isoloop/isoloop/issues/276) · `onSkipped`.
+- 2026-11-20 · clarified · [ADR 0020 · 6. The inspect grant and its port](../adr/0020-inspection-feed.md#6-the-inspect-grant-and-its-port) · The Log tab was renamed Messages (#328). Before: The Log tab's header shows the cap and the total skipped.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `insp.no-host-subscription`
+
+History:
+
+- 2026-11-18 · rejected · [ADR 0020 · Alternatives considered](../adr/0020-inspection-feed.md#alternatives-considered) · Why not subscribe from the host like any consumer? It counts as a consumer in the bus figures and takes part in credit, so the devtools would change what they measure.
+
+### `insp.no-feed-on-bus`
+
+History:
+
+- 2026-11-18 · rejected · [ADR 0020 · Alternatives considered](../adr/0020-inspection-feed.md#alternatives-considered) · Why not publish the feed on the bus? It would stop when the bus restarts, which is when it's most needed, and add to the bus figures.
+
+### `insp.no-control-grant`
+
+History:
+
+- 2026-11-18 · rejected · [ADR 0020 · Alternatives considered](../adr/0020-inspection-feed.md#alternatives-considered) · Why not gate the controls apart from reading? The app chose to mount the devtools, and two grants for one panel add nothing.
+
+### `insp.no-block-as-suspend`
+
+History:
+
+- 2026-11-18 · rejected · [ADR 0020 · Alternatives considered](../adr/0020-inspection-feed.md#alternatives-considered) · Why not pause the isolate instead? That shows something else; the point is to watch containment handle a real busy loop.
 
 ## Watchers
 
