@@ -1,6 +1,8 @@
 /*
- * The isolate's watches (ADR 0023): `ctx.bus.watch`, the current value per
- * key rather than the stream.
+ * Watches (ADR 0023): `ctx.bus.watch` and `kernel.watch`, the current value
+ * per key rather than the stream. Shared by the isolate's bus client and the
+ * host's own bus connection (point 31), as the committer is, so both sides
+ * follow the same rules.
  *
  * - Every local watch on a topic shares one bus watch per port, on the union
  *   of their keys, or every key when any of them is unfiltered (point 11).
@@ -19,13 +21,9 @@
  *   topic the restart lost comes back as a full snapshot, which clears what
  *   it no longer has (point 23).
  */
-import {
-  BusError,
-  type BusToIsolate,
-  type CallResult,
-  type IsolateToBus,
-  type WatchKey,
-} from '@isoloop/protocol';
+import { BusError } from '../errors/bus-error';
+import type { CallResult } from '../errors/errors';
+import type { BusToIsolate, IsolateToBus, WatchKey } from '../messages/bus';
 
 /** `bus.watch`'s options. @experimental */
 export type WatchOptions = {

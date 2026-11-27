@@ -51,8 +51,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 772,
-          "end_line": 778,
+          "line": 798,
+          "end_line": 804,
           "label": "unsupported_browser",
           "anchor": "export function createKernel(config: KernelConfig): Kernel {"
         },
@@ -82,8 +82,8 @@
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1084,
-          "end_line": 1105,
+          "line": 1110,
+          "end_line": 1131,
           "label": "pool fate",
           "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
           "anchor_offset": 1
@@ -143,8 +143,8 @@
         },
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 428,
-          "end_line": 442,
+          "line": 463,
+          "end_line": 477,
           "label": "attach: a port per isolate",
           "anchor": "const connect: BusController['connect'] = (isolateId, grants, opts = {}) => {"
         }
@@ -160,8 +160,8 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 613,
-          "end_line": 615,
+          "line": 730,
+          "end_line": 732,
           "label": "kernel.subscribe's own port",
           "anchor": "subscribe(sub) {"
         }

@@ -44,8 +44,8 @@
       "sources": [
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1084,
-          "end_line": 1105,
+          "line": 1110,
+          "end_line": 1131,
           "label": "pool fate",
           "anchor": "* A pool's members share fate (M2c, ADR 0001). When one crashes for a",
           "anchor_offset": 1
@@ -67,15 +67,15 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 428,
-          "end_line": 442,
+          "line": 463,
+          "end_line": 477,
           "label": "attach a new port",
           "anchor": "const connect: BusController['connect'] = (isolateId, grants, opts = {}) => {"
         },
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 517,
-          "end_line": 525,
+          "line": 634,
+          "end_line": 642,
           "label": "detach keeps offsets",
           "anchor": "detach(isolateId, opts = {}) {"
         }

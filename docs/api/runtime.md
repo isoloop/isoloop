@@ -240,16 +240,7 @@ interface IsolateRoot {
 
 ### `OnView`
 
-**Experimental.**
-
-Called with each view of a watched topic: `view` holds the current value
-per key the watch reads, `changed` the keys added, updated or cleared since
-the last call. Treat both as read-only. The next view waits until this
-returns, or until its promise settles.
-
-```ts nocheck
-type OnView<Out> = (view: ReadonlyMap<string | null, Out>, changed: ReadonlySet<string | null>) => void | Promise<void>;
-```
+Also exported by `@isoloop/host`, which documents it: see [`OnView`](host.md#onview).
 
 ### `RequestOptions`
 
@@ -320,19 +311,7 @@ type SubscribeOptions = {
 
 ### `WatchOptions`
 
-**Experimental.**
-
-`bus.watch`'s options.
-
-```ts nocheck
-type WatchOptions = {
-  keys?: readonly (string | null)[];
-};
-```
-
-| Field | Description |
-| --- | --- |
-| `keys?` | Watch only these keys; `null` is the key of records with no key. Default: every key the topic retains. |
+Also exported by `@isoloop/host`, which documents it: see [`WatchOptions`](host.md#watchoptions).
 
 ## `@isoloop/runtime/testing`
 

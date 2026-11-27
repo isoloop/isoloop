@@ -31,22 +31,25 @@
 import {
   BusError,
   createCommitter,
+  createWatches,
   DEFAULT_COMMIT_INTERVAL_MS,
   deliveryPoints,
   isBusToIsolate,
+  isThenable,
   type BusRecord,
   type BusToIsolate,
   type CallResult,
   type CommitOffsets,
   type CommitPoint,
   type IsolateToBus,
+  type OnView,
   type StartPosition,
   type TopicRef,
   type TypedRecord,
+  type WatchOptions,
 } from '@isoloop/protocol';
-import { createWatches, isThenable, type OnView, type WatchOptions } from './watches';
 
-export type { OnView, WatchOptions } from './watches';
+export type { OnView, WatchOptions } from '@isoloop/protocol';
 
 /** `bus.request`'s options. @experimental */
 export type RequestOptions = {

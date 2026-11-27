@@ -44,15 +44,15 @@
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1360,
-          "end_line": 1396,
+          "line": 1386,
+          "end_line": 1422,
           "label": "attach before init",
           "anchor": "const start = (slot: Slot, o: { wake?: boolean } = {}): void => {"
         },
         {
           "path": "packages/host/src/kernel/kernel.ts",
-          "line": 1261,
-          "end_line": 1278,
+          "line": 1287,
+          "end_line": 1304,
           "label": "ready: format and version check",
           "anchor": "case 'ready': {"
         }
@@ -66,15 +66,15 @@
       "sources": [
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 428,
-          "end_line": 442,
+          "line": 463,
+          "end_line": 477,
           "label": "attach a new port",
           "anchor": "const connect: BusController['connect'] = (isolateId, grants, opts = {}) => {"
         },
         {
           "path": "packages/host/src/bus/controller.ts",
-          "line": 517,
-          "end_line": 525,
+          "line": 634,
+          "end_line": 642,
           "label": "detach keeps offsets",
           "anchor": "detach(isolateId, opts = {}) {"
         }

@@ -22,7 +22,7 @@ export type {
   KernelRequestOptions,
   ToolJsonSchema,
 } from './agents/agents';
-export type { RequestVia } from '@isoloop/protocol';
+export type { OnView, RequestVia, WatchOptions } from '@isoloop/protocol';
 export type { Inspector } from './inspect/inspect';
 export type {
   InspectBeat,
