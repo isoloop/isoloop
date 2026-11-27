@@ -1,13 +1,19 @@
 # ADR 0009, rule 12: Ubuntu only. Five jobs: `browser`, `e2e` (one per engine)
-# and `bench` start after `check` passes; `cli-node24` runs beside `check`. Actions are pinned by commit SHA
-# (rule 9), tags in comments.
+# and `bench` start after `check` passes; `cli-node24` runs beside `check`.
+# Actions are pinned by commit SHA (rule 9), tags in comments.
 #
-# What runs when (decided 2026-11-07):
-# - pull requests: everything;
-# - pushes to main: `check` only, since the PR already ran the rest;
+# What runs when (ADR 0009, amended 2026-11-27):
+# - pull requests: everything, unless the PR is docs-only: every changed file
+#   is under `docs/` or `.changeset/` or `.claude/`, or ends in `.md`. Then
+#   `check` runs in full and the other jobs report success without running
+#   their steps, so the required checks still pass;
+# - pushes to main and release/0.1: `check` and `cli-node24`, since the PR
+#   already ran the rest;
 # - dry runs and stage runs of release.yml, which call it: everything. A called
-#   workflow sees its caller's event. Tags run nothing;
-# - weekly, Monday 05:00 UTC: everything, to catch flaky tests and drift.
+#   workflow sees its caller's event, so it's never docs-only. Tags run nothing;
+# - nightly, 03:00 UTC on main: everything, called by nightly.yml, which skips
+#   quiet nights and reports failures in an issue;
+# - run by hand: everything.
 name: CI
 
 on:
@@ -15,8 +21,6 @@ on:
   push:
     branches: [main, release/0.1]
   workflow_call:
-  schedule:
-    - cron: '0 5 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -29,7 +33,42 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Whether this is a docs-only pull request: every changed file is docs, so the
+  # jobs after `check` skip their steps. Only `pull_request` runs can be; release
+  # runs (workflow_call), the nightly, pushes and runs by hand never are.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs-only: ${{ steps.diff.outputs.docs-only }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          # HEAD is the merge commit and HEAD^1 main's tip, as in `check`.
+          fetch-depth: 2
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          docs=false
+          if [ "$EVENT" = pull_request ]; then
+            files=$(git diff --name-only HEAD^1 HEAD)
+            if [ -n "$files" ]; then
+              docs=true
+              while IFS= read -r f; do
+                case "$f" in
+                  docs/* | .changeset/* | .claude/* | *.md) ;;
+                  *) docs=false; echo "not docs: $f"; break ;;
+                esac
+              done <<< "$files"
+            fi
+          fi
+          echo "docs-only: $docs"
+          echo "docs-only=$docs" >> "$GITHUB_OUTPUT"
+
   check:
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -64,6 +103,8 @@ jobs:
   # CLI also supports Node 24 LTS (its `engines`), so run its tests and the
   # built CLI there.
   cli-node24:
+    needs: changes
+    if: needs.changes.outputs.docs-only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -91,8 +132,8 @@ jobs:
           test -f .claude/skills/build-with-isoloop/SKILL.md
 
   browser:
-    needs: check
-    if: github.event_name != 'push'
+    needs: [changes, check]
+    if: github.event_name != 'push' && needs.changes.outputs.docs-only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -109,8 +150,11 @@ jobs:
           browsers: chromium firefox webkit
       - run: pnpm test:browser
 
+  # A matrix job skipped at the job level reports one unexpanded `e2e` check, and
+  # the required `e2e (chromium)`, `e2e (firefox)` and `e2e (webkit)` would stay
+  # pending. So on a docs-only PR the jobs run and skip their steps.
   e2e:
-    needs: check
+    needs: [changes, check]
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -118,20 +162,30 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
+    env:
+      DOCS_ONLY: ${{ needs.changes.outputs.docs-only }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - if: env.DOCS_ONLY == 'true'
+        run: echo "A docs-only pull request; e2e skipped."
+      - if: env.DOCS_ONLY != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: env.DOCS_ONLY != 'true'
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - if: env.DOCS_ONLY != 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - uses: ./.github/actions/install-browsers
+      - if: env.DOCS_ONLY != 'true'
+        run: pnpm install --frozen-lockfile
+      - if: env.DOCS_ONLY != 'true'
+        uses: ./.github/actions/install-browsers
         with:
           browsers: ${{ matrix.browser }}
       # Chromium also runs the WebMCP suite, with WebMCP's flag on (M4a decision 15).
-      - run: pnpm e2e --project=${{ matrix.browser }} ${{ matrix.browser == 'chromium' && '--project=chromium-webmcp' || '' }} ${{ matrix.browser == 'firefox' && '--project=firefox-webmcp' || '' }}
-      - if: failure()
+      - if: env.DOCS_ONLY != 'true'
+        run: pnpm e2e --project=${{ matrix.browser }} ${{ matrix.browser == 'chromium' && '--project=chromium-webmcp' || '' }} ${{ matrix.browser == 'firefox' && '--project=firefox-webmcp' || '' }}
+      - if: failure() && env.DOCS_ONLY != 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-${{ matrix.browser }}
@@ -143,8 +197,8 @@ jobs:
   # Report only (plan m1-kernel, task 13): no threshold yet. The numbers are in
   # the job log and in the bench-results artifact.
   bench:
-    needs: check
-    if: github.event_name != 'push'
+    needs: [changes, check]
+    if: github.event_name != 'push' && needs.changes.outputs.docs-only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

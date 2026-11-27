@@ -685,6 +685,178 @@
     ]
   },
   {
+    "id": "tool.ci-docs-only",
+    "statement": "On a docs-only pull request, `check` runs in full and `cli-node24`, `browser`, `e2e` and `bench` report success without running their steps.",
+    "status": "active",
+    "repo": true,
+    "code": [".github/workflows/ci.yml"],
+    "related": ["tool.ci-docs-only-paths", "tool.ci-docs-only-required-checks", "tool.ci-nightly"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0009#amended-2026-11-27-what-runs-when",
+        "why": "A docs change can't break runtime code, and the e2e and bench runs cost runner time for files they never read."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#507",
+        "why": "In force from the PR that built the docs-only skip and the nightly."
+      }
+    ]
+  },
+  {
+    "id": "tool.ci-docs-only-paths",
+    "statement": "A pull request is docs-only when every changed file is under `docs/`, `.changeset/` or `.claude/`, or ends in `.md`. Any other file makes it a full run.",
+    "status": "active",
+    "repo": true,
+    "values": ["docs/**", "**/*.md", ".changeset/**", ".claude/**"],
+    "code": [".github/workflows/ci.yml"],
+    "related": ["tool.ci-docs-only"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0009#amended-2026-11-27-what-runs-when",
+        "why": "An allowlist defaults to the full run, so a kind of file nobody listed never skips the tests."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#507",
+        "why": "In force from the PR that built the docs-only skip and the nightly."
+      }
+    ]
+  },
+  {
+    "id": "tool.ci-docs-only-required-checks",
+    "statement": "On a docs-only pull request the `e2e` jobs run and skip their steps, so `e2e (chromium)`, `e2e (firefox)` and `e2e (webkit)` still report as required checks.",
+    "status": "active",
+    "repo": true,
+    "code": [".github/workflows/ci.yml"],
+    "related": ["tool.ci-docs-only"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0009#amended-2026-11-27-what-runs-when",
+        "why": "A matrix job skipped as a whole reports one unexpanded `e2e` check, and the required names would stay pending."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#507",
+        "why": "In force from the PR that built the docs-only skip and the nightly."
+      }
+    ]
+  },
+  {
+    "id": "tool.ci-docs-only-pr-events",
+    "statement": "Only `pull_request` runs can be docs-only. Release dry runs and stage runs, the nightly, pushes and runs by hand always run every job they include.",
+    "status": "active",
+    "repo": true,
+    "code": [".github/workflows/ci.yml"],
+    "related": ["tool.ci-docs-only"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0009#amended-2026-11-27-what-runs-when",
+        "why": "A release run is the last full check before npm, so it must never skip."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#507",
+        "why": "In force from the PR that built the docs-only skip and the nightly."
+      }
+    ]
+  },
+  {
+    "id": "tool.ci-nightly",
+    "statement": "Every CI job, `bench` included, runs on `main` each night at 03:00 UTC, through `nightly.yml` calling `ci.yml`.",
+    "status": "active",
+    "repo": true,
+    "values": ["03:00 UTC daily"],
+    "code": [".github/workflows/nightly.yml"],
+    "related": ["tool.ci-nightly-quiet-skip", "tool.ci-nightly-issue", "tool.ci-docs-only"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0009#amended-2026-11-27-what-runs-when",
+        "why": "With docs-only PRs skipping e2e, a daily full run catches flaky tests, browser drift and interactions between PRs merged the same day; it replaces the weekly run."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#507",
+        "why": "In force from the PR that built the docs-only skip and the nightly."
+      }
+    ]
+  },
+  {
+    "id": "tool.ci-nightly-quiet-skip",
+    "statement": "A scheduled nightly is skipped when `main` has no commits since the last green nightly. A nightly run by hand always runs.",
+    "status": "active",
+    "repo": true,
+    "code": [".github/workflows/nightly.yml"],
+    "related": ["tool.ci-nightly"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0009#amended-2026-11-27-what-runs-when",
+        "why": "A night with nothing new can only repeat the last result."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#507",
+        "why": "In force from the PR that built the docs-only skip and the nightly."
+      }
+    ]
+  },
+  {
+    "id": "tool.ci-nightly-issue",
+    "statement": "A failed nightly opens an issue labelled `nightly-failure`, or comments on the open one, with the failed jobs and the commits since the last green nightly. The next green nightly closes it.",
+    "status": "active",
+    "repo": true,
+    "values": ["label: nightly-failure"],
+    "code": [".github/workflows/nightly.yml"],
+    "related": ["tool.ci-nightly"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0009#amended-2026-11-27-what-runs-when",
+        "why": "GitHub emails a failed scheduled run only to whoever last edited the workflow; an issue is seen by everyone, and the commit range points at the cause."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#507",
+        "why": "In force from the PR that built the docs-only skip and the nightly."
+      }
+    ]
+  },
+  {
+    "id": "tool.no-ci-paths-ignore",
+    "statement": "We don't use `paths-ignore` or a path-filter action to skip CI for docs.",
+    "status": "rejected",
+    "repo": true,
+    "related": ["tool.ci-docs-only"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-27",
+        "ref": "adr/0009#alternatives-considered",
+        "why": "Why not just `paths-ignore`? The workflow wouldn't start, so the required checks would stay pending and the PR couldn't merge; a path-filter action is a dependency for a dozen lines of shell."
+      }
+    ]
+  },
+  {
     "id": "tool.pnpm-workspaces",
     "statement": "The repo is a pnpm 12 workspace, run with plain `pnpm -r` in dependency order and no task runner on top.",
     "status": "active",
