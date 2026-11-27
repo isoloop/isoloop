@@ -1,0 +1,92 @@
+# The nightly (ADR 0009, amended 2026-11-27): every CI job on main, bench
+# included, at 03:00 UTC, through ci.yml. A night with no commits on main since
+# the last green nightly is skipped. A failed run opens an issue labelled
+# `nightly-failure`, or comments on the open one, with the failed jobs and the
+# commits since the last green nightly; the next green run closes it.
+name: Nightly
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+      last-green: ${{ steps.gate.outputs.last-green }}
+    steps:
+      - id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          last=$(gh run list --workflow nightly.yml --branch main --status success \
+            --limit 20 --json headSha,conclusion \
+            --jq '[.[] | select(.conclusion == "success")][0].headSha // empty')
+          run=true
+          # A run by hand always runs.
+          if [ "$EVENT" = schedule ] && [ "$last" = "$SHA" ]; then run=false; fi
+          echo "last green nightly: ${last:-none}; head: $SHA; run: $run"
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "last-green=$last" >> "$GITHUB_OUTPUT"
+
+  ci:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    uses: ./.github/workflows/ci.yml
+
+  report:
+    needs: [gate, ci]
+    if: always() && needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RESULT: ${{ needs.ci.result }}
+      RUN_ID: ${{ github.run_id }}
+      SHA: ${{ github.sha }}
+      LAST: ${{ needs.gate.outputs.last-green }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+    steps:
+      - run: |
+          open=$(gh issue list --label nightly-failure --state open --limit 1 \
+            --json number --jq '.[0].number // empty')
+          if [ "$RESULT" = success ]; then
+            if [ -n "$open" ]; then
+              gh issue close "$open" --comment "The nightly run on \`${SHA:0:7}\` is green: $RUN_URL"
+            fi
+            exit 0
+          fi
+          failed=$(gh run view "$RUN_ID" --json jobs \
+            --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out") | "- `\(.name)`: \(.conclusion)"')
+          [ -n "$failed" ] || failed="- the CI workflow ended with \`$RESULT\`"
+          if [ -n "$LAST" ]; then
+            commits="[\`${LAST:0:7}...${SHA:0:7}\`]($REPO_URL/compare/$LAST...$SHA), since the last green nightly"
+          else
+            commits="\`${SHA:0:7}\`, with no green nightly to compare against"
+          fi
+          body=$(printf 'The nightly run failed: %s\n\nFailed jobs:\n%s\n\nCommits: %s\n' "$RUN_URL" "$failed" "$commits")
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$body"
+          else
+            gh issue create --title "Nightly CI failed" --label nightly-failure --body "$body"
+          fi
