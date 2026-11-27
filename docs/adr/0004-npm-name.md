@@ -22,12 +22,16 @@ Two constraints shaped the choice:
 
 Every real word we checked was taken on at least one of those (bulkhead, mullion, septa, fenestra, casement, tessera, skein, weft, strand, filament, lattice, canton, keel, palisade, transom). So were the `iso-` names isolit (npm), isorun, isolane and isokit. The coined names free on all three were `isoloop`, `isofold`, `isopane`, `paneloop`, `threadpane` and `panesmith`.
 
+Rules: `ver.no-federa-name`
+
 ## Decision
 
 - The project is **Isoloop**: an isolated event loop per unit, which is exactly what the runtime provides, visual or headless.
 - npm: the **`@isoloop/*`** scope for packages (`@isoloop/protocol`, `@isoloop/host`, `@isoloop/runtime`, `@isoloop/bus`, `@isoloop/dom`, `@isoloop/react`, `@isoloop/preact`, `@isoloop/devtools`), and the unscoped **`isoloop`** for the CLI.
 - GitHub: the **`isoloop`** org, with the repo at `isoloop/isoloop`.
 - Prefixes in code: host components `iso-*` (e.g. `<iso-button>`), the surface element `<iso-surface>`, and system topics `isoloop.*` (e.g. `isoloop.route.v1`).
+
+Rules: `ver.project-name`, `ver.name-prefixes`
 
 ## Consequences
 
