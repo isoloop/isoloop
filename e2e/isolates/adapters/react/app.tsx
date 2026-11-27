@@ -3,7 +3,7 @@
  * major by e2e/build-adapters.ts. Same behaviour as ../preact/app.tsx.
  */
 import type { TopicRef } from '@isoloop/protocol';
-import { defineIsolate, useHost, usePublish, useRoute, useTopic } from '@isoloop/react';
+import { defineIsolate, useHost, usePublish, useRoute, useTopic, useWatch } from '@isoloop/react';
 import { useRef, useState, version } from 'react';
 
 const notes: TopicRef<string> = { name: 'notes.v1', schema: { '~standard': {} } };
@@ -13,6 +13,25 @@ const notes: TopicRef<string> = { name: 'notes.v1', schema: { '~standard': {} } 
 function Mirror() {
   const last = useTopic(notes, { from: 'earliest' });
   return <p className="mirror">{last ?? '0'}</p>;
+}
+
+// Watchers (M8 Watchers W1): two components watch `notes.v1`, one for the
+// records with no key and one for every key; `.key-a` watches key `a`, which
+// only `.mark` publishes to.
+function Watched() {
+  const none = useWatch(notes, { key: null });
+  const a = useWatch(notes, { key: 'a' });
+  return (
+    <>
+      <p className="watched">{none ?? 'none'}</p>
+      <p className="key-a">{a ?? 'none'}</p>
+    </>
+  );
+}
+
+function WatchedAll() {
+  const view = useWatch(notes);
+  return <p className="watched-all">{[...view].map(([k, v]) => `${k ?? '-'}=${v}`).join(',')}</p>;
 }
 
 function App() {
@@ -38,6 +57,11 @@ function App() {
       {mirror ? <Mirror /> : null}
       <button className="unmirror" onClick={() => setMirror(false)}>
         unmirror
+      </button>
+      <Watched />
+      <WatchedAll />
+      <button className="mark" onClick={() => void publish(String(count), { key: 'a' })}>
+        mark
       </button>
       <button className="inc" onClick={inc}>
         +1

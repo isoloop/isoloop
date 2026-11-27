@@ -72,6 +72,23 @@ for (const [fw, major] of MAJORS)
         await expect(el(page, 'count')).toHaveText('2');
       });
 
+      test('watchers: the null key, one key and every key, from three components', async ({
+        page,
+      }) => {
+        await expect(el(page, 'watched')).toHaveText('none');
+        await expect(el(page, 'key-a')).toHaveText('none');
+        await el(page, 'inc').click();
+        await expect(el(page, 'count')).toHaveText('1');
+        await expect(el(page, 'watched')).toHaveText('1');
+        await expect(el(page, 'key-a')).toHaveText('none');
+        await el(page, 'mark').click();
+        await expect(el(page, 'key-a')).toHaveText('1');
+        await expect(el(page, 'watched-all')).toHaveText('-=1,a=1');
+        await el(page, 'inc').click();
+        await expect(el(page, 'watched')).toHaveText('2');
+        await expect(el(page, 'watched-all')).toHaveText('-=2,a=1');
+      });
+
       test('host-owned inputs keep what the user types', async ({ page }) => {
         const text = 'typed fast';
         await el(page, 'field').pressSequentially(text, { delay: 10 });
