@@ -4,7 +4,7 @@ What was decided and shipped, by date, newest first. The order ahead is in the [
 
 ## 2026-11-27
 
-- A rules registry was grilled (Q1–Q31, yes to all) and written up as [ADR 0026](../adr/0026-rules-registry.md) (Proposed): what holds today, one fact per rule, in `docs/rules/`, with each rule's history of decisions and amendments, checked in CI and shown on a local board. It's internal tooling, not a milestone, and runs beside M8 Watchers W1.
+- A rules registry was grilled (Q1–Q31, yes to all) and written up as [ADR 0026](../adr/0026-rules-registry.md), accepted the same day: what holds today, one fact per rule, in `docs/rules/`, with each rule's history of decisions and amendments, checked in CI and shown on a local board. It's internal tooling, not a milestone, and runs beside M8 Watchers W1.
 
 ## 2026-11-26
 

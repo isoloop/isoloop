@@ -1,6 +1,6 @@
 # ADR 0026: Rules registry
 
-- **Status:** Proposed 2026-11-27, from a grilling with the maintainer (Q1–Q31, yes to all).
+- **Status:** Accepted 2026-11-27 (proposed the same day), from a grilling with the maintainer (Q1–Q31, yes to all), with a `superseded` event and `Rules:` lines required from ADR 0026 on, added in review.
 - **Date:** 2026-11-27
 - **Plan:** none. This is internal tooling for the repo, not a milestone, and it ships nothing to npm.
 - **Touches:** every ADR (each decision gains a `Rules:` line), [ADR 0019](0019-versioning-and-releases.md) (version PRs run `rules:ship`), [ADR 0009](0009-toolchain.md) (scripts run on Node with no new dependency).
@@ -76,7 +76,7 @@ The forces:
    | `removed` | taken out with no replacement | ADR section |
    | `rejected` | an alternative we said no to | ADR section |
    | `withdrawn` | an accepted rule taken back | ADR section |
-   | `superseded` | replaced by another rule, named in `supersededBy` | ADR section |
+| `superseded` | replaced by another rule, named in `supersededBy` | ADR section |
 
    `clarified` and `amended` also need `prev`: the old wording or behaviour, so the rule as it was can be read without opening the ADR. A `ref` is something a reader can open on GitHub: an ADR file and heading anchor, a PR, an issue or a release tag. Grilling notes and agent memory are never a source.
 
@@ -147,7 +147,8 @@ The forces:
     Rules: `tool.rules-check`
 11. **`rules.yml`**, a workflow of its own like `changeset.yml`, so adding or removing its label re-runs only this check:
     - a PR that changes `docs/adr/**` must change `docs/rules/**`, unless it has the `no-rules` label. That label is for edits that change no fact (typos, links), and an agent may add it, like `no-changeset`;
-    - it fails if an id or alias on `main` is missing from the PR;
+    - it fails if an id or alias on `main` is missing from the PR.
+
     - every decision and amendment in an ADR numbered 0026 or higher has a `Rules:` line, from the start.
 
     Until the backfill is done, the pairing applies to older ADRs only once they have `Rules:` lines.
