@@ -16,6 +16,8 @@ Workers have no `history` or `location.assign`, and only one party can own the a
 - `KernelConfig.routing?: boolean`, default `true`. With `false` the kernel adds no listeners and never publishes the route topic (it stays reserved and empty), `syncRoute()` does nothing, `navigate()` rejects with `routing_disabled`, and link clicks aren't intercepted, so the browser loads the page as usual. This is for static pages, widgets embedded in someone else's app, and headless setups.
 - `KernelConfig.basePath?: string`, default `/`, normalised to start and end with `/`. It applies only when routing is on. It must match the host router's `basename`. In dev, the kernel warns once if `syncRoute()` sees a URL outside `basePath` while isolates are subscribed, which is the usual symptom of a mismatch.
 
+Rules: `route.host-owns-url`, `route.routing-switch`, `route.base-path`, `route.base-path-warning`
+
 ### Route topic
 
 - The kernel publishes the current location to a built-in compacted system topic, `isoloop.route.v1`, exported as `routeTopic` from `@isoloop/protocol`. Key `"current"`, value `{ href, pathname, path, search, hash, state }`:
@@ -25,9 +27,13 @@ Workers have no `history` or `location.assign`, and only one party can own the a
 - **Subscribing is opt-in.** Nothing subscribes on an isolate's behalf, and the bus delivers route records only to isolates that subscribed, so an isolate that doesn't care about the route pays nothing and isn't woken from suspension by navigation. Isolates read it with `from: 'earliest'` to get the current route at once. The M3 adapters' `useRoute()` subscribes only when a component uses it.
 - **Host router wiring.** Navigations the host's router makes itself are reported with `kernel.syncRoute()`, which reads `location` and `history.state` and publishes if something changed. The host wires it once, e.g. `router.subscribe(() => kernel.syncRoute())`.
 
+Rules: `route.route-topic`, `route.state-dropped`, `route.publish-points`, `route.opt-in-subscribe`, `route.sync-route`
+
 ### Reserved namespace
 
 Topics under `isoloop.*` are system topics. Every isolate may subscribe to them without a grant. Only the kernel publishes them: an isolate's publish is `forbidden` even with a matching grant glob, and `kernel.publish` from host code rejects too.
+
+Rules: `route.reserved-namespace`
 
 ### Navigation from isolates
 
@@ -38,11 +44,15 @@ Topics under `isoloop.*` are system topics. Every isolate may subscribe to them 
 - **Ordering.** After `true` the kernel runs `syncRoute()`. If that publishes (the URL already changed, as with the default hook or a sync router), the call resolves only after the bus commits the route record. So code that awaits `navigate` can rely on the route being in the log. With async routers there is no such guarantee: wait for the route topic. If the bus is down, the call resolves at once and the route arrives with the republish after the restart.
 - No `back`/`go(n)` in v1. `go` can't be vetoed cleanly beforehand, gives no result, and may leave the app. Isolates navigate to an explicit href, or the host exposes a command topic.
 
+Rules: `route.navigate-grant`, `route.resolver`, `route.on-navigate`, `route.navigate-result`, `route.navigate-ordering`, `route.no-back-go`
+
 ### Links
 
 - `<a href>` in an isolate's tree is rendered by the host. The compositor rewrites every same-origin `href` to the resolved absolute URL on render and on every patch that changes it, so hover, copy-link, Ctrl-click and middle-click use the same URL as a plain click.
 - A plain primary-button click on a same-origin link, hash-only links included, is prevented on the host and sent to `onNavigate` with `from` set to the isolate. It needs no `navigate` grant: it's a real user click on the host DOM, which an isolate can't fake. The host keeps its veto.
 - The browser handles the click as usual when any modifier key (Ctrl, Meta, Shift, Alt) is held, for a non-primary button, when the link has `target` other than `_self`, or when it has `download`. Cross-origin links always open normally.
+
+Rules: `route.link-hrefs`, `route.link-clicks`
 
 ## Consequences
 

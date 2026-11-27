@@ -1,1 +1,700 @@
-[]
+[
+  {
+    "id": "dur.per-topic",
+    "statement": "Each topic sets its durability. `memory` keeps the log in the bus worker's memory only; `persistent` also writes it to segment files in the Origin Private File System (OPFS).",
+    "status": "active",
+    "values": ["default: memory"],
+    "knob": "topic `durability`",
+    "code": ["packages/bus/src/storage/opfs.ts"],
+    "since": "0.1.0",
+    "related": ["dur.group-commit", "dur.survives-reload"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#2-durability-per-topic",
+        "why": "Held only in memory, every log and offset is lost when the bus worker crashes. OPFS gives dedicated workers synchronous file access, which suits append-only segments."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#98",
+        "why": "The bus worker keeps persistent topics in OPFS, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.group-commit",
+    "statement": "Appends to persistent topics are written in batches, every 5 ms or 256 records. A `publish` is acknowledged only after its batch is flushed, and committed offsets are flushed the same way.",
+    "status": "active",
+    "values": ["5 ms", "256 records"],
+    "code": ["packages/bus/src/storage/opfs.ts"],
+    "since": "0.1.0",
+    "related": ["dur.per-topic"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#2-durability-per-topic",
+        "why": "Batching keeps writes cheap without acknowledging a record that isn't on disk."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#89",
+        "why": "Segments and group commit, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.log-storage",
+    "statement": "The `LogEngine` is the broker's only interface to the log. Durability is a `LogStorage` the engine writes through: `MemoryStorage` or `OpfsStorage`.",
+    "status": "active",
+    "code": ["packages/bus/src/engine/types.ts", "packages/bus/src/storage/opfs.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#3-storage-layer-under-the-engine",
+        "why": "Storage plugs in under the engine, so adding OPFS changed nothing above it."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#89",
+        "why": "`OpfsStorage` with segments and group commit, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.evict-replay",
+    "statement": "Old segments of a persistent topic can be evicted from memory and read back from disk on replay, so the topic can hold more than fits in memory.",
+    "status": "active",
+    "code": ["packages/bus/src/storage/opfs.ts"],
+    "since": "0.1.0",
+    "related": ["dur.per-topic"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#3-storage-layer-under-the-engine",
+        "why": "A durable log shouldn't be capped by the bus worker's memory."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#105",
+        "why": "Eviction and replay from disk, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.codec",
+    "statement": "Records of persistent topics are encoded with `@isoloop/codec`, in the format `isoloop-codec@1`. The codec has no dependency.",
+    "status": "active",
+    "code": ["packages/codec/src/codec/format.ts"],
+    "since": "0.1.0",
+    "related": ["dur.codec-one-encoding", "dur.codec-types", "dur.no-codec-library"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-07",
+        "ref": "adr/0014#decision",
+        "why": "It was the fastest or within 1.42× of the fastest library in every engine, with the smallest records and a 3.1 KB gzipped bundle."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#74",
+        "why": "The codec's core types, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.codec-one-encoding",
+    "statement": "Every value has exactly one encoding in `isoloop-codec@1`, fixed by a byte-layout test. Changing the format means a new version that reads the old one.",
+    "status": "active",
+    "code": ["packages/codec/src/codec/format.ts"],
+    "since": "0.1.0",
+    "related": ["dur.codec"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-07",
+        "ref": "adr/0014#decision",
+        "why": "Files on disk must stay readable, so the format can't drift."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#74",
+        "why": "The codec's core types, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.codec-types",
+    "statement": "A persistent topic accepts objects, arrays, strings, numbers, booleans, `null`, `undefined`, `bigint`, `Date`, `Map`, `Set`, typed arrays and `ArrayBuffer`. A `publish` of a function, a symbol, a class instance or a cycle rejects with `not_encodable`. Memory topics don't check.",
+    "status": "active",
+    "errors": ["not_encodable"],
+    "code": ["packages/codec/src/codec/format.ts", "packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "related": ["dur.codec"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#consequences",
+        "why": "Topic values must be structured-clone data the codec can write."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-07",
+        "ref": "adr/0014#decision",
+        "why": "The codec's type list settled: the other structured-clone types are in, and cycles fail.",
+        "prev": "A persistent topic accepts structured-clone data without functions, DOM nodes or class instances."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#84",
+        "why": "The codec covers the other structured-clone types, and the broker rejects `not_encodable`."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.no-codec-library",
+    "statement": "The codec isn't a MessagePack or CBOR library.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-07",
+        "ref": "adr/0014#alternatives-considered",
+        "why": "Why not use msgpackr or cbor-x? No library was more than 2× faster (at most 1.42×), and ours is smaller on the wire and in the bundle."
+      }
+    ]
+  },
+  {
+    "id": "dur.reattach",
+    "statement": "After a bus crash, isolates keep running. The kernel gives each a new bus port with `reattach` as soon as the new bus worker is booted, before it reports `ready`, and the new bus buffers each port's publishes and subscriptions while it loads.",
+    "status": "active",
+    "code": ["packages/host/src/bus/controller.ts"],
+    "since": "0.1.0",
+    "related": ["dur.resume-committed", "dur.memory-reset", "dur.publish-buffer"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#4-reattach-not-restart-after-a-bus-crash",
+        "why": "A bus crash should be a short pause, not a restart of every isolate."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#44",
+        "why": "The host's bus controller and its supervision, built in M2."
+      },
+      {
+        "type": "clarified",
+        "date": "2026-11-13",
+        "ref": "adr/0007#4-reattach-not-restart-after-a-bus-crash",
+        "why": "Written down as built in `controller.ts`, so isolates don't wait on the restore.",
+        "prev": "The kernel gives every running isolate a new bus port via `reattach`, with no word on when."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.resume-committed",
+    "statement": "After a bus restart, a subscription to a persistent topic resumes after its committed offset, with no gap, whatever `from` it asked for. One that never committed starts at its `from`.",
+    "status": "active",
+    "code": ["packages/runtime/src/bus/bus-client.ts", "packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "related": ["dur.reattach"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#4-reattach-not-restart-after-a-bus-crash",
+        "why": "A persistent topic survives the crash, so a reader picks up where it left off."
+      },
+      {
+        "type": "clarified",
+        "date": "2026-11-07",
+        "ref": "adr/0007#4-reattach-not-restart-after-a-bus-crash",
+        "why": "A reattached `from: 'earliest'` subscription first replayed the whole log; the committed offset wins.",
+        "prev": "Persistent topics resume after the committed offset."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#118",
+        "why": "A reattached subscription to a persistent topic resumes after its committed offset."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.memory-reset",
+    "statement": "After a bus restart, a memory topic answers each subscription with `reset { topic, reason: 'bus_restart' }`. Adapters clear their topic state and replay from `earliest`; a plain `subscribe` gets its `onReset` callback.",
+    "status": "active",
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "related": ["dur.reattach", "dur.on-reset-restart"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#4-reattach-not-restart-after-a-bus-crash",
+        "why": "The old log is gone, and a reset is cheaper than restarting every isolate."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#44",
+        "why": "The host's bus controller and its supervision, built in M2."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.on-reset-restart",
+    "statement": "An isolate whose manifest sets `bus: { onReset: 'restart' }` is restarted by the supervisor on a reset, instead of handling it.",
+    "status": "active",
+    "values": ["default: 'reset'"],
+    "knob": "manifest `bus.onReset`",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["dur.memory-reset"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#4-reattach-not-restart-after-a-bus-crash",
+        "why": "Some isolates can't rebuild their state from a replay."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#44",
+        "why": "The host's bus controller and its supervision, built in M2."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.publish-buffer",
+    "statement": "While the bus restarts, an isolate's `BusClient` buffers its publishes, up to 1,000 unanswered calls, then sends them after its subscriptions. Past the limit a publish rejects with `bus_unavailable`.",
+    "status": "active",
+    "values": ["1 000 calls"],
+    "errors": ["bus_unavailable"],
+    "code": ["packages/runtime/src/bus/bus-client.ts"],
+    "since": "0.1.0",
+    "related": ["dur.dedupe", "dur.host-resend"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#4-reattach-not-restart-after-a-bus-crash",
+        "why": "Publishes in flight across a restart are sent again, not lost."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#44",
+        "why": "The host's bus controller and its supervision, built in M2."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.dedupe",
+    "statement": "On a persistent topic, every publish and request carries `(producer, epoch, seq)`. A re-send whose `seq` the bus already has, among the producer's last 1,000 on that topic, is answered with the original offset and not appended again. Memory topics skip the check.",
+    "status": "active",
+    "values": ["last 1 000 seqs"],
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "related": ["dur.publish-buffer"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-07",
+        "ref": "adr/0007#4-reattach-not-restart-after-a-bus-crash",
+        "why": "The old bus may have flushed a record before it crashed. Rejecting the re-send wouldn't stop the duplicate, since an app that retries writes it again."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#116",
+        "why": "Re-sent publishes are deduplicated on persistent topics, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.host-resend",
+    "statement": "`kernel.publish` calls the old bus never answered are sent again on the new bus, with the host as the producer. Calls made while no bus is running wait for the new one, up to 1,000.",
+    "status": "active",
+    "values": ["1 000 calls"],
+    "code": ["packages/host/src/bus/controller.ts"],
+    "since": "0.1.0",
+    "related": ["dur.dedupe"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-06",
+        "ref": "adr/0007#4-reattach-not-restart-after-a-bus-crash",
+        "why": "Recorded as built in M2."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-07",
+        "ref": "adr/0007#4-reattach-not-restart-after-a-bus-crash",
+        "why": "Deduplication makes the re-send safe, so the host stops rejecting.",
+        "prev": "`kernel.publish` calls the old bus never answered reject with `bus_unavailable`, since the host can't tell whether they were appended."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#116",
+        "why": "Re-sent publishes are deduplicated on persistent topics, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.safe-mode",
+    "statement": "If the bus crashes a second time during or right after loading from OPFS, the new bus worker sets the newest segment of each persistent topic aside, renamed and not deleted, and starts from the one before. The kernel emits `bus:recovered { quarantined }`.",
+    "status": "active",
+    "errors": ["bus:recovered"],
+    "code": ["packages/bus/src/server/server.ts", "packages/bus/src/storage/safe-mode.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#5-safe-mode-against-crash-loops",
+        "why": "A crash right after loading most likely comes from a persisted record."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#106",
+        "why": "Safe mode, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.one-tab",
+    "statement": "The first tab takes the `isoloop-bus` Web Lock and uses OPFS. Other tabs on the same origin run every topic in memory, and the kernel emits `bus:durability_degraded` with `reason: 'another_tab'`.",
+    "status": "active",
+    "errors": ["bus:durability_degraded"],
+    "code": ["packages/bus/src/storage/lock.ts"],
+    "since": "0.1.0",
+    "related": ["dur.no-sync-access", "dur.tab-own-bus"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#6-one-tab-owns-the-files",
+        "why": "Sync access handles are exclusive, so only one tab can write the files."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#107",
+        "why": "One tab owns the files, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.no-sync-access",
+    "statement": "Where sync access handles are missing or the files can't be opened (as in Firefox's and Safari's private windows), persistent topics behave as memory topics. The bus reports `ready.storage: 'memory'`, and `bus:durability_degraded` carries `no_sync_access` or `open_failed`.",
+    "status": "active",
+    "errors": ["bus:durability_degraded"],
+    "code": ["packages/bus/src/server/server.ts"],
+    "since": "0.1.0",
+    "related": ["dur.one-tab", "dur.no-indexeddb"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#6-one-tab-owns-the-files",
+        "why": "Without sync access handles, the bus needs somewhere else to put persistent topics."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-07",
+        "ref": "adr/0007#6-one-tab-owns-the-files",
+        "why": "Every major browser has had sync access handles in normal browsing since 2022 or 2023, so a second engine would only serve private windows and old browsers.",
+        "prev": "Where sync access handles are missing, persistent topics are stored in IndexedDB."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#110",
+        "why": "Memory with `bus:durability-degraded` where sync access handles are missing, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.tab-own-bus",
+    "statement": "Each tab runs its own bus worker. Tabs don't share a bus.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["dur.one-tab", "dur.no-replicas"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#6-one-tab-owns-the-files",
+        "why": "Sharing a bus across tabs is out of scope for v1."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#44",
+        "why": "The host's bus controller, built in M2."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.quota",
+    "statement": "The bus reports OPFS usage in its metrics. The kernel emits `bus:quota` once usage reaches 80 % of the quota, and when storage is full, publishes to persistent topics reject with `quota_exceeded` while memory topics carry on.",
+    "status": "active",
+    "values": ["80 %"],
+    "errors": ["bus:quota", "quota_exceeded"],
+    "code": ["packages/host/src/kernel/kernel.ts", "packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0007#consequences",
+        "why": "OPFS quota and eviction apply to the origin, so the app needs to hear before writes fail."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#108",
+        "why": "Quota, `bus:quota` at 80 % and `quota_exceeded` when full, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.flush-on-freeze",
+    "statement": "On the Page Lifecycle `freeze` event and on `pagehide`, the kernel asks the bus to flush persistent topics at once.",
+    "status": "active",
+    "code": ["packages/host/src/bus/controller.ts", "packages/bus/src/server/server.ts"],
+    "since": "0.1.0",
+    "related": ["dur.survives-reload"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#what-the-browser-still-controls",
+        "why": "A frozen or closing tab may never run again, so nothing waits for the next group commit."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#112",
+        "why": "Flush on freeze, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.survives-reload",
+    "statement": "Persistent topics survive a page reload and a discarded tab. Memory topics don't.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["dur.per-topic", "dur.flush-on-freeze"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0001#what-the-browser-still-controls",
+        "why": "A browser may discard a tab, so state that must outlive it goes in a persistent topic."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#98",
+        "why": "The bus worker keeps persistent topics in OPFS, built in M2b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dur.no-replicas",
+    "statement": "The bus worker has no replicas.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0007#context",
+        "why": "Why not run follower bus workers, like Kafka replicas? They share the page's browser process, so they die with the leader; a record or memory pressure that crashes the leader crashes them too; and they double every append and the memory."
+      }
+    ]
+  },
+  {
+    "id": "dur.no-indexeddb",
+    "statement": "Persistent topics aren't stored in IndexedDB.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0007#alternatives-considered",
+        "why": "Why not IndexedDB, as RFC 0001 planned? It's slower for append-heavy logs and asynchronous only; OPFS with sync handles fits a log better. It stayed as the fallback until the 2026-11-07 amendment."
+      }
+    ]
+  },
+  {
+    "id": "dur.no-main-thread-mirror",
+    "statement": "The log isn't mirrored on the main thread.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0007#alternatives-considered",
+        "why": "Why not keep a copy where the host is? It puts every record back on the main thread, against ADR 0005."
+      }
+    ]
+  },
+  {
+    "id": "dur.no-snapshots",
+    "statement": "Persistent topics are a write-ahead log, not periodic snapshots.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0007#alternatives-considered",
+        "why": "Why not snapshot now and then? Writes are cheaper, but records since the last snapshot are lost. It could come later as an extra `durability: 'snapshot'` mode."
+      }
+    ]
+  }
+]
