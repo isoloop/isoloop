@@ -50,6 +50,8 @@ export {
   deliveryPoints,
 } from './topics/commits';
 export type { CommitOffsets, CommitPoint, Committer, CommitterOptions } from './topics/commits';
+export { createWatches, isThenable } from './topics/watches';
+export type { OnView, WatchOptions, Watches, WatchesOptions } from './topics/watches';
 export { BusError } from './errors/bus-error';
 export {
   BUS_TO_HOST,

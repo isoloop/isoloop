@@ -623,6 +623,7 @@ interface Kernel {
   subscribe<Out>(topic: TopicRef<any, Out, any, any>, fn: (r: TypedRecord<Out>) => void, opts?: {
     from?: StartPosition;
   }): () => void;
+  watch<Out>(topic: TopicRef<any, Out, any, any>, onView: OnView<Out>, opts?: WatchOptions): () => void;
   on<E extends KernelEvent>(event: E, fn: (e: KernelEvents[E]) => void): () => void;
   isolates(): IsolateSnapshot[];
   pools(): PoolSnapshot[];
@@ -643,6 +644,7 @@ interface Kernel {
 | `request()` | **Experimental.** Requests from the host, the mirror of `bus.request`: appends a request record with `req: { from: 'host', id, via }` and resolves with the first valid reply. Works on any requestable topic, exposed to agents or not. An isolate that restarts within the timeout still gets the request and can answer it. |
 | `tools()` | **Experimental.** The tools exposed through `agents.expose`, with their JSON Schemas, made once at `createKernel`. Transports list these and call them with `kernel.request`. |
 | `subscribe()` | Subscribes from the host. Records cross the main thread only here. |
+| `watch()` | **Experimental.** A watcher skips values; use `subscribe` to get every record. Reads a topic's current value per key from the host, not its stream: `onView` gets a snapshot first, the newest retained value of each key it watches, then the keys that changed. When several values arrive for one key between two views, only the newest is passed on. Records with no key share the key `null`. A key leaves the view when retention removes its newest record. The host's watches on one topic share one watch on the bus. After a bus restart the watch carries on; a memory topic the restart lost comes back empty, with every key it had in `changed`. |
 | `on()` | Listens to one of the kernel's events. |
 | `isolates()` | Every isolate not stopped, as the kernel sees it now. |
 | `pools()` | The named pools that have members. |
@@ -923,6 +925,19 @@ type OnNavigate = (req: NavigateRequest) => boolean | Promise<boolean>;
 
 **Guides:** [Writing isolates](../guide/isolates.md).
 
+### `OnView`
+
+**Experimental.**
+
+Called with each view of a watched topic: `view` holds the current value
+per key the watch reads, `changed` the keys added, updated or cleared since
+the last call. Treat both as read-only. The next view waits until this
+returns, or until its promise settles.
+
+```ts nocheck
+type OnView<Out> = (view: ReadonlyMap<string | null, Out>, changed: ReadonlySet<string | null>) => void | Promise<void>;
+```
+
 ### `PoolSnapshot`
 
 A named pool now: `kernel.pools()`.
@@ -998,6 +1013,22 @@ type ToolJsonSchema = {
 ```
 
 **Guides:** [Tools for agents](../guide/agents.md).
+
+### `WatchOptions`
+
+**Experimental.**
+
+`bus.watch`'s options.
+
+```ts nocheck
+type WatchOptions = {
+  keys?: readonly (string | null)[];
+};
+```
+
+| Field | Description |
+| --- | --- |
+| `keys?` | Watch only these keys; `null` is the key of records with no key. Default: every key the topic retains. |
 
 ## `@isoloop/host/dev-mcp`
 

@@ -32,7 +32,7 @@ A PR that crosses a budget runs `--record` and says in its description why the s
 ## Recorded
 
 <!-- table:start -->
-Recorded 2026-11-21: Isoloop `0.1.0-next.11`, Vite 8.3.7 (Rolldown 1.2.18), minified, with only the framework left out.
+Recorded 2026-11-27: Isoloop `0.1.0`, Vite 8.3.8 (Rolldown 1.2.18), minified, with only the framework left out.
 
 | Item | Minified | Gzipped | Budget |
 | --- | --- | --- | --- |
@@ -45,25 +45,25 @@ Recorded 2026-11-21: Isoloop `0.1.0-next.11`, Vite 8.3.7 (Rolldown 1.2.18), mini
 | import-time · @isoloop/dom/host | 0 B | 0 B | 0 B |
 | import-time · @isoloop/dom/testing | 15.4 KB | 4.9 KB | 16.5 KB |
 | import-time · @isoloop/dom/testing/worker | 15.7 KB | 5.0 KB | 16.5 KB |
-| import-time · @isoloop/host | 92 B | 101 B | 512 B |
+| import-time · @isoloop/host | 84 B | 93 B | 512 B |
 | import-time · @isoloop/host/dev-mcp | 26 B | 46 B | 512 B |
 | import-time · @isoloop/preact | 119 B | 106 B | 512 B |
 | import-time · @isoloop/protocol | 1.3 KB | 732 B | 1.5 KB |
 | import-time · @isoloop/react | 122 B | 109 B | 512 B |
-| import-time · @isoloop/runtime | 94 B | 103 B | 512 B |
+| import-time · @isoloop/runtime | 86 B | 95 B | 512 B |
 | import-time · @isoloop/runtime/testing | 26 B | 46 B | 512 B |
 | import-time · @isoloop/vite | 18 B | 38 B | 512 B |
 | import-time · @isoloop/webmcp | 22 B | 42 B | 512 B |
-| app · host page | 64.8 KB | 22.8 KB | 68.5 KB |
-| app · host page with devtools | 66.4 KB | 23.4 KB | 70.0 KB |
-| app · host page with the balancer | 79.3 KB | 27.7 KB | 83.5 KB |
+| app · host page | 70.8 KB | 24.8 KB | 74.5 KB |
+| app · host page with devtools | 72.4 KB | 25.5 KB | 76.0 KB |
+| app · host page with the balancer | 85.4 KB | 29.7 KB | 90.0 KB |
 | app · contracts module | 4.0 KB | 1.7 KB | 4.5 KB |
 | app · React isolate | 3.2 KB | 1.6 KB | 3.5 KB |
 | app · Preact isolate | 3.5 KB | 1.8 KB | 4.0 KB |
-| app · vanilla isolate | 1.5 KB | 843 B | 2.0 KB |
+| app · vanilla isolate | 1.5 KB | 836 B | 2.0 KB |
 | script · @isoloop/bus/worker | 64.4 KB | 22.1 KB | 68.0 KB |
 | script · @isoloop/devtools/panel | 13.1 KB | 5.5 KB | 14.0 KB |
-| script · @isoloop/runtime/bootstrap | 46.7 KB | 16.4 KB | 49.0 KB |
+| script · @isoloop/runtime/bootstrap | 46.6 KB | 16.4 KB | 49.0 KB |
 | script · @isoloop/runtime/worker | 47.1 KB | 16.5 KB | 49.5 KB |
 <!-- table:end -->
 

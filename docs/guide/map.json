@@ -275,6 +275,8 @@
       "servePoolFixture",
       "trackUsage"
     ],
+    "@isoloop/preact": ["UseWatchOptions", "useWatch"],
+    "@isoloop/react": ["UseWatchOptions", "useWatch"],
     "@isoloop/vite": ["BuildManifest"]
   }
 }

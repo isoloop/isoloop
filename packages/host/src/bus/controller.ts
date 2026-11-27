@@ -1,7 +1,8 @@
 /*
  * The bus controller (design §1, ADR 0005, ADR 0007). Starts the bus worker
  * before any isolate, gives each isolate a MessageChannel end wired to the
- * bus (`attach`), carries `kernel.publish` / `kernel.subscribe`, and
+ * bus (`attach`), carries `kernel.publish` / `kernel.subscribe` /
+ * `kernel.watch`, and
  * supervises the bus with the same state machine as isolates: on a crash it
  * starts a new bus worker and asks the kernel to `reattach` every connected
  * isolate instead of restarting it.
@@ -10,6 +11,8 @@
  */
 import {
   createCommitter,
+  createWatches,
+  DEFAULT_COMMIT_INTERVAL_MS,
   topicConfigOf,
   type BusMetrics,
   type Committer,
@@ -23,9 +26,13 @@ import {
   type ErrorCode,
   type Grants,
   type HostToBus,
+  type IsolateToBus,
+  type OnView,
   type RequestVia,
   type SeedEvent,
   type StartPosition,
+  type WatchOptions,
+  type Watches,
   isBusToHost,
   isBusToIsolate,
   isBusToTap,
@@ -124,6 +131,13 @@ export interface BusController {
   drop(topic: string, force: boolean): Promise<CallResult>;
   subscribe(sub: HostSubscription): () => void;
   /**
+   * `kernel.watch` (ADR 0023, points 30 to 34): every host watch shares one
+   * host connection to the bus, and the watches on one topic share one bus
+   * watch. After a bus restart the connection watches again with `have`.
+   * @returns The function that ends this watch.
+   */
+  watch(topic: string, onView: OnView<unknown>, opts?: WatchOptions): () => void;
+  /**
    * The inspection feed's tap (ADR 0020, decision 3): `fn` gets each
    * matching record as a preview, and the `skipped` counts. Not a consumer,
    * so it never shows in `bus:metrics`. It's opened again on each new bus
@@ -154,6 +168,17 @@ export interface BusController {
 
 /** Ids of the host's own bus connections; spawn rejects isolate ids with this prefix. */
 export const HOST_CONNECTION_PREFIX = 'isoloop:';
+
+/** The one host connection every `kernel.watch` shares (ADR 0023, point 31). */
+const WATCH_CONNECTION_ID = `${HOST_CONNECTION_PREFIX}host:watch`;
+
+type WatchConnection = {
+  watches: Watches;
+  port: MessagePort | null;
+  /** Calls on the current port waiting for their `result`. */
+  calls: Map<string, (r: CallResult) => void>;
+  seenTimer: ReturnType<typeof setTimeout> | undefined;
+};
 
 const unavailable = (message: string): CallResult => ({
   ok: false,
@@ -231,6 +256,9 @@ export function createBusController(o: BusControllerOptions): BusController {
     { sub: HostSubscription; port: MessagePort | null; committer: Committer | null }
   >();
 
+  /** `kernel.watch`: one host connection, made at the first watch. */
+  let watchConn: WatchConnection | undefined;
+
   const send = (msg: HostToBus, transfer: Transferable[] = []): void => {
     if (worker) worker.postMessage(msg, transfer);
     else queue.push({ msg, transfer });
@@ -271,7 +299,13 @@ export function createBusController(o: BusControllerOptions): BusController {
     if ('code' in f) return;
     // Crash loop: isolates keep running, each on a port that rejects everything.
     for (const id of conns.keys()) {
-      if (!hostSubs.has(id)) o.events.reattach(id);
+      if (!hostSubs.has(id) && id !== WATCH_CONNECTION_ID) o.events.reattach(id);
+    }
+    if (watchConn) {
+      watchConn.port?.close();
+      watchConn.port = null;
+      for (const settle of watchConn.calls.values()) settle(unavailable(f.message));
+      watchConn.calls.clear();
     }
   };
 
@@ -381,6 +415,7 @@ export function createBusController(o: BusControllerOptions): BusController {
       if (c.gen >= mine) continue;
       const host = hostSubs.get(id);
       if (host) bindHost(id, host.sub, true);
+      else if (id === WATCH_CONNECTION_ID) bindWatch(true);
       else o.events.reattach(id);
     }
   };
@@ -509,6 +544,88 @@ export function createBusController(o: BusControllerOptions): BusController {
     port.postMessage({ v: 1, t: 'subscribe', p: { topic: sub.topic, from: sub.from } });
   };
 
+  /** Sends a `commits` carrying only the host watches' pending `seen`. */
+  const sendSeen = (): void => {
+    if (!watchConn) return;
+    clearTimeout(watchConn.seenTimer);
+    watchConn.seenTimer = undefined;
+    const seen = watchConn.watches.takeSeen();
+    if (seen.length > 0)
+      watchConn.port?.postMessage({ v: 1, t: 'commits', p: { offsets: [], seen } });
+  };
+
+  /** A message for the bus on the watch connection; dropped while it has no port. */
+  const watchSend = (msg: IsolateToBus): void => {
+    watchConn?.port?.postMessage(msg);
+  };
+
+  /** (Re)connects the watch connection; on a new bus, every topic is watched again with `have`. */
+  const bindWatch = (reattach: boolean): void => {
+    if (!watchConn) return;
+    const c = watchConn;
+    c.port?.close();
+    // Calls sent on the old port have no answer coming. A watch sent there is
+    // sent again below, so its refusal (if any) is reported once, by the new bus.
+    c.calls.clear();
+    clearTimeout(c.seenTimer);
+    c.seenTimer = undefined;
+    const port = connect(WATCH_CONNECTION_ID, { publish: [], subscribe: ['*'] }, { reattach });
+    c.port = port;
+    port.addEventListener('message', (e: MessageEvent<unknown>) => {
+      const msg = e.data;
+      if (c.port !== port || !isBusToIsolate(msg)) return;
+      if (msg.t === 'view') c.watches.receive(msg);
+      else if (msg.t === 'result' && msg.re !== undefined) {
+        const settle = c.calls.get(msg.re);
+        c.calls.delete(msg.re);
+        settle?.(msg.p);
+      }
+    });
+    port.start();
+    if (reattach) c.watches.reattach();
+  };
+
+  const intervalMs = o.commitIntervalMs ?? DEFAULT_COMMIT_INTERVAL_MS;
+
+  const watchConnection = (): WatchConnection => {
+    if (watchConn) return watchConn;
+    const c: WatchConnection = {
+      port: null,
+      calls: new Map(),
+      seenTimer: undefined,
+      watches: createWatches({
+        send: watchSend,
+        call: (msg) => {
+          if (down() || !c.port) return Promise.resolve(unavailable('The bus is down'));
+          const id = `w${++nextId}`;
+          return new Promise((settle) => {
+            c.calls.set(id, settle);
+            c.port?.postMessage({ ...msg, id });
+          });
+        },
+        now: () => performance.now(),
+        onError: (err) => {
+          console.error('[isoloop] kernel.watch', err);
+        },
+        intervalMs,
+        // The burst rule (ADR 0023, point 22) on the host connection: it has
+        // no subscriptions, so its `commits` carry only `seen`.
+        flushNow: sendSeen,
+        flushSoon: () => {
+          if (intervalMs === 0) {
+            queueMicrotask(sendSeen);
+            return;
+          }
+          c.seenTimer ??= setTimeout(sendSeen, intervalMs);
+        },
+        delivered: () => {},
+      }),
+    };
+    watchConn = c;
+    if (!down()) bindWatch(false);
+    return c;
+  };
+
   spawn();
 
   return {
@@ -625,6 +742,10 @@ export function createBusController(o: BusControllerOptions): BusController {
       };
     },
 
+    watch(topic, onView, opts) {
+      return watchConnection().watches.watch(topic, onView, opts);
+    },
+
     feed,
 
     get state() {
@@ -652,6 +773,12 @@ export function createBusController(o: BusControllerOptions): BusController {
         h.port?.close();
       }
       hostSubs.clear();
+      if (watchConn) {
+        clearTimeout(watchConn.seenTimer);
+        watchConn.port?.close();
+        watchConn.port = null;
+        watchConn.calls.clear();
+      }
       for (const t of taps.values()) t.port?.close();
       taps.clear();
       worker?.terminate();
