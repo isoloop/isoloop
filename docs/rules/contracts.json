@@ -1,1 +1,823 @@
-[]
+[
+  {
+    "id": "con.standard-schema",
+    "statement": "A topic takes any schema that implements Standard Schema V1, such as Zod 4, Valibot or ArkType. Isoloop depends on no schema library.",
+    "status": "active",
+    "code": ["packages/bus/src/contracts/topic.ts"],
+    "since": "0.1.0",
+    "related": ["con.schema-required", "con.no-zod-only"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#schemas",
+        "why": "A Zod schema is code that can't be cloned to the bus worker, and tying Isoloop to one library would lock users in."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#13",
+        "why": "Topic definitions and contracts."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.schema-required",
+    "statement": "Every topic has a schema. `unchecked<T>()` is the explicit opt-out: it accepts any value and only carries the type.",
+    "status": "active",
+    "code": ["packages/bus/src/contracts/topic.ts"],
+    "since": "0.1.0",
+    "related": ["con.standard-schema", "con.no-optional-schemas", "con.contracts-export"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#schemas",
+        "why": "A forgotten schema would look the same as a deliberate one; with `unchecked` the choice is visible and tools can list it."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#13",
+        "why": "Topic definitions and contracts."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.reply-schema",
+    "statement": "A topic used with `request` declares a `reply` schema. A request on a topic without one rejects.",
+    "status": "active",
+    "errors": ["not_requestable"],
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "related": ["con.reply-validated"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#schemas",
+        "why": "Half of every request and reply pair would otherwise have no contract."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#22",
+        "why": "Consumer groups and request/response."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.contracts-module",
+    "statement": "The bus worker imports the module at `KernelConfig.contracts.url` and builds its topics only from that module's default export, `contracts(…)`, which rejects duplicate names. The host passes the same export as `list`.",
+    "status": "active",
+    "knob": "`KernelConfig.contracts`",
+    "code": ["packages/bus/src/contracts/topic.ts", "packages/bus/src/server/server.ts"],
+    "since": "0.1.0",
+    "related": ["con.boot-check", "con.no-hot-swap"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#the-contracts-module",
+        "why": "A schema is code, so the bus worker has to load the schemas itself; one module keeps host, isolates and bus on one source."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#13",
+        "why": "Topic definitions and contracts."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.boot-check",
+    "statement": "At start the host sends the cloneable part of each topic it was built with, and the bus fails if the module's topics differ, naming them.",
+    "status": "active",
+    "errors": ["contracts_mismatch"],
+    "code": ["packages/bus/src/server/server.ts"],
+    "since": "0.1.0",
+    "related": ["con.contracts-module", "con.load-failures-fatal"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#the-contracts-module",
+        "why": "A host bundled against one contracts version and a URL serving another should fail at start, not at the first publish."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.system-topics",
+    "statement": "Topics named `isoloop.*` are built into the bus, and a contracts module that exports one fails.",
+    "status": "active",
+    "errors": ["reserved_topic"],
+    "code": ["packages/bus/src/contracts/topic.ts", "packages/bus/src/server/server.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#the-contracts-module",
+        "why": "System topics such as `isoloop.route.v1` are defined in `@isoloop/protocol`, so an app can't redefine them."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.load-failures-fatal",
+    "statement": "A contracts module that fails to load is never retried. The kernel emits `bus:failed { code }`, isolates already started fail with reason `bus-failed`, and later `spawn()` calls throw.",
+    "status": "active",
+    "errors": [
+      "contracts_failed",
+      "contracts_invalid",
+      "contracts_mismatch",
+      "reserved_topic",
+      "bus_failed"
+    ],
+    "code": ["packages/bus/src/server/server.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["con.boot-check", "con.no-retry-contract-load"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#the-contracts-module",
+        "why": "These failures are deterministic, so a restart loop would only hide them."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-06",
+        "ref": "adr/0003#the-contracts-module",
+        "why": "`createKernel` stays synchronous, so isolates can start before the failure is known; they fail instead of never being spawned.",
+        "prev": "Kernel start fails, the kernel emits `bus:failed { code }`, and no isolate is spawned."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.publish-buffer-at-boot",
+    "statement": "While the contracts module loads, the bus accepts attaches and subscriptions and holds each port's publishes, then validates them in order. Past 1,000 held publishes on a port it rejects.",
+    "status": "active",
+    "values": ["1,000 per port"],
+    "errors": ["bus_unavailable"],
+    "code": ["packages/bus/src/server/server.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#the-contracts-module",
+        "why": "Isolates start in parallel with the schema library instead of waiting for it."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-06",
+        "ref": "adr/0003#the-contracts-module",
+        "why": "The buffer is per port in the bus worker, apart from the isolate-side buffer used across a bus restart.",
+        "prev": "The bus buffers publishes in the same buffer as a bus restart, and rejects past the inbox limit."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.no-hot-swap",
+    "statement": "The contracts loaded at start stay until the page reloads. A bus restart imports the same URL again.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["con.contracts-module"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#the-contracts-module",
+        "why": "Topics would otherwise change under running isolates."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.broker-validates",
+    "statement": "Records are validated in the broker only. Isolates and the host carry only the types, and a failed publish rejects with the issues as plain `{ message, path }` objects.",
+    "status": "active",
+    "errors": ["invalid"],
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "related": ["con.no-isolate-validation", "con.validate-on-publish-only"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#validation",
+        "why": "The broker is the one authoritative place, and isolate bundles stay free of a schema library."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.stores-output",
+    "statement": "The log stores each schema's validated output, not the published value, so subscribers get defaults and coercions applied. Publishers are typed with the schema's input, subscribers with its output.",
+    "status": "active",
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "related": ["con.clone-check-dev"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#validation",
+        "why": "Storing the input would mean defaults and coercion never apply and subscribers see raw data."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.clone-check-dev",
+    "statement": "A memory topic's validated output is checked with `structuredClone` only when `KernelConfig.dev` is set. On a persistent topic the codec rejects a value it can't encode.",
+    "status": "active",
+    "knob": "`KernelConfig.dev`",
+    "errors": ["not_encodable"],
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "related": ["con.stores-output", "con.test-contracts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#validation",
+        "why": "A non-cloneable output is a bug in host code that an isolate can't trigger, so production skips the extra copy per record."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-06",
+        "ref": "adr/0003#validation",
+        "why": "The check follows the kernel's `dev` flag rather than the build.",
+        "prev": "For memory topics the broker checks with `structuredClone` in dev builds only."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.test-contracts",
+    "statement": "`testContracts()` from `@isoloop/bus/testing` runs sample values through each topic's schema and checks the output.",
+    "status": "active",
+    "code": ["packages/bus/src/testing.ts"],
+    "since": "0.1.0",
+    "related": ["con.clone-check-dev"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#validation",
+        "why": "It catches a schema whose output can't be cloned before production, where the check is off."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.async-order",
+    "statement": "When a schema's `validate` returns a promise, the broker awaits it but appends records in publish order per topic.",
+    "status": "active",
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#validation",
+        "why": "A slow validation must never reorder records."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.validate-on-publish-only",
+    "statement": "Records are validated on publish only. Replayed records, records read by late subscribers and records restored from disk aren't validated again.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["con.broker-validates", "con.major-in-name"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#validation",
+        "why": "They were validated when written, and readers must already tolerate old records."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.unknown-fields",
+    "statement": "Unknown fields follow the schema library's own rule; Zod strips them by default.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["con.contracts-deploy-first"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#validation",
+        "why": "The default, not strict mode, keeps newer producers compatible with older contracts."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.contracts-deploy-first",
+    "statement": "Contracts deploy before or together with the producers that use them.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["con.unknown-fields"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#validation",
+        "why": "A producer publishing a field the deployed contracts don't know yet would have it stripped or rejected."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.reply-validated",
+    "statement": "The broker validates every `reply()` against the topic's `reply` schema and stores nothing. An invalid reply rejects the responder's call, and the caller gets an error at once instead of waiting for its timeout.",
+    "status": "active",
+    "errors": ["invalid", "reply_invalid"],
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "related": ["con.reply-schema", "con.who-replies"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#requestreply",
+        "why": "Replies need a contract as much as requests."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#22",
+        "why": "Consumer groups and request/response."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.who-replies",
+    "statement": "Only an isolate the broker delivered the request to may reply. The first valid reply wins, and later ones reject.",
+    "status": "active",
+    "errors": ["already_replied"],
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "related": ["con.reply-validated"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#requestreply",
+        "why": "Responders can't be impersonated."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#22",
+        "why": "Consumer groups and request/response."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.major-in-name",
+    "statement": "A topic's name carries its major version (`cart.items.v1`). Within a version a schema only gains optional fields; any other change is a new topic.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["con.seed", "con.validate-on-publish-only"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#versioning-and-seeding",
+        "why": "Old records are never validated again, so readers must be able to read every record a version ever stored."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.seed",
+    "statement": "A topic can start from an older one with `seed: { from, map }`. On the first start where the old topic has data, the new topic holds its publishes and gives its subscribers nothing until the seed completes; other topics start as usual.",
+    "status": "active",
+    "code": ["packages/bus/src/broker/seed.ts"],
+    "since": "0.1.0",
+    "related": [
+      "con.seed-exactly-once",
+      "con.seed-map-sync",
+      "con.seed-rejects",
+      "con.seed-follow",
+      "con.major-in-name"
+    ],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#versioning-and-seeding",
+        "why": "A breaking change costs a new topic name, but the bus moves the data, and history always comes before new records."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#113",
+        "why": "Seeding, a topic starts from an older one."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.seed-exactly-once",
+    "statement": "A seed copies each old record exactly once, keeping its original `ts` and `producer`, and resumes where it stopped after a crash. It runs in the tab that holds the storage lock.",
+    "status": "active",
+    "code": ["packages/bus/src/broker/seed.ts"],
+    "since": "0.1.0",
+    "related": ["con.seed"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#versioning-and-seeding",
+        "why": "Progress is saved with the appends, so a crash never copies a record twice."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#114",
+        "why": "Seeding exactly once, with progress saved."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.seed-map-sync",
+    "statement": "A seed's `map` must be pure and synchronous; a returned promise counts as a rejected record.",
+    "status": "active",
+    "errors": ["seed_async"],
+    "code": ["packages/bus/src/broker/seed.ts"],
+    "since": "0.1.0",
+    "related": ["con.seed-rejects"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#versioning-and-seeding",
+        "why": "Exactly-once copying needs a map that can run again with the same result."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.seed-rejects",
+    "statement": "A record that `map` throws on, or that the new schema rejects, is skipped and reported with `bus:seed_rejected`, and stays in the old topic. When the seed ends the bus emits `bus:seeded { topic, copied, rejected }`; rejected records aren't retried.",
+    "status": "active",
+    "code": ["packages/bus/src/broker/seed.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["con.seed", "con.drop-topic"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#versioning-and-seeding",
+        "why": "Halting on one bad old record would leave the new topic dead on that device."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#114",
+        "why": "Rejects reported."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.seed-follow",
+    "statement": "With `follow: true` a seed keeps mapping new records from the old topic for as long as the contracts list both. The default is `false`.",
+    "status": "active",
+    "values": ["default false"],
+    "code": ["packages/bus/src/broker/seed.ts"],
+    "since": "0.1.0",
+    "related": ["con.seed"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#versioning-and-seeding",
+        "why": "Gradual rollouts have producers still publishing the old version."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#115",
+        "why": "Follow, orphaned topics and kernel.dropTopic."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.orphaned-topics",
+    "statement": "Persistent topics on disk that the contracts no longer list are kept but not opened, and reported with `bus:orphaned_topics { names, bytes }`. Nothing is deleted on its own.",
+    "status": "active",
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["con.drop-topic", "con.no-auto-delete-orphans"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#versioning-and-seeding",
+        "why": "Deleting them automatically would destroy data whenever the contracts URL serves the wrong version."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#115",
+        "why": "Follow, orphaned topics and kernel.dropTopic."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.drop-topic",
+    "statement": "`kernel.dropTopic(name)` deletes a topic's data. It rejects while a seed that reads from that topic hasn't completed, and needs `{ force: true }` when rejected seed records from it are recorded.",
+    "status": "active",
+    "errors": ["seed_pending"],
+    "code": ["packages/bus/src/broker/broker.ts", "packages/host/src/bus/controller.ts"],
+    "since": "0.1.0",
+    "related": ["con.orphaned-topics", "con.seed-rejects"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#versioning-and-seeding",
+        "why": "Losing data a pending seed still needs is always deliberate."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#115",
+        "why": "Follow, orphaned topics and kernel.dropTopic."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.contracts-export",
+    "statement": "`isoloop contracts export` writes JSON Schema (draft 2020-12) for every topic through Standard JSON Schema, with input and output schemas when they differ and the `reply` schema. `unchecked` topics export as `{}` and are flagged.",
+    "status": "active",
+    "code": [
+      "packages/cli/src/commands/contracts-export.ts",
+      "packages/bus/src/contracts/json-schema.ts"
+    ],
+    "since": "0.1.0",
+    "related": ["con.schema-required"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0003#tooling",
+        "why": "Non-JS tools want a data format, and one vendored interface avoids a converter per schema library."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#245",
+        "why": "The isoloop CLI with contracts export."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "con.no-zod-only",
+    "statement": "Isoloop doesn't require Zod.",
+    "status": "rejected",
+    "related": ["con.standard-schema"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-04",
+        "ref": "adr/0003#alternatives-considered",
+        "why": "Why not Zod only? It's the simplest, but it locks users in and offers non-JS tools nothing."
+      }
+    ]
+  },
+  {
+    "id": "con.no-json-schema-source",
+    "statement": "JSON Schema isn't the source format for topics.",
+    "status": "rejected",
+    "related": ["con.contracts-export"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-04",
+        "ref": "adr/0003#alternatives-considered",
+        "why": "Why not write topics in JSON Schema? TypeScript inference is weaker, and Isoloop would own a JSON Schema validator in the worker."
+      }
+    ]
+  },
+  {
+    "id": "con.no-optional-schemas",
+    "statement": "A topic can't leave its schema out.",
+    "status": "rejected",
+    "related": ["con.schema-required"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-04",
+        "ref": "adr/0003#alternatives-considered",
+        "why": "Why are schemas required? An optional schema means a forgotten one looks the same as a deliberate one."
+      }
+    ]
+  },
+  {
+    "id": "con.no-isolate-validation",
+    "statement": "Isolates don't validate records before they publish.",
+    "status": "rejected",
+    "related": ["con.broker-validates"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-04",
+        "ref": "adr/0003#alternatives-considered",
+        "why": "Why not validate in the isolate for an immediate error? Every isolate would bundle the schema library."
+      }
+    ]
+  },
+  {
+    "id": "con.no-retry-contract-load",
+    "statement": "A failed contracts load isn't retried like a bus crash.",
+    "status": "rejected",
+    "related": ["con.load-failures-fatal"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-04",
+        "ref": "adr/0003#alternatives-considered",
+        "why": "Why not retry it? The error is deterministic, so a restart loop only hides it."
+      }
+    ]
+  },
+  {
+    "id": "con.no-auto-delete-orphans",
+    "statement": "Orphaned topics aren't deleted automatically.",
+    "status": "rejected",
+    "related": ["con.orphaned-topics"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-04",
+        "ref": "adr/0003#alternatives-considered",
+        "why": "Why not clean them up? It would destroy data whenever the contracts URL serves the wrong version."
+      }
+    ]
+  }
+]

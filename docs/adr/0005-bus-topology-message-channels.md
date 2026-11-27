@@ -22,6 +22,8 @@ RFC 0001 places the broker in a dedicated bus worker, but routes records through
 
 The "bus bridge" in the kernel becomes a **bus controller**: it starts the bus worker, wires ports, and forwards host-side `kernel.publish()` calls (rare).
 
+Rules: `bus.direct-ports`, `bus.grants-enforced`, `bus.offsets-kept`, `bus.host-subscriptions`, `bus.reserved-ids`
+
 ## Consequences
 
 - The main thread carries only patches, events, heartbeats and control traffic.
@@ -33,3 +35,5 @@ The "bus bridge" in the kernel becomes a **bus controller**: it starts the bus w
 - **Route through the main thread (RFC as written):** simpler wiring, but costs main-thread time per record.
 - **`BroadcastChannel`:** no per-isolate identity or ACL, and every listener gets every message.
 - **`SharedWorker` as the bus:** survives across tabs, which isn't a v1 goal, and Safari support has been patchy.
+
+Rules: `bus.no-main-thread-routing`, `bus.no-broadcast-channel`, `bus.no-shared-worker`
