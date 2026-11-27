@@ -1,1 +1,537 @@
-[]
+[
+  {
+    "id": "bus.direct-ports",
+    "statement": "Each isolate has its own `MessageChannel` port to the bus worker, and its publishes, subscriptions, deliveries and commits travel on it. No record crosses the main thread, except the records the host publishes or subscribes to itself.",
+    "status": "active",
+    "code": ["packages/host/src/bus/controller.ts"],
+    "since": "0.1.0",
+    "related": ["bus.grants-enforced", "bus.host-subscriptions", "bus.no-main-thread-routing"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0005#decision",
+        "why": "Routing records through the main thread would clone each one twice on the way in and twice more on the way out, and the main thread should only draw."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.grants-enforced",
+    "statement": "The kernel hands an isolate's grants from its manifest to the bus worker when it attaches the isolate, and the bus worker enforces them. An isolate can't widen its own grants.",
+    "status": "active",
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "related": ["bus.direct-ports"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0005#decision",
+        "why": "The isolate is the code being contained, so the check has to sit on the other side of the port."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.offsets-kept",
+    "statement": "An isolate keeps its committed offsets when it stops, restarts or is suspended.",
+    "status": "active",
+    "code": ["packages/host/src/bus/controller.ts"],
+    "since": "0.1.0",
+    "related": ["bus.combined-commits"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0005#decision",
+        "why": "A restarted or woken isolate resumes where it left off instead of replaying or skipping records."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.host-subscriptions",
+    "statement": "Each `kernel.subscribe` is its own bus connection, named `isoloop:host:<n>`, that may subscribe to every topic and publish to none. Unsubscribing detaches it and drops its offsets.",
+    "status": "active",
+    "code": ["packages/host/src/bus/controller.ts"],
+    "since": "0.1.0",
+    "related": ["bus.reserved-ids", "bus.direct-ports"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0005#decision",
+        "why": "The host reads records it asked for over its own port, without a bridge on the main thread for everyone else."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.reserved-ids",
+    "statement": "Isolate ids that start with `isoloop:` belong to the kernel, and `spawn` rejects them.",
+    "status": "active",
+    "errors": ["invalid_manifest"],
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["bus.host-subscriptions"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0005#decision",
+        "why": "The host's own bus connections use that prefix, so an isolate can't take one of their names."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.no-main-thread-routing",
+    "statement": "We don't route records through a bus bridge on the main thread.",
+    "status": "rejected",
+    "related": ["bus.direct-ports"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0005#alternatives-considered",
+        "why": "Why not keep the bus bridge on the main thread, as the RFC had it? The wiring is simpler, but every record would cost main-thread time."
+      }
+    ]
+  },
+  {
+    "id": "bus.no-broadcast-channel",
+    "statement": "We don't carry bus traffic on a `BroadcastChannel`.",
+    "status": "rejected",
+    "related": ["bus.grants-enforced"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0005#alternatives-considered",
+        "why": "Why not a BroadcastChannel? It has no identity per isolate, so no grants, and every listener gets every message."
+      }
+    ]
+  },
+  {
+    "id": "bus.no-shared-worker",
+    "statement": "The bus worker is a dedicated worker, not a `SharedWorker`.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0005#alternatives-considered",
+        "why": "Why not a SharedWorker, which survives across tabs? A bus shared across tabs isn't a goal, and Safari's support has been patchy."
+      }
+    ]
+  },
+  {
+    "id": "bus.combined-commits",
+    "statement": "A subscriber's settled offsets go to the bus together, in one `commits` message per port per commit interval, for isolates and the host alike. There's no per-record `commit` message.",
+    "status": "active",
+    "values": ["one `commits` per port per interval"],
+    "knob": "`KernelConfig.bus.commitIntervalMs`",
+    "code": [
+      "packages/protocol/src/topics/commits.ts",
+      "packages/runtime/src/bus/bus-client.ts",
+      "packages/host/src/bus/controller.ts"
+    ],
+    "since": "0.1.0",
+    "related": ["bus.commit-interval", "bus.commit-early", "bus.redelivery-window"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-11",
+        "ref": "adr/0016#combined-commits",
+        "why": "Most of the CPU Isoloop adds goes into moving messages between threads, at a fixed price per port message; combining commits cut port messages by 20% on the plant dashboard."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-11",
+        "ref": "#166",
+        "why": "Subscribers commit together, once per commit interval."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.commit-interval",
+    "statement": "The commit interval defaults to 100 ms and takes an integer from 0 to 1,000 ms, where `0` sends pending commits at the end of each task. Any other value makes `createKernel` throw.",
+    "status": "active",
+    "values": ["100 ms", "0–1,000 ms", "0 = every task"],
+    "knob": "`KernelConfig.bus.commitIntervalMs`",
+    "errors": ["invalid_config"],
+    "code": ["packages/protocol/src/topics/commits.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["bus.combined-commits"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-11",
+        "ref": "adr/0016#combined-commits",
+        "why": "250 ms saved about 5 ms/s more for a redelivery window 2.5 times longer, and the cap keeps the window after a crash under a second."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-11",
+        "ref": "#166",
+        "why": "The interval and its check came with combined commits."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.commit-early",
+    "statement": "A subscription sends its commits before the interval ends once its uncommitted records reach half its credit. The broker's credit is 1,000 records delivered and not committed.",
+    "status": "active",
+    "values": ["credit 1,000", "early at 500"],
+    "code": ["packages/protocol/src/topics/commits.ts"],
+    "since": "0.1.0",
+    "related": ["bus.combined-commits"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-11",
+        "ref": "adr/0016#combined-commits",
+        "why": "A busy subscription must never pause on credit because of the interval."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-11",
+        "ref": "#166",
+        "why": "The early send came with combined commits."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.commits-on-shutdown",
+    "statement": "On a graceful stop, restart or suspend, and when it closes, the bus client sends its pending commits and waits for the broker's answer, within the shutdown grace.",
+    "status": "active",
+    "code": ["packages/runtime/src/bus/bus-client.ts"],
+    "since": "0.1.0",
+    "related": ["bus.combined-commits", "bus.offsets-kept"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-11",
+        "ref": "adr/0016#combined-commits",
+        "why": "The host's detach travels on another channel and can overtake commits that were only sent, so waiting is what makes a graceful stop lose nothing."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-11",
+        "ref": "#166",
+        "why": "The waiting shutdown came with combined commits."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.no-commits-after-reattach",
+    "statement": "After a bus restart, the bus client sends no commits on the new port before its subscriptions. A persistent topic can then deliver up to one commit interval of records again.",
+    "status": "active",
+    "code": ["packages/runtime/src/bus/bus-client.ts"],
+    "since": "0.1.0",
+    "related": ["bus.redelivery-window", "bus.old-connection-commits"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-11",
+        "ref": "adr/0016#combined-commits",
+        "why": "The broker accepts a commit only for a topic the connection subscribes to, and the window is the same as after a crash, so it needs no extra protocol."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-11",
+        "ref": "#166",
+        "why": "Came with combined commits."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.settled",
+    "statement": "A record is settled when its handler returns. A handler that throws marks its subscription stuck, and its commit stops at the record before.",
+    "status": "active",
+    "code": ["packages/runtime/src/bus/bus-client.ts"],
+    "since": "0.1.0",
+    "related": ["bus.combined-commits", "bus.manual-commit"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-11",
+        "ref": "adr/0016#combined-commits",
+        "why": "Combining commits changes when offsets are sent, not what counts as done."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.redelivery-window",
+    "statement": "Delivery is at least once. An isolate that crashes or is killed without a graceful stop can get up to one commit interval of records it already handled again when it restarts; a group member that crashes leaves as many for the others.",
+    "status": "active",
+    "values": ["up to one interval (100 ms by default)"],
+    "since": "0.1.0",
+    "related": ["bus.combined-commits", "bus.no-commits-after-reattach"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-11",
+        "ref": "adr/0016#combined-commits",
+        "why": "The accepted cost of combining commits: the window grows from one record to one interval, about 100 ms."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.group-commit-seq",
+    "statement": "Every delivery to a subscription carries a sequence number, counted from 1 at each `subscribe`. A consumer group's commit covers only records at or below its offset that also came in deliveries at or below its sequence, so it never covers a record redelivered after it.",
+    "status": "active",
+    "code": ["packages/bus/src/broker/broker.ts", "packages/protocol/src/topics/commits.ts"],
+    "since": "0.1.0",
+    "related": ["bus.combined-commits", "bus.partial-delivery", "bus.group-resume"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0016#group-commits-carry-a-delivery-sequence-amended-2026-11-17",
+        "why": "A cumulative commit could cover a record redelivered to a member before its handler ran, and if the member then stopped, nobody got the record again (#211)."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#224",
+        "why": "Group commits carry a delivery seq."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.group-resume",
+    "statement": "A consumer group that has committed resumes from its committed offset, whatever `from` says. `from` applies only before the group's first commit; a member joining a group that has members starts where the group is.",
+    "status": "active",
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "since": "0.1.0",
+    "related": ["bus.group-commit-seq"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0016#group-commits-carry-a-delivery-sequence-amended-2026-11-17",
+        "why": "An emptied group rejoining with `from: 'earliest'` replayed the whole topic: the File processor handled 117 files twice."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#224",
+        "why": "Came with the delivery seq fix."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.manual-commit",
+    "statement": "With `autoCommit: false`, `commit(record)` settles that record and every record delivered before it on the subscription.",
+    "status": "active",
+    "code": ["packages/runtime/src/bus/bus-client.ts"],
+    "since": "0.1.0",
+    "related": ["bus.settled", "bus.group-commit-seq"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0016#group-commits-carry-a-delivery-sequence-amended-2026-11-17",
+        "why": "Records settle in the order they arrived; counting each by-hand commit as one record would stop a member that commits only some records from ever completing a delivery."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#224",
+        "why": "Decided while building the delivery seq fix."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.old-connection-commits",
+    "statement": "A record delivered on an earlier connection, before a bus restart or a new `subscribe`, commits nothing when its handler settles it. It comes back through redelivery.",
+    "status": "active",
+    "code": ["packages/runtime/src/bus/bus-client.ts"],
+    "since": "0.1.0",
+    "related": ["bus.no-commits-after-reattach", "bus.group-commit-seq"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0016#group-commits-carry-a-delivery-sequence-amended-2026-11-17",
+        "why": "A sequence number from another connection would cover the wrong deliveries."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#224",
+        "why": "Decided while building the delivery seq fix."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.partial-delivery",
+    "statement": "A group member that settles the first records of a delivery and then stops keeps those records committed: its commit carries how many records of the next delivery are settled.",
+    "status": "active",
+    "code": ["packages/bus/src/broker/broker.ts", "packages/protocol/src/topics/commits.ts"],
+    "since": "0.1.0",
+    "related": ["bus.group-commit-seq", "bus.no-attempt-limit"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0016#a-partly-settled-delivery-keeps-what-it-settled-amended-2026-11-18-m3j",
+        "why": "A batch went back to the group whole, so a file that crashed its processor came back to the next one, and two processors crashed in turn until the kernel gave up on both, losing about 480 files a run."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#256",
+        "why": "A group member keeps what it settled of a partly handled delivery."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.no-attempt-limit",
+    "statement": "A record that crashes every member before it's settled comes back to each of them until the kernel gives up on all of them. There is no limit on delivery attempts.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["bus.partial-delivery", "bus.redelivery-window"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0016#a-partly-settled-delivery-keeps-what-it-settled-amended-2026-11-18-m3j",
+        "why": "That's at-least-once delivery; a dead-letter topic that sets such a record aside is a separate idea, in would-like."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "bus.no-port-batching",
+    "statement": "Messages sent on one port in one task aren't batched into one message.",
+    "status": "rejected",
+    "related": ["bus.combined-commits"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-11",
+        "ref": "adr/0016#not-taken",
+        "why": "Why not batch everything a port sends in a task? It was built (#167) and measured: port messages fell only 3–5% and no CPU figure moved, because most messages are one record going to several isolates, each on its own port."
+      }
+    ]
+  },
+  {
+    "id": "bus.no-fire-and-forget-publish",
+    "statement": "A `publish` to a memory topic doesn't resolve as soon as it's sent with only failures reported later: it waits for the bus's result, like any publish.",
+    "status": "rejected",
+    "related": ["bus.combined-commits"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-11",
+        "ref": "adr/0016#not-taken",
+        "why": "Why does a publish to a memory topic wait for an answer? Answering only on failure would save an estimated 5–8 ms/s, not enough to change what awaiting `publish` means or to move rejections away from its `catch`."
+      }
+    ]
+  }
+]
