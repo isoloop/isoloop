@@ -94,7 +94,8 @@
                 "reopened",
                 "removed",
                 "rejected",
-                "withdrawn"
+                "withdrawn",
+                "superseded"
               ]
             },
             "date": {

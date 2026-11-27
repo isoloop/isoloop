@@ -35,6 +35,7 @@ export const EVENT_TYPES = [
   'removed',
   'rejected',
   'withdrawn',
+  'superseded',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -51,6 +52,7 @@ export const REF_KINDS: Record<EventType, readonly RefKind[]> = {
   removed: ['adr'],
   rejected: ['adr'],
   withdrawn: ['adr'],
+  superseded: ['adr'],
 };
 
 export interface RuleEvent {
@@ -107,7 +109,12 @@ export interface Adr {
   file: string;
   anchors: Map<string, string>;
   rulesIds: string[];
+  /** Decisions and amendments with no `Rules:` line (decision 11 holds ADR 0026 on to them). */
+  unruled: string[];
 }
+
+/** From this ADR on, every decision and amendment has a `Rules:` line from the start (decision 11). */
+export const RULES_LINES_FROM = '0026';
 
 export interface Problem {
   file: string;
@@ -214,19 +221,110 @@ export function readAnchors(md: string): Map<string, string> {
   return out;
 }
 
-/** The ids on an ADR's `Rules:` lines (decision 9): backticked, comma-separated. */
+/** The lines of a Markdown file outside code fences, with their index. */
+function outsideFences(md: string): { i: number; line: string }[] {
+  const out: { i: number; line: string }[] = [];
+  let fence: string | undefined;
+  md.split('\n').forEach((line, i) => {
+    const f = /^\s*(```+|~~~+)/.exec(line);
+    if (f) {
+      if (fence === undefined) fence = f[1]!.slice(0, 3);
+      else if (f[1]!.startsWith(fence)) fence = undefined;
+      return;
+    }
+    if (fence === undefined) out.push({ i, line });
+  });
+  return out;
+}
+
+const RULES_LINE = /^\s*Rules:(.*)$/;
+
+/** The ids on an ADR's `Rules:` lines (decision 9): backticked, comma-separated, outside fences. */
 export function readRulesLines(md: string): string[] {
   const ids: string[] = [];
-  for (const m of md.matchAll(/^Rules:(.*)$/gm)) {
-    for (const id of m[1]!.matchAll(/`([^`]+)`/g)) ids.push(id[1]!);
+  for (const { line } of outsideFences(md)) {
+    const m = RULES_LINE.exec(line);
+    if (m) for (const id of m[1]!.matchAll(/`([^`]+)`/g)) ids.push(id[1]!);
   }
   return ids;
+}
+
+/**
+ * The decisions and amendments in an ADR that have no `Rules:` line.
+ * - A decision, under the `## Decision` heading, is a numbered `###` heading
+ *   (`### 1. …`, ADR 0007's style) when there are any; otherwise a top-level
+ *   numbered item (`12. …` at column 0, ADR 0026's style), up to the next such
+ *   item or heading; otherwise each `###` section.
+ * - An amendment is any heading whose text says "amended", up to the next
+ *   heading of the same or a higher level.
+ */
+export function unruledSections(md: string): string[] {
+  const lines = outsideFences(md);
+  type Unit = { name: string; level: number; isHeading: boolean; ruled: boolean };
+  const units: Unit[] = [];
+  const itemUnits: Unit[] = [];
+  const open: Unit[] = [];
+  let inDecision = false;
+  let decisionLevel = 0;
+  const h3s: Unit[] = [];
+  const close = (level: number, item: boolean) => {
+    for (let k = open.length - 1; k >= 0; k--) {
+      const u = open[k]!;
+      if (item ? !u.isHeading : u.level >= level) open.splice(k, 1);
+    }
+  };
+  for (const { line } of lines) {
+    const h = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+    if (h) {
+      const level = h[1]!.length;
+      const text = headingText(h[2]!);
+      close(level, false);
+      close(0, true); // a heading ends any numbered item
+      if (inDecision && level <= decisionLevel) inDecision = false;
+      if (level === 2 && /^decision\b/i.test(text)) {
+        inDecision = true;
+        decisionLevel = 2;
+      }
+      if (/amended/i.test(text)) {
+        const u = { name: `amendment "${text}"`, level, isHeading: true, ruled: false };
+        units.push(u);
+        open.push(u);
+      } else if (inDecision && level === 3) {
+        const num = /^(\d+)\.\s/.exec(text);
+        const name = num ? `decision ${num[1]}` : `section "${text}"`;
+        const u = { name, level, isHeading: true, ruled: false };
+        h3s.push(u);
+        open.push(u);
+      }
+      continue;
+    }
+    const n = /^(\d+)\.\s/.exec(line);
+    if (inDecision && n) {
+      close(0, true);
+      const u = { name: `decision ${n[1]}`, level: 99, isHeading: false, ruled: false };
+      itemUnits.push(u);
+      open.push(u);
+      continue;
+    }
+    if (RULES_LINE.test(line)) for (const u of open) u.ruled = true;
+  }
+  const numbered = h3s.filter((u) => u.name.startsWith('decision '));
+  if (numbered.length > 0) units.push(...numbered);
+  else if (itemUnits.length > 0) units.push(...itemUnits);
+  else units.push(...h3s);
+  return units.filter((u) => !u.ruled).map((u) => u.name);
 }
 
 export function parseAdr(file: string, md: string): Adr | undefined {
   const m = /^(\d{4})-.+\.md$/.exec(file);
   if (!m) return undefined;
-  return { number: m[1]!, file, anchors: readAnchors(md), rulesIds: readRulesLines(md) };
+  return {
+    number: m[1]!,
+    file,
+    anchors: readAnchors(md),
+    rulesIds: readRulesLines(md),
+    unruled: unruledSections(md),
+  };
 }
 
 export function readAdrs(root: string): Map<string, Adr> {

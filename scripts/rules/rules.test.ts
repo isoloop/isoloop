@@ -9,6 +9,7 @@ import {
   parseRef,
   readAnchors,
   readRulesLines,
+  unruledSections,
   rulesIn,
   type Registry,
   type Rule,
@@ -43,6 +44,13 @@ const isRaw = (v: unknown): v is Raw => typeof v === 'object' && v !== null && !
 function raw(v: unknown): Raw {
   if (!isRaw(v)) throw new Error('not an object');
   return v;
+}
+
+/** Adds an event to a rule's own list. */
+function pushEvent(r: Raw, e: Raw): void {
+  const list: unknown = r['events'];
+  if (!Array.isArray(list)) throw new Error('no events');
+  (list as unknown[]).push(e);
 }
 
 /** A rule's events as plain JSON. */
@@ -184,6 +192,55 @@ describe('registry helpers', () => {
     expect(a.has('not-a-heading')).toBe(false);
     expect(a.has('consequences')).toBe(true);
     expect(a.has('consequences-1')).toBe(true);
+  });
+
+  it('skips Rules: lines in code fences, and reads indented ones', () => {
+    expect(readRulesLines('```md\nRules: `x.y`\n```\n   Rules: `a.b`\n')).toEqual(['a.b']);
+  });
+
+  it('finds numbered decisions with no Rules: line', () => {
+    const md = [
+      '# ADR 0030: X',
+      '## Decision',
+      '### One part',
+      '1. **First.** Text.',
+      '',
+      '   Rules: `sup.a`',
+      '2. **Second.** Text.',
+      '   ```md',
+      '   Rules: `sup.b`',
+      '   ```',
+      '3. **Third.**',
+      '### Amended: a change (2026-12-01)',
+      'Text.',
+      '## Consequences',
+      '1. Not a decision.',
+    ].join('\n');
+    expect(unruledSections(md)).toEqual([
+      'amendment "Amended: a change (2026-12-01)"',
+      'decision 2',
+      'decision 3',
+    ]);
+  });
+
+  it('counts numbered ### headings as decisions when an ADR uses them', () => {
+    const md = [
+      '## Decision',
+      '### 1. Supervise',
+      '1. A step, not a decision.',
+      'Rules: `sup.a`',
+      '### 2. Durability',
+      'Text.',
+      '### Amended: x (2026-11-20)',
+      'Rules: `sup.b`',
+    ].join('\n');
+    expect(unruledSections(md)).toEqual(['decision 2']);
+  });
+
+  it('counts each ### section when there are no numbered decisions', () => {
+    expect(
+      unruledSections('## Decision\n### Ownership\nRules: `a.b`\n### Topics\nText.\n'),
+    ).toEqual(['section "Topics"']);
   });
 
   it('reads Rules: lines', () => {
@@ -415,9 +472,40 @@ describe('rules:check', () => {
     expect(withRule((r) => (r['status'] = 'superseded'))).toContainEqual(
       expect.stringContaining('a superseded rule needs "supersededBy"'),
     );
+    expect(
+      withRule((r) => {
+        r['status'] = 'superseded';
+        r['supersededBy'] = 'sup.short-runs';
+      }),
+    ).toContainEqual(expect.stringContaining('a superseded rule needs a superseded event'));
+    expect(
+      withRule((r) => {
+        r['status'] = 'superseded';
+        r['supersededBy'] = 'sup.short-runs';
+        pushEvent(r, { type: 'superseded', date: '2026-11-25', ref: 'adr/0007', why: 'Replaced.' });
+      }),
+    ).toEqual([]);
+    expect(
+      withRule((r) => {
+        pushEvent(r, { type: 'superseded', date: '2026-11-25', ref: '#12', why: 'Replaced.' });
+      }),
+    ).toContainEqual(expect.stringContaining("a superseded event's ref must be adr, not issue"));
     expect(withRule((r) => (r['supersededBy'] = 'sup.short-runs'))).toContainEqual(
       expect.stringContaining('only a superseded rule has "supersededBy"'),
     );
+  });
+
+  it('fails an ADR from 0026 on with a decision that has no Rules: line, not an older one', () => {
+    const md =
+      '# ADR\n\n## Decision\n\n1. **One.**\n\n   Rules: `sup.restart-limit`\n\n2. **Two.**\n';
+    const a = new Map([
+      ['0007', parseAdr('0007-bus-worker-supervision.md', ADR_7)!],
+      ['0026', parseAdr('0026-rules.md', md)!],
+      ['0001', parseAdr('0001-old.md', md)!],
+    ]);
+    expect(messages(input(registry(), { adrs: a }))).toEqual([
+      'docs/adr/0026-rules.md: decision 2 has no Rules: line',
+    ]);
   });
 
   it('fails a version PR that leaves a rule waiting on its version', () => {
@@ -565,6 +653,27 @@ describe('the Rules workflow', () => {
       },
     });
     expect(d.ok).toBe(true);
+  });
+
+  it('holds an ADR from 0026 on to the pairing and to its Rules: lines, from the start', () => {
+    const md = '## Decision\n\n1. **One.**\n\n2. **Two.**\n\n   Rules: `sup.a`\n';
+    const noLines = runPr({
+      changed: ['docs/adr/0031-new.md'],
+      files: { 'docs/adr/0031-new.md': { head: '## Decision\n\nText.\n' } },
+    });
+    expect(noLines.ok).toBe(false);
+    expect(!noLines.ok && noLines.errors[0]).toContain("docs/rules/ didn't");
+    const missing = runPr({
+      changed: ['docs/adr/0031-new.md', 'docs/rules/supervision.json'],
+      files: {
+        'docs/adr/0031-new.md': { head: md },
+        'docs/rules/supervision.json': { base: '[]', head: JSON.stringify([{ id: 'sup.a' }]) },
+      },
+    });
+    expect(missing).toEqual({
+      ok: false,
+      errors: ['docs/adr/0031-new.md: decision 1 has no Rules: line.'],
+    });
   });
 
   it('counts a new ADR with Rules: lines', () => {

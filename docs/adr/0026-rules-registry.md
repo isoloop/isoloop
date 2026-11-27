@@ -21,6 +21,8 @@ The forces:
 ### What a rule is
 
 1. **A rule is one fact:** one default or one behaviour, as it holds today. "The bus worker restarts at most 3 times in 60 s" and "a crash after a short healthy run counts" are two rules. When one ADR section holds three facts, it becomes three rules, linked through `related`.
+
+   Rules: `tool.rule-one-fact`
 2. **A rule's fields:**
 
    | Field | Required | Holds |
@@ -40,8 +42,14 @@ The forces:
    | `aliases` | no | old ids, after a rename or a move |
    | `events` | yes | its history, oldest first (decision 6) |
 
+   Rules: `tool.rule-fields`
+
 3. **The statement follows [`docs/writing.md`](../writing.md),** and gets the prose check during the backfill like other copy. The why isn't in the statement: the current why is the newest `decided`, `amended` or `clarified` event's `why`, so there's no separate field to drift from the history.
+
+   Rules: `tool.statement-form`, `tool.current-why`
 4. **Ids** are `<prefix>.<slug>`. The prefix names the concept (decision 7). An id never changes: a renamed or moved rule gets a new id and keeps the old one in `aliases`, so links from ADRs keep working. A rule that stops holding changes status. It's never deleted.
+
+   Rules: `tool.ids-never-change`, `tool.rules-never-deleted`
 5. **Six statuses:**
    - **`active`:** accepted and shipped;
    - **`decided`:** accepted, not shipped yet;
@@ -51,6 +59,8 @@ The forces:
    - **`superseded`:** replaced by the rule in `supersededBy`.
 
    "Merged but not released" is a `built` event, not a status.
+
+   Rules: `tool.rule-statuses`, `tool.rejected-rules`
 6. **Events.** Twelve types. Each has a `type`, a `date` (`YYYY-MM-DD`), a `ref` and a one-line `why`:
 
    | Type | Means | `ref` |
@@ -66,9 +76,11 @@ The forces:
    | `removed` | taken out with no replacement | ADR section |
    | `rejected` | an alternative we said no to | ADR section |
    | `withdrawn` | an accepted rule taken back | ADR section |
-| `superseded` | replaced by another rule, named in `supersededBy` | ADR section |
+   | `superseded` | replaced by another rule, named in `supersededBy` | ADR section |
 
    `clarified` and `amended` also need `prev`: the old wording or behaviour, so the rule as it was can be read without opening the ADR. A `ref` is something a reader can open on GitHub: an ADR file and heading anchor, a PR, an issue or a release tag. Grilling notes and agent memory are never a source.
+
+   Rules: `tool.event-types`, `tool.event-prev`, `tool.event-refs`
 
 ### Where rules live
 
@@ -95,6 +107,8 @@ The forces:
    | `tauri` | Tauri |
 
    A concept is added in a normal PR.
+
+   Rules: `tool.rule-concepts`
 8. **Files.** JSON, one file per concept, so a PR's diff stays inside the concept it touches:
    ```
    docs/rules/
@@ -105,11 +119,15 @@ The forces:
      README.md            ← generated (decision 11)
    ```
    `scripts/rules/check.ts` does its own validation; there's no validator library.
+
+   Rules: `tool.rules-json`
 9. **The registry is the source of truth.** ADRs stay the story of why. Each decision and each amendment in an ADR ends with one line naming the rules it adds or changes:
    ```md
    Rules: `sup.restart-limit`, `sup.short-runs`
    ```
    This amends the ADR template in [the index](README.md). The `Rules:` lines are added to the existing ADRs during the backfill (decision 16), and to every new ADR from the start.
+
+   Rules: `tool.registry-source`, `tool.rules-lines`
 
 ### Checks
 
@@ -125,24 +143,35 @@ The forces:
     - `docs/rules/README.md` isn't what `rules:build` would write.
 
     Whether each `values` entry matches the default in the code is left for after the backfill, once it's clear how many can be read from the code ([would-like](../would-like.md)).
+
+    Rules: `tool.rules-check`
 11. **`rules.yml`**, a workflow of its own like `changeset.yml`, so adding or removing its label re-runs only this check:
     - a PR that changes `docs/adr/**` must change `docs/rules/**`, unless it has the `no-rules` label. That label is for edits that change no fact (typos, links), and an agent may add it, like `no-changeset`;
-    - it fails if an id or alias on `main` is missing from the PR.
-
+    - it fails if an id or alias on `main` is missing from the PR;
     - every decision and amendment in an ADR numbered 0026 or higher has a `Rules:` line, from the start.
 
     Until the backfill is done, the pairing applies to older ADRs only once they have `Rules:` lines.
+
+    Rules: `tool.adr-pairing`, `tool.rule-ids-kept`, `tool.rules-lines-from-0026`
 12. **Who writes rules.** Whoever changes an ADR updates its rules in the same PR. CI catches a registry left untouched. The steward's instructions gain one line, so it catches a registry that says something different from the ADR: "rules that don't match what the ADR says are a must-fix".
+
+    Rules: `tool.rules-same-pr`
 13. **`pnpm rules:ship <version>`** runs in the version PR. Each rule whose `target` is that version becomes `active`: `since` is set, a `shipped` event is added with the tag's date, and `target` is removed. `rules:check` fails a version PR that leaves such a rule `decided`. Version PRs then carry edits beyond the changesets, so they take the `no-changeset` label. The backfill runs it for `0.1.0` and `0.1.1` to create the existing `shipped` events.
+
+    Rules: `tool.rules-ship`
 
 ### Views
 
 14. **`pnpm rules:build`** writes `docs/rules/README.md`, which is committed: one section per concept, each with a table (id, statement, values, status, `since` or `target`) and then each rule's history as a short list (date, type, ref, why). It's the version agents and GitHub readers use.
+
+    Rules: `tool.rules-readme`
 15. **`pnpm rules:board`** writes one self-contained HTML page, with the data inlined and no server, to a gitignored path, prints the path and opens it. The template is `scripts/rules/board.html`, taken from the demo built while this ADR was grilled. It has:
     - **Board:** concepts as columns, rules as cards (id, status, statement, values, events count, `since`), with status filters and a search over ids, values, knobs and refs. Rejected, withdrawn and superseded rules are dimmed.
     - **Rule drawer:** the fields first, then the current why, then the history newest first, with `prev` as a "Before:" line, then the related rules.
     - **Agenda:** every event by day, newest first, with a "by version" toggle that groups events under the release they shipped in, or under "Unreleased". A "rules as of version X" view comes later.
     - The page fills the window's width, uses isoloop.dev's palette (`packages/ui/src/tokens.css` in `isoloop/web`) and has a System, Light and Dark switch.
+
+    Rules: `tool.rules-board`
 
 ### Rollout
 
@@ -150,9 +179,17 @@ The forces:
     1. One infrastructure PR after this ADR is accepted: the schema, `check.ts`, `build.ts`, `board.html`, `concepts.json`, an empty file per concept, `rules.yml`, the `ci.yml` step, the `AGENTS.md` line (decision 17) and the steward line.
     2. Then one PR per concept. A fork writes its rules and adds the `Rules:` lines to the ADRs. The maintainer reviews each PR on its own, and it's squash-merged.
     3. Supervision, Durability and Versioning & releases go first, then the others in the guide's order. Withdrawn ADR 0013 counts, as a withdrawn rule. This ADR's own rules go in `tool`, and its `Rules:` lines are added in the infrastructure PR, since decision 11 holds it to them.
+
+    Rules: `tool.rules-backfill`
 17. **`AGENTS.md`** gains one rule: "For what holds today, read `docs/rules/README.md`; an ADR change updates `docs/rules/` in the same PR."
+
+    Rules: `tool.agents-md-rules`
 18. **Scope.** Only this repo's ADRs. The web and social repos could get their own registry later, with the same format and tooling.
+
+    Rules: `tool.rules-scope`
 19. **No milestone.** It runs beside the milestones (now M8 Watchers W1), every PR takes `no-changeset`, and it isn't on the roadmap.
+
+    Rules: `tool.rules-not-milestone`
 
 ## Consequences
 

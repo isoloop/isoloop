@@ -20,6 +20,7 @@ import {
   readAdrs,
   readRegistry,
   REF_KINDS,
+  RULES_LINES_FROM,
   type Registry,
   STATUSES,
 } from './registry.ts';
@@ -230,7 +231,7 @@ export function checkRules(input: CheckInput): Problem[] {
       at(file, `${name}: a ${status} rule needs "target"`);
     if (status !== 'decided' && status !== 'proposed' && 'target' in r)
       at(file, `${name}: only a decided or proposed rule has "target"`);
-    for (const s of ['withdrawn', 'rejected'] as const)
+    for (const s of ['withdrawn', 'rejected', 'superseded'] as const)
       if (status === s && !has(s)) at(file, `${name}: a ${s} rule needs a ${s} event`);
     if (status === 'superseded' && !isStr(r['supersededBy']))
       at(file, `${name}: a superseded rule needs "supersededBy"`);
@@ -249,6 +250,11 @@ export function checkRules(input: CheckInput): Problem[] {
         `${name}: target ${r['target']} is reached (packages are at ${input.version}): run pnpm rules:ship ${r['target']}`,
       );
   }
+
+  // ADRs from 0026 on: every decision and amendment has a `Rules:` line.
+  for (const adr of adrs.values())
+    if (adr.number >= RULES_LINES_FROM)
+      for (const u of adr.unruled) at(`docs/adr/${adr.file}`, `${u} has no Rules: line`);
 
   // ADRs with `Rules:` lines.
   for (const adr of adrs.values())

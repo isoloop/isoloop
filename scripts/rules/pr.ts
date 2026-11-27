@@ -8,7 +8,14 @@
 //   label doesn't skip this.
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
-import { ADR_DIR, NOT_RULE_FILES, readRulesLines, RULES_DIR } from './registry.ts';
+import {
+  ADR_DIR,
+  NOT_RULE_FILES,
+  readRulesLines,
+  RULES_DIR,
+  RULES_LINES_FROM,
+  unruledSections,
+} from './registry.ts';
 
 export const SKIP_LABEL = 'no-rules';
 
@@ -17,6 +24,7 @@ export type ReadPair = (path: string) => { base: string | undefined; head: strin
 
 export type Decision = { ok: true; message: string } | { ok: false; errors: string[] };
 
+const adrNumber = (p: string): string => /(\d{4})-[^/]+\.md$/.exec(p)?.[1] ?? '0000';
 const isAdr = (p: string) => new RegExp(`^${ADR_DIR}/\\d{4}-[^/]+\\.md$`).test(p);
 const isRuleFile = (p: string) => {
   const m = new RegExp(`^${RULES_DIR}/([^/]+\\.json)$`).exec(p);
@@ -58,10 +66,17 @@ export function decide(input: {
   const { labels, changed, read } = input;
   const errors: string[] = [];
 
+  // ADRs from 0026 on always count; older ones once they have `Rules:` lines.
   const adrs = changed.filter(isAdr).filter((p) => {
+    if (adrNumber(p) >= RULES_LINES_FROM) return true;
     const { base, head } = read(p);
     return readRulesLines(base ?? '').length > 0 || readRulesLines(head ?? '').length > 0;
   });
+  for (const p of adrs) {
+    const head = read(p).head;
+    if (head === undefined || adrNumber(p) < RULES_LINES_FROM) continue;
+    for (const u of unruledSections(head)) errors.push(`${p}: ${u} has no Rules: line.`);
+  }
   const touchesRules = changed.some((p) => p.startsWith(`${RULES_DIR}/`));
   if (adrs.length > 0 && !touchesRules && !labels.includes(SKIP_LABEL))
     errors.push(

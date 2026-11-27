@@ -84,7 +84,276 @@ No rules yet.
 
 Tools, source layout, checks and the repo's own process. Prefix `tool`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `tool.rule-one-fact` | A rule holds one fact: one default or one behaviour, as it holds today. An ADR section with several facts becomes several rules, linked through `related`. |  | decided | target `0.2.0` |
+| `tool.rule-fields` | A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy` and `aliases`. |  | decided | target `0.2.0` |
+| `tool.statement-form` | A statement is one or two sentences in the present tense that say what holds, with no why. It follows `docs/writing.md`. |  | decided | target `0.2.0` |
+| `tool.current-why` | A rule's current why is the `why` of its newest `decided`, `amended` or `clarified` event. There's no separate field for it. |  | decided | target `0.2.0` |
+| `tool.ids-never-change` | A rule id is `<prefix>.<slug>` in kebab-case and never changes. A renamed or moved rule gets a new id and keeps the old one in `aliases`. |  | decided | target `0.2.0` |
+| `tool.rules-never-deleted` | A rule that stops holding changes status. It's never deleted. |  | decided | target `0.2.0` |
+| `tool.rule-statuses` | A rule's status is one of six: `active`, `decided`, `proposed`, `withdrawn`, `rejected` or `superseded`. Merged but unreleased work is a `built` event, not a status. | `6 statuses` | decided | target `0.2.0` |
+| `tool.rejected-rules` | An alternative becomes a `rejected` rule only when it answers a real "why don't you just…?" question, and its `why` names that question. |  | decided | target `0.2.0` |
+| `tool.event-types` | An event has a `type`, a `date`, a `ref` and a one-line `why`. The type is one of twelve: `proposed`, `decided`, `clarified`, `amended`, `built`, `shipped`, `corrected`, `reopened`, `removed`, `rejected`, `withdrawn` and `superseded`. | `12 event types` | decided | target `0.2.0` |
+| `tool.event-prev` | A `clarified` or `amended` event carries `prev`, the wording or behaviour before it. |  | decided | target `0.2.0` |
+| `tool.event-refs` | An event's `ref` is something a reader can open on GitHub: an ADR section, a PR, an issue or a release tag. Grilling notes and agent memory are never a source. |  | decided | target `0.2.0` |
+| `tool.rule-concepts` | Concepts are a fixed list in `docs/rules/concepts.json`, each with an id, a prefix, a name, a description and an order. Each rule belongs to exactly one concept. | `17 concepts` | decided | target `0.2.0` |
+| `tool.rules-json` | The registry is JSON, one file per concept in `docs/rules/`, validated by `scripts/rules/check.ts` with no library. `schema.json` gives editors hints only. |  | decided | target `0.2.0` |
+| `tool.registry-source` | The registry is the source of truth for what holds today. ADRs keep the story of why. |  | decided | target `0.2.0` |
+| `tool.rules-lines` | Each decision and each amendment in an ADR ends with a `Rules:` line naming the rules it adds or changes. |  | decided | target `0.2.0` |
+| `tool.rules-check` | `pnpm rules:check` runs in CI. It fails on a malformed registry, an unknown or repeated id, a broken ADR ref, a status that doesn't match its fields and events, a missing `code` path or an out-of-date README. |  | decided | target `0.2.0` |
+| `tool.adr-pairing` | A PR that changes an ADR with `Rules:` lines, or any ADR from 0026 on, also changes `docs/rules/`, unless it's labelled `no-rules`. | `label: no-rules` | decided | target `0.2.0` |
+| `tool.rule-ids-kept` | A PR fails if a rule id or alias on `main` is missing from it. The `no-rules` label doesn't skip this. |  | decided | target `0.2.0` |
+| `tool.rules-lines-from-0026` | Every decision and amendment in an ADR numbered 0026 or higher has a `Rules:` line from the start. Older ADRs are checked once they have `Rules:` lines. | `from ADR 0026` | decided | target `0.2.0` |
+| `tool.rules-same-pr` | Whoever changes an ADR updates its rules in the same PR. The steward treats rules that don't match the ADR as a must-fix. |  | decided | target `0.2.0` |
+| `tool.rules-ship` | `pnpm rules:ship <version>` runs in the version PR. Each rule whose `target` is that version becomes `active`, with `since` set, a `shipped` event and no `target`. |  | decided | target `0.2.0` |
+| `tool.rules-readme` | `pnpm rules:build` writes `docs/rules/README.md`, which is committed: per concept, a table of rules, then each rule's history. |  | decided | target `0.2.0` |
+| `tool.rules-board` | `pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. It has the Board, a rule drawer and the Agenda by day or by version. |  | decided | target `0.2.0` |
+| `tool.rules-backfill` | Rules for the existing ADRs are added one concept per PR, each reviewed by the maintainer. Supervision, Durability and Versioning & releases go first. |  | decided | target `0.2.0` |
+| `tool.agents-md-rules` | `AGENTS.md` sends agents to `docs/rules/README.md` for what holds today. |  | decided | target `0.2.0` |
+| `tool.rules-scope` | The registry covers this repo's ADRs only. |  | decided | target `0.2.0` |
+| `tool.rules-not-milestone` | The rules registry is internal tooling outside the milestones, and its PRs take the `no-changeset` label. |  | decided | target `0.2.0` |
+
+### `tool.rule-one-fact`
+
+- **Why:** A card that holds a paragraph brings back the problem of digging a default out of an ADR.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · A card that holds a paragraph brings back the problem of digging a default out of an ADR.
+
+### `tool.rule-fields`
+
+- **Code:** `docs/rules/schema.json`, `scripts/rules/check.ts`
+- **Why:** Each field answers one question a reader asks about a fact: its value, how to change it, where it's built, since when.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · Each field answers one question a reader asks about a fact: its value, how to change it, where it's built, since when.
+
+### `tool.statement-form`
+
+- **Related:** `tool.current-why`
+- **Why:** A card should read as a fact; the why changes over time and lives in the events.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · A card should read as a fact; the why changes over time and lives in the events.
+
+### `tool.current-why`
+
+- **Related:** `tool.statement-form`
+- **Why:** A separate field would drift from the history it summarises.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · A separate field would drift from the history it summarises.
+
+### `tool.ids-never-change`
+
+- **Related:** `tool.rules-never-deleted`, `tool.rule-ids-kept`
+- **Why:** ADRs cite ids, and aliases keep those links working.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · ADRs cite ids, and aliases keep those links working.
+
+### `tool.rules-never-deleted`
+
+- **Related:** `tool.rule-ids-kept`
+- **Why:** The history of a fact that no longer holds is still the answer to why it changed.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · The history of a fact that no longer holds is still the answer to why it changed.
+
+### `tool.rule-statuses`
+
+- **Why:** Status answers whether the rule holds today; events say what happened.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · Status answers whether the rule holds today; events say what happened.
+
+### `tool.rejected-rules`
+
+- **Why:** A board full of rejections would bury the rules that hold.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · A board full of rejections would bury the rules that hold.
+
+### `tool.event-types`
+
+- **Related:** `tool.event-prev`, `tool.event-refs`
+- **Why:** These are the steps a decision went through while the ADRs were grilled.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · These are the steps a decision went through while the ADRs were grilled.
+
+### `tool.event-prev`
+
+- **Why:** The rule as it was can then be read without opening the ADR.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · The rule as it was can then be read without opening the ADR.
+
+### `tool.event-refs`
+
+- **Why:** A reader has to be able to check every event.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · A reader has to be able to check every event.
+
+### `tool.rule-concepts`
+
+- **Code:** `docs/rules/concepts.json`
+- **Why:** One concept per rule keeps the board from showing a rule twice; cross-links go through `related`.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Where rules live](../adr/0026-rules-registry.md#where-rules-live) · One concept per rule keeps the board from showing a rule twice; cross-links go through `related`.
+
+### `tool.rules-json`
+
+- **Code:** `docs/rules/schema.json`, `scripts/rules/check.ts`
+- **Why:** One file per concept keeps a PR's diff inside the concept it touches, and the repo owns its checks.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Where rules live](../adr/0026-rules-registry.md#where-rules-live) · One file per concept keeps a PR's diff inside the concept it touches, and the repo owns its checks.
+
+### `tool.registry-source`
+
+- **Related:** `tool.rules-lines`
+- **Why:** A fact often has several ADRs behind it and fields no ADR has, so it can't live inside one ADR.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Where rules live](../adr/0026-rules-registry.md#where-rules-live) · A fact often has several ADRs behind it and fields no ADR has, so it can't live inside one ADR.
+
+### `tool.rules-lines`
+
+- **Related:** `tool.rules-lines-from-0026`, `tool.adr-pairing`
+- **Why:** The line ties an ADR to its rules, and the checks read it.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Where rules live](../adr/0026-rules-registry.md#where-rules-live) · The line ties an ADR to its rules, and the checks read it.
+
+### `tool.rules-check`
+
+- **Change it:** `pnpm rules:check`
+- **Code:** `scripts/rules/check.ts`, `.github/workflows/ci.yml`
+- **Why:** Each of these is a way the registry could quietly be wrong.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Checks](../adr/0026-rules-registry.md#checks) · Each of these is a way the registry could quietly be wrong.
+
+### `tool.adr-pairing`
+
+- **Code:** `scripts/rules/pr.ts`, `.github/workflows/rules.yml`
+- **Related:** `tool.rules-same-pr`
+- **Why:** A fact must change in the same PR as the ADR that changes it.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Checks](../adr/0026-rules-registry.md#checks) · A fact must change in the same PR as the ADR that changes it.
+
+### `tool.rule-ids-kept`
+
+- **Code:** `scripts/rules/pr.ts`
+- **Related:** `tool.ids-never-change`
+- **Why:** Rules are never deleted, and links from ADRs must keep working.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Checks](../adr/0026-rules-registry.md#checks) · Rules are never deleted, and links from ADRs must keep working.
+
+### `tool.rules-lines-from-0026`
+
+- **Code:** `scripts/rules/check.ts`, `scripts/rules/pr.ts`
+- **Why:** New ADRs shouldn't add to the backfill.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Checks](../adr/0026-rules-registry.md#checks) · New ADRs shouldn't add to the backfill.
+
+### `tool.rules-same-pr`
+
+- **Code:** `AGENTS.md`
+- **Why:** CI catches a registry left untouched; only a review catches one that says the wrong thing.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Checks](../adr/0026-rules-registry.md#checks) · CI catches a registry left untouched; only a review catches one that says the wrong thing.
+
+### `tool.rules-ship`
+
+- **Change it:** `pnpm rules:ship <version>`
+- **Code:** `scripts/rules/ship.ts`
+- **Why:** Shipped events are generated, so a card's version can't be wrong.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Checks](../adr/0026-rules-registry.md#checks) · Shipped events are generated, so a card's version can't be wrong.
+
+### `tool.rules-readme`
+
+- **Change it:** `pnpm rules:build`
+- **Code:** `scripts/rules/build.ts`
+- **Why:** Agents and GitHub readers get every fact and every why in one file, with no tooling.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Views](../adr/0026-rules-registry.md#views) · Agents and GitHub readers get every fact and every why in one file, with no tooling.
+
+### `tool.rules-board`
+
+- **Change it:** `pnpm rules:board`
+- **Code:** `scripts/rules/build.ts`, `scripts/rules/board.html`
+- **Why:** The board is the view for reading across concepts and over time.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Views](../adr/0026-rules-registry.md#views) · The board is the view for reading across concepts and over time.
+
+### `tool.rules-backfill`
+
+- **Why:** Each PR stays small enough to check against its ADRs.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Rollout](../adr/0026-rules-registry.md#rollout) · Each PR stays small enough to check against its ADRs.
+
+### `tool.agents-md-rules`
+
+- **Code:** `AGENTS.md`
+- **Why:** Agents can't find the registry from the file tree alone.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Rollout](../adr/0026-rules-registry.md#rollout) · Agents can't find the registry from the file tree alone.
+
+### `tool.rules-scope`
+
+- **Why:** CI can only hold this repo's ADR PRs to their rules.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Rollout](../adr/0026-rules-registry.md#rollout) · CI can only hold this repo's ADR PRs to their rules.
+
+### `tool.rules-not-milestone`
+
+- **Why:** It ships nothing to npm and waits for no release.
+
+History:
+
+- 2026-11-27 · decided · [ADR 0026 · Rollout](../adr/0026-rules-registry.md#rollout) · It ships nothing to npm and waits for no release.
 
 ## Derived topics
 
