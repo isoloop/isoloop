@@ -124,7 +124,11 @@ const show = (rev: string, path: string): string | undefined => {
 
 const listRuleFiles = (rev: string): string[] => {
   try {
-    return git(['ls-tree', '--name-only', `${rev}:${RULES_DIR}`])
+    // Quiet: the base has no docs/rules/ before the registry lands.
+    return execFileSync('git', ['ls-tree', '--name-only', `${rev}:${RULES_DIR}`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
       .split('\n')
       .filter(Boolean)
       .map((n) => `${RULES_DIR}/${n}`)
