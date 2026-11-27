@@ -24,6 +24,8 @@ RFC 0001 called the unit of isolation a *pane*: a UI region with its own worker.
   - supervision, heartbeats, bus access and replay are identical to visual isolates. A crashed headless isolate has no fallback UI; the host sees `isolate:crash` / `isolate:failed` events.
 - A visual isolate's surface can be **detached and re-attached** later (for example a widget moved between dashboard slots) without restarting the worker. The compositor replays the current tree to the new surface. This is an M3 feature, not a v1 promise.
 
+Rules: `iso.unit`, `iso.api-names`, `iso.surface-optional`, `iso.headless-no-dom`, `iso.headless-no-surface-calls`, `iso.headless-same-supervision`
+
 ## Consequences
 
 - Headless state stores are a first-class use case: a store isolate owns state, publishes it to a compacted topic, and UI isolates subscribe. That's a natural fit for the log bus.
@@ -35,3 +37,5 @@ RFC 0001 called the unit of isolation a *pane*: a UI region with its own worker.
 - **Keep "pane" and add `headless: true`:** the word would mislead for half the use cases.
 - **"Actor":** fits the supervision model, but implies actor semantics (a mailbox per actor, addressing by actor id) that the topic-based bus deliberately avoids.
 - **"Unit" / "cell":** neutral, but "isolate" also says what it guarantees.
+
+Rules: `iso.no-pane`, `iso.no-actor`

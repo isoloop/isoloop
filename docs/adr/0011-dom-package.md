@@ -33,6 +33,8 @@ Other forces:
    - `host` may import `@isoloop/dom/host` only, and only in `render/isoloop-dom.ts`, the bridge the compositor drives (invariant I1); its tests may also import `@isoloop/dom/testing`.
    - `protocol`, `bus` and `codec` never import `dom`.
    - `dom` imports no other `@isoloop/*` package.
+
+   Rules: `tool.dom-imports`
 3. **No runtime dependencies; `/testing` has an optional peer on Vitest.** Not even `protocol`. Node ids are plain numbers that `dom` defines. `runtime` and `host` relate them to protocol types if they need to.
 
    Rules: `dom.no-runtime-deps`
@@ -51,6 +53,8 @@ Other forces:
    | `src/testing` | `ES2022`, `DOM`, `DOM.Iterable` | conformance suite |
 
    Each folder has its own tsconfig (`tsconfig.shared.json`, `tsconfig.worker.json`, `tsconfig.host.json`, `tsconfig.testing.json`), and `typecheck` runs all of them. `src/shared` imports nothing outside itself. `src/worker` and `src/host` import `src/shared` but not each other. Only `src/testing` sees both halves, because a bridge pair is both. A stray `document` in the worker half fails the build, not a review. tsdown builds one entry per subpath.
+
+   Rules: `tool.dom-halves`
 6. **What `dom` owns, and what it doesn't:** the format end to end, with no timing and no policy.
    - **`dom/worker`:** installs the subset, records changes into batches, and calls an `onBatch(batch)` hook that `runtime` provides. Its `deliver(nodeId, event)` dispatches an incoming event record to a node by id, with capture and bubble inside the worker.
    - **`dom/host`:** applies a batch, keeps `idFor` / `nodeFor` both ways, and turns a DOM event into a plain event record, but only for listeners the isolate registered (`listen` records).
@@ -66,7 +70,7 @@ Other forces:
 
 8. **Format mismatch is a hard error.** `runtime` and `host` are released together: every `@isoloop/*` package is in one Changesets `fixed` group and always shares one version (set up with the release pipeline in M4). If an isolate's `ready.renderFmt` isn't exactly the fmt `dom/host` speaks (and isn't `'none'` for a headless isolate), the isolate crashes with reason `render-fmt-mismatch` and goes straight to `failed`: no restart, since a restart can't change the outcome. No range is needed: both halves of the fmt ship in the host app's build ([ADR 0010](0010-own-render-bridge.md)). Isolates built apart from the host are versioned by what they call instead, `ctx`, the DOM subset and the adapter hooks ([ADR 0012](0012-isolates-built-apart.md)).
 
-   Rules: `dom.fmt-exact`
+   Rules: `ver.one-version`, `dom.fmt-exact`
 
 9. **Published, documented as internal.** `@isoloop/dom` is on npm because `runtime` and `host` depend on it. App and adapter authors never import it. Its README says so, and its API carries no semver promise beyond the fmt version: a breaking record change bumps the fmt (`isoloop-dom@2`).
 
