@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { highlight, pretty } from './format';
+import { highlight, pretty, shown } from './format';
 
 describe('log value formatting', () => {
   it('indents JSON and JSON-like text, one member to a line', () => {
@@ -44,5 +44,21 @@ describe('log value formatting', () => {
   it('does not colour a quoted word that only looks like a number or a literal', () => {
     const parts = highlight('"true 12"');
     expect(parts).toEqual([{ text: '"true 12"', kind: 'string' }]);
+  });
+});
+
+const w = (records: number, values: number) =>
+  ({ watches: 1, liveKeys: 1, transport: 'messages', records, values }) as const;
+
+describe('watched topics in words', () => {
+  it('says how many values each watch showed', () => {
+    expect(shown(w(400, 10))).toBe('showed 1 of every 40 records on the topic');
+    expect(shown(w(25, 10))).toBe('showed 1 of every 2.5 records on the topic');
+    expect(shown(w(10, 10))).toBe('showed every record on the topic');
+  });
+
+  it('says so when nothing came yet, or nothing was shown', () => {
+    expect(shown(w(0, 0))).toBe('no records yet');
+    expect(shown(w(12, 0))).toBe('showed none of 12 records on the topic');
   });
 });

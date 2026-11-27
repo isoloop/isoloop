@@ -22,8 +22,10 @@ import {
   type HostToBus,
   MAX_READ,
   type TopicConfig,
+  type TopicWatchMetrics,
 } from '@isoloop/protocol';
 import { Broker, publishId, type BrokerStats, type BusPort } from '../broker/broker';
+import type { WatchStats } from '../broker/watch';
 import { MemoryStorage } from '../engine/memory-storage';
 import { TsEngine } from '../engine/ts-engine';
 import type { LogStorage, StoredState } from '../engine/types';
@@ -84,6 +86,13 @@ function contractsCode(e: unknown): ErrorCode | undefined {
   return typeof code === 'string' && CONTRACT_CODES.has(code)
     ? (code as ErrorCode) // oxlint-disable-line typescript/no-unsafe-type-assertion -- checked against the set
     : undefined;
+}
+
+/** A topic row's watcher figures (ADR 0023, point 25), once it has had a watch. */
+function watchRow(w: WatchStats | undefined): { watch?: TopicWatchMetrics } {
+  if (!w) return {};
+  const { watches, liveKeys, records, values } = w;
+  return { watch: { watches, liveKeys, transport: 'messages', records, values } };
 }
 
 /** Topic configs as a canonical string, so key order doesn't matter. */
@@ -443,6 +452,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
       const t = now();
       const secs = Math.max(0.001, (t - at) / 1000);
       const before = new Map(prev.topics.map((x) => [x.topic, x]));
+      const watched = new Map(stats.watches.map((x) => [x.topic, x]));
       const metrics: BusMetrics = {
         topics: stats.topics.map((x) => ({
           topic: x.topic,
@@ -450,6 +460,7 @@ export function serve(scope: BusScope, opts: ServeOptions = {}): void {
           bytesPerSec: (x.bytes - (before.get(x.topic)?.bytes ?? 0)) / secs,
           head: x.head,
           retained: x.retained,
+          ...watchRow(watched.get(x.topic)),
         })),
         subscriptions: stats.subscriptions,
         rejected: stats.rejected,

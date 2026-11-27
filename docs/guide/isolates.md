@@ -181,6 +181,7 @@ Both adapters have the same hooks, with the same signatures:
 | Hook | Returns |
 | --- | --- |
 | `useTopic(topic, { from? })` | The latest value on `topic`, or `undefined` until one arrives. `from` is `'latest'` by default; `'earliest'` replays the topic, so a compacted one gives its current value at once. A bus restart that lost a memory topic clears it. |
+| `useWatch(topic, { key? })` | The current value per key of `topic`, as a map, or one key's value with `key` (`@experimental`). The bus sends only the newest value per key, one view per committed render ([watchers](watchers.md)). |
 | `usePublish(topic)` | A function `(value, { key? }) => Promise<void>` that publishes to `topic`. |
 | `useRequest(topic)` | A function `(value, { key?, timeoutMs? }) => Promise<reply>` for topics with a `reply` schema (`@experimental`; see [request and reply](bus.md#request-and-reply)). |
 | `useHost()` | `ctx.host`: `measure`, `focus`, `scrollIntoView`, `navigate` and `requestCanvas`. Pass the elements a ref holds. |

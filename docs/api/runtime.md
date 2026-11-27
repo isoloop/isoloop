@@ -82,7 +82,7 @@ interface BusClient {
 | `request()` | **Experimental.** Appends a request record to a topic with a `reply` schema and waits for the first valid reply. |
 | `reply()` | **Experimental.** Answers a request record delivered to this isolate. |
 | `commit()` | **Experimental.** Commits a record by hand, for `autoCommit: false`: that record and every one delivered before it on its subscription count as settled. |
-| `watch()` | **Experimental.** A watcher skips values; use `useTopic` or `subscribe` to get every record. Reads a topic's current value per key, not its stream: `onView` gets a snapshot first, the newest retained value of each key it watches, then the keys that changed. When several values arrive for one key between two views, only the newest is passed on. Records with no key share the key `null`. A key leaves the view when retention removes its newest record. Several watches on one topic share one watch on the bus, so each component can have its own. Needs the subscribe grant for the topic; a refused watch is reported as a non-fatal error. |
+| `watch()` | **Experimental.** A watcher skips values; use `subscribe` to get every record. Reads a topic's current value per key, not its stream: `onView` gets a snapshot first, the newest retained value of each key it watches, then the keys that changed. When several values arrive for one key between two views, only the newest is passed on. Records with no key share the key `null`. A key leaves the view when retention removes its newest record. Several watches on one topic share one watch on the bus, so each component can have its own. Needs the subscribe grant for the topic; a refused watch is reported as a non-fatal error. |
 
 **Guides:** [Writing isolates](../guide/isolates.md).
 

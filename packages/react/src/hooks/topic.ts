@@ -26,6 +26,10 @@ export type UseTopicOptions = {
  * current value at once. The first one's `from` sets where the shared subscription starts; a
  * later `useTopic` with a different `from` gets the shared value and a console warning.
  *
+ * Every record still reaches the isolate, including the ones no render shows. To show the
+ * current value per key with only those sent, use `useWatch`; the watchers guide
+ * compares the two.
+ *
  * @param topic - The topic to read. The isolate needs a subscribe grant for it.
  * @param opts - Where reading starts ({@link UseTopicOptions}).
  * @returns The latest value, or `undefined` until one arrives. A bus restart that lost a

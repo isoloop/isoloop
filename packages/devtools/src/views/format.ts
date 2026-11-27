@@ -3,6 +3,7 @@
  * `pretty` indents it when it is whole JSON (a preview cut at 2 KB isn't, and
  * stays as it came); `highlight` splits the text into plain and coloured parts.
  */
+import type { TopicWatchMetrics } from '@isoloop/protocol';
 
 const pad = (n: number): string => '  '.repeat(n);
 
@@ -110,4 +111,18 @@ export function recordJson(r: {
     null,
     2,
   );
+}
+
+/**
+ * A watched topic's records against the values its watches got, in words:
+ * "showed 1 of every 40 records on the topic". Every record on the topic
+ * counts, keys a watch doesn't read included. Counted from the bus worker's
+ * start.
+ */
+export function shown(w: TopicWatchMetrics): string {
+  if (w.values === 0)
+    return w.records === 0 ? 'no records yet' : `showed none of ${w.records} records on the topic`;
+  const every = w.records / w.values;
+  if (every < 1.05) return 'showed every record on the topic';
+  return `showed 1 of every ${every >= 10 ? Math.round(every) : every.toFixed(1)} records on the topic`;
 }
