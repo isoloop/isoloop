@@ -1,1 +1,992 @@
-[]
+[
+  {
+    "id": "ver.project-name",
+    "statement": "The project is Isoloop. Its packages are published under the `@isoloop/*` npm scope, and the CLI as the unscoped `isoloop`.",
+    "status": "active",
+    "values": ["@isoloop/*", "isoloop"],
+    "since": "0.1.0",
+    "related": ["ver.no-federa-name", "ver.name-prefixes"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0004#decision",
+        "why": "An isolated event loop per unit is what the runtime gives, visual or headless, and the name was free on npm, as an npm scope and as a GitHub org."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.no-federa-name",
+    "statement": "The packages aren't published under the working name Federa.",
+    "status": "rejected",
+    "related": ["ver.project-name"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-03",
+        "ref": "adr/0004#context",
+        "why": "Why not keep Federa? The `@federa` npm scope belongs to another maintainer, so `@federa/host` couldn't be published and npm searches would mix us with an unrelated project."
+      }
+    ]
+  },
+  {
+    "id": "ver.name-prefixes",
+    "statement": "System topics are named `isoloop.*`, for example `isoloop.route.v1`, and the host's surface element is `<iso-surface>`.",
+    "status": "active",
+    "values": ["isoloop.*", "<iso-surface>"],
+    "code": ["packages/host/src/render/compositor.ts"],
+    "since": "0.1.0",
+    "related": ["ver.project-name"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0004#decision",
+        "why": "One prefix per kind of name, taken from the project's name."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.one-version",
+    "statement": "Every `@isoloop/*` package and the `isoloop` CLI share one version, through one Changesets `fixed` group.",
+    "status": "active",
+    "code": [".changeset/config.json"],
+    "since": "0.1.0",
+    "related": ["ver.no-mixed-versions"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0011#decision",
+        "why": "`runtime` and `host` must always speak the same render format, so they're released together."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-17",
+        "ref": "adr/0019#1-three-kinds-of-version",
+        "why": "The CLI joins the group, so one number names a build across every package.",
+        "prev": "Every `@isoloop/*` package shares one version."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.app-versions",
+    "statement": "Each app in `isoloop/web` (`plant-v*`, `markets-v*`, `processor-v*`, `site-v*`) has its own version, apart from the library's, and the maintainer pushes its tags.",
+    "status": "active",
+    "repo": true,
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#1-three-kinds-of-version",
+        "why": "The apps deploy on their own schedule, so tying them to the library's version would say nothing."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#229",
+        "why": "In force from the ADR's PR."
+      }
+    ]
+  },
+  {
+    "id": "ver.protocol-unversioned",
+    "statement": "The host-to-worker protocol (`PROTOCOL { v, min }`) may change in any release.",
+    "status": "active",
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#1-three-kinds-of-version",
+        "why": "Both ends ship in one build, so no released version ever talks to another."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.previews",
+    "statement": "Previews are `x.y.z-next.N` versions under npm `next`, made in Changesets pre mode `next`. Releases are plain `x.y.z` under `latest`.",
+    "status": "active",
+    "repo": true,
+    "values": ["next", "latest"],
+    "code": [".changeset/pre.json", "scripts/release/rules.ts"],
+    "related": ["ver.pre-mode-counter"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#2-the-road-to-10",
+        "why": "`0.0.0-next.<sha>` didn't sort by time and led to no release."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#221",
+        "why": "Changesets went into pre mode `next`, with the version step and the changeset check."
+      }
+    ]
+  },
+  {
+    "id": "ver.pre-mode-counter",
+    "statement": "In pre mode a version PR moves only the `-next.N` counter, whatever the changesets' bump types.",
+    "status": "active",
+    "repo": true,
+    "related": ["ver.previews"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#2-the-road-to-10",
+        "why": "That's how Changesets pre mode counts, so previews of one minor stay in order."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#221",
+        "why": "Changesets went into pre mode `next`."
+      }
+    ]
+  },
+  {
+    "id": "ver.minor-on-0x",
+    "statement": "On 0.x a minor may contain anything: breaking changes, and additions to the isolate seam (`IsolateContext`, `defineIsolate`, the DOM subset, the adapter hooks).",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["ver.patch-on-0x", "ver.codemod-rule"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#3-what-a-minor-and-a-patch-may-contain-on-0x",
+        "why": "The isolate check compares only `major.minor`, so a seam member added in a patch would pass the check on an older host and then fail."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.patch-on-0x",
+    "statement": "On 0.x a patch holds fixes plus compatible additions outside the isolate seam: the host API, `KernelConfig` and new packages.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["ver.minor-on-0x"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#3-what-a-minor-and-a-patch-may-contain-on-0x",
+        "why": "Host-side additions don't need the isolate check, so they needn't wait for a minor."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.semver-from-1",
+    "statement": "From 1.0 the versions are plain semver: a major breaks, a minor adds, the isolate seam included, and a patch fixes.",
+    "status": "decided",
+    "target": "1.0.0",
+    "related": ["ver.no-major-below-1"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#3-what-a-minor-and-a-patch-may-contain-on-0x",
+        "why": "From 1.0 the isolate check compares majors, so a minor may add to the seam."
+      }
+    ]
+  },
+  {
+    "id": "ver.experimental",
+    "statement": "An `@experimental` API may change or be removed in any minor, before and after 1.0.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["ver.experimental-marked", "ver.experimental-codemods"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#4-experimental",
+        "why": "Tying 1.0 to every new API settling would hold 1.0 back on a browser shipping WebMCP and on the balancer's design."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.experimental-marked",
+    "statement": "Each `@experimental` API is marked `@experimental` in its TSDoc, and a change to it is called out in the changelog.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["ver.experimental"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#4-experimental",
+        "why": "A promise that may change in any minor has to be visible where people read the API."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.experimental-exit",
+    "statement": "An API leaves `@experimental` through a decision recorded in its ADR. From then on it follows the minor and patch rules.",
+    "status": "active",
+    "repo": true,
+    "related": ["ver.experimental"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#4-experimental",
+        "why": "Leaving experimental is a promise to users, so it's decided on the record."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#229",
+        "why": "In force from the ADR's PR."
+      }
+    ]
+  },
+  {
+    "id": "ver.patch-branch",
+    "statement": "A patch to the current release during a preview cycle comes from a `release/0.x` branch, cut from the latest `v0.x.y` tag only when a fix is needed.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/release/rules.ts"],
+    "related": [
+      "ver.fix-main-first",
+      "ver.release-branch-admitted",
+      "ver.release-branch-lifetime",
+      "ver.no-standing-branches"
+    ],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#5-patches-during-a-preview-cycle",
+        "why": "Pre mode applies to the whole repo, so `main` can't release a patch while it previews the next minor."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-24",
+        "ref": "#420",
+        "why": "`release.yml` releases from `release/0.1` as well as `main`, for 0.1.1."
+      }
+    ]
+  },
+  {
+    "id": "ver.fix-main-first",
+    "statement": "A fix goes to `main` first. Its backport to the release branch is its own PR, with its own regression test.",
+    "status": "active",
+    "repo": true,
+    "related": ["ver.patch-branch", "ver.small-backports"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-23",
+        "ref": "adr/0019#5-patches-during-a-preview-cycle",
+        "why": "A fix that skips `main` comes back as a regression in the next minor."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-23",
+        "ref": "#396",
+        "why": "In force from the amendment's PR."
+      }
+    ]
+  },
+  {
+    "id": "ver.small-backports",
+    "statement": "Only a small, reviewable backport goes to a release branch. A larger fix ships in the next minor, brought forward if it's urgent.",
+    "status": "active",
+    "repo": true,
+    "related": ["ver.fix-main-first"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-23",
+        "ref": "adr/0019#5-patches-during-a-preview-cycle",
+        "why": "Backports are made by hand, and a large one is a second change nobody tested on `main`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-23",
+        "ref": "#396",
+        "why": "In force from the amendment's PR."
+      }
+    ]
+  },
+  {
+    "id": "ver.release-branch-admitted",
+    "statement": "A release branch can stage only once it's admitted: added to the `npm` environment by its exact name, with a ruleset of its own. `release.yml` accepts `main` and that branch by exact name.",
+    "status": "active",
+    "repo": true,
+    "values": ["main", "release/0.1"],
+    "code": ["scripts/release/rules.ts", ".github/workflows/release.yml"],
+    "related": ["ver.patch-branch"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-22",
+        "ref": "adr/0019#5-patches-during-a-preview-cycle",
+        "why": "A pattern such as `release/*` would also match version-PR branches, which no ruleset protects."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-24",
+        "ref": "#420",
+        "why": "`RELEASE_BRANCHES` lists `main` and `release/0.1`."
+      }
+    ]
+  },
+  {
+    "id": "ver.release-branch-lifetime",
+    "statement": "One release branch exists at a time. It's deleted when the next minor takes `latest`, keeps its tags, and is never merged back into `main`.",
+    "status": "active",
+    "repo": true,
+    "related": ["ver.patch-branch"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-23",
+        "ref": "adr/0019#5-patches-during-a-preview-cycle",
+        "why": "Only the latest release is supported, so an older line needs no branch."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-23",
+        "ref": "#396",
+        "why": "In force from the amendment's PR."
+      }
+    ]
+  },
+  {
+    "id": "ver.no-older-line-patch",
+    "statement": "No patch is released for an older line. `release.yml` refuses a version that would move `latest` or `next` back.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/release/rules.ts"],
+    "related": ["ver.latest-only"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-22",
+        "ref": "adr/0019#5-patches-during-a-preview-cycle",
+        "why": "Once 0.2.0 is `latest`, a 0.1.x must not take that dist-tag back."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-22",
+        "ref": "#373",
+        "why": "The stage run checks each package's current dist-tags before it stages."
+      }
+    ]
+  },
+  {
+    "id": "ver.no-standing-branches",
+    "statement": "There's no standing `release/0.x` branch for every minor.",
+    "status": "rejected",
+    "related": ["ver.patch-branch"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-23",
+        "ref": "adr/0019#alternatives-considered",
+        "why": "Why not keep a branch per minor? It costs a ruleset, CI, a Changesets state and hand cherry-picks every week, for a line users are told to leave."
+      }
+    ]
+  },
+  {
+    "id": "ver.tag-per-version",
+    "statement": "Every published version has an annotated tag `v<version>` on the commit it was built from, made by the `finish` run after the publish. Pushing a tag starts nothing.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/release/finish.ts", ".github/workflows/release.yml"],
+    "related": ["ver.release-workflow", "ver.no-tag-first"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#6-tags-and-github-releases",
+        "why": "One tag per version answers which commit a build came from."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-22",
+        "ref": "adr/0019#6-tags-and-github-releases",
+        "why": "The tags ruleset forbids moving a tag, so a tag made before a rejected stage would stay on the wrong commit.",
+        "prev": "The Prerelease workflow tagged previews after publishing, and a release tag pushed by the maintainer started the release."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-22",
+        "ref": "#373",
+        "why": "Staged releases from `release.yml`, with `finish` making the tag."
+      }
+    ]
+  },
+  {
+    "id": "ver.no-tag-first",
+    "statement": "A release isn't started by pushing its tag.",
+    "status": "rejected",
+    "related": ["ver.tag-per-version"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-22",
+        "ref": "adr/0019#alternatives-considered",
+        "why": "Why not tag first and let the tag start the release? A tag can't be moved or deleted, so a rejected stage would leave the version's tag on the wrong commit for good."
+      }
+    ]
+  },
+  {
+    "id": "ver.github-releases",
+    "statement": "Each release from 0.1.0 on gets a GitHub Release, made by `finish`; previews get none. Its text is `.github/releases/<version>.md` where that file exists, and the changelog sections otherwise.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/release/notes.ts", ".github/releases/0.1.0.md"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#6-tags-and-github-releases",
+        "why": "Previews are for this project and `isoloop/web`, and their tag and changelogs are enough."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-22",
+        "ref": "adr/0019#6-tags-and-github-releases",
+        "why": "0.1.0's changelogs would repeat every preview's entries, so a release can carry its own text.",
+        "prev": "Each release from 0.1.0 on gets a GitHub Release; previews get none."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-22",
+        "ref": "#373",
+        "why": "`finish` makes the Release."
+      }
+    ]
+  },
+  {
+    "id": "ver.release-workflow",
+    "statement": "Every version, preview or release, is published by one workflow, `release.yml`. It's started by hand, it's a dry run unless told otherwise, and the npm dist-tag comes from the version.",
+    "status": "active",
+    "repo": true,
+    "values": ["dry run by default"],
+    "code": [".github/workflows/release.yml"],
+    "related": ["ver.stage-approve-finish", "ver.tag-per-version"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-22",
+        "ref": "adr/0019#6-tags-and-github-releases",
+        "why": "One path to audit, and previews rehearse the path a release takes."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-22",
+        "ref": "#373",
+        "why": "Staged releases from `release.yml`."
+      }
+    ]
+  },
+  {
+    "id": "ver.stage-approve-finish",
+    "statement": "A version is staged by `release.yml`, then the maintainer approves each of the 13 packages on npmjs.com with 2FA, then a `finish` run checks every package's version, dist-tag and provenance before it tags.",
+    "status": "active",
+    "repo": true,
+    "values": ["13 packages", "2FA approval"],
+    "code": [".github/workflows/release.yml", "scripts/release/finish.ts"],
+    "related": ["ver.approval-order", "ver.stage-only-trust"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-22",
+        "ref": "adr/0019#6-tags-and-github-releases",
+        "why": "A publish then needs the maintainer's 2FA, which an agent or a job holding GitHub credentials doesn't have."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-22",
+        "ref": "#373",
+        "why": "Staged releases from `release.yml`."
+      }
+    ]
+  },
+  {
+    "id": "ver.approval-order",
+    "statement": "The maintainer approves the staged packages in dependency order: protocol, codec, dom and vite; then bus and runtime; then host, react and preact; then balancer, devtools, webmcp and the `isoloop` CLI. None is approved until all 13 are staged.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/release/rules.ts"],
+    "related": ["ver.stage-approve-finish"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-22",
+        "ref": "adr/0019#6-tags-and-github-releases",
+        "why": "Each approval moves a dist-tag at once, so this order keeps what's on npm installable at every step."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-22",
+        "ref": "#373",
+        "why": "`APPROVAL_ORDER` holds the order, and the stage summary follows it."
+      }
+    ]
+  },
+  {
+    "id": "ver.stage-only-trust",
+    "statement": "Each package trusts only `release.yml` in the `npm` environment, allowed to stage and not to publish or change dist-tags. Tokens are disallowed, and there's no fallback publish.",
+    "status": "active",
+    "repo": true,
+    "related": ["ver.stage-approve-finish", "ver.no-direct-publish", "ver.no-cli-approval"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-22",
+        "ref": "adr/0019#6-tags-and-github-releases",
+        "why": "npm accepts a publish that matches any one trust entry, so the gate holds only if it's the only way in."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-22",
+        "ref": "#373",
+        "why": "Staged releases from `release.yml`."
+      }
+    ]
+  },
+  {
+    "id": "ver.no-direct-publish",
+    "statement": "Packages aren't published directly from a GitHub environment, for releases or previews.",
+    "status": "rejected",
+    "related": ["ver.stage-only-trust"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-22",
+        "ref": "adr/0019#alternatives-considered",
+        "why": "Why not publish from a protected environment and skip the approvals? Whoever holds the maintainer's GitHub credentials, as agents do, can change the environment and publish."
+      }
+    ]
+  },
+  {
+    "id": "ver.no-cli-approval",
+    "statement": "Staged packages are approved in the browser, not with the npm CLI.",
+    "status": "rejected",
+    "related": ["ver.stage-only-trust"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-22",
+        "ref": "adr/0019#alternatives-considered",
+        "why": "Why not approve 13 packages faster from the CLI? Agents share that shell's npm session, and npm can skip 2FA for 5 minutes after a prompt."
+      }
+    ]
+  },
+  {
+    "id": "ver.pages-by-hand",
+    "statement": "GitHub Pages isn't part of a release. It serves a redirect to isoloop.dev, and `pages.yml` is run by hand when that changes.",
+    "status": "active",
+    "repo": true,
+    "code": [".github/workflows/pages.yml"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-22",
+        "ref": "adr/0019#6-tags-and-github-releases",
+        "why": "The redirect doesn't change with a release, and the `github-pages` environment refuses deploys from tags."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-22",
+        "ref": "#373",
+        "why": "Staged releases from `release.yml`, with no Pages step."
+      }
+    ]
+  },
+  {
+    "id": "ver.no-major-below-1",
+    "statement": "The changeset check fails a changeset that asks for a `major` bump while the version is below 1.0.0, unless the PR has the `release-1.0` label.",
+    "status": "active",
+    "repo": true,
+    "values": ["label: release-1.0"],
+    "code": ["scripts/ci/changeset-check.ts", ".github/workflows/changeset.yml"],
+    "related": ["ver.minor-on-0x", "ver.semver-from-1"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#7-guards-in-ci",
+        "why": "On 0.x a breaking change is a minor, so a major is a mistake until 1.0's previews start."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#230",
+        "why": "Changeset guards for majors and version PRs."
+      }
+    ]
+  },
+  {
+    "id": "ver.version-pr-passes",
+    "statement": "A PR whose diff only consumes changesets passes the changeset check without the `no-changeset` label. The check reads the diff, not the branch name.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/ci/changeset-check.ts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#7-guards-in-ci",
+        "why": "A version PR has no changeset of its own by design."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-17",
+        "ref": "#230",
+        "why": "Changeset guards for majors and version PRs."
+      }
+    ]
+  },
+  {
+    "id": "ver.no-mixed-versions",
+    "statement": "`release.yml` stages only when every package has the same version: a `-next.N` in pre mode, or a plain `x.y.z` out of it.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/release/packages.ts"],
+    "related": ["ver.one-version"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#7-guards-in-ci",
+        "why": "Packages in one fixed group must never reach npm at different versions."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-22",
+        "ref": "adr/0019#7-guards-in-ci",
+        "why": "Releases go through the same workflow as previews, so the check covers both.",
+        "prev": "The preview workflow stages only when every package has the same `-next.N` version."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-22",
+        "ref": "#373",
+        "why": "Staged releases from `release.yml`."
+      }
+    ]
+  },
+  {
+    "id": "ver.old-versions-deprecated",
+    "statement": "Every `0.0.0*` version of each `@isoloop/*` package is deprecated on npm, not unpublished.",
+    "status": "active",
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-17",
+        "ref": "adr/0019#8-the-versions-before-this-adr",
+        "why": "Unpublishing would break old lockfiles, and npm limits it anyway."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.latest-only",
+    "statement": "Only the version on npm `latest` is supported. `next` previews are never supported.",
+    "status": "active",
+    "values": ["latest only"],
+    "code": ["SECURITY.md"],
+    "since": "0.1.0",
+    "related": ["ver.no-older-line-patch", "ver.security-advisory", "ver.no-support-window"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-23",
+        "ref": "adr/0019#9-what-is-supported-amended-2026-11-23",
+        "why": "On 0.x a minor may break anything, so a second supported line would mean backports to code users were told to leave."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.security-advisory",
+    "statement": "A security bug in an unsupported version is fixed in `latest` and published as a GitHub security advisory that names the affected range and the fixed version.",
+    "status": "active",
+    "code": ["SECURITY.md"],
+    "since": "0.1.0",
+    "related": ["ver.latest-only", "ver.deprecate-known-bug"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-23",
+        "ref": "adr/0019#9-what-is-supported-amended-2026-11-23",
+        "why": "Users of an old line still need to learn they're affected and where the fix is."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.deprecate-known-bug",
+    "statement": "A version range is deprecated on npm, with the message \"Upgrade to latest\", only for a known security or data-loss bug.",
+    "status": "active",
+    "code": ["SECURITY.md"],
+    "since": "0.1.0",
+    "related": ["ver.security-advisory"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-23",
+        "ref": "adr/0019#9-what-is-supported-amended-2026-11-23",
+        "why": "Deprecating every superseded minor would warn on every install for no known risk."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.no-support-window",
+    "statement": "The previous minor gets no support window on 0.x.",
+    "status": "rejected",
+    "related": ["ver.latest-only"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-23",
+        "ref": "adr/0019#alternatives-considered",
+        "why": "Why not support the previous minor for a while? On 0.x a minor may break anything. The question comes back at 1.0."
+      }
+    ]
+  },
+  {
+    "id": "ver.breaking-listed",
+    "statement": "Each minor's changesets name its breaking changes and how to migrate. The steward checks it.",
+    "status": "active",
+    "repo": true,
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-23",
+        "ref": "adr/0019#9-what-is-supported-amended-2026-11-23",
+        "why": "Users who must upgrade to stay supported need to know what breaks."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-23",
+        "ref": "#396",
+        "why": "In force from the amendment's PR."
+      }
+    ]
+  },
+  {
+    "id": "ver.codemod-rule",
+    "statement": "A breaking change to a stable API ships with a codemod that migrates it, in the same release, or it doesn't ship. Stable means every export the API check compares, except `@internal` ones.",
+    "status": "active",
+    "repo": true,
+    "related": ["ver.codemod-gate", "ver.migrate-command", "ver.experimental-codemods"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-24",
+        "ref": "adr/0019#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24",
+        "why": "Moving the web apps to 0.1.0 meant migrating each API change by hand."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-26",
+        "ref": "#462",
+        "why": "`isoloop migrate`, the codemod gate and the parser interface."
+      }
+    ]
+  },
+  {
+    "id": "ver.codemod-gate",
+    "statement": "A changeset whose summary starts with `breaking:` fails the changeset check unless the PR adds codemod fixtures under `packages/cli/src/migrate/<version>/fixtures/`.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/ci/changeset-check.ts"],
+    "related": ["ver.codemod-rule"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-24",
+        "ref": "adr/0019#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24",
+        "why": "The rule holds only if CI holds a breaking change to it."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-26",
+        "ref": "#462",
+        "why": "`isoloop migrate`, the codemod gate and the parser interface."
+      }
+    ]
+  },
+  {
+    "id": "ver.migrate-command",
+    "statement": "`npx isoloop migrate` reads the installed `@isoloop/*` version and applies each codemod up to the latest; `npx isoloop migrate 0.2` names the target. It's a dry run that prints the diff unless given `--write`.",
+    "status": "decided",
+    "knob": "`--write`",
+    "code": ["packages/cli/src/migrate/run.ts"],
+    "target": "0.2.0",
+    "related": ["ver.codemod-rule", "ver.migrate-comments", "ver.codemod-parser"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-24",
+        "ref": "adr/0019#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24",
+        "why": "Users get each breaking change's migration from one command, in order."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-26",
+        "ref": "#462",
+        "why": "`isoloop migrate`, the codemod gate and the parser interface."
+      }
+    ]
+  },
+  {
+    "id": "ver.migrate-comments",
+    "statement": "A behaviour change with no syntax to rewrite gets an `// isoloop-migrate:` comment where the code uses it, and a migration section in the guide.",
+    "status": "decided",
+    "code": ["packages/cli/src/migrate/"],
+    "target": "0.2.0",
+    "related": ["ver.migrate-command"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-24",
+        "ref": "adr/0019#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24",
+        "why": "A codemod can't rewrite behaviour, but it can point at every place that depends on it."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-26",
+        "ref": "#462",
+        "why": "`isoloop migrate`, the codemod gate and the parser interface."
+      }
+    ]
+  },
+  {
+    "id": "ver.codemod-parser",
+    "statement": "Codemods parse TypeScript and JSX with `oxc-parser`, behind Isoloop's own `parse` and `edit` interface with conformance tests, and rewrite by text edits so the user's formatting is kept.",
+    "status": "decided",
+    "code": ["packages/cli/src/migrate/parser.ts", "packages/cli/src/migrate/edit.ts"],
+    "target": "0.2.0",
+    "related": ["ver.migrate-command"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-24",
+        "ref": "adr/0019#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24",
+        "why": "It comes from the same project as the repo's oxlint and oxfmt, needs no printer, and can be swapped for TypeScript 7's own API once that's stable."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-26",
+        "ref": "#462",
+        "why": "`isoloop migrate`, the codemod gate and the parser interface."
+      }
+    ]
+  },
+  {
+    "id": "ver.experimental-codemods",
+    "statement": "A change to an `@experimental` API gets a codemod when the change is mechanical, and a migration note otherwise.",
+    "status": "active",
+    "repo": true,
+    "related": ["ver.experimental", "ver.codemod-rule"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-24",
+        "ref": "adr/0019#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24",
+        "why": "Experimental APIs may change in any minor, but a mechanical rewrite still costs users nothing."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-24",
+        "ref": "#434",
+        "why": "In force from the amendment's PR."
+      }
+    ]
+  },
+  {
+    "id": "ver.codemods-on-real-apps",
+    "statement": "`isoloop/web`'s plant-bench runs the codemods on every run branch that needs them, and a codemod that fails there blocks the release.",
+    "status": "decided",
+    "repo": true,
+    "related": ["ver.codemod-rule"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-24",
+        "ref": "adr/0019#10-a-breaking-change-ships-with-a-codemod-amended-2026-11-24",
+        "why": "Fixtures prove a codemod on small cases; real apps prove it on code nobody wrote for it."
+      }
+    ]
+  }
+]
