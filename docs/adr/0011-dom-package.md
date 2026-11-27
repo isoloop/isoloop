@@ -30,6 +30,8 @@ Other forces:
    - `host` may import `@isoloop/dom/host` only, and only in `render/isoloop-dom.ts`, the bridge the compositor drives (invariant I1); its tests may also import `@isoloop/dom/testing`.
    - `protocol`, `bus` and `codec` never import `dom`.
    - `dom` imports no other `@isoloop/*` package.
+
+   Rules: `tool.dom-imports`
 3. **No runtime dependencies; `/testing` has an optional peer on Vitest.** Not even `protocol`. Node ids are plain numbers that `dom` defines. `runtime` and `host` relate them to protocol types if they need to.
 4. **`dom` owns the format.** The record types and the fmt constant `ISOLOOP_DOM_FMT = 'isoloop-dom@1'` live in `src/shared` and are exported from both `/worker` and `/host`. `protocol` keeps `patch.batch: unknown` and never learns the record shape.
 5. **Four source folders, each type-checked on its own:**
@@ -42,6 +44,8 @@ Other forces:
    | `src/testing` | `ES2022`, `DOM`, `DOM.Iterable` | conformance suite |
 
    Each folder has its own tsconfig (`tsconfig.shared.json`, `tsconfig.worker.json`, `tsconfig.host.json`, `tsconfig.testing.json`), and `typecheck` runs all of them. `src/shared` imports nothing outside itself. `src/worker` and `src/host` import `src/shared` but not each other. Only `src/testing` sees both halves, because a bridge pair is both. A stray `document` in the worker half fails the build, not a review. tsdown builds one entry per subpath.
+
+   Rules: `tool.dom-halves`
 6. **What `dom` owns, and what it doesn't:** the format end to end, with no timing and no policy.
    - **`dom/worker`:** installs the subset, records changes into batches, and calls an `onBatch(batch)` hook that `runtime` provides. Its `deliver(nodeId, event)` dispatches an incoming event record to a node by id, with capture and bubble inside the worker.
    - **`dom/host`:** applies a batch, keeps `idFor` / `nodeFor` both ways, and turns a DOM event into a plain event record, but only for listeners the isolate registered (`listen` records).

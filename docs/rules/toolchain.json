@@ -855,5 +855,820 @@
         "why": "Why not just `paths-ignore`? The workflow wouldn't start, so the required checks would stay pending and the PR couldn't merge; a path-filter action is a dependency for a dozen lines of shell."
       }
     ]
+  },
+  {
+    "id": "tool.pnpm-workspaces",
+    "statement": "The repo is a pnpm 12 workspace, run with plain `pnpm -r` in dependency order and no task runner on top.",
+    "status": "active",
+    "repo": true,
+    "values": ["pnpm@12.16.1"],
+    "code": ["pnpm-workspace.yaml", "package.json"],
+    "related": ["tool.no-corepack", "tool.no-task-runner"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#tools",
+        "why": "A workspace and dependency order cover what this repo needs."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#1",
+        "why": "The workspace skeleton."
+      }
+    ]
+  },
+  {
+    "id": "tool.node-version",
+    "statement": "Development and CI run on Node 26 LTS, pinned in `.nvmrc`.",
+    "status": "active",
+    "repo": true,
+    "values": ["Node 26"],
+    "code": [".nvmrc"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#tools",
+        "why": "One Node version for every contributor and every CI job."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#1",
+        "why": "The workspace skeleton."
+      }
+    ]
+  },
+  {
+    "id": "tool.typescript",
+    "statement": "Type checking runs `tsc --noEmit` from TypeScript 7 in every package, and editors, the checker and tsgolint use the same version.",
+    "status": "active",
+    "repo": true,
+    "values": ["typescript@7.0.2"],
+    "code": ["package.json", "pnpm-workspace.yaml"],
+    "related": ["tool.isolated-declarations"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#tools",
+        "why": "One TypeScript version, so the checker, the editor and lint never disagree."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#1",
+        "why": "The workspace skeleton."
+      }
+    ]
+  },
+  {
+    "id": "tool.oxc-lint-format",
+    "statement": "Lint is oxlint with `oxlint-tsgolint`, type-aware on every run, and formatting is oxfmt.",
+    "status": "active",
+    "repo": true,
+    "code": [".oxlintrc.json", ".oxfmtrc.json"],
+    "related": ["tool.lint-errors-only", "tool.format-settings", "tool.no-eslint"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#tools",
+        "why": "Fast enough to run on every save, and from the same project as the bundler."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#3",
+        "why": "Lint, format and dependency rules."
+      }
+    ]
+  },
+  {
+    "id": "tool.no-eslint",
+    "statement": "The repo doesn't use ESLint, typescript-eslint or Prettier.",
+    "status": "rejected",
+    "related": ["tool.oxc-lint-format"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-04",
+        "ref": "adr/0009#alternatives-considered",
+        "why": "Why not the usual ESLint and Prettier? They're much slower, and typescript-eslint's type-aware rules need TypeScript's JS API, which TypeScript 7 doesn't offer as stable yet."
+      }
+    ]
+  },
+  {
+    "id": "tool.tsdown-builds",
+    "statement": "Packages are built with tsdown, which writes the `.d.ts` files through `isolatedDeclarations` with no type checker in the build. Apps and the dev server use Vite 8.",
+    "status": "active",
+    "repo": true,
+    "related": ["tool.isolated-declarations"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#tools",
+        "why": "tsdown runs on the same Rolldown core as Vite, and doesn't need TypeScript's JS API."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#1",
+        "why": "The workspace skeleton."
+      }
+    ]
+  },
+  {
+    "id": "tool.test-runners",
+    "statement": "Unit and browser tests run on Vitest 5, as projects in the root config. End-to-end tests and the browser benches run on Playwright in Chromium, Firefox and WebKit.",
+    "status": "active",
+    "repo": true,
+    "code": ["vitest.config.ts", "playwright.config.ts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#tools",
+        "why": "One test runner for Node and the browser, and a real browser for each engine."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#1",
+        "why": "The workspace skeleton."
+      }
+    ]
+  },
+  {
+    "id": "tool.root-scripts",
+    "statement": "Tools are only called through root scripts (`pnpm format`, `lint`, `typecheck`, `test`, `build`, `e2e`, `check`), never as a tool binary. `pnpm check` runs the format check, lint, typecheck and unit tests.",
+    "status": "active",
+    "repo": true,
+    "code": ["package.json"],
+    "related": ["tool.no-git-hooks"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "Swapping a tool means editing one script, and CI shows the swap changed nothing."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#1",
+        "why": "The workspace skeleton."
+      }
+    ]
+  },
+  {
+    "id": "tool.no-git-hooks",
+    "statement": "The repo has no git hooks. CI is the only gate.",
+    "status": "active",
+    "repo": true,
+    "related": ["tool.root-scripts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "Hooks are one more dependency, slow every commit, and `--no-verify` skips them anyway."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#1",
+        "why": "The workspace skeleton."
+      }
+    ]
+  },
+  {
+    "id": "tool.isolated-declarations",
+    "statement": "Every published package compiles with `isolatedDeclarations: true`, so every export has an explicit type. Private packages and the CLI, which publishes no `.d.ts`, keep normal inference.",
+    "status": "active",
+    "repo": true,
+    "code": ["tsconfig.lib.json", "packages/cli/tsconfig.json"],
+    "related": ["tool.tsdown-builds"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "A body change can then never change the published `.d.ts` without a visible diff."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#1",
+        "why": "The workspace skeleton."
+      }
+    ]
+  },
+  {
+    "id": "tool.source-condition",
+    "statement": "Imports between packages resolve to source through the `@isoloop/source` export condition, so type checking, lint and tests need no build first. `publishConfig.exports` replaces it on publish.",
+    "status": "active",
+    "repo": true,
+    "code": ["tsconfig.base.json", "vitest.config.ts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "Building first makes every check wait for a build and points errors at `dist`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#1",
+        "why": "The workspace skeleton."
+      }
+    ]
+  },
+  {
+    "id": "tool.dependency-rules",
+    "statement": "A package can only import what its `package.json` lists (pnpm's strict `node_modules`), oxlint `no-restricted-imports` sets the allowed imports per package, and `bus` compiles with no DOM types.",
+    "status": "active",
+    "repo": true,
+    "code": [".oxlintrc.json", "packages/bus/tsconfig.json"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "The package boundaries are checked by tools rather than by review."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#3",
+        "why": "Lint, format and dependency rules."
+      }
+    ]
+  },
+  {
+    "id": "tool.lint-errors-only",
+    "statement": "Every lint rule is an error or off; there are no warnings. The `correctness`, `suspicious` and `perf` groups and the type-aware TypeScript rules are errors, and other rules are added by name.",
+    "status": "active",
+    "repo": true,
+    "code": [".oxlintrc.json"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "Warnings pile up unread, and promise rules matter in a message-passing runtime."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#3",
+        "why": "Lint, format and dependency rules."
+      }
+    ]
+  },
+  {
+    "id": "tool.format-settings",
+    "statement": "oxfmt uses single quotes, semicolons, a print width of 100 and trailing commas everywhere, with defaults otherwise.",
+    "status": "active",
+    "repo": true,
+    "values": ["singleQuote", "semi", "printWidth 100", "trailingComma all"],
+    "code": [".oxfmtrc.json"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "It matches the code samples in the design docs."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#3",
+        "why": "Lint, format and dependency rules."
+      }
+    ]
+  },
+  {
+    "id": "tool.browser-baseline",
+    "statement": "Isoloop supports Baseline \"widely available\" browsers, and the packages build to `es2022`. The minimums for the features it relies on are Chrome 108, Firefox 114 and Safari 16.4.",
+    "status": "active",
+    "values": ["Chrome 108", "Firefox 114", "Safari 16.4", "es2022"],
+    "code": ["tsconfig.base.json"],
+    "since": "0.1.0",
+    "related": ["tool.unsupported-browser"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "Features in every major engine for 30 months or more cover what the runtime needs."
+      },
+      {
+        "type": "clarified",
+        "date": "2026-11-05",
+        "ref": "adr/0009#rules",
+        "why": "The minimums were looked up per feature in MDN's browser-compat-data.",
+        "prev": "Baseline \"widely available\", with no version numbers named."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "tool.unsupported-browser",
+    "statement": "`createKernel` checks for module workers, `MessageChannel`, adopted stylesheets and OPFS, and throws `unsupported_browser` naming whatever is missing.",
+    "status": "active",
+    "errors": ["unsupported_browser"],
+    "code": ["packages/host/src/kernel/features.ts", "packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "related": ["tool.browser-baseline"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0009#rules",
+        "why": "A missing feature fails at start with its name, not later with a confusing error."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#20",
+        "why": "The browser feature check."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "tool.exact-pins",
+    "statement": "Every tool version is pinned exactly, with no `^`, in the pnpm `catalog:` in `pnpm-workspace.yaml`.",
+    "status": "active",
+    "repo": true,
+    "code": ["pnpm-workspace.yaml"],
+    "related": ["tool.dependabot", "tool.supply-chain"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "Caret ranges let 0.x tools change behaviour without a PR."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#1",
+        "why": "The workspace skeleton."
+      }
+    ]
+  },
+  {
+    "id": "tool.dependabot",
+    "statement": "Dependabot opens one grouped PR a week for npm and GitHub Actions minors and patches, with a 3-day cooldown. Majors come as separate PRs.",
+    "status": "active",
+    "repo": true,
+    "values": ["weekly", "3-day cooldown"],
+    "code": [".github/dependabot.yml"],
+    "related": ["tool.exact-pins"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "Dependabot is built into GitHub, where Renovate is one more app to install."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#10",
+        "why": "CI, Dependabot and Pages."
+      }
+    ]
+  },
+  {
+    "id": "tool.supply-chain",
+    "statement": "pnpm refuses versions younger than 3 days (`minimumReleaseAge: 4320`), lifecycle scripts stay blocked unless allow-listed by name, peers are strict, and GitHub Actions are pinned by commit SHA.",
+    "status": "active",
+    "repo": true,
+    "values": ["minimumReleaseAge 4320 min", "strictPeerDependencies"],
+    "code": ["pnpm-workspace.yaml", ".github/workflows/ci.yml"],
+    "related": ["tool.exact-pins"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "A compromised release is usually caught within days, and install scripts are the usual way in."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#1",
+        "why": "The workspace skeleton."
+      }
+    ]
+  },
+  {
+    "id": "tool.no-corepack",
+    "statement": "`packageManager: \"pnpm@12.16.1\"` pins pnpm. Contributors install pnpm's standalone binary, and corepack isn't used.",
+    "status": "active",
+    "repo": true,
+    "code": ["package.json"],
+    "related": ["tool.pnpm-workspaces"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "One field pins the version for contributors and for CI's `pnpm/action-setup`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#1",
+        "why": "The workspace skeleton."
+      }
+    ]
+  },
+  {
+    "id": "tool.vscode-config",
+    "statement": "VS Code settings are committed in `.vscode/`: the workspace TypeScript, oxc as the formatter, format on save and oxlint diagnostics.",
+    "status": "active",
+    "repo": true,
+    "code": [".vscode/settings.json", ".vscode/extensions.json"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "Editors then use the same tools and versions as CI."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#3",
+        "why": "Lint, format and dependency rules."
+      }
+    ]
+  },
+  {
+    "id": "tool.ci-jobs",
+    "statement": "CI runs on Ubuntu only. The `browser`, `e2e` and `bench` jobs start only after `check` passes, and install browsers through one local action with time limits, retries and caches.",
+    "status": "active",
+    "repo": true,
+    "code": [".github/workflows/ci.yml", ".github/actions/install-browsers"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-04",
+        "ref": "adr/0009#rules",
+        "why": "One OS keeps CI fast, and the browser jobs skip a run that already failed its checks."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-04",
+        "ref": "#10",
+        "why": "CI, Dependabot and Pages."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#52",
+        "why": "Time-limited, retried Playwright install with a browser cache."
+      }
+    ]
+  },
+  {
+    "id": "tool.no-task-runner",
+    "statement": "The repo uses no NX, turbo or Vite+ task graph.",
+    "status": "rejected",
+    "related": ["tool.pnpm-workspaces"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-04",
+        "ref": "adr/0009#alternatives-considered",
+        "why": "Why not cache builds with a task runner? It pays off in big monorepos; here it would mostly add config. It comes back if CI time becomes a problem."
+      }
+    ]
+  },
+  {
+    "id": "tool.entries-at-top",
+    "statement": "The top of a package's `src/` holds only its entries, the files `exports`, `bin` or the build point at, and tests named after them. dom keeps its entries in its four folders.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/layout/layout.ts"],
+    "related": ["tool.areas", "tool.layout-test"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-21",
+        "ref": "adr/0021#1-entries-sit-at-the-top-of-src",
+        "why": "Entries are the files other things depend on by path, so they stay put and are easy to find."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-21",
+        "ref": "#360",
+        "why": "The last packages moved, and the layout test's pending list went."
+      }
+    ]
+  },
+  {
+    "id": "tool.areas",
+    "statement": "Everything else in `src/` lives in an area: one level of kebab-case folders named for a concept from the system design, never for a kind (`utils`, `helpers`, `lib`, `common`, `misc`, `types`).",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/layout/layout.ts"],
+    "related": ["tool.entries-at-top", "tool.layout-test"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-21",
+        "ref": "adr/0021#2-everything-else-lives-in-an-area",
+        "why": "A folder named for a concept says where a change goes; one named for a kind collects anything."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-21",
+        "ref": "#360",
+        "why": "The last packages moved into areas."
+      }
+    ]
+  },
+  {
+    "id": "tool.no-barrels",
+    "statement": "`index.ts` is only ever an entry, a module imports the file that defines what it needs, and entries list what they export instead of `export *`.",
+    "status": "active",
+    "repo": true,
+    "code": [".oxlintrc.json"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-21",
+        "ref": "adr/0021#3-no-barrels-inside-a-package",
+        "why": "Barrels hide where code lives and make import cycles easy."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-21",
+        "ref": "#352",
+        "why": "protocol's and bus's entries name what they export."
+      }
+    ]
+  },
+  {
+    "id": "tool.tests-next-to-code",
+    "statement": "A test sits next to the code it tests. Files tests load by URL live in `src/__fixtures__/`, and helpers tests import live in `test/` at the package root, which holds no test files.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/layout/layout.ts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-21",
+        "ref": "adr/0021#4-tests-and-fixtures",
+        "why": "A test next to its code moves with it, and a fixture loaded by URL needs one known place."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-21",
+        "ref": "#360",
+        "why": "The last packages moved."
+      }
+    ]
+  },
+  {
+    "id": "tool.no-relative-escape",
+    "statement": "Shipped code never uses a relative path to leave its package; it imports other packages by name. Tests and fixtures may, to start another package's worker.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/layout/layout.ts"],
+    "related": ["tool.dependency-rules"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-21",
+        "ref": "adr/0021#4-tests-and-fixtures",
+        "why": "A relative import across packages skips the dependency rules and breaks once published."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-21",
+        "ref": "#349",
+        "why": "The layout checks."
+      }
+    ]
+  },
+  {
+    "id": "tool.moves-keep-names",
+    "statement": "A file that moves keeps its name, and a move changes nothing in `dist` except tsdown's source-path comments.",
+    "status": "active",
+    "repo": true,
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-21",
+        "ref": "adr/0021#5-moving-files",
+        "why": "tsdown names shared declaration chunks after their first module, and the API check reads those names."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-21",
+        "ref": "#347",
+        "why": "In force from the ADR's PR."
+      }
+    ]
+  },
+  {
+    "id": "tool.docs-paths",
+    "statement": "History docs (ADRs, plans, posts, investigations) keep the paths of their day, living docs follow the code, and no living doc carries a folder map.",
+    "status": "active",
+    "repo": true,
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-21",
+        "ref": "adr/0021#5-moving-files",
+        "why": "A folder map would drift, and the tree shows the layout anyway."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-21",
+        "ref": "#347",
+        "why": "In force from the ADR's PR."
+      }
+    ]
+  },
+  {
+    "id": "tool.esm-only",
+    "statement": "Packages ship ESM only, one bundled file per entry plus tsdown's shared chunks.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["tool.side-effects"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-21",
+        "ref": "adr/0021#6-the-tree-shaking-contract",
+        "why": "One file per entry keeps what an app imports small and predictable."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "tool.side-effects",
+    "statement": "Every package declares `sideEffects: false` except for its scripts (bus's worker, runtime's bootstrap and worker, the devtools panel), which are listed by both their `./src/` and `./dist/` paths.",
+    "status": "active",
+    "code": ["packages/runtime/package.json", "scripts/check-exports.ts"],
+    "since": "0.1.0",
+    "related": ["tool.esm-only", "tool.bundle-budgets"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-21",
+        "ref": "adr/0021#6-the-tree-shaking-contract",
+        "why": "Bundlers drop unused exports, and the files that run on load are named so they're kept."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-21",
+        "ref": "#363",
+        "why": "The bundle guard, and scripts declared in `sideEffects`."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "tool.bundle-budgets",
+    "statement": "`bench/bundle-size` budgets each library entry's import-time code, seven app bundles and the four scripts, bundled with Vite's own `build()`. Each budget is its size at acceptance plus 5%, rounded up to the next 0.5 KB; a PR that crosses one raises it and says why.",
+    "status": "active",
+    "repo": true,
+    "values": ["+5%", "0.5 KB steps"],
+    "code": ["bench/bundle-size/bundle-size.ts", "bench/bundle-size/budgets.json"],
+    "related": ["tool.side-effects"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-21",
+        "ref": "adr/0021#7-bundle-budgets",
+        "why": "A new global side effect or a heavier entry shows up as a number in CI."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-21",
+        "ref": "#363",
+        "why": "The bundle guard, with budgets."
+      }
+    ]
+  },
+  {
+    "id": "tool.layout-lint",
+    "statement": "oxlint fails `export *` barrels, import cycles and file names that aren't kebab-case, through `oxc/no-barrel-file`, `import/no-cycle` and `unicorn/filename-case`.",
+    "status": "active",
+    "repo": true,
+    "code": [".oxlintrc.json"],
+    "related": ["tool.no-barrels", "tool.lint-errors-only"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-21",
+        "ref": "adr/0021#8-enforcement",
+        "why": "Three rules added by name, as the lint rules allow."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-21",
+        "ref": "#349",
+        "why": "The layout checks, `import/no-cycle` and kebab-case file names."
+      }
+    ]
+  },
+  {
+    "id": "tool.layout-test",
+    "statement": "The layout test in `scripts/layout/`, run by `pnpm test`, checks the file tree: entries at the top, `index.ts` only as an entry, areas one level deep, fixtures and `test/` in their places, no relative escapes, every test in a Vitest project and every `./src/` `sideEffects` path existing.",
+    "status": "active",
+    "repo": true,
+    "code": ["scripts/layout/layout.ts", "scripts/layout/layout.test.ts"],
+    "related": ["tool.entries-at-top", "tool.areas"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-21",
+        "ref": "adr/0021#8-enforcement",
+        "why": "There's no custom lint rule, since oxlint's JS plugins are alpha, so a test checks the tree."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-21",
+        "ref": "#349",
+        "why": "The layout checks."
+      }
+    ]
+  },
+  {
+    "id": "tool.dom-imports",
+    "statement": "`runtime` may import only `@isoloop/dom/worker`, `host` only `@isoloop/dom/host` and only in `render/isoloop-dom.ts`, `protocol`, `bus` and `codec` never import `dom`, and `dom` imports no other `@isoloop/*` package.",
+    "status": "active",
+    "repo": true,
+    "code": [".oxlintrc.json"],
+    "related": ["tool.dependency-rules", "tool.dom-halves"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0011#decision",
+        "why": "Each side of the render bridge sees only its own half, so a host-only API can't leak into a worker."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#29",
+        "why": "`@isoloop/dom`, the render bridge `isoloop-dom@1`."
+      }
+    ]
+  },
+  {
+    "id": "tool.dom-halves",
+    "statement": "`dom`'s four source folders (`shared`, `worker`, `host`, `testing`) are each type-checked with their own tsconfig and `lib`. `worker` and `host` import `shared` but not each other.",
+    "status": "active",
+    "repo": true,
+    "code": ["packages/dom/tsconfig.worker.json", "packages/dom/tsconfig.host.json"],
+    "related": ["tool.dom-imports"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0011#decision",
+        "why": "A stray `document` in the worker half then fails the build, not a review."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#29",
+        "why": "`@isoloop/dom`, the render bridge `isoloop-dom@1`."
+      }
+    ]
   }
 ]
