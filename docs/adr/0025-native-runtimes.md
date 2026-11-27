@@ -26,13 +26,19 @@ The forces:
 
 Placement gains a runtime next to own-worker and pools, for example `runtime: 'worker' | 'wasm' | 'native'`. `worker` is today's behaviour and the default. The same `defineIsolate` and bus API apply in every runtime, and a headless isolate's code doesn't change with its runtime. Visual isolates stay in the webview.
 
+Rules: `native.runtime-placement`
+
 ### 2. Derive isolates first, user isolates after
 
 The first workload is ADR 0024's derive isolates, with the Rust engine built natively. A user's headless JS isolate comes after, through the WASM runtime (decision 4). Native sidecars for existing binaries come last.
 
+Rules: `native.derive-first`
+
 ### 3. The bus moves to the core in a Tauri app that uses native runtimes
 
 M5's engine, built natively, runs the bus in the Tauri core, with webview isolates attached over Tauri IPC. A webview isolate can't tell whether a topic's producer is native. This reopens ADR 0022's rejected alternative, so it's question 2, not settled here: the alternative is the bus staying in the webview, with native isolates attached over IPC.
+
+Rules: `native.bus-in-core`
 
 ### 4. Three runtimes
 
@@ -40,13 +46,19 @@ M5's engine, built natively, runs the bus in the Tauri core, with webview isolat
 - **`wasm`:** a WASM component in wasmtime in the core. JS isolates reach it through ComponentizeJS (SpiderMonkey) or Javy (QuickJS), so a headless JS isolate compiles unchanged. These have no JIT, so the runtime is measured against `worker` and the result documented, whatever it shows.
 - **`native`:** a native process or thread in the core, for Rust engines and, later, sidecars spawned with stdio under an OS sandbox (Landlock and seccomp on Linux, App Sandbox on macOS, AppContainer on Windows).
 
+Rules: `native.three-runtimes`
+
 ### 5. A Rust supervisor on M11's decisions
 
 The core gets a supervisor with heartbeats, restarts and replay driven by M11's pure decisions, so the TypeScript and Rust supervisors make the same choice from the same inputs. Crash, restart and replay behave the same in every runtime, checked by one conformance suite run against both.
 
+Rules: `native.rust-supervisor`
+
 ### 6. Grants as capability handles outside the webview
 
 Outside the webview, a grant becomes a capability handle: filesystem scopes, network and MCP, checked when the handle is created rather than per record. That begins a real security boundary. No untrusted code runs natively until a separate ADR on that boundary is accepted (question 7).
+
+Rules: `native.capability-handles`, `native.no-untrusted-native`
 
 ## Consequences
 
