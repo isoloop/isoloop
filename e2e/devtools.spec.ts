@@ -184,7 +184,7 @@ test.describe('devtools: bus view (M4b task 9)', () => {
     await expect(watched.locator('[data-watches]')).toHaveText('1');
     await expect(watched.locator('[data-records]')).not.toHaveAttribute('data-records', '0');
     await expect(watched.locator('[data-records]')).toContainText(
-      /^showed (every value|1 of every [\d.]+ values)$/,
+      /^showed (every record on the topic|1 of every [\d.]+ records on the topic)$/,
     );
   });
 

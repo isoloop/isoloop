@@ -59,8 +59,8 @@
       "sources": [
         {
           "path": "packages/protocol/src/messages/control.ts",
-          "line": 191,
-          "end_line": 195,
+          "line": 194,
+          "end_line": 198,
           "label": "host publish on the control port",
           "anchor": "* `kernel.publish`. With `id` set, the bus replies with `result`. The host",
           "anchor_offset": 1

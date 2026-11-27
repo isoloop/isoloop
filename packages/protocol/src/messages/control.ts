@@ -62,9 +62,11 @@ export type SeedEvent =
  * A watched topic's figures in `BusMetrics`. Watches from isolates and from
  * the host are counted together.
  *
- * `records / values` is how many records each watch got one value for:
- * 40 means a watch showed 1 of every 40 values. Both count from the bus
- * worker's start, and a snapshot's values aren't in `values`.
+ * `records / values` is how many of the topic's records each watch got one
+ * value for: 40 means a watch showed 1 of every 40 records on the topic.
+ * Every record on the topic counts, keys a watch doesn't read included. Both
+ * count from the bus worker's start, and a snapshot's values aren't in
+ * `values`.
  * @experimental
  */
 export type TopicWatchMetrics = {
@@ -74,7 +76,7 @@ export type TopicWatchMetrics = {
   liveKeys: number;
   /** How views reach the watches: `'messages'`, one `view` message each. */
   transport: 'messages';
-  /** Records appended to the topic, counted once per watch on it at the time. */
+  /** Records appended to the topic while each watch was on it, summed over the watches. */
   records: number;
   /** Values sent to watches in views after their snapshot. */
   values: number;
@@ -94,7 +96,8 @@ export type BusMetrics = {
     retained: number;
     /**
      * The topic's watcher figures, present once the topic has had a watch
-     * since the bus worker started.
+     * since the bus worker started. Its ratio counts every record on the
+     * topic: "showed 1 of every 40 records on the topic".
      * @experimental
      */
     watch?: TopicWatchMetrics;

@@ -92,4 +92,36 @@ describe('watch stats (ADR 0023, point 25)', () => {
     await a.call('unwatch', { topic: 'quiet.v1' });
     expect(watchStats('quiet.v1')).toMatchObject({ watches: 0, liveKeys: 0, records: 1 });
   });
+
+  it('counts only the records after a watch starts mid-stream', async () => {
+    const { broker, pub, watchStats } = setup();
+    await Promise.all(Array.from({ length: 7 }, (_, i) => pub('prices.v1', 'a', i)));
+    const a = connect(broker, 'A', all);
+    await a.call('watch', { topic: 'prices.v1' });
+    await Promise.all(Array.from({ length: 3 }, (_, i) => pub('prices.v1', 'a', 10 + i)));
+    expect(watchStats('prices.v1')?.records).toBe(3);
+  });
+
+  it("folds in an ended watch's records, and counts on for the one left", async () => {
+    const { broker, pub, watchStats } = setup();
+    const a = connect(broker, 'A', all);
+    const b = connect(broker, 'B', all);
+    await a.call('watch', { topic: 'prices.v1' });
+    await b.call('watch', { topic: 'prices.v1' });
+    await Promise.all(Array.from({ length: 4 }, (_, i) => pub('prices.v1', 'a', i)));
+    await a.call('unwatch', { topic: 'prices.v1' });
+    await Promise.all(Array.from({ length: 2 }, (_, i) => pub('prices.v1', 'a', 10 + i)));
+    // A saw 4 records while it watched, B all 6.
+    expect(watchStats('prices.v1')).toMatchObject({ watches: 1, records: 10 });
+  });
+
+  it('counts a replaced watch once, across the new watch on the same connection', async () => {
+    const { broker, pub, watchStats } = setup();
+    const a = connect(broker, 'A', all);
+    await a.call('watch', { topic: 'prices.v1', keys: ['a'] });
+    await pub('prices.v1', 'a', 1);
+    await a.call('watch', { topic: 'prices.v1', keys: ['a', 'b'] });
+    await pub('prices.v1', 'b', 2);
+    expect(watchStats('prices.v1')).toMatchObject({ watches: 1, records: 2 });
+  });
 });

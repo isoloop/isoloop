@@ -4,7 +4,7 @@
  * count, each subscription's lag (head − cursor) and credit, and the
  * publishes the bus rejected, by error code, since its worker started.
  * Watched topics get a second table: their watches, the keys they hold, and
- * how many values each watch showed (ADR 0023, point 25).
+ * how many of the topic's records each watch showed (ADR 0023, point 25).
  * The panel's own feed doesn't go through the bus (devtools decision 5), so
  * none of these figures include it.
  */

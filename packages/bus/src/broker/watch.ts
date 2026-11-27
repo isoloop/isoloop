@@ -33,7 +33,7 @@ export type WatchStats = {
   watches: number;
   /** Distinct keys the topic's watches hold now. */
   liveKeys: number;
-  /** Records appended, once per watch on the topic at the time. */
+  /** Records appended while each watch was on the topic, summed over the watches. */
   records: number;
   /** Values sent to watches in views after their snapshot. */
   values: number;
@@ -76,6 +76,8 @@ type Watch = {
   building: Build | undefined;
   paging: boolean;
   warned: boolean;
+  /** The topic's head when the watch started: `records` counts from here (point 25). */
+  startHead: number;
 };
 
 /** A view in progress: the newest record per key read so far. */
@@ -116,7 +118,11 @@ export class WatchBook {
   readonly #dev: boolean;
   readonly #topics = new Map<string, TopicWatches>();
   readonly #byWatcher = new Map<Watcher, Map<string, Watch>>();
-  /** Per topic, kept after its last watch leaves: the counters behind `WatchStats`. */
+  /**
+   * Per topic, kept after its last watch leaves: the counters behind
+   * `WatchStats`. `records` holds only the watches that ended; a live watch's
+   * share is read from the head at sample time, so an append counts nothing.
+   */
   readonly #counts = new Map<string, { records: number; values: number }>();
 
   constructor(opts: WatchBookOptions) {
@@ -160,6 +166,7 @@ export class WatchBook {
       building: undefined,
       paging: false,
       warned: false,
+      startHead: this.#engine.head(topic),
     };
     tw.watches.add(w);
     tw.gen++;
@@ -208,7 +215,6 @@ export class WatchBook {
   appended(topic: string): void {
     const tw = this.#topics.get(topic);
     if (!tw) return;
-    if (tw.watches.size > 0) this.#count(topic).records += tw.watches.size;
     for (const w of tw.watches) this.#note(w);
   }
 
@@ -218,11 +224,14 @@ export class WatchBook {
     for (const [topic, c] of this.#counts) {
       const keys = new Set<WatchKey>();
       let watches = 0;
+      let records = c.records;
+      const head = this.#engine.head(topic);
       for (const w of this.#topics.get(topic)?.watches ?? []) {
         watches++;
+        records += head - w.startHead;
         for (const k of w.sent.keys()) keys.add(k);
       }
-      out.push({ topic, watches, liveKeys: keys.size, records: c.records, values: c.values });
+      out.push({ topic, watches, liveKeys: keys.size, records, values: c.values });
     }
     return out;
   }
@@ -267,7 +276,8 @@ export class WatchBook {
     if (mine?.get(w.topic) === w) mine.delete(w.topic);
     const tw = this.#topics.get(w.topic);
     if (!tw) return;
-    tw.watches.delete(w);
+    if (tw.watches.delete(w))
+      this.#count(w.topic).records += this.#engine.head(w.topic) - w.startHead;
     if (!graceful || tw.watches.size > 0) return;
     const gen = ++tw.gen;
     this.#timers.set(() => {

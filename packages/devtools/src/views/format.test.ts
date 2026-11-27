@@ -52,13 +52,13 @@ const w = (records: number, values: number) =>
 
 describe('watched topics in words', () => {
   it('says how many values each watch showed', () => {
-    expect(shown(w(400, 10))).toBe('showed 1 of every 40 values');
-    expect(shown(w(25, 10))).toBe('showed 1 of every 2.5 values');
-    expect(shown(w(10, 10))).toBe('showed every value');
+    expect(shown(w(400, 10))).toBe('showed 1 of every 40 records on the topic');
+    expect(shown(w(25, 10))).toBe('showed 1 of every 2.5 records on the topic');
+    expect(shown(w(10, 10))).toBe('showed every record on the topic');
   });
 
   it('says so when nothing came yet, or nothing was shown', () => {
-    expect(shown(w(0, 0))).toBe('no values yet');
-    expect(shown(w(12, 0))).toBe('showed none of 12 values');
+    expect(shown(w(0, 0))).toBe('no records yet');
+    expect(shown(w(12, 0))).toBe('showed none of 12 records on the topic');
   });
 });

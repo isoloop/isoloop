@@ -115,12 +115,14 @@ export function recordJson(r: {
 
 /**
  * A watched topic's records against the values its watches got, in words:
- * "showed 1 of every 40 values". Counted from the bus worker's start.
+ * "showed 1 of every 40 records on the topic". Every record on the topic
+ * counts, keys a watch doesn't read included. Counted from the bus worker's
+ * start.
  */
 export function shown(w: TopicWatchMetrics): string {
   if (w.values === 0)
-    return w.records === 0 ? 'no values yet' : `showed none of ${w.records} values`;
+    return w.records === 0 ? 'no records yet' : `showed none of ${w.records} records on the topic`;
   const every = w.records / w.values;
-  if (every < 1.05) return 'showed every value';
-  return `showed 1 of every ${every >= 10 ? Math.round(every) : every.toFixed(1)} values`;
+  if (every < 1.05) return 'showed every record on the topic';
+  return `showed 1 of every ${every >= 10 ? Math.round(every) : every.toFixed(1)} records on the topic`;
 }
