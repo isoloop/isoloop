@@ -22,7 +22,7 @@
 
 **Ships:** as its own app tag, `shop-v0.1.0`, in `isoloop/web`, built on `0.2.0` and announced with it if it's ready (the [releases table](roadmap.md#releases)). `0.2.0` doesn't wait for it. The `resolveRemote` hook and `@isoloop/federation` ship in `0.2.0` if their ADR is accepted in time, otherwise in `0.3.0`; the shop ships on its own bootstrap first and moves to `mf:` in a later `shop-v*` tag.
 
-**Status:** grilled 2026-11-26 (Q1–Q25, yes to all after Q1, Q8, Q14 and Q17 were reworded; then Q26–Q31 on the gaps, yes to all). Spike next; the task list comes after it.
+**Status:** grilled 2026-11-26 (Q1–Q25, yes to all after Q1, Q8, Q14 and Q17 were reworded; then Q26–Q31 on the gaps, yes to all). Spike run 2026-11-26 ([write-up](m9-spike.md)): MF runs in Isoloop workers on all three engines with both bundlers; Rsbuild needs an ESM entry, and Firefox needs the remotes in `worker-src`. Next: the `resolveRemote` ADR, then the task list.
 
 ## Decisions (2026-11-26, grilled; maintainer)
 
