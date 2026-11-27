@@ -44,6 +44,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
+      # The rules registry and its generated README (ADR 0026, decision 10).
+      - run: pnpm rules:check
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test:node

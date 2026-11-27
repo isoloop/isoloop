@@ -23,6 +23,9 @@ bench-results/
 .env.*
 !.env.example
 
+# The rules board page, built by pnpm rules:board (ADR 0026)
+/.rules-board/
+
 # archify diagrams (local)
 /.archify/
 

@@ -1,0 +1,121 @@
+[
+  {
+    "id": "isolates",
+    "prefix": "iso",
+    "name": "Isolates",
+    "description": "What an isolate is, how it starts and stops, and the worker it runs in.",
+    "order": 1
+  },
+  {
+    "id": "supervision",
+    "prefix": "sup",
+    "name": "Supervision",
+    "description": "Beats, timeouts, restarts and failure, for isolates and the bus worker.",
+    "order": 2
+  },
+  {
+    "id": "bus",
+    "prefix": "bus",
+    "name": "Bus",
+    "description": "Topics, publishing, subscribing, requests and how records reach a reader.",
+    "order": 3
+  },
+  {
+    "id": "durability",
+    "prefix": "dur",
+    "name": "Durability",
+    "description": "What survives a bus crash or a reload, and where it's stored.",
+    "order": 4
+  },
+  {
+    "id": "contracts",
+    "prefix": "con",
+    "name": "Contracts & schemas",
+    "description": "Topic contracts, schemas, grants and versions of a topic.",
+    "order": 5
+  },
+  {
+    "id": "routing",
+    "prefix": "route",
+    "name": "Routing",
+    "description": "Who owns the URL and how isolates navigate.",
+    "order": 6
+  },
+  {
+    "id": "rendering",
+    "prefix": "dom",
+    "name": "Rendering",
+    "description": "The render bridge: the DOM subset in the worker and what reaches the page.",
+    "order": 7
+  },
+  {
+    "id": "pools",
+    "prefix": "pool",
+    "name": "Pools",
+    "description": "Several isolates in one worker, by choice.",
+    "order": 8
+  },
+  {
+    "id": "balancer",
+    "prefix": "bal",
+    "name": "Balancer",
+    "description": "The opt-in balancer's placement, quarantine and moves.",
+    "order": 9
+  },
+  {
+    "id": "agents",
+    "prefix": "agent",
+    "name": "Agents & tools",
+    "description": "Tools on topics and the transports that expose them to agents.",
+    "order": 10
+  },
+  {
+    "id": "inspection",
+    "prefix": "insp",
+    "name": "Inspection & devtools",
+    "description": "The inspection feed and the devtools panel.",
+    "order": 11
+  },
+  {
+    "id": "watchers",
+    "prefix": "watch",
+    "name": "Watchers",
+    "description": "Reading the current value per key, beside a stream.",
+    "order": 12
+  },
+  {
+    "id": "versioning",
+    "prefix": "ver",
+    "name": "Versioning & releases",
+    "description": "Version numbers, what a release may change, and how a version ships.",
+    "order": 13
+  },
+  {
+    "id": "toolchain",
+    "prefix": "tool",
+    "name": "Toolchain & layout",
+    "description": "Tools, source layout, checks and the repo's own process.",
+    "order": 14
+  },
+  {
+    "id": "derived-topics",
+    "prefix": "derive",
+    "name": "Derived topics",
+    "description": "Topics defined by a plan over other topics.",
+    "order": 15
+  },
+  {
+    "id": "native-runtimes",
+    "prefix": "native",
+    "name": "Native runtimes",
+    "description": "Isolates that run outside a browser worker.",
+    "order": 16
+  },
+  {
+    "id": "tauri",
+    "prefix": "tauri",
+    "name": "Tauri",
+    "description": "Isoloop inside a Tauri app.",
+    "order": 17
+  }
+]

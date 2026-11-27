@@ -11,6 +11,13 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.oxc": "explicit"
   },
+  // Editor hints for the rules registry (ADR 0026); scripts/rules/check.ts validates.
+  "json.schemas": [
+    {
+      "fileMatch": ["docs/rules/*.json", "!docs/rules/concepts.json", "!docs/rules/schema.json"],
+      "url": "./docs/rules/schema.json"
+    }
+  ],
   "[markdown]": {
     // Docs aren't formatted (.oxfmtrc.json ignores *.md).
     "editor.formatOnSave": false
