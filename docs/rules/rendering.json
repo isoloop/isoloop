@@ -1,1 +1,773 @@
-[]
+[
+  {
+    "id": "dom.own-bridge",
+    "statement": "Surfaces render through Isoloop's own bridge, `isoloop-dom@1`, with no rendering dependency.",
+    "status": "active",
+    "values": ["isoloop-dom@1"],
+    "code": ["packages/dom/src/shared/records.ts"],
+    "since": "0.1.0",
+    "related": ["dom.remote-dom", "dom.no-vdom-reconciler", "dom.dom-subset"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0010#decision",
+        "why": "The spike showed Remote DOM works but means about 7,000 adopted lines and five gaps to patch, against about 1,450 lines of our own."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.remote-dom",
+    "statement": "Shopify Remote DOM behind an internal `RenderBridge`, with records tagged `remote-dom@1`.",
+    "status": "superseded",
+    "supersededBy": "dom.own-bridge",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0006#decision",
+        "why": "It saved the hardest maintenance work at the start, confined to one module per side."
+      },
+      {
+        "type": "superseded",
+        "date": "2026-11-05",
+        "ref": "adr/0010#decision",
+        "why": "The M1 spike costed both options, and our own bridge came out smaller with no gaps to patch."
+      }
+    ]
+  },
+  {
+    "id": "dom.no-vdom-reconciler",
+    "statement": "The worker doesn't render through a virtual-DOM reconciler of Isoloop's own.",
+    "status": "rejected",
+    "related": ["dom.own-bridge"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-05",
+        "ref": "adr/0010#alternatives-considered",
+        "why": "Why not extend `legacy-vdom` and skip the worker DOM? Frameworks render into a DOM, so every adapter would need its own reconciler, which is more code than the subset."
+      }
+    ]
+  },
+  {
+    "id": "dom.dom-subset",
+    "statement": "Isolates with a surface get a DOM subset as `document` and the DOM globals: nodes and elements, tree reads and writes, attributes, `style`, synced form properties, events and the input `instanceof` classes. Headless isolates get none.",
+    "status": "active",
+    "code": ["packages/dom/src/worker/dom.ts"],
+    "since": "0.1.0",
+    "related": ["dom.grows-on-evidence", "dom.subset-additions", "dom.not-supported-throws"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0010#decision",
+        "why": "It covers exactly what the Preact and React adapters call."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.untrusted-events",
+    "statement": "`isTrusted` is always `false` in the worker, including for input the host forwards.",
+    "status": "active",
+    "code": ["packages/dom/src/worker/"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0010#decision",
+        "why": "The worker can't prove an event came from the user, so code that checks the flag must not trust forwarded input."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.records",
+    "statement": "A `patch` carries `{ fmt: 'isoloop-dom@1', batch }`, where a batch is an array of plain tuples collected per microtask: `insert`, `move`, `remove`, `text`, `attr`, `prop` and `listen`, referencing nodes by Isoloop's own ids.",
+    "status": "active",
+    "code": ["packages/dom/src/shared/records.ts"],
+    "since": "0.1.0",
+    "related": ["dom.one-record-moves", "dom.listen-records", "dom.comment-records"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0010#decision",
+        "why": "Plain tuples are cheap to copy and easy to inspect, and ids don't shift the way indexes do."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.one-record-moves",
+    "statement": "Moving an existing node is one `move` record, without re-serializing it, and the node keeps its identity on the host.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["dom.records"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0010#decision",
+        "why": "Keyed reorders stay cheap and keep focus, which the conformance suite checks."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.listen-records",
+    "statement": "Listener registration travels as `listen` records, and the host sends events back as plain event records. Functions never cross the worker boundary.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["dom.records"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0006#decision",
+        "why": "It keeps the protocol copyable, versioned and inspectable in devtools."
+      },
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0010#decision",
+        "why": "Our own bridge keeps ADR 0006's event contract."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.comment-records",
+    "statement": "An `insert` subtree can hold comment nodes, which `text` records update and which are inert on the host. A `DocumentFragment` inserts its children in order and needs no record of its own.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["dom.records"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-07",
+        "ref": "adr/0010#amended-in-m3a-2026-11-07",
+        "why": "The frameworks' DOM usage logs in M3a showed they create comments and fragments."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.fmt-exact",
+    "statement": "A visual isolate whose `ready.renderFmt` isn't exactly the host's fmt, or a headless one that doesn't report `'none'`, fails with `render_format_mismatch` and isn't restarted.",
+    "status": "active",
+    "errors": ["render_format_mismatch"],
+    "code": ["packages/host/src/kernel/kernel.ts", "packages/host/src/supervisor/machine.ts"],
+    "since": "0.1.0",
+    "related": ["dom.fmt-in-host-build"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0011#decision",
+        "why": "A restart can't change which format the isolate speaks."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.fmt-in-host-build",
+    "statement": "Both halves of the render format ship in the host app's build: the worker half comes from the app's isolate bootstrap, and an isolate module renders into the `document` it installed.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["dom.fmt-exact"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0010#decision",
+        "why": "An isolate built and hosted apart can't bring a different format, so an exact match is enough."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.fmt-bumps",
+    "statement": "The fmt changes only when the record shape does, for example to a binary encoding. A faster transport keeps `isoloop-dom@1`.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["dom.internal-package"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0011#decision",
+        "why": "The transport belongs to `runtime` and `host`; the format is what `dom` owns."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.host-applies",
+    "statement": "The host applies batches through the compositor only, and keeps `id → Node` and `Node → id` maps (`nodeFor`, `idFor`).",
+    "status": "active",
+    "code": ["packages/host/src/render/compositor.ts", "packages/host/src/render/isoloop-dom.ts"],
+    "since": "0.1.0",
+    "related": ["dom.sanitising-required"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0010#decision",
+        "why": "One place applies changes, so the frame budget and sanitising can't be skipped."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.sanitising-required",
+    "statement": "The host's applier takes a sanitising policy when a bridge is created, with no default, and every tag, attribute, URL and `prop` record goes through it.",
+    "status": "active",
+    "code": ["packages/host/src/render/registry.ts"],
+    "since": "0.1.0",
+    "related": ["dom.host-applies", "dom.style-cssom"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0011#decision",
+        "why": "The applier then can't create an element or set an attribute the host's registry didn't allow."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.host-owned-inputs",
+    "statement": "The host decides whether a `prop` record for `value` or `checked` is applied: an unforced value waits until the user leaves the input, and a forced one (`ctx.setValue(node, value, { force: true })`) applies at once with the caret at the end.",
+    "status": "active",
+    "knob": "`ctx.setValue(node, value, { force: true })`",
+    "code": ["packages/runtime/src/render/render.ts"],
+    "since": "0.1.0",
+    "related": ["dom.host-applies"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0010#decision",
+        "why": "A render from the worker mustn't overwrite what the user is typing."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-07",
+        "ref": "adr/0010#amended-in-m3a-2026-11-07",
+        "why": "An app sometimes has to clear an input the user is in, such as a note box after sending.",
+        "prev": "The host decides whether a `prop` record for `value` or `checked` is applied, and holds it while the user is in the input."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.style-cssom",
+    "statement": "The host writes a `style` attribute through the element's CSSOM (`el.style.cssText`), never `setAttribute('style', …)`, after the sanitising policy, so surfaces run under `style-src 'self'`.",
+    "status": "active",
+    "code": ["packages/dom/src/host/applier.ts"],
+    "since": "0.1.1",
+    "related": ["dom.sanitising-required"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-24",
+        "ref": "adr/0010#amended-2026-11-24-style-through-the-cssom",
+        "why": "CSP's `style-src` governs a style attribute but not CSSOM writes, so pages no longer need `'unsafe-inline'`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-24",
+        "ref": "#429",
+        "why": "Style through the CSSOM, devtools' page elements included."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-24",
+        "ref": "v0.1.1",
+        "why": "First released in 0.1.1."
+      }
+    ]
+  },
+  {
+    "id": "dom.conformance-suite",
+    "statement": "Every bridge must pass the conformance suite in `@isoloop/dom/testing` (`runBridgeConformance`), with no known gaps.",
+    "status": "active",
+    "code": ["packages/dom/src/testing/index.ts"],
+    "since": "0.1.0",
+    "related": ["dom.grows-on-evidence"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0006#decision",
+        "why": "One suite that every bridge passes makes a bridge replaceable."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-05",
+        "ref": "adr/0010#decision",
+        "why": "With our own bridge, done means the suite passes with no known gaps.",
+        "prev": "Every bridge, `legacy-vdom` and the Remote DOM bridge, runs one conformance suite in `packages/host/test`."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.grows-on-evidence",
+    "statement": "The DOM subset gains a member only when a conformance case, an adapter test or a real isolate needs it, and each addition comes with a test.",
+    "status": "active",
+    "repo": true,
+    "related": ["dom.dom-subset", "dom.conformance-suite"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0010#decision",
+        "why": "The subset stays bounded by what's used, and the suite keeps it honest."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-05",
+        "ref": "#29",
+        "why": "`@isoloop/dom`, the render bridge `isoloop-dom@1`."
+      }
+    ]
+  },
+  {
+    "id": "dom.subset-additions",
+    "statement": "The subset also has event handler properties, `select.options` and its option members, `document.head` (detached), type-only `document.querySelector`, `classList`, `dataset`, `id`, `getElementById`, `contains`, `DocumentFragment` and `Comment`.",
+    "status": "active",
+    "code": ["packages/dom/src/worker/dom.ts"],
+    "since": "0.1.0",
+    "related": ["dom.dom-subset", "dom.tolerated-missing"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-07",
+        "ref": "adr/0010#amended-in-m3a-2026-11-07",
+        "why": "The DOM usage logs and smoke tests per framework major in M3a showed Preact and React call them."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.head-not-rendered",
+    "statement": "Elements React 19 hoists into `document.head` aren't rendered. The `patch` names what landed there, and the kernel warns once in dev.",
+    "status": "active",
+    "since": "0.1.0",
+    "related": ["dom.subset-additions"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-07",
+        "ref": "adr/0010#amended-in-m3a-2026-11-07",
+        "why": "A surface has no head of its own, and a page's head isn't the isolate's to change."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.tolerated-missing",
+    "statement": "Framework reads of members the subset doesn't have, which the frameworks handle as `undefined`, are listed with their reasons in `TOLERATED_MISSING`.",
+    "status": "active",
+    "code": ["packages/dom/src/testing/index.ts"],
+    "since": "0.1.0",
+    "related": ["dom.subset-additions"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-07",
+        "ref": "adr/0010#amended-in-m3a-2026-11-07",
+        "why": "A read the framework survives is recorded, so a new one shows up as a change."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.not-supported-throws",
+    "statement": "Layout reads and other synchronous answers only the page has (`getBoundingClientRect`, `getComputedStyle`, sizes, scrolling, selection) aren't in the worker, and a missing member throws `NotSupportedError`. They stay asynchronous host calls such as `measure`, `focus` and `scrollIntoView`.",
+    "status": "active",
+    "errors": ["NotSupportedError"],
+    "code": ["packages/dom/src/worker/dom.ts"],
+    "since": "0.1.0",
+    "related": ["dom.dom-subset"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-06",
+        "ref": "adr/0010#beyond-the-frameworks",
+        "why": "The worker has no layout, and a fake value would be worse than an error."
+      },
+      {
+        "type": "clarified",
+        "date": "2026-11-16",
+        "ref": "adr/0010#amended-2026-11-16-adapters-after-01",
+        "why": "Layout reads stay out for the new adapters too, with no fake values, and the limits page lists them.",
+        "prev": "Layout reads and other synchronous answers only the page has aren't in the worker; they stay asynchronous host calls."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.frameworks",
+    "statement": "The adapters support Preact `^10 || ^11` and React `^18 || ^19`, declared as peer dependencies, as well as plain JS.",
+    "status": "active",
+    "values": ["preact ^10 || ^11", "react ^18 || ^19"],
+    "code": ["packages/react/package.json", "packages/preact/package.json"],
+    "since": "0.1.0",
+    "related": ["dom.majors-in-ci"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-06",
+        "ref": "adr/0010#frameworks-and-versions",
+        "why": "Apps bring any release of a supported major."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.majors-in-ci",
+    "statement": "CI proves each supported framework major: the catalog pins one exact version per major, the adapter tests and a DOM usage log run once per major, and Dependabot moves each pin within its major.",
+    "status": "active",
+    "repo": true,
+    "code": ["pnpm-workspace.yaml", ".github/dependabot.yml"],
+    "related": ["dom.frameworks"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-06",
+        "ref": "adr/0010#frameworks-and-versions",
+        "why": "A release that calls a member the subset lacks shows up as a red update PR, not on `main`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-07",
+        "ref": "#73",
+        "why": "The adapter packages and the per-major test matrix."
+      }
+    ]
+  },
+  {
+    "id": "dom.vue-adapter",
+    "statement": "A Vue `^3` adapter ships after 0.1, in M6 adapters.",
+    "status": "decided",
+    "target": "0.6.0",
+    "related": ["dom.svelte-adapter", "dom.solid-adapter", "dom.html-parsing"],
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-06",
+        "ref": "adr/0010#frameworks-and-versions",
+        "why": "Solid and Svelte compile markup to HTML strings, so they need HTML parsing and `cloneNode` first."
+      },
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0010#amended-2026-11-16-adapters-after-01",
+        "why": "Planned in M6 adapters: it starts with a spike, because Vue's own renderer may build on the worker's nodes without HTML parsing."
+      }
+    ]
+  },
+  {
+    "id": "dom.svelte-adapter",
+    "statement": "A Svelte `^5` adapter (runes; Svelte 4 isn't supported) ships after 0.1, in M6 adapters.",
+    "status": "decided",
+    "target": "0.7.0",
+    "related": ["dom.vue-adapter", "dom.solid-adapter", "dom.html-parsing"],
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-06",
+        "ref": "adr/0010#frameworks-and-versions",
+        "why": "Solid and Svelte compile markup to HTML strings, so they need HTML parsing and `cloneNode` first."
+      },
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0010#amended-2026-11-16-adapters-after-01",
+        "why": "Planned in M6 adapters: it comes after Vue, before Solid."
+      }
+    ]
+  },
+  {
+    "id": "dom.solid-adapter",
+    "statement": "A Solid `^1` adapter ships after 0.1, in M6 adapters.",
+    "status": "decided",
+    "target": "0.8.0",
+    "related": ["dom.vue-adapter", "dom.svelte-adapter", "dom.html-parsing"],
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-06",
+        "ref": "adr/0010#frameworks-and-versions",
+        "why": "Solid and Svelte compile markup to HTML strings, so they need HTML parsing and `cloneNode` first."
+      },
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0010#amended-2026-11-16-adapters-after-01",
+        "why": "Planned in M6 adapters: it comes after Svelte, with Solid 2 added when it ships stable."
+      }
+    ]
+  },
+  {
+    "id": "dom.html-parsing",
+    "statement": "HTML parsing (`innerHTML`, `insertAdjacentHTML`, `<template>`), `cloneNode` and `importNode` are built in the worker in M6, sending ordinary insert records with no format change.",
+    "status": "decided",
+    "target": "0.6.0",
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-06",
+        "ref": "adr/0010#beyond-the-frameworks",
+        "why": "Built when a library the dashboard picks needs it."
+      },
+      {
+        "type": "decided",
+        "date": "2026-11-16",
+        "ref": "adr/0010#amended-2026-11-16-adapters-after-01",
+        "why": "The template-compiling frameworks need them, not only libraries."
+      }
+    ]
+  },
+  {
+    "id": "dom.no-worker-custom-elements",
+    "statement": "Custom elements and Shadow DOM aren't available in the worker. An isolate can render elements the page defines, which the host creates on the real DOM through the registry.",
+    "status": "active",
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-06",
+        "ref": "adr/0010#frameworks-and-versions",
+        "why": "Defining elements needs a real DOM; the page can define them and the host creates them."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.no-angular",
+    "statement": "There's no Angular adapter.",
+    "status": "rejected",
+    "related": ["dom.frameworks"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-06",
+        "ref": "adr/0010#frameworks-and-versions",
+        "why": "Why not Angular too? It needs a real DOM at runtime."
+      }
+    ]
+  },
+  {
+    "id": "dom.package-entries",
+    "statement": "`@isoloop/dom` has three entries, `/worker`, `/host` and `/testing`, and no root entry. Canvas and other output that isn't DOM don't belong in it.",
+    "status": "active",
+    "code": ["packages/dom/package.json"],
+    "since": "0.1.0",
+    "related": ["dom.internal-package"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0011#decision",
+        "why": "The name says it's a DOM bridge, and each side imports only its half."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.no-runtime-deps",
+    "statement": "`@isoloop/dom` has no runtime dependencies, not even `protocol`. Node ids are plain numbers it defines, and `/testing` has an optional peer on Vitest.",
+    "status": "active",
+    "code": ["packages/dom/package.json"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0011#decision",
+        "why": "The format has no reason to depend on the rest of the runtime."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.owns-format",
+    "statement": "`dom` owns the record types and `ISOLOOP_DOM_FMT`, exported from both `/worker` and `/host`. `protocol` keeps `patch.batch: unknown`.",
+    "status": "active",
+    "code": ["packages/dom/src/shared/records.ts"],
+    "since": "0.1.0",
+    "related": ["dom.records"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0011#decision",
+        "why": "The format changes in one package, and `protocol` never learns its shape."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.internal-package",
+    "statement": "`@isoloop/dom` is on npm because `runtime` and `host` depend on it, but it's documented as internal: apps and adapters never import it, and its API carries no promise beyond the fmt version.",
+    "status": "active",
+    "code": ["packages/dom/README.md"],
+    "since": "0.1.0",
+    "related": ["dom.fmt-bumps"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-05",
+        "ref": "adr/0011#decision",
+        "why": "A breaking record change bumps the fmt, so the package's own API needn't be frozen."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "dom.legacy-vdom-removed",
+    "statement": "The `legacy-vdom` bridge, the proof of concept's renderer kept as a fallback.",
+    "status": "withdrawn",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-03",
+        "ref": "adr/0006#decision",
+        "why": "A fallback if Remote DOM blocked progress, and a benchmark baseline."
+      },
+      {
+        "type": "withdrawn",
+        "date": "2026-11-05",
+        "ref": "adr/0011#decision",
+        "why": "Deleted in the M1 cleanup once four-loops moved to the new bridge; benches compare against plain DOM instead."
+      }
+    ]
+  }
+]

@@ -34,6 +34,8 @@ This ADR records the whole scheme, so each release follows it rather than decidi
 
 The host ↔ worker protocol (`PROTOCOL { v, min }`) is none of these. Both ends ship in one build, so it may change in any release (ADR 0012, decision 2).
 
+Rules: `ver.one-version`, `ver.app-versions`, `ver.protocol-unversioned`
+
 ### 2. The road to 1.0
 
 ```
@@ -49,6 +51,8 @@ The host ↔ worker protocol (`PROTOCOL { v, min }`) is none of these. Both ends
 - **Previews** are Changesets pre mode `next`: `pnpm changeset pre enter next` after a release, and `pre exit` before the next one. While in pre mode, every version PR moves only the counter (`-next.N`), whatever the changesets' bump types.
 - **dist-tags:** `next` points to the latest preview, and `latest` to the latest release. `latest` stays on the `0.0.0` placeholder until 0.1.0.
 
+Rules: `ver.previews`, `ver.pre-mode-counter`
+
 ### 3. What a minor and a patch may contain on 0.x
 
 - **A minor** may contain anything: breaking changes, and anything added to the isolate seam (`IsolateContext`, `defineIsolate`, the DOM subset, the adapter hooks).
@@ -57,11 +61,15 @@ The host ↔ worker protocol (`PROTOCOL { v, min }`) is none of these. Both ends
 - **The seam still only grows** between floor changes, on 0.x too (ADR 0012, decision 2). "Anything breaking" in a minor means the host API and `KernelConfig`, not the seam.
 - From 1.0, plain semver: a major breaks, a minor adds (the seam included, since the check then compares majors), and a patch fixes.
 
+Rules: `ver.minor-on-0x`, `ver.patch-on-0x`, `ver.semver-from-1`
+
 ### 4. `@experimental`
 
 - **An `@experimental` API may change or be removed in any minor,** before 1.0 and after it. Today that covers groups, request/response, `kernel.request`, tools on contracts, `kernel.inspect()`, `@isoloop/webmcp` and `@isoloop/balancer`.
 - **It must be visible.** Each one is marked `@experimental` in its TSDoc and listed on one docs page, and a change to it is called out in the changelog.
 - **Leaving `@experimental`** is a decision recorded in that API's ADR. After that it follows decision 3.
+
+Rules: `ver.experimental`, `ver.experimental-marked`, `ver.experimental-exit`
 
 ### 5. Patches during a preview cycle
 
@@ -75,6 +83,8 @@ Pre mode applies to the whole repo, so while `main` previews `0.2.0-next.N`, it 
 - **The branch lives until the next minor ships (amended 2026-11-23).** One such branch exists at a time. It's deleted when `0.2.0` is `latest`, and its tags stay. It is never merged back into `main`.
 - **A patch to an older line isn't made (amended 2026-11-22, restated 2026-11-23).** Once `0.2.0` is `latest`, a `0.1.x` must not take that dist-tag back, so the release workflow refuses it. Decision 9 says why.
 - **The branch is created only when needed.** Most cycles won't need one.
+
+Rules: `ver.patch-branch`, `ver.fix-main-first`, `ver.small-backports`, `ver.release-branch-admitted`, `ver.release-branch-lifetime`, `ver.no-older-line-patch`
 
 ### 6. Tags and GitHub Releases
 
@@ -123,15 +133,21 @@ The rehearsal is also where these are found out, since npm's docs don't say or w
 - whether a version can be staged again after a reject (if not, a failed stage means the next version);
 - whether the approval page shows the shasum to compare.
 
+Rules: `ver.tag-per-version`, `ver.github-releases`, `ver.release-workflow`, `ver.stage-approve-finish`, `ver.approval-order`, `ver.stage-only-trust`, `ver.pages-by-hand`
+
 ### 7. Guards in CI
 
 - **No accidental 1.0.** The changeset check fails on any changeset that asks for a `major` bump while the version is below 1.0.0, unless the PR has the `release-1.0` label. The maintainer adds that label when 1.0's previews are to start. On 0.x a breaking change is a minor (decision 3).
 - **Version PRs pass on their own.** A PR whose diff only consumes changesets (the changeset files, `.changeset/pre/`, the `version` fields and the `CHANGELOG.md`s) passes the changeset check without the `no-changeset` label. The check reads the diff, not the branch name.
 - **The release workflow refuses mixed versions** (#221's rule for previews, extended to releases on 2026-11-22). It stages only if every package shares one version: a `-next.N` in pre mode, or a plain `x.y.z` out of it.
 
+Rules: `ver.no-major-below-1`, `ver.version-pr-passes`, `ver.no-mixed-versions`
+
 ### 8. The versions before this ADR
 
 Once `isoloop/web` has moved to `0.1.0-next.0`, every `0.0.0*` version of each `@isoloop/*` package is deprecated on npm: the `0.0.0-next.<sha>` builds, `0.0.0-stage`, and the `0.0.0` placeholder that `latest` points to. The message is "Pre-release builds; install @isoloop/<pkg>@next until 0.1.0". The maintainer runs `npm deprecate`, since it needs their npm login. The versions aren't unpublished: that would break old lockfiles, and npm limits it anyway.
+
+Rules: `ver.old-versions-deprecated`
 
 ### 9. What is supported (amended 2026-11-23)
 
@@ -146,6 +162,8 @@ Grilled 2026-11-23, Q1–Q13, yes to all.
 - **0.x only.** At 1.0 the policy is decided again, since a previous-minor window may be expected then.
 - **Apps and the site (web repo) are outside it.** They deploy from `main` on a fresh tag, with no branches and no backports.
 
+Rules: `ver.latest-only`, `ver.security-advisory`, `ver.deprecate-known-bug`, `ver.breaking-listed`
+
 ### 10. A breaking change ships with a codemod (amended 2026-11-24)
 
 Decided for the 0.1.1 plan (decision 12, [#427](https://github.com/isoloop/isoloop/issues/427)), from the web repo's move to 0.1.0, where each API change meant migrating the apps by hand.
@@ -159,6 +177,8 @@ Decided for the 0.1.1 plan (decision 12, [#427](https://github.com/isoloop/isolo
 - **The parser.** Codemods parse TypeScript and JSX with `oxc-parser`, from the same project as the repo's oxlint and oxfmt, and rewrite by text edits at its source positions, so a user's formatting is kept and no printer is needed. It sits behind our own `parse` and `edit` interface, with conformance tests, so it can be swapped. TypeScript 7's own API is the expected replacement once it's stable; 7.0.2 exposes it only as `typescript/unstable/*`.
 - **Proved on real apps.** The web repo's plant-bench runs the codemods on every run branch that needs them. A codemod that fails there blocks the release.
 - **When.** The command, the gate and the parser interface are built in 0.2, before the first breaking change lands on `main`. Nothing changes in 0.1.x, which has no breaking changes (decision 3).
+
+Rules: `ver.codemod-rule`, `ver.codemod-gate`, `ver.migrate-command`, `ver.migrate-comments`, `ver.codemod-parser`, `ver.experimental-codemods`, `ver.codemods-on-real-apps`
 
 ## Consequences
 
@@ -196,3 +216,6 @@ Decided for the 0.1.1 plan (decision 12, [#427](https://github.com/isoloop/isolo
 - **Skipping packages that are already staged** on a re-run (amendment of 2026-11-22). Rejected: the job can't list staged versions, so it can't tell whether one is its own tarball.
 - **Deploying Pages with each release** (decided 2026-11-07, dropped 2026-11-22). The redirect doesn't change with a release, and the `github-pages` environment refuses deploys from tags.
 - **Generated notes for 0.1.0's GitHub Release** (amendment of 2026-11-22). Rejected: they'd repeat the preview cycle's changesets as the first release anyone reads.
+
+Rules: `ver.no-standing-branches`, `ver.no-support-window`, `ver.no-direct-publish`, `ver.no-tag-first`, `ver.no-cli-approval`
+

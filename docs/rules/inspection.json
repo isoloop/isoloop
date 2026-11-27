@@ -1,1 +1,666 @@
-[]
+[
+  {
+    "id": "insp.kernel-inspect",
+    "statement": "`kernel.inspect()` returns an `Inspector` with `snapshot()`, `on()`, `tap()`, `records()` and `close()`. It reads the kernel's existing events and getters, and every open inspector shares one feed.",
+    "status": "active",
+    "experimental": true,
+    "knob": "`kernel.inspect()`",
+    "code": ["packages/host/src/inspect/inspect.ts"],
+    "since": "0.1.0",
+    "related": ["insp.one-format"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#1-kernelinspect-returns-an-inspector",
+        "why": "Each reader would otherwise build its own snapshot and message format."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#247",
+        "why": "The inspection feed, M4b task 2."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.one-format",
+    "statement": "Every inspection message is plain, structured-cloneable data, the same whether it reaches the host, an isolate over the `inspect` port, or the dev MCP's WebSocket.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/protocol/src/"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#1-kernelinspect-returns-an-inspector",
+        "why": "One format for every reader: the panel, the dev MCP and a later extension."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#247",
+        "why": "M4b task 2."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.snapshot",
+    "statement": "`snapshot()` gives the isolates as `kernel.isolates()` has them, the pools as `kernel.pools()` has them, the bus's state, restart count and last `bus:metrics`, and the recent events.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/host/src/inspect/inspect.ts"],
+    "since": "0.1.0",
+    "related": ["insp.recent-events"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#2-what-the-feed-carries",
+        "why": "A reader starts from the current state, then follows events."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#247",
+        "why": "M4b task 2."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.event-coalescing",
+    "statement": "After the snapshot, `on` delivers isolate state, crashes, supervisor events, `bus:*` lifecycle events, `workers:budget` and `agents:unmatched` at once. Beats per isolate and `bus:metrics` are coalesced to about one a second.",
+    "status": "active",
+    "experimental": true,
+    "values": ["~1 per second"],
+    "code": ["packages/host/src/inspect/inspect.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#2-what-the-feed-carries",
+        "why": "Beats and metrics arrive too often to draw each one."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#247",
+        "why": "M4b task 2."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.metrics-head-retained",
+    "statement": "`BusMetrics` carries each topic's head offset and retained record count.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/protocol/src/messages/control.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#2-what-the-feed-carries",
+        "why": "The panel's bus view shows how far each topic has gone and how much it keeps."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#248",
+        "why": "Head and retained count, M4b task 3."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.tap",
+    "statement": "`tap({ topics, maxPerSec })` copies matching records onto a dedicated port as they're appended, capped at `maxPerSec`. A tap isn't a consumer: it has no cursor, credit or commits, and it doesn't appear in `bus:metrics`. The kernel reopens it after a bus restart.",
+    "status": "active",
+    "experimental": true,
+    "values": ["default 50/s"],
+    "code": [
+      "packages/bus/src/server/tap.ts",
+      "packages/host/src/inspect/inspect.ts",
+      "packages/protocol/src/messages/control.ts"
+    ],
+    "since": "0.1.0",
+    "related": ["insp.tap-skipped"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#3-records-a-tap-and-a-read-outside-the-consumer-figures",
+        "why": "A host subscription counts as a consumer and takes part in credit, so the devtools would change what they measure."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#248",
+        "why": "The tap and read, M4b task 3."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.tap-skipped",
+    "statement": "Records over a tap's `maxPerSec` are counted as skipped, not queued, and the count reaches the reader through `onSkipped(count)` at most once a second, on the host's and the isolate's inspector.",
+    "status": "active",
+    "experimental": true,
+    "knob": "`tap({ onSkipped })`",
+    "code": ["packages/host/src/inspect/inspect.ts", "packages/runtime/src/isolate/inspector.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#3-records-a-tap-and-a-read-outside-the-consumer-figures",
+        "why": "A tap must never build a backlog."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-19",
+        "ref": "adr/0020#6-the-inspect-grant-and-its-port",
+        "why": "The isolate side dropped the counts, so a reader couldn't tell a quiet topic from one over the cap.",
+        "prev": "Records over the cap are counted as skipped, not queued."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-19",
+        "ref": "#276",
+        "why": "`onSkipped`, the ADR 0020 amendment."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.records-read",
+    "statement": "`records(topic, { last })` returns the last `last` records still retained, at most 100.",
+    "status": "active",
+    "experimental": true,
+    "values": ["at most 100"],
+    "code": ["packages/protocol/src/messages/control.ts", "packages/host/src/inspect/inspect.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#3-records-a-tap-and-a-read-outside-the-consumer-figures",
+        "why": "It serves the dev MCP's `isoloop_records` and a log opened on a quiet topic."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#248",
+        "why": "M4b task 3."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.value-previews",
+    "statement": "In a tap and a read, each record's value is a text preview cut to 2,048 characters, with the value's estimated size in bytes.",
+    "status": "active",
+    "experimental": true,
+    "values": ["2,048 characters"],
+    "code": ["packages/protocol/src/messages/control.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#3-records-a-tap-and-a-read-outside-the-consumer-figures",
+        "why": "A devtools view never holds a large record twice."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#248",
+        "why": "M4b task 3."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.memory-from-host",
+    "statement": "Memory per isolate comes from the host's `performance.measureUserAgentSpecificMemory()`, called while a reader listens, at most every 5 s, and only when the page is cross-origin isolated. Elsewhere, and in Firefox and Safari, there's no figure.",
+    "status": "active",
+    "experimental": true,
+    "values": ["at most every 5 s", "Chromium, cross-origin isolated"],
+    "code": ["packages/host/src/inspect/memory.ts"],
+    "since": "0.1.0",
+    "related": ["insp.worker-url-fragment"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#4-block-in-the-runtime-and-memory-measured-by-the-host",
+        "why": "Memory per isolate is what a developer reaches for when a dashboard feels heavy."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-18",
+        "ref": "adr/0020#4-block-in-the-runtime-and-memory-measured-by-the-host",
+        "why": "Chromium has `performance.memory` only on the main thread, not in workers (#251).",
+        "prev": "Each isolate's beat carries `heapBytes` from `performance.memory`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#259",
+        "why": "Memory per isolate, M4b task 5b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.worker-url-fragment",
+    "statement": "The kernel adds `#isoloop-worker=N` to each worker started from the `@isoloop/runtime/worker` entry, so memory can be attributed by URL. Workers that share a URL get no figure, and pool members share their worker's.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/host/src/kernel/loader.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#4-block-in-the-runtime-and-memory-measured-by-the-host",
+        "why": "Every isolate starts from the same bootstrap URL; a fragment on the bootstrap itself evaluated it twice."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#259",
+        "why": "M4b task 5b."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.block",
+    "statement": "`block { ms }` makes an isolate's worker busy-loop for `ms`, capped at 10 s. Only the `inspect` port and the host's `Inspector` can send it, and on a pooled isolate it blocks the whole worker.",
+    "status": "active",
+    "experimental": true,
+    "values": ["at most 10 000 ms"],
+    "code": ["packages/runtime/src/bootstrap.ts", "packages/protocol/src/messages/isolate.ts"],
+    "since": "0.1.0",
+    "related": ["insp.no-block-as-suspend"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#4-block-in-the-runtime-and-memory-measured-by-the-host",
+        "why": "A developer can watch containment work: the heartbeat goes late, the supervisor acts, the page keeps running."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#251",
+        "why": "`block { ms }`, M4b task 4."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.recent-events",
+    "statement": "The kernel keeps a ring buffer of the last 200 supervisor and bus events from the moment it starts, inspected or not, and `snapshot()` includes it.",
+    "status": "active",
+    "experimental": true,
+    "values": ["200 events"],
+    "code": ["packages/host/src/inspect/inspect.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#5-recent-events-kept-from-the-start",
+        "why": "A reader that connects after a crash still sees the crash; that's the first thing an agent asks about."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#247",
+        "why": "M4b task 2."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.inspect-grant",
+    "statement": "`grants.inspect: true` gives an isolate the inspection feed and its controls. Spawning an isolate with it into a pool fails with `invalid_config`.",
+    "status": "active",
+    "experimental": true,
+    "knob": "manifest `grants.inspect`",
+    "errors": ["invalid_config"],
+    "code": ["packages/host/src/kernel/kernel.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#6-the-inspect-grant-and-its-port",
+        "why": "A pool merges its members' grants, so the capability would reach every member."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#255",
+        "why": "The inspect grant, M4b task 5."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.inspect-port",
+    "statement": "The `inspect` port goes from the host to the isolate on the isolate's own channel, never through the bus, so it keeps working while the bus restarts and never counts in the bus figures.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/host/src/kernel/kernel.ts", "packages/runtime/src/isolate/inspector.ts"],
+    "since": "0.1.0",
+    "related": ["insp.no-feed-on-bus"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#6-the-inspect-grant-and-its-port",
+        "why": "The panel must keep working while the bus restarts."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#255",
+        "why": "M4b task 5."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.controls",
+    "statement": "The inspector carries `restart(id)`, `kill(id)` and `block(id, ms)`, on the host's `Inspector` and on `ctx.inspector`. `kill` ends the isolate's worker as a crash. The controls reject after `close()`, and nothing gates them in production.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/host/src/inspect/inspect.ts", "packages/runtime/src/isolate/inspector.ts"],
+    "since": "0.1.0",
+    "related": ["insp.no-control-grant"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#6-the-inspect-grant-and-its-port",
+        "why": "Mounting the devtools is the app's choice, and any page code can already busy-loop or crash an isolate."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-18",
+        "ref": "adr/0020#6-the-inspect-grant-and-its-port",
+        "why": "The dev MCP's page side needed to kill and block from the host.",
+        "prev": "The `inspect` port carries restart, kill and block."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#255",
+        "why": "M4b task 5."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.ctx-inspector",
+    "statement": "`ctx.inspector` is defined only when the isolate holds `inspect: true`, and `undefined` otherwise. It mirrors the host's `Inspector`, with every call that crosses the port asynchronous.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/runtime/src/isolate/inspector.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#6-the-inspect-grant-and-its-port",
+        "why": "A panel checks once at start, and one optional object reads better than methods spread across `ctx.host`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#255",
+        "why": "M4b task 5."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.additive-format",
+    "statement": "`InspectMessage`, `InspectSnapshot` and the port's control messages live in `@isoloop/protocol` with a `v`, and only grow. Readers ignore what they don't know.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/protocol/src/"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#7-a-versioned-additive-message-format",
+        "why": "An older panel, dev MCP or extension keeps working against a newer kernel."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-18",
+        "ref": "#247",
+        "why": "M4b task 2."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.devtools-panel",
+    "statement": "`connectDevtools(kernel, options)` from `@isoloop/devtools` spawns the panel as a visual isolate with the `inspect` grant, in its own worker. Importing it is the opt-in, production builds included.",
+    "status": "active",
+    "experimental": true,
+    "knob": "`connectDevtools`",
+    "code": ["packages/devtools/src/index.ts"],
+    "since": "0.1.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-18",
+        "ref": "adr/0020#6-the-inspect-grant-and-its-port",
+        "why": "A devtools crash or hang never touches the app, and the panel restarts like any isolate."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-19",
+        "ref": "#265",
+        "why": "`@isoloop/devtools` and the panel isolate, M4b task 7."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.devtools-skipped-header",
+    "statement": "The devtools panel's Messages tab header shows a tap's cap and the records skipped since the tab opened, as `50/s cap · N skipped`.",
+    "status": "active",
+    "experimental": true,
+    "code": ["packages/devtools/src/views/messages-view.tsx"],
+    "since": "0.1.0",
+    "related": ["insp.tap-skipped"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-19",
+        "ref": "adr/0020#6-the-inspect-grant-and-its-port",
+        "why": "A reader must be able to tell a quiet topic from one over the cap."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-19",
+        "ref": "#276",
+        "why": "`onSkipped`."
+      },
+      {
+        "type": "clarified",
+        "date": "2026-11-20",
+        "ref": "adr/0020#6-the-inspect-grant-and-its-port",
+        "why": "The Log tab was renamed Messages (#328).",
+        "prev": "The Log tab's header shows the cap and the total skipped."
+      },
+      {
+        "type": "shipped",
+        "date": "2026-11-23",
+        "ref": "v0.1.0",
+        "why": "First released in 0.1.0."
+      }
+    ]
+  },
+  {
+    "id": "insp.no-host-subscription",
+    "statement": "The inspection feed doesn't read records through a host subscription.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-18",
+        "ref": "adr/0020#alternatives-considered",
+        "why": "Why not subscribe from the host like any consumer? It counts as a consumer in the bus figures and takes part in credit, so the devtools would change what they measure."
+      }
+    ]
+  },
+  {
+    "id": "insp.no-feed-on-bus",
+    "statement": "The inspection feed doesn't travel over bus topics such as `isoloop.inspect.*`.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-18",
+        "ref": "adr/0020#alternatives-considered",
+        "why": "Why not publish the feed on the bus? It would stop when the bus restarts, which is when it's most needed, and add to the bus figures."
+      }
+    ]
+  },
+  {
+    "id": "insp.no-control-grant",
+    "statement": "There's no separate grant for kill, block and restart.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-18",
+        "ref": "adr/0020#alternatives-considered",
+        "why": "Why not gate the controls apart from reading? The app chose to mount the devtools, and two grants for one panel add nothing."
+      }
+    ]
+  },
+  {
+    "id": "insp.no-block-as-suspend",
+    "statement": "`block` doesn't suspend delivery; it's a real busy loop.",
+    "status": "rejected",
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-18",
+        "ref": "adr/0020#alternatives-considered",
+        "why": "Why not pause the isolate instead? That shows something else; the point is to watch containment handle a real busy loop."
+      }
+    ]
+  }
+]

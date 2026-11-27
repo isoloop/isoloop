@@ -45,6 +45,8 @@ inspector.close();
 - **Every message is plain, structured-cloneable data.** The same `InspectMessage`s go to an isolate over the `inspect` port (decision 6) and over the dev MCP's WebSocket, so there is one format for every reader.
 - **One feed underneath,** however many inspectors are open. Each inspector filters nothing; a reader shows what it wants.
 
+Rules: `insp.kernel-inspect`, `insp.one-format`
+
 ### 2. What the feed carries
 
 `snapshot()` gives:
@@ -61,12 +63,16 @@ After it, `on` delivers events:
 
 `BusMetrics` gains, per topic, the head offset and the retained record count. Both are additions to the control port.
 
+Rules: `insp.snapshot`, `insp.event-coalescing`, `insp.metrics-head-retained`
+
 ### 3. Records: a tap and a read, outside the consumer figures
 
 - **`tap({ topics, maxPerSec })`** sends a new `HostToBus` `tap` with a dedicated port. The bus copies matching records onto it as they're appended, capped at `maxPerSec` (default 50); the rest are counted as skipped, not queued. A tap isn't a consumer: it has no cursor, no credit and no commits, and it doesn't appear in the subscriptions of `bus:metrics`. It runs only while open. After a bus restart the kernel opens it again.
 - **`records(topic, { last })`** sends a new `HostToBus` `read` and returns the last `last` records still retained, capped at 100. It serves the dev MCP's `isoloop_records` and a log that opens on a quiet topic.
 - **Values are previews.** Each record's value is cut to a 2 KB preview, with its full size given, in both the tap and the read. A devtools view never holds a large record twice.
 - **Both are gated by inspect access:** an `Inspector` on the host, or the `inspect` port.
+
+Rules: `insp.tap`, `insp.tap-skipped`, `insp.records-read`, `insp.value-previews`
 
 ### 4. Block in the runtime, and memory measured by the host
 
@@ -78,9 +84,13 @@ After it, `on` delivers events:
   - `@isoloop/vite`'s existing `crossOriginIsolated: true` (added for `SharedArrayBuffer`; this ADR first named it `crossOriginIsolation` as if new) makes its dev and preview servers send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, so the figure works during development. It stays off by default, because COEP blocks third-party resources that don't opt in.
 - **Block:** a new runtime message, `block { ms }`, makes the isolate's worker busy-loop for `ms`, capped at 10 s, so a developer can watch containment work: the heartbeat goes late, the supervisor acts, the page keeps running. Only the `inspect` port (decision 6) and an `Inspector` on the host can send it. For a pooled isolate it blocks the whole worker, as a real busy loop would.
 
+Rules: `insp.memory-from-host`, `insp.worker-url-fragment`, `insp.block`
+
 ### 5. Recent events, kept from the start
 
 The kernel keeps a ring buffer of the last 200 supervisor and bus events from the moment it starts, inspected or not, and `snapshot()` includes it. A reader that connects after a crash still sees the crash; that's the first thing an agent asks about. It's the one cost this ADR adds before anything inspects: a small, fixed-size buffer of 200 events, not yet measured (task 6 measures it with the feed).
+
+Rules: `insp.recent-events`
 
 ### 6. The `inspect` grant and its port
 
@@ -118,9 +128,13 @@ kernel.spawn({ id: 'devtools', url, grants: { publish: [], subscribe: [], inspec
 
 - **Skipped records reach the reader (amended 2026-11-19).** The host's `Inspector.tap` and `ctx.inspector.tap` both take `onSkipped?: (count: number) => void`, `@experimental`. It's called with each count of records the bus left out over `maxPerSec` (decision 3), the `skipped` messages the tap's port already carries, at most one a second. Before, the isolate side dropped them, so a reader couldn't tell a quiet topic from one over the cap. Readers that pass nothing see no change. The devtools panel's Messages header (the Log tab, until it was renamed on 2026-11-20) shows the cap and the total skipped since the tab was opened (`50/s cap · N skipped`), starting again from zero when it's reopened.
 
+Rules: `insp.tap-skipped`, `insp.inspect-grant`, `insp.inspect-port`, `insp.controls`, `insp.ctx-inspector`, `insp.devtools-panel`, `insp.devtools-skipped-header`
+
 ### 7. A versioned, additive message format
 
 `InspectMessage`, `InspectSnapshot` and the port's control messages are types in `@isoloop/protocol`, in the usual envelope with `v`. They only grow: new fields and new messages are additions, and readers ignore what they don't know. An older panel, dev MCP or extension keeps working against a newer kernel.
+
+Rules: `insp.additive-format`
 
 ## Consequences
 

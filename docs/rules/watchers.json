@@ -1,1 +1,840 @@
-[]
+[
+  {
+    "id": "watch.current-value",
+    "statement": "A watcher gets the current value per key, never the stream: a snapshot when it starts, then only the keys that changed. When several values arrive for a key between two views, only the newest is sent.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/bus/src/broker/watch.ts"],
+    "target": "0.2.0",
+    "related": ["watch.use-topic-unchanged", "watch.key-clears", "watch.bus-watch"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#semantics",
+        "why": "Most widgets show the current value, and with `useTopic` every record still crosses to the isolate and is committed, including the ones no render shows."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.use-topic-unchanged",
+    "statement": "`useTopic` stays a stream with the same options and result; `useWatch` sits beside it, with no break and no codemod.",
+    "status": "decided",
+    "target": "0.2.0",
+    "related": ["watch.use-watch", "watch.use-topic-not-watcher"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#semantics",
+        "why": "Moving `useTopic` onto a watcher is decided when watchers go stable, not on `@experimental` machinery."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#480",
+        "why": "useWatch beside useTopic."
+      }
+    ]
+  },
+  {
+    "id": "watch.null-key",
+    "statement": "Records with no key share one key, `null`. On a topic without keys, that key holds the newest value.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/bus/src/broker/watch.ts"],
+    "target": "0.2.0",
+    "related": ["watch.current-value"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#semantics",
+        "why": "It gives a topic without keys what `useTopic` gives today."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.key-clears",
+    "statement": "A key leaves the view when retention removes its newest record. On a compacted topic a key's newest record stays, so its key stays. On a quiet bus a watcher holds the same value per key as a stream reader that started from `earliest`.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/bus/src/broker/watch.ts"],
+    "target": "0.2.0",
+    "related": ["watch.key-kept-after-retention", "watch.version-pointers"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#semantics",
+        "why": "Keeping a key after retention removed it would show values a replay can't, and the equivalence with a replay would need exceptions."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#486",
+        "why": "The equivalence property across retention, restarts and wakes."
+      }
+    ]
+  },
+  {
+    "id": "watch.values-not-frozen",
+    "statement": "A watcher's values go through the same codec and checks as a delivered record, and aren't frozen; treat them as read-only.",
+    "status": "decided",
+    "experimental": true,
+    "target": "0.2.0",
+    "related": ["watch.current-value"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#semantics",
+        "why": "Freezing costs time on every value."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.bus-watch",
+    "statement": "`ctx.bus.watch(topic, onView, { keys? })` calls `onView(view, changed)` with the whole map and the keys added, updated or cleared, and returns `unwatch()`. It has no `from`, no group, no `onGap` and nothing to commit.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/runtime/src/bus/bus-client.ts", "packages/protocol/src/topics/watches.ts"],
+    "target": "0.2.0",
+    "related": ["watch.current-value", "watch.kernel-watch", "watch.many-watches"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#the-api",
+        "why": "A watcher starts from a snapshot, never joins a consumer group and has nothing to commit."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#478",
+        "why": "ctx.bus.watch, the current value per key."
+      }
+    ]
+  },
+  {
+    "id": "watch.use-watch",
+    "statement": "`useWatch(topic)` returns the map of current values, empty before the first view; `useWatch(topic, { key })` returns that key's value or `undefined`. It reads through the same external store as `useTopic`, so concurrent renders never tear.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/react/src/hooks/watch.ts", "packages/preact/src/hooks/shared-topic.ts"],
+    "target": "0.2.0",
+    "related": ["watch.use-watch-shared", "watch.use-topic-unchanged"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#the-api",
+        "why": "React and Preact components get the current value with the same tearing guarantee as `useTopic`."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-27",
+        "ref": "adr/0023#the-api",
+        "why": "Every caller would need a check if the map were `undefined` before the first view.",
+        "prev": "The return value before the first view was not specified."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#480",
+        "why": "useWatch in React and Preact."
+      }
+    ]
+  },
+  {
+    "id": "watch.use-watch-shared",
+    "statement": "Components that call `useWatch` on one topic and one key, or all with no key, share one watch entry, so a component that mounts later renders the current view at once.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/react/src/hooks/shared-topic.ts"],
+    "target": "0.2.0",
+    "related": ["watch.use-watch", "watch.many-watches"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0023#the-api",
+        "why": "With one runtime watch per component, a later component would start empty and wait for the bus."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#480",
+        "why": "useWatch in React and Preact."
+      }
+    ]
+  },
+  {
+    "id": "watch.skips-values-docs",
+    "statement": "The first line of the TSDoc of `bus.watch` and `useWatch` says a watcher skips values, and the guide opens by sending code that needs history, sums or counts to `subscribe`.",
+    "status": "decided",
+    "experimental": true,
+    "target": "0.2.0",
+    "related": ["watch.current-value"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#the-api",
+        "why": "Code that needs every value could pick a watcher by mistake and lose values with no error."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#487",
+        "why": "The watchers guide."
+      }
+    ]
+  },
+  {
+    "id": "watch.subscribe-grant",
+    "statement": "A watch needs the subscribe grant for its topic; a refused watch fails the way a refused `subscribe` does.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "target": "0.2.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#the-api",
+        "why": "A watcher is a reader, so no new grant is needed."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.many-watches",
+    "statement": "An isolate may have any number of watches on a topic; the client runs them over one bus watch per topic per port, with the union of their keys, and each `onView` gets only its own keys. Watches and subscriptions on a topic are independent.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/protocol/src/topics/watches.ts", "packages/runtime/src/bus/bus-client.ts"],
+    "target": "0.2.0",
+    "related": ["watch.use-watch-shared", "watch.host-shares"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#the-api",
+        "why": "Two components on one topic both get values, which `useTopic` doesn't allow."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#478",
+        "why": "ctx.bus.watch, the current value per key."
+      }
+    ]
+  },
+  {
+    "id": "watch.wide-watch-warning",
+    "statement": "With the kernel's `dev: true`, the bus warns once in the console when an unfiltered watch holds more than 1,000 keys.",
+    "status": "decided",
+    "experimental": true,
+    "values": ["1,000 keys"],
+    "knob": "`KernelConfig.dev`",
+    "code": ["packages/bus/src/broker/watch.ts"],
+    "target": "0.2.0",
+    "related": ["watch.fixed-constants"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#the-api",
+        "why": "An unfiltered watch on a wide topic holds an entry for every retained key."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.wire-messages",
+    "statement": "Watches add `watch`, `view` and `unwatch` messages and a `seen` field on `commits` to the bus port. `PROTOCOL` stays `{ v: 1, min: 1 }`.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/protocol/src/messages/control.ts"],
+    "target": "0.2.0",
+    "related": ["watch.snapshot-parts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#on-the-bus-port",
+        "why": "Both ends of the bus port come from one build, and the additions are new message types and an optional field."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-27",
+        "ref": "adr/0023#on-the-bus-port",
+        "why": "Every part of a snapshot but the last carries `more: true`, so the client never needs the part size.",
+        "prev": "`view { topic, vseq, values, cleared? }`, with no marker for the last part of a snapshot."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#475",
+        "why": "Watch, view and unwatch messages, and commits.seen."
+      }
+    ]
+  },
+  {
+    "id": "watch.new-watch-drops-seen",
+    "statement": "Before it sends a new `watch` on a topic, the client drops that topic's unsent `seen`, and the bus ignores a `seen` above the last view number it sent.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/protocol/src/topics/watches.ts", "packages/bus/src/broker/watch.ts"],
+    "target": "0.2.0",
+    "related": ["watch.replaced-watch-views"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0023#on-the-bus-port",
+        "why": "View numbers start again at 1 with each watch, so a late `seen` from the old watch could confirm the wrong view."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#478",
+        "why": "ctx.bus.watch, the current value per key."
+      }
+    ]
+  },
+  {
+    "id": "watch.replaced-watch-views",
+    "statement": "A view that arrives while a newer `watch` on its topic is still unanswered belongs to the replaced watch: its values are applied, but it gets no `seen`.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/protocol/src/topics/watches.ts"],
+    "target": "0.2.0",
+    "related": ["watch.new-watch-drops-seen"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-27",
+        "ref": "adr/0023#on-the-bus-port",
+        "why": "Ordered delivery and a first view for every `watch` tell the views apart, with no extra field on every view."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#478",
+        "why": "ctx.bus.watch, the current value per key."
+      }
+    ]
+  },
+  {
+    "id": "watch.no-work-on-append",
+    "statement": "An append doesn't touch any watch's state; the bus only notes that the topic has news for watches with no view in flight.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/bus/src/broker/watch.ts"],
+    "target": "0.2.0",
+    "related": ["watch.view-built-when-sent", "watch.no-slots-on-append"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#in-the-bus-worker",
+        "why": "The append path carries every publisher, and a watcher must not slow it."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.view-built-when-sent",
+    "statement": "The bus builds a view when it sends it, reading the log from the watch's last sent offset to the tail and keeping the newest record per watched key.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/bus/src/broker/watch.ts"],
+    "target": "0.2.0",
+    "related": ["watch.no-work-on-append"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#in-the-bus-worker",
+        "why": "A burst costs one read of its records, and values that arrived while a view was in flight are in that range."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.version-pointers",
+    "statement": "For each watch, the bus keeps the version it last sent per key as pointers into the log, with no copied values. They decide clears and reattach.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/bus/src/broker/watch.ts"],
+    "target": "0.2.0",
+    "related": ["watch.key-clears", "watch.reattach-have"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#in-the-bus-worker",
+        "why": "A second copy of every watched value in the bus worker would cost memory for nothing."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.one-view-in-flight",
+    "statement": "At most one view is in flight per watch: the bus sends the next only after the `seen` for the last.",
+    "status": "decided",
+    "experimental": true,
+    "values": ["1 view in flight"],
+    "code": ["packages/bus/src/broker/watch.ts"],
+    "target": "0.2.0",
+    "related": ["watch.burst-rule"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#in-the-bus-worker",
+        "why": "A watcher never gets values faster than it uses them."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.snapshot-parts",
+    "statement": "A watch's first view carries every key it asked for, in parts of at most 512 values sent back to back; every part but the last carries `more`, and `onView` runs once after the last.",
+    "status": "decided",
+    "experimental": true,
+    "values": ["512 values per part"],
+    "code": ["packages/bus/src/broker/watch.ts"],
+    "target": "0.2.0",
+    "related": ["watch.wire-messages", "watch.snapshot-grace"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#in-the-bus-worker",
+        "why": "The snapshot isn't paced, so a watcher starts with every key at once."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-27",
+        "ref": "adr/0023#in-the-bus-worker",
+        "why": "Marking the last part in the message means a snapshot of exactly 512 × n values needs no empty part.",
+        "prev": "The client knew the last part by its size: a part under 512 values ended the snapshot."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.snapshot-grace",
+    "statement": "The bus drops a topic's snapshot map 5 s after its last watch leaves, so a remount or a reattach within that time doesn't read the log again.",
+    "status": "decided",
+    "experimental": true,
+    "values": ["5 s"],
+    "code": ["packages/bus/src/broker/watch.ts"],
+    "target": "0.2.0",
+    "related": ["watch.snapshot-parts"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#in-the-bus-worker",
+        "why": "The first watch of a topic reads the whole retained log once."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.fixed-constants",
+    "statement": "The watch constants are fixed and internal: one view in flight, 512 values per part, 5 s of grace and 1,000 keys for the warning. There is no `KernelConfig.bus` setting for them.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/bus/src/broker/watch.ts"],
+    "target": "0.2.0",
+    "related": [
+      "watch.one-view-in-flight",
+      "watch.snapshot-parts",
+      "watch.snapshot-grace",
+      "watch.wide-watch-warning"
+    ],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#in-the-bus-worker",
+        "why": "Settings are hard to remove once public, and nothing has measured a need."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.settled",
+    "statement": "A view is settled when its consumer is done with it: when `onView` returns or its promise settles, or for `useWatch` after the render commits. A view several local watches share is settled when all of them are.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/protocol/src/topics/watches.ts", "packages/react/src/hooks/watch.ts"],
+    "target": "0.2.0",
+    "related": ["watch.burst-rule"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#when-seen-is-sent",
+        "why": "`seen` must mean the view was used, so the bus never sends faster than the reader draws."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#478",
+        "why": "ctx.bus.watch, the current value per key."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#480",
+        "why": "useWatch in React and Preact."
+      }
+    ]
+  },
+  {
+    "id": "watch.burst-rule",
+    "statement": "A view that arrives less than one commit interval after the previous one gets its `seen` at once; any other view's `seen` rides on the next `commits`, or on a `commits` of its own when none goes out within one interval.",
+    "status": "decided",
+    "experimental": true,
+    "knob": "`KernelConfig.bus.commitIntervalMs`",
+    "code": ["packages/protocol/src/topics/watches.ts"],
+    "target": "0.2.0",
+    "related": ["watch.one-view-in-flight", "watch.no-seen-message"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#when-seen-is-sent",
+        "why": "A burst then follows the paint rate, and a slow topic costs one message per view, as a delivery does."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-27",
+        "ref": "adr/0023#when-seen-is-sent",
+        "why": "A port with watches and no subscriptions sent no `commits`, so its watch stalled after the first view.",
+        "prev": "Any other view gets its `seen` in the next `commits` the client sends."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#478",
+        "why": "ctx.bus.watch, the current value per key."
+      }
+    ]
+  },
+  {
+    "id": "watch.reattach-have",
+    "statement": "After a bus restart, isolates and the host send `watch` again with the versions they hold, and the new bus sends only the keys that differ and clears the rest. For a memory topic it ignores those versions and sends a full snapshot, which resets the view.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/bus/src/broker/watch.ts", "packages/protocol/src/topics/watches.ts"],
+    "target": "0.2.0",
+    "related": ["watch.version-pointers"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#restart-and-wake",
+        "why": "A persistent topic comes back from disk, so usually little changes; an empty snapshot is the reset for a lost memory topic."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-27",
+        "ref": "adr/0023#restart-and-wake",
+        "why": "A memory topic's offsets start again from 0 on the new bus, so a version could name a different record.",
+        "prev": "The new bus sends only the keys whose version differs from `have`, for every topic."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.wake-from-scratch",
+    "statement": "A woken isolate watches from scratch and gets a full snapshot. A changed key on a watched topic wakes a suspended headless isolate, as a subscription does.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/bus/src/broker/broker.ts"],
+    "target": "0.2.0",
+    "related": ["watch.w2-pools-wake"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#restart-and-wake",
+        "why": "Waking starts a new worker, so the client holds nothing; waking from a snapshot without replay is W2."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#476",
+        "why": "Watches in the bus worker."
+      }
+    ]
+  },
+  {
+    "id": "watch.metrics-rows",
+    "statement": "The bus metrics have a row per watched topic: the number of watches, live keys, the transport, and totals since the bus worker started of the records on the topic and the values sent to watchers. The devtools show the ratio in words, such as \"showed 1 of every 40 records on the topic\".",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/bus/src/server/server.ts", "packages/devtools/src/index.ts"],
+    "target": "0.2.0",
+    "related": ["watch.host-shares"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#inspection",
+        "why": "It makes skipping visible, so a watcher picked by mistake shows up."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-27",
+        "ref": "adr/0023#inspection",
+        "why": "Counting records per watched key would be work on every append, so the totals come from offsets when the metrics are read.",
+        "prev": "Records appended and values delivered to watchers, with the ratio \"showed 1 of every 40 values\"."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#485",
+        "why": "Watcher rows in the bus metrics and the devtools bus view."
+      }
+    ]
+  },
+  {
+    "id": "watch.needs-new-host",
+    "statement": "An isolate that uses watches needs a host of the same minor; an older host fails it at start, and there is no fallback over `subscribe`.",
+    "status": "decided",
+    "experimental": true,
+    "errors": ["runtime-too-old"],
+    "target": "0.2.0",
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-25",
+        "ref": "adr/0023#older-hosts",
+        "why": "ADR 0012 already fails such an isolate before it runs, so an emulation would be dead code."
+      }
+    ]
+  },
+  {
+    "id": "watch.kernel-watch",
+    "statement": "`kernel.watch(topic, onView, { keys? })` on the host has the same signature as `ctx.bus.watch`, needs no grant, throws without contracts, and settles a view when `onView` returns.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/host/src/bus/controller.ts"],
+    "target": "0.2.0",
+    "related": ["watch.bus-watch", "watch.host-shares"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-26",
+        "ref": "adr/0023#the-hosts-watch-amended-2026-11-26",
+        "why": "The M9 shop's header on the main thread shows the cart count, and `kernel.subscribe` would bring every cart record to the main thread for one number."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#481",
+        "why": "kernel.watch, the current value per key from the host."
+      }
+    ]
+  },
+  {
+    "id": "watch.host-shares",
+    "statement": "The host's watches on a topic share one bus watch, run the same watch code as isolates, and are counted in the same watcher rows with no label of their own.",
+    "status": "decided",
+    "experimental": true,
+    "code": ["packages/protocol/src/topics/watches.ts", "packages/host/src/bus/controller.ts"],
+    "target": "0.2.0",
+    "related": ["watch.kernel-watch", "watch.many-watches", "watch.metrics-rows"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-26",
+        "ref": "adr/0023#the-hosts-watch-amended-2026-11-26",
+        "why": "The bus doesn't tell a host watch from an isolate's, so nothing changes in the bus worker."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-27",
+        "ref": "adr/0023#the-hosts-watch-amended-2026-11-26",
+        "why": "Two copies of the watch rules could drift, so the code lives once in `@isoloop/protocol`.",
+        "prev": "Devtools count host watches in the per-topic watcher rows, with an isolate's."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-27",
+        "ref": "#481",
+        "why": "kernel.watch from the host."
+      }
+    ]
+  },
+  {
+    "id": "watch.w2-pools-wake",
+    "statement": "W2 gives a pool one watch per worker, with values handed to its members read-only, and wakes isolates from a snapshot without replay.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "0.3.0",
+    "related": ["watch.wake-from-scratch"],
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0023#not-in-this-adr",
+        "why": "In W1 each pool member watches on its own; W2 is grilled before 0.3.0."
+      }
+    ]
+  },
+  {
+    "id": "watch.w3-shared-slots",
+    "statement": "W3 adds one `SharedArrayBuffer` per topic, written by the bus worker under a sequence lock, with a message fallback when the page isn't cross-origin isolated.",
+    "status": "proposed",
+    "experimental": true,
+    "target": "0.4.0",
+    "related": ["watch.metrics-rows"],
+    "events": [
+      {
+        "type": "proposed",
+        "date": "2026-11-25",
+        "ref": "adr/0023#not-in-this-adr",
+        "why": "Shared slots would remove the view messages; how they're sized is decided in an amendment before W3."
+      }
+    ]
+  },
+  {
+    "id": "watch.use-topic-not-watcher",
+    "statement": "`useTopic` doesn't become a watcher.",
+    "status": "rejected",
+    "related": ["watch.use-topic-unchanged"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-25",
+        "ref": "adr/0023#alternatives-considered",
+        "why": "Why not turn `useTopic` into a watcher? A watcher hands over the current value on attach where `from: 'latest'` gives `undefined`, and a stable hook would rest on `@experimental` code. Revisited when watchers go stable."
+      }
+    ]
+  },
+  {
+    "id": "watch.no-seen-message",
+    "statement": "`seen` doesn't always travel on its own message.",
+    "status": "rejected",
+    "related": ["watch.burst-rule"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-25",
+        "ref": "adr/0023#alternatives-considered",
+        "why": "Why not send `seen` on its own message? On a slow topic that's one extra message per value, the regression the plant dashboard rules out."
+      }
+    ]
+  },
+  {
+    "id": "watch.no-slots-on-append",
+    "statement": "Watches aren't updated on every append.",
+    "status": "rejected",
+    "related": ["watch.no-work-on-append"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-25",
+        "ref": "adr/0023#alternatives-considered",
+        "why": "Why not keep each watch's values up to date as records land? Every publisher would pay a slot update and a mark per watching port on each append."
+      }
+    ]
+  },
+  {
+    "id": "watch.key-kept-after-retention",
+    "statement": "A key doesn't keep its last value after retention removes its record.",
+    "status": "rejected",
+    "related": ["watch.key-clears"],
+    "events": [
+      {
+        "type": "rejected",
+        "date": "2026-11-25",
+        "ref": "adr/0023#alternatives-considered",
+        "why": "Why not keep the last value? The watcher would show values a replay can't."
+      }
+    ]
+  }
+]
