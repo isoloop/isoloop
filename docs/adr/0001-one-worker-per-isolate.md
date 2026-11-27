@@ -20,6 +20,8 @@ Isoloop supports two placements, chosen by the host in the isolate's manifest. I
 
 Placement belongs to the host manifest alone. An isolate module cannot ask for a pool or refuse one; its author can only document a recommendation.
 
+Rules: `iso.own-worker`, `iso.placement-host`, `iso.no-worker-identity`
+
 Staging:
 
 - **v1 (M1):** only the own-worker placement runs. `manifest.pool` is part of the types and is validated, but `spawn` rejects it with `pools_unsupported`, so the API shape is fixed and adding pools later breaks nothing.
@@ -62,6 +64,8 @@ Supporting rules:
 - **Replay:** the isolate resubscribes from its committed offsets and replays what it missed (a subscription that asked for `from: 'latest'` resumes from `committed` after a wake, so nothing published while it slept is skipped; `earliest` stays `earliest`), for memory and persistent topics alike. Losses are signalled, never silent: retention (`last-n` or `time`) dropping unread records arrives as `deliver.gap`, and a bus crash wiping a memory topic arrives as `reset` (ADR 0007). The kernel warns when a suspendable isolate subscribes to a `last-n` or `time` topic; the warning comes from the bus metrics, so it arrives within about a second of the subscribe.
 - **Pools** suspend only as a whole, when every member is suspendable and idle; otherwise the pool never suspends and registration warns that the setting has no effect. Any member's wake condition wakes the pool.
 - Built in M2 ([task 12b](../plans/m2-bus.md#12b-opt-in-suspension)).
+
+Rules: `iso.suspend-opt-in`, `iso.suspend-idle`, `iso.keep-awake`, `iso.suspend-steps`, `iso.wake`, `iso.wake-queue`, `iso.wake-on-bus-restart`, `iso.wake-replay`, `iso.suspend-retention-warning`
 
 ### Worker budget and spawn failures
 
@@ -229,4 +233,4 @@ Rules: `sup.hidden-tab`, `sup.clocks-reset-on-show`, `dur.flush-on-freeze`, `dur
 - **A longer threshold only in E2E builds** (2026-11-20): makes CI pass while hiding what a slow device hits; rejected.
 - **Hard worker limit:** fails apps on capable machines and still doesn't protect weak ones, since the real limit depends on the device. Rejected in favour of a warning.
 
-Rules: `sup.no-device-budget`, `sup.no-hard-worker-limit`, `sup.no-budget-suspend`
+Rules: `sup.no-device-budget`, `sup.no-hard-worker-limit`, `sup.no-budget-suspend`, `iso.no-auto-suspend`, `iso.no-snapshot-api`, `iso.no-wake-every-record`
