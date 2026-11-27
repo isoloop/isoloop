@@ -92,7 +92,11 @@ export type BusMetrics = {
     bytesPerSec: number;
     head: number;
     retained: number;
-    /** Present once the topic has had a watch since the bus worker started. */
+    /**
+     * The topic's watcher figures, present once the topic has had a watch
+     * since the bus worker started.
+     * @experimental
+     */
     watch?: TopicWatchMetrics;
   }[];
   /**
