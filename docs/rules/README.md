@@ -60,7 +60,423 @@ No rules yet.
 
 Tools on topics and the transports that expose them to agents. Prefix `agent`.
 
-No rules yet.
+| Rule | Statement | Values | Status | Version |
+| --- | --- | --- | --- | --- |
+| `agent.tool-field` | A requestable topic becomes a tool by carrying a `tool` field. `description` and `readOnly` are required; `title`, `consequential` and `untrustedContent` are optional, and the two flags default to `false`. |  | active, experimental | since `0.1.0` |
+| `agent.tool-needs-reply` | A `tool` on a topic without `reply` is a type error, and the kernel's start check rejects it at run time. |  | active, experimental | since `0.1.0` |
+| `agent.tool-hints` | Transports map the flags: `readOnly` to `readOnlyHint`, `consequential` to `consequentialHint` in WebMCP and `destructiveHint` in MCP, and `untrustedContent` to `untrustedContentHint` in WebMCP. MCP has no such hint, so the dev MCP adds a sentence to the description instead. |  | active, experimental | since `0.1.0` |
+| `agent.tool-name` | A tool's name is its topic's name, so a new topic version is a new tool. | `1–128 characters` | active, experimental | since `0.1.0` |
+| `agent.tool-schemas` | A tool's input schema is its topic schema's input and its output schema is `reply`'s output, both JSON Schema draft 2020-12 made through `~standard.jsonSchema`. The host makes them once, at start. |  | active, experimental | since `0.1.0` |
+| `agent.tool-host-only` | `tool` and the topic's Standard Schema stay on the host. The bus never sees them, so a differing `tool` doesn't break delivery or trip the contracts-mismatch check. |  | active, experimental | since `0.1.0` |
+| `agent.expose-app-only` | Only the app's `agents.expose` patterns (grant matchers) expose tools. A `tool` field alone exposes nothing, and isolates can't expose anything themselves. |  | active, experimental | since `0.1.0` |
+| `agent.kernel-tools` | `kernel.tools()` lists the exposed tools: name, title, description, flags, both JSON Schemas, the `timeoutMs` to pass on and the `TopicRef` to call. Every transport reads it. |  | active, experimental | since `0.1.0` |
+| `agent.start-check` | `createKernel` throws `KernelError('not_exposable')`, naming the topic, when an `expose` pattern matches a topic with no `reply`, no `tool`, a schema without `~standard.jsonSchema`, or an `unchecked` schema. |  | active, experimental | since `0.1.0` |
+| `agent.unmatched-warning` | An `expose` pattern that matches no topic is reported once through the `agents:unmatched` kernel event. |  | active, experimental | since `0.1.0` |
+| `agent.kernel-request` | `kernel.request(topic, value, { key?, timeoutMs?, signal?, via? })` sends a request from the host on any requestable topic, exposed or not. |  | active, experimental | since `0.1.0` |
+| `agent.request-errors` | `kernel.request` rejects with a `BusError`: `not_requestable`, `invalid`, `reply_invalid`, `timeout` and `bus_unavailable` as `bus.request` does, plus `aborted` when its `signal` aborts, `no_responder` and `dropped`. |  | active, experimental | since `0.1.0` |
+| `agent.request-timeout-default` | `kernel.request`'s `timeoutMs` defaults to the bus's request timeout. | `30 000 ms` | active, experimental | since `0.1.0` |
+| `agent.agent-timeout` | Agent calls time out after `agents.timeoutMs`. Transports pass it from `kernel.tools()`. | `10 000 ms` | active, experimental | since `0.1.0` |
+| `agent.request-via` | A host request record carries `req: { from: 'host', id, via? }`. `via` is one of `'mcp'`, `'webmcp'` or `'builder'`, and any other value rejects with `invalid`. It's a self-declared label for logging and policy, never for authorisation. |  | active, experimental | since `0.1.0` |
+| `agent.restart-wait` | A request waits in its topic's log, so an isolate that restarts within the timeout gets the call when it resubscribes, and replies. |  | active, experimental | since `0.1.0` |
+| `agent.dropped` | When retention removes a request record before the bus delivered it to any subscriber, the bus answers that caller at once with `BusError('dropped')`. It applies to an isolate's `bus.request` too. |  | active | since `0.1.0` |
+| `agent.no-responder` | Before sending a `kernel.request`, the host checks that at least one isolate could answer: its grants allow subscribing and it isn't `stopped` or `failed`. With none, the call fails at once with `no_responder`. An isolate's own `bus.request` gets no such check. |  | active, experimental | since `0.1.0` |
+| `agent.idempotent-handlers` | A tool handler must check `req.id` before doing its work, because a crash between its side effect and its reply delivers the record again. |  | active, experimental | since `0.1.0` |
+| `agent.dev-mcp-entry` | `connectDevMCP(kernel, { url, token })` from `@isoloop/host/dev-mcp` dials the `isoloop mcp` CLI's WebSocket and sends requests with `via: 'mcp'`. | `ws://127.0.0.1:4317` | active, experimental | since `0.1.0` |
+| `agent.dev-mcp-pairing` | The `isoloop mcp` CLI accepts a page only with its token, printed on stderr each run or fixed through `ISOLOOP_MCP_TOKEN`, and only from an `Origin` matching `--origin`. | `--origin http://localhost:*` | active, experimental | since `0.1.0` |
+| `agent.dev-mcp-build-guard` | `@isoloop/vite` fails a production build that still contains the dev MCP entry, unless the plugin is given `allowDevMcp: true`. |  | active, experimental | since `0.1.0` |
+| `agent.dev-mcp-write` | Through the dev MCP, an app tool without `readOnly: true` needs the CLI's `--allow-write`. |  | active, experimental | since `0.1.0` |
+| `agent.webmcp-connect` | `connectWebMCP(kernel)` from `@isoloop/webmcp` registers each exposed tool with the page's WebMCP. Its `execute` calls `kernel.request` with the tool's `timeoutMs` and `via: 'webmcp'`, and a failed call rejects with the `BusError`. Without WebMCP it does nothing. |  | active, experimental | since `0.1.0` |
+| `agent.webmcp-lookup` | `connectWebMCP` uses `document.modelContext`, or `navigator.modelContext` where only that exists, never both. |  | active, experimental | since `0.1.0` |
+| `agent.webmcp-hints-when-true` | `connectWebMCP` sends each hint only when it's `true`. |  | active, experimental | since `0.1.0` |
+| `agent.webmcp-duplicate-name` | If a tool name from `kernel.tools()` is already registered by `connectWebMCP` on the same `ModelContext`, it throws `KernelError('invalid_config')` and registers nothing. |  | active, experimental | since `0.1.0` |
+| `agent.webmcp-cancel` | `toolcancel` aborts that tool's calls in flight where `ModelContext` has `addEventListener`. Where a call gets no signal and there's no `toolcancel`, the agent can't cancel it and it runs to its reply or timeout. Disconnecting aborts every registration and call. |  | active, experimental | since `0.1.0` |
+| `agent.webmcp-stays-registered` | Tools stay registered with WebMCP while their isolates restart. |  | active, experimental | since `0.1.0` |
+| `agent.no-isolate-expose-grant` | There's no per-isolate grant to expose tools. |  | rejected |  |
+| `agent.no-register-tool-api` | Tools aren't a separate API beside topics, such as `kernel.registerTool(name, handler)`. |  | rejected |  |
+| `agent.no-enforced-via` | `via` isn't enforced; any main-thread code can set it. |  | rejected |  |
+| `agent.no-dev-mcp-option` | The dev MCP isn't a kernel option. |  | rejected |  |
+| `agent.no-mcp-sdk` | The `isoloop mcp` CLI doesn't use the official MCP SDK; it has its own server. |  | rejected |  |
+| `agent.no-webmcp-shim` | Isoloop ships no WebMCP polyfill or shim. |  | rejected |  |
+
+### `agent.tool-field`
+
+- **Code:** `packages/bus/src/contracts/topic.ts`
+- **Related:** `agent.tool-needs-reply`, `agent.expose-app-only`
+- **Why:** Requiring `readOnly` makes every author decide whether the tool changes anything.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 1. A tool is a requestable topic with a tool field](../adr/0018-tools-for-agents.md#1-a-tool-is-a-requestable-topic-with-a-tool-field) · Requiring `readOnly` makes every author decide whether the tool changes anything.
+- 2026-11-18 · built · [#241](https://github.com/isoloop/isoloop/issues/241) · `tool` on topic definitions, M4a task 2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.tool-needs-reply`
+
+- **Errors and events:** `not_exposable`
+- **Code:** `packages/bus/src/contracts/topic.ts`, `packages/host/src/agents/agents.ts`
+- **Why:** A tool has to answer, and only a requestable topic can.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 1. A tool is a requestable topic with a tool field](../adr/0018-tools-for-agents.md#1-a-tool-is-a-requestable-topic-with-a-tool-field) · A tool has to answer, and only a requestable topic can.
+- 2026-11-18 · built · [#242](https://github.com/isoloop/isoloop/issues/242) · The start check, M4a task 4.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.tool-hints`
+
+- **Code:** `packages/cli/src/mcp/tools.ts`, `packages/webmcp/src/index.ts`
+- **Why:** Agents read the hints to decide what to ask the user first; MCP's `openWorldHint` means something else.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 1. A tool is a requestable topic with a tool field](../adr/0018-tools-for-agents.md#1-a-tool-is-a-requestable-topic-with-a-tool-field) · Agents read the hints to decide what to ask the user first; MCP's `openWorldHint` means something else.
+- 2026-11-18 · built · [#258](https://github.com/isoloop/isoloop/issues/258) · The dev MCP's tools, M4a task 8.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.tool-name`
+
+- **Why:** Topic names already fit both WebMCP's and MCP's naming rules.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 1. A tool is a requestable topic with a tool field](../adr/0018-tools-for-agents.md#1-a-tool-is-a-requestable-topic-with-a-tool-field) · Topic names already fit both WebMCP's and MCP's naming rules.
+- 2026-11-18 · built · [#242](https://github.com/isoloop/isoloop/issues/242) · `kernel.tools()`, M4a task 4.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.tool-schemas`
+
+- **Code:** `packages/protocol/src/`
+- **Related:** `agent.start-check`
+- **Why:** The contract is already the source of truth for the topic's shape.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 1. A tool is a requestable topic with a tool field](../adr/0018-tools-for-agents.md#1-a-tool-is-a-requestable-topic-with-a-tool-field) · The contract is already the source of truth for the topic's shape.
+- 2026-11-18 · built · [#240](https://github.com/isoloop/isoloop/issues/240) · Run-time JSON Schema, M4a task 3.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.tool-host-only`
+
+- **Why:** Building it put the Standard Schema on the host's `TopicShape`, so the host can make JSON Schema itself.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 1. A tool is a requestable topic with a tool field](../adr/0018-tools-for-agents.md#1-a-tool-is-a-requestable-topic-with-a-tool-field) · The bus never acts on a tool, and transports only run on the host.
+- 2026-11-18 · amended · [ADR 0018 · 1. A tool is a requestable topic with a tool field](../adr/0018-tools-for-agents.md#1-a-tool-is-a-requestable-topic-with-a-tool-field) · Building it put the Standard Schema on the host's `TopicShape`, so the host can make JSON Schema itself. Before: `tool` stays on the host. The bus never sees it, so a differing `tool` doesn't break delivery or trip the contracts-mismatch check.
+- 2026-11-18 · built · [#242](https://github.com/isoloop/isoloop/issues/242) · M4a task 4.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.expose-app-only`
+
+- **Change it:** `KernelConfig.agents.expose`
+- **Code:** `packages/host/src/agents/agents.ts`
+- **Related:** `agent.no-isolate-expose-grant`
+- **Why:** A contract shared between apps, or from another team, must not expose tools in an app that never chose to.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 2. The app opts in: agents.expose](../adr/0018-tools-for-agents.md#2-the-app-opts-in-agentsexpose) · A contract shared between apps, or from another team, must not expose tools in an app that never chose to.
+- 2026-11-18 · built · [#242](https://github.com/isoloop/isoloop/issues/242) · `agents.expose`, M4a task 4.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.kernel-tools`
+
+- **Code:** `packages/host/src/agents/agents.ts`, `packages/host/src/kernel/kernel.ts`
+- **Why:** A transport can't read the kernel's config or look topics up by name, so each entry carries both.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 2. The app opts in: agents.expose](../adr/0018-tools-for-agents.md#2-the-app-opts-in-agentsexpose) · One list means no transport builds schemas of its own.
+- 2026-11-18 · amended · [ADR 0018 · 2. The app opts in: agents.expose](../adr/0018-tools-for-agents.md#2-the-app-opts-in-agentsexpose) · A transport can't read the kernel's config or look topics up by name, so each entry carries both. Before: `kernel.tools()` lists name, title, description, the flags and the two JSON Schemas.
+- 2026-11-18 · built · [#242](https://github.com/isoloop/isoloop/issues/242) · M4a task 4.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.start-check`
+
+- **Errors and events:** `not_exposable`
+- **Code:** `packages/host/src/agents/agents.ts`
+- **Why:** An agent needs a real input schema, so this is stricter than `isoloop contracts export`.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 3. The kernel checks at start](../adr/0018-tools-for-agents.md#3-the-kernel-checks-at-start) · An agent needs a real input schema, so this is stricter than `isoloop contracts export`.
+- 2026-11-18 · built · [#242](https://github.com/isoloop/isoloop/issues/242) · M4a task 4.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.unmatched-warning`
+
+- **Errors and events:** `agents:unmatched`
+- **Code:** `packages/host/src/agents/agents.ts`
+- **Why:** A typo in a pattern would otherwise expose nothing in silence; devtools can show the event.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 3. The kernel checks at start](../adr/0018-tools-for-agents.md#3-the-kernel-checks-at-start) · A typo in a pattern would otherwise expose nothing in silence; devtools can show the event.
+- 2026-11-18 · built · [#242](https://github.com/isoloop/isoloop/issues/242) · M4a task 4.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.kernel-request`
+
+- **Change it:** `kernel.request`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Related:** `agent.request-errors`
+- **Why:** Transports would otherwise be special clients, and apps want the call for their own use.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 4. kernel.request](../adr/0018-tools-for-agents.md#4-kernelrequest) · Transports would otherwise be special clients, and apps want the call for their own use.
+- 2026-11-18 · built · [#242](https://github.com/isoloop/isoloop/issues/242) · M4a task 4.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.request-errors`
+
+- **Errors and events:** `aborted`, `no_responder`, `dropped`, `timeout`, `bus_unavailable`
+- **Code:** `packages/host/src/kernel/kernel.ts`, `packages/protocol/src/errors/errors.ts`
+- **Why:** A request retention removes before any subscriber gets it now fails at once.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 4. kernel.request](../adr/0018-tools-for-agents.md#4-kernelrequest) · One error shape for callers, not the platform's `AbortError`.
+- 2026-11-18 · built · [#242](https://github.com/isoloop/isoloop/issues/242) · M4a task 4.
+- 2026-11-20 · amended · [ADR 0018 · 5. A call waits for a restart, up to the timeout](../adr/0018-tools-for-agents.md#5-a-call-waits-for-a-restart-up-to-the-timeout) · A request retention removes before any subscriber gets it now fails at once. Before: Rejects with `not_requestable`, `invalid`, `reply_invalid`, `timeout`, `bus_unavailable`, `aborted` or `no_responder`.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.request-timeout-default`
+
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Why:** The host's call mirrors `bus.request`.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 4. kernel.request](../adr/0018-tools-for-agents.md#4-kernelrequest) · The host's call mirrors `bus.request`.
+- 2026-11-18 · built · [#242](https://github.com/isoloop/isoloop/issues/242) · M4a task 4.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.agent-timeout`
+
+- **Change it:** `KernelConfig.agents.timeoutMs`
+- **Code:** `packages/host/src/agents/agents.ts`
+- **Related:** `agent.restart-wait`
+- **Why:** Long enough for a restart and catch-up, short enough not to look broken.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 5. A call waits for a restart, up to the timeout](../adr/0018-tools-for-agents.md#5-a-call-waits-for-a-restart-up-to-the-timeout) · Long enough for a restart and catch-up, short enough not to look broken.
+- 2026-11-18 · built · [#242](https://github.com/isoloop/isoloop/issues/242) · M4a task 4.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.request-via`
+
+- **Errors and events:** `invalid`
+- **Code:** `packages/protocol/src/messages/bus.ts`
+- **Why:** Handlers can tell agent calls apart; a closed list stops a typo slipping through.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 4. kernel.request](../adr/0018-tools-for-agents.md#4-kernelrequest) · Handlers can tell agent calls apart; a closed list stops a typo slipping through.
+- 2026-11-18 · built · [#241](https://github.com/isoloop/isoloop/issues/241) · `via` on request records, M4a task 2.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.restart-wait`
+
+- **Related:** `agent.agent-timeout`, `agent.no-responder`
+- **Why:** A crashed responder answers after its restart instead of failing the call.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 5. A call waits for a restart, up to the timeout](../adr/0018-tools-for-agents.md#5-a-call-waits-for-a-restart-up-to-the-timeout) · A crashed responder answers after its restart instead of failing the call.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.dropped`
+
+- **Errors and events:** `dropped`
+- **Code:** `packages/bus/src/broker/broker.ts`
+- **Related:** `agent.request-errors`
+- **Why:** Each such caller waited out its whole timeout; #288 measured 100 of 1,000 burst calls answered on a topic keeping 100 records.
+
+History:
+
+- 2026-11-20 · decided · [ADR 0018 · 5. A call waits for a restart, up to the timeout](../adr/0018-tools-for-agents.md#5-a-call-waits-for-a-restart-up-to-the-timeout) · Each such caller waited out its whole timeout; #288 measured 100 of 1,000 burst calls answered on a topic keeping 100 records.
+- 2026-11-20 · built · [#303](https://github.com/isoloop/isoloop/issues/303) · The broker's check, for #288.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.no-responder`
+
+- **Errors and events:** `no_responder`
+- **Code:** `packages/host/src/kernel/kernel.ts`
+- **Why:** Ten seconds of silence when every responder has given up looks like a hang, and the host already knows.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 6. no_responder at once](../adr/0018-tools-for-agents.md#6-no_responder-at-once) · Ten seconds of silence when every responder has given up looks like a hang, and the host already knows.
+- 2026-11-18 · built · [#242](https://github.com/isoloop/isoloop/issues/242) · M4a task 4.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.idempotent-handlers`
+
+- **Why:** Delivery is at least once; for a `consequential` tool a repeat means doing the work twice.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 7. Tool handlers must be idempotent by req.id](../adr/0018-tools-for-agents.md#7-tool-handlers-must-be-idempotent-by-reqid) · Delivery is at least once; for a `consequential` tool a repeat means doing the work twice.
+- 2026-11-19 · built · [#278](https://github.com/isoloop/isoloop/issues/278) · The Agents guide says how.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.dev-mcp-entry`
+
+- **Code:** `packages/host/src/dev-mcp.ts`
+- **Related:** `agent.dev-mcp-pairing`, `agent.dev-mcp-build-guard`
+- **Why:** A transport of its own entry, imported behind `import.meta.env.DEV`, stays out of production bundles.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 8. Two transports, each in its own entry](../adr/0018-tools-for-agents.md#8-two-transports-each-in-its-own-entry) · A transport of its own entry, imported behind `import.meta.env.DEV`, stays out of production bundles.
+- 2026-11-18 · built · [#250](https://github.com/isoloop/isoloop/issues/250) · M4a task 7.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.dev-mcp-pairing`
+
+- **Change it:** `ISOLOOP_MCP_TOKEN`, `--origin`
+- **Code:** `packages/cli/src/mcp/pairing.ts`, `packages/cli/src/commands/mcp.ts`
+- **Why:** Any site open in the browser can try `ws://127.0.0.1`; without the token it gets nothing.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 8. Two transports, each in its own entry](../adr/0018-tools-for-agents.md#8-two-transports-each-in-its-own-entry) · Any site open in the browser can try `ws://127.0.0.1`; without the token it gets nothing.
+- 2026-11-18 · built · [#249](https://github.com/isoloop/isoloop/issues/249) · The dev MCP server, M4a task 6.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.dev-mcp-build-guard`
+
+- **Change it:** `allowDevMcp`
+- **Code:** `packages/vite/src/plugins/guard.ts`
+- **Why:** The dev MCP's WebSocket client must never ship by accident.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 8. Two transports, each in its own entry](../adr/0018-tools-for-agents.md#8-two-transports-each-in-its-own-entry) · The dev MCP's WebSocket client must never ship by accident.
+- 2026-11-18 · built · [#250](https://github.com/isoloop/isoloop/issues/250) · M4a task 7.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.dev-mcp-write`
+
+- **Change it:** `isoloop mcp --allow-write`
+- **Code:** `packages/cli/src/commands/mcp.ts`
+- **Why:** Writes from a coding agent are opt-in for each run.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 8. Two transports, each in its own entry](../adr/0018-tools-for-agents.md#8-two-transports-each-in-its-own-entry) · Writes from a coding agent are opt-in for each run.
+- 2026-11-18 · built · [#258](https://github.com/isoloop/isoloop/issues/258) · The dev MCP's reads and writes, M4a task 8.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.webmcp-connect`
+
+- **Code:** `packages/webmcp/src/index.ts`
+- **Related:** `agent.webmcp-lookup`
+- **Why:** A package of its own keeps a moving draft API out of `@isoloop/host`.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 8. Two transports, each in its own entry](../adr/0018-tools-for-agents.md#8-two-transports-each-in-its-own-entry) · A package of its own keeps a moving draft API out of `@isoloop/host`.
+- 2026-11-18 · built · [#264](https://github.com/isoloop/isoloop/issues/264) · M4a task 9.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.webmcp-lookup`
+
+- **Code:** `packages/webmcp/src/index.ts`
+- **Why:** Chromium puts it on `document`, Firefox on `navigator`; the code follows the features, not the browser's name.
+
+History:
+
+- 2026-11-19 · decided · [ADR 0018 · 8. Two transports, each in its own entry](../adr/0018-tools-for-agents.md#8-two-transports-each-in-its-own-entry) · Chromium puts it on `document`, Firefox on `navigator`; the code follows the features, not the browser's name.
+- 2026-11-19 · built · [#267](https://github.com/isoloop/isoloop/issues/267) · Firefox's WebMCP.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.webmcp-hints-when-true`
+
+- **Code:** `packages/webmcp/src/index.ts`
+- **Why:** Firefox reads `readOnlyHint` as true whenever it's present, which would list a consequential tool as read-only.
+
+History:
+
+- 2026-11-19 · decided · [ADR 0018 · 8. Two transports, each in its own entry](../adr/0018-tools-for-agents.md#8-two-transports-each-in-its-own-entry) · Firefox reads `readOnlyHint` as true whenever it's present, which would list a consequential tool as read-only.
+- 2026-11-19 · built · [#267](https://github.com/isoloop/isoloop/issues/267) · Firefox's WebMCP.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.webmcp-duplicate-name`
+
+- **Errors and events:** `invalid_config`
+- **Code:** `packages/webmcp/src/index.ts`
+- **Why:** Chromium rejects a duplicate and Firefox replaces it; refusing it ourselves behaves the same in both.
+
+History:
+
+- 2026-11-19 · decided · [ADR 0018 · 8. Two transports, each in its own entry](../adr/0018-tools-for-agents.md#8-two-transports-each-in-its-own-entry) · Chromium rejects a duplicate and Firefox replaces it; refusing it ourselves behaves the same in both.
+- 2026-11-19 · built · [#267](https://github.com/isoloop/isoloop/issues/267) · Firefox's WebMCP.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.webmcp-cancel`
+
+- **Code:** `packages/webmcp/src/index.ts`
+- **Why:** Firefox's `ModelContext` isn't an `EventTarget` and passes no signal.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 8. Two transports, each in its own entry](../adr/0018-tools-for-agents.md#8-two-transports-each-in-its-own-entry) · The draft gives each call a signal and a `toolcancel` event.
+- 2026-11-19 · amended · [ADR 0018 · 8. Two transports, each in its own entry](../adr/0018-tools-for-agents.md#8-two-transports-each-in-its-own-entry) · Firefox's `ModelContext` isn't an `EventTarget` and passes no signal. Before: `toolcancel` aborts that call's signal, and the returned function aborts every registration.
+- 2026-11-19 · built · [#267](https://github.com/isoloop/isoloop/issues/267) · Firefox's WebMCP.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.webmcp-stays-registered`
+
+- **Code:** `packages/webmcp/src/index.ts`
+- **Related:** `agent.no-responder`
+- **Why:** Agents cache tool lists; `no_responder` reports an isolate that can't answer when a call is made.
+
+History:
+
+- 2026-11-17 · decided · [ADR 0018 · 8. Two transports, each in its own entry](../adr/0018-tools-for-agents.md#8-two-transports-each-in-its-own-entry) · Agents cache tool lists; `no_responder` reports an isolate that can't answer when a call is made.
+- 2026-11-18 · built · [#264](https://github.com/isoloop/isoloop/issues/264) · M4a task 9.
+- 2026-11-23 · shipped · [v0.1.0](https://github.com/isoloop/isoloop/releases/tag/v0.1.0) · First released in 0.1.0.
+
+### `agent.no-isolate-expose-grant`
+
+History:
+
+- 2026-11-17 · rejected · [ADR 0018 · Alternatives considered](../adr/0018-tools-for-agents.md#alternatives-considered) · Why not let each isolate expose its own tools? A request reaches every subscriber, so the grant would gate one isolate while another answers the same call.
+
+### `agent.no-register-tool-api`
+
+History:
+
+- 2026-11-17 · rejected · [ADR 0018 · Alternatives considered](../adr/0018-tools-for-agents.md#alternatives-considered) · Why not a plain tool API? It would duplicate request and reply, their schemas, timeouts and restarts, and a host-side handler would run agent calls on the main thread.
+
+### `agent.no-enforced-via`
+
+History:
+
+- 2026-11-17 · rejected · [ADR 0018 · Alternatives considered](../adr/0018-tools-for-agents.md#alternatives-considered) · Why not let only transports set `via`? On one page that needs a token scheme, and the page is one trust domain anyway.
+
+### `agent.no-dev-mcp-option`
+
+History:
+
+- 2026-11-17 · rejected · [ADR 0018 · Alternatives considered](../adr/0018-tools-for-agents.md#alternatives-considered) · Why not `createKernel({ dev: { mcp } })`? The WebSocket client would ship in every production bundle, and the kernel can't tell a dev build from a production one.
+
+### `agent.no-mcp-sdk`
+
+- **Code:** `packages/cli/src/mcp/server.ts`
+
+History:
+
+- 2026-11-17 · rejected · [ADR 0018 · Alternatives considered](../adr/0018-tools-for-agents.md#alternatives-considered) · Why not use `@modelcontextprotocol/sdk`? The surface needed is about 300 lines; the SDK's client stays a dev dependency for conformance tests.
+
+### `agent.no-webmcp-shim`
+
+History:
+
+- 2026-11-17 · rejected · [ADR 0018 · Alternatives considered](../adr/0018-tools-for-agents.md#alternatives-considered) · Why not a polyfill for browsers without WebMCP? It only helps if some agent reads it, and the dev MCP covers development; deferred to M7.
 
 ## Inspection & devtools
 
