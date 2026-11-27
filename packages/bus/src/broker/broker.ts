@@ -806,7 +806,7 @@ export class Broker {
       case 'watch':
       case 'unwatch':
         // M8 Watchers W1 task 3 replaces this placeholder
-        reply(fail('unsupported', `${msg.t} is not handled by this bus yet`));
+        reply(fail('unsupported', `${msg.t} is not supported by this bus`));
         return;
       case 'commits': {
         // Each entry stands alone (ADR 0016, decision 1): one that fails
