@@ -7,6 +7,7 @@
     "code": ["packages/bus/src/contracts/topic.ts"],
     "since": "0.1.0",
     "related": ["agent.tool-needs-reply", "agent.expose-app-only"],
+    "keywords": ["trust-boundary", "requests"],
     "events": [
       {
         "type": "decided",
@@ -36,6 +37,7 @@
     "errors": ["not_exposable"],
     "code": ["packages/bus/src/contracts/topic.ts", "packages/host/src/agents/agents.ts"],
     "since": "0.1.0",
+    "keywords": ["requests"],
     "events": [
       {
         "type": "decided",
@@ -64,6 +66,7 @@
     "experimental": true,
     "code": ["packages/cli/src/mcp/tools.ts", "packages/webmcp/src/index.ts"],
     "since": "0.1.0",
+    "keywords": ["dev-only", "trust-boundary"],
     "events": [
       {
         "type": "decided",
@@ -121,6 +124,7 @@
     "code": ["packages/protocol/src/"],
     "since": "0.1.0",
     "related": ["agent.start-check"],
+    "keywords": ["requests", "schemas"],
     "events": [
       {
         "type": "decided",
@@ -148,6 +152,7 @@
     "status": "active",
     "experimental": true,
     "since": "0.1.0",
+    "keywords": ["schemas"],
     "events": [
       {
         "type": "decided",
@@ -185,6 +190,7 @@
     "code": ["packages/host/src/agents/agents.ts"],
     "since": "0.1.0",
     "related": ["agent.no-isolate-expose-grant"],
+    "keywords": ["grants", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -213,6 +219,7 @@
     "experimental": true,
     "code": ["packages/host/src/agents/agents.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
+    "keywords": ["schemas", "timeouts", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -249,6 +256,7 @@
     "errors": ["not_exposable"],
     "code": ["packages/host/src/agents/agents.ts"],
     "since": "0.1.0",
+    "keywords": ["lifecycle", "requests", "schemas", "errors"],
     "events": [
       {
         "type": "decided",
@@ -278,6 +286,7 @@
     "errors": ["agents:unmatched"],
     "code": ["packages/host/src/agents/agents.ts"],
     "since": "0.1.0",
+    "keywords": ["observability"],
     "events": [
       {
         "type": "decided",
@@ -308,6 +317,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["agent.request-errors"],
+    "keywords": ["keys", "requests", "timeouts", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -337,6 +347,7 @@
     "errors": ["aborted", "no_responder", "dropped", "timeout", "bus_unavailable"],
     "code": ["packages/host/src/kernel/kernel.ts", "packages/protocol/src/errors/errors.ts"],
     "since": "0.1.0",
+    "keywords": ["bus-restart", "requests", "timeouts", "errors"],
     "events": [
       {
         "type": "decided",
@@ -373,6 +384,7 @@
     "values": ["30 000 ms"],
     "code": ["packages/bus/src/broker/broker.ts"],
     "since": "0.1.0",
+    "keywords": ["requests", "timeouts", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -404,6 +416,7 @@
     "code": ["packages/host/src/agents/agents.ts"],
     "since": "0.1.0",
     "related": ["agent.restart-wait"],
+    "keywords": ["timeouts", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -433,6 +446,7 @@
     "errors": ["invalid"],
     "code": ["packages/protocol/src/messages/bus.ts"],
     "since": "0.1.0",
+    "keywords": ["requests", "errors"],
     "events": [
       {
         "type": "decided",
@@ -461,6 +475,7 @@
     "experimental": true,
     "since": "0.1.0",
     "related": ["agent.agent-timeout", "agent.no-responder"],
+    "keywords": ["replay", "requests", "timeouts", "restart"],
     "events": [
       {
         "type": "decided",
@@ -484,6 +499,7 @@
     "code": ["packages/bus/src/broker/broker.ts"],
     "since": "0.1.0",
     "related": ["agent.request-errors"],
+    "keywords": ["retention", "requests"],
     "events": [
       {
         "type": "decided",
@@ -513,6 +529,7 @@
     "errors": ["no_responder"],
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
+    "keywords": ["grants", "requests", "errors", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -540,6 +557,7 @@
     "status": "active",
     "experimental": true,
     "since": "0.1.0",
+    "keywords": ["delivery", "requests"],
     "events": [
       {
         "type": "decided",
@@ -570,6 +588,7 @@
     "code": ["packages/host/src/dev-mcp.ts"],
     "since": "0.1.0",
     "related": ["agent.dev-mcp-pairing", "agent.dev-mcp-build-guard"],
+    "keywords": ["source-layout", "trust-boundary", "requests"],
     "events": [
       {
         "type": "decided",
@@ -600,6 +619,7 @@
     "knob": "`ISOLOOP_MCP_TOKEN`, `--origin`",
     "code": ["packages/cli/src/mcp/pairing.ts", "packages/cli/src/commands/mcp.ts"],
     "since": "0.1.0",
+    "keywords": ["trust-boundary", "errors"],
     "events": [
       {
         "type": "decided",
@@ -629,6 +649,7 @@
     "knob": "`allowDevMcp`",
     "code": ["packages/vite/src/plugins/guard.ts"],
     "since": "0.1.0",
+    "keywords": ["dev-only", "source-layout"],
     "events": [
       {
         "type": "decided",
@@ -658,6 +679,7 @@
     "knob": "`isoloop mcp --allow-write`",
     "code": ["packages/cli/src/commands/mcp.ts"],
     "since": "0.1.0",
+    "keywords": ["dev-only"],
     "events": [
       {
         "type": "decided",
@@ -687,6 +709,7 @@
     "code": ["packages/webmcp/src/index.ts"],
     "since": "0.1.0",
     "related": ["agent.webmcp-lookup"],
+    "keywords": ["requests", "timeouts", "errors", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -772,6 +795,7 @@
     "errors": ["invalid_config"],
     "code": ["packages/webmcp/src/index.ts"],
     "since": "0.1.0",
+    "keywords": ["errors", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -800,6 +824,7 @@
     "experimental": true,
     "code": ["packages/webmcp/src/index.ts"],
     "since": "0.1.0",
+    "keywords": ["requests", "timeouts"],
     "events": [
       {
         "type": "decided",
@@ -836,6 +861,7 @@
     "code": ["packages/webmcp/src/index.ts"],
     "since": "0.1.0",
     "related": ["agent.no-responder"],
+    "keywords": ["restart"],
     "events": [
       {
         "type": "decided",
@@ -861,6 +887,7 @@
     "id": "agent.no-isolate-expose-grant",
     "statement": "There's no per-isolate grant to expose tools.",
     "status": "rejected",
+    "keywords": ["grants"],
     "events": [
       {
         "type": "rejected",
@@ -874,6 +901,7 @@
     "id": "agent.no-register-tool-api",
     "statement": "Tools aren't a separate API beside topics, such as `kernel.registerTool(name, handler)`.",
     "status": "rejected",
+    "keywords": ["host-api"],
     "events": [
       {
         "type": "rejected",
@@ -887,6 +915,7 @@
     "id": "agent.no-enforced-via",
     "statement": "`via` isn't enforced; any main-thread code can set it.",
     "status": "rejected",
+    "keywords": ["main-thread"],
     "events": [
       {
         "type": "rejected",
@@ -900,6 +929,7 @@
     "id": "agent.no-dev-mcp-option",
     "statement": "The dev MCP isn't a kernel option.",
     "status": "rejected",
+    "keywords": ["dev-only"],
     "events": [
       {
         "type": "rejected",
@@ -914,6 +944,7 @@
     "statement": "The `isoloop mcp` CLI doesn't use the official MCP SDK; it has its own server.",
     "status": "rejected",
     "code": ["packages/cli/src/mcp/server.ts"],
+    "keywords": ["own-stack"],
     "events": [
       {
         "type": "rejected",
@@ -927,6 +958,7 @@
     "id": "agent.no-webmcp-shim",
     "statement": "Isoloop ships no WebMCP polyfill or shim.",
     "status": "rejected",
+    "keywords": ["own-stack"],
     "events": [
       {
         "type": "rejected",
