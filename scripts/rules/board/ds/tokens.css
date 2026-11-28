@@ -65,6 +65,14 @@
     --ar-dot: 8px;
     --ar-marker: 10px;
     --ar-rail: 16px;
+    /* A side panel beside a chart, and the most a square plot grows to. */
+    --ar-panel: 20rem;
+    --ar-plot-max: 56rem;
+
+    /* Opacity steps for marks that fade back or come forward on focus. */
+    --ar-opacity-faint: 0.08;
+    --ar-opacity-dim: 0.3;
+    --ar-opacity-strong: 0.9;
 
     /* 2. Semantic: the fonts' defaults; a theme may override --ar-font-sans. */
     --ar-font-sans: var(--ar-font-system);
@@ -106,6 +114,8 @@
     --ar-stepper-track: var(--ar-line);
 
     --ar-badge-text: var(--ar-text-xs);
+    --ar-chart-changed: var(--ar-accent);
+    --ar-chart-changed-width: var(--ar-rule);
 
     --ar-compare-bg: var(--ar-sunk);
     --ar-compare-before: var(--ar-muted);
