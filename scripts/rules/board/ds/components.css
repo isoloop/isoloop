@@ -541,6 +541,35 @@
     fill: var(--ar-swatch, var(--ar-cat-other));
     stroke: var(--ar-swatch, var(--ar-cat-other));
   }
+  /* Sankey: nodes, and ribbons that trace on hover or when a chart marks them data-on/data-off. */
+  .ar-chart-node {
+    fill: var(--ar-fg);
+  }
+  .ar-chart-ribbon {
+    fill: var(--ar-swatch, var(--ar-cat-other));
+    stroke: none;
+    opacity: var(--ar-ribbon-rest);
+    cursor: pointer;
+  }
+  .ar-chart-ribbon:hover,
+  .ar-chart-ribbon[data-on] {
+    opacity: var(--ar-ribbon-on);
+  }
+  .ar-chart-ribbon[data-off] {
+    opacity: var(--ar-ribbon-off);
+  }
+  /* Treemap cells. */
+  .ar-chart-cell {
+    fill: var(--ar-swatch, var(--ar-cat-other));
+    stroke: var(--ar-surface);
+    stroke-width: var(--ar-cell-gap);
+    opacity: var(--ar-cell-rest);
+    cursor: pointer;
+  }
+  .ar-chart-cell:hover,
+  .ar-chart-cell[data-on] {
+    opacity: var(--ar-cell-on);
+  }
 
   /* Symbols: event marks, coloured by their family, filled or outlined. */
   [data-family='decision'] {

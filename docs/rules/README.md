@@ -4908,7 +4908,7 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.rules-hive` | The Hive tab draws one axis per concept and a dot per rule, ordered by first event date and coloured by status, with links as curves between axes. |  | active, repo | in force since [#511](https://github.com/isoloop/isoloop/issues/511) |
 | `tool.rules-keywords-tab` | The Keywords tab holds the keyword glossary, each keyword with its definition and its rules by concept, and the keyword map, which joins keywords that tag the same rules. |  | active, repo | in force since [#514](https://github.com/isoloop/isoloop/issues/514) |
 | `tool.rules-timeline` | The Timeline tab shows every event in one lane per concept, by date, with release tags as lines, and a Churn heatmap counts `amended`, `clarified` and `corrected` events per concept and day. |  | active, repo | in force since [#512](https://github.com/isoloop/isoloop/issues/512) |
-| `tool.rules-sources` | The Sources tab shows which ADRs feed which concepts, a treemap of the `code` paths rules cite, and a Health list of where the registry is weak. |  | decided, repo |  |
+| `tool.rules-sources` | The Sources tab shows which ADRs feed which concepts, a treemap of the `code` paths rules cite, and a Health list of where the registry is weak. |  | active, repo | in force since [#515](https://github.com/isoloop/isoloop/issues/515) |
 | `tool.rules-as-of` | Board, Agenda and Hive have an "as of" option that rebuilds each rule as it stood on a chosen date or release, and a diff that lists what changed between two points. |  | active, repo | in force since [#513](https://github.com/isoloop/isoloop/issues/513) |
 | `tool.rules-as-of-limits` | "As of" places a whole day at once, since events have no time; earlier wording comes from `prev`, which is free text; only the statement and the status have a history. |  | active, repo | in force since [#513](https://github.com/isoloop/isoloop/issues/513) |
 | `tool.rules-links` | Links between rules are derived when the page is built, in four kinds: `related` and `supersededBy`, the same ADR section, a shared symbol, and a shared `code` path. | `4 kinds` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
@@ -5773,12 +5773,14 @@ History:
 
 ### `tool.rules-sources`
 
+- **Code:** `scripts/rules/board/views/sources.js`, `scripts/rules/model.ts`, `scripts/rules/board/ds/chart.js`
 - **Related:** `tool.rules-tabs`
 - **Why:** It shows where facts come from, where they live in the code, and what the registry is missing.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · It shows where facts come from, where they live in the code, and what the registry is missing.
+- 2026-11-28 · built · [#515](https://github.com/isoloop/isoloop/issues/515) · The Sources tab, with Code and Health, is in force from this PR.
 
 ### `tool.rules-as-of`
 
