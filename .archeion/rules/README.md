@@ -4886,7 +4886,7 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.dom-halves` | `dom`'s four source folders (`shared`, `worker`, `host`, `testing`) are each type-checked with their own tsconfig and `lib`. `worker` and `host` import `shared` but not each other. |  | active, repo | in force since [#29](https://github.com/isoloop/isoloop/issues/29) |
 | `tool.rules-keyword-review` | The maintainer reviews the keywords on each concept's rules, one concept per PR. |  | decided, repo |  |
 | `tool.rules-product-neutral` | The rules registry runs on Archeion, a product-neutral tool with its own design system; nothing in Archeion's code, tokens or components is about Isoloop, and Isoloop uses it only as dev tooling. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
-| `tool.rules-own-repo` | Archeion lives in its own repo, sabbz-dev/archeion, and isoloop installs it as `@sabbz/archeion`, a root devDependency; Isoloop's published packages never depend on it. |  | active, repo | in force since [#9999](https://github.com/isoloop/isoloop/issues/9999) |
+| `tool.rules-own-repo` | Archeion lives in its own repo, sabbz-dev/archeion, and isoloop installs it as `@sabbz/archeion`, a root devDependency; Isoloop's published packages never depend on it. |  | active, repo | in force since [#534](https://github.com/isoloop/isoloop/issues/534) |
 | `tool.rules-theme` | Isoloop's palette is one theme, `.archeion/isoloop.css`, named in `.archeion/archeion.json`; a theme sets only the semantic tokens and may bring a webfont. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
 
 ### `tool.rules-lines`
@@ -5505,7 +5505,7 @@ History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../../docs/adr/0026-rules-registry.md#amended-2026-11-28-design-system) · It's dev tooling for the repo; nothing a user installs should pull it in.
 - 2026-11-28 · amended · [ADR 0026 · Amended 2026-11-28: the move to Archeion](../../docs/adr/0026-rules-registry.md#amended-2026-11-28-the-move-to-archeion) · The move is done: the tool is a package isoloop installs. Before: Archeion moves to a repo of its own later, and Isoloop's published packages never depend on it.
-- 2026-11-28 · built · [#9999](https://github.com/isoloop/isoloop/issues/9999) · Isoloop switched to the @sabbz/archeion package.
+- 2026-11-28 · built · [#534](https://github.com/isoloop/isoloop/issues/534) · Isoloop switched to the @sabbz/archeion package.
 
 ### `tool.rules-theme`
 
