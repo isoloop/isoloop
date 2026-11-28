@@ -1903,7 +1903,7 @@
   },
   {
     "id": "tool.rules-product-neutral",
-    "statement": "The rules tooling is a product-neutral tool with its own design system; nothing in its code, tokens or components is about Isoloop, and Isoloop uses it only as dev tooling.",
+    "statement": "The rules registry runs on Archeion, a product-neutral tool with its own design system; nothing in Archeion's code, tokens or components is about Isoloop, and Isoloop uses it only as dev tooling.",
     "status": "decided",
     "repo": true,
     "related": ["tool.rules-own-repo", "tool.rules-theme", "tool.rules-config"],
@@ -1918,7 +1918,7 @@
   },
   {
     "id": "tool.rules-own-repo",
-    "statement": "The rules tooling moves to a repo of its own later, and Isoloop's published packages never depend on it.",
+    "statement": "Archeion moves to a repo of its own later, and Isoloop's published packages never depend on it.",
     "status": "decided",
     "repo": true,
     "related": ["tool.rules-product-neutral"],
@@ -2072,17 +2072,17 @@
   },
   {
     "id": "tool.rules-css-prefix",
-    "statement": "Until the product has a name, tokens use the placeholder prefix `--rb-` and classes `.rb-`, set in one place so a rename is one mechanical pass.",
+    "statement": "Tokens use the prefix `--ar-` and classes `.ar-`, from Archeion's name, used the same way everywhere so a rename stays one mechanical pass.",
     "status": "decided",
     "repo": true,
-    "values": ["--rb-", "rb-"],
+    "values": ["--ar-", "ar-"],
     "related": ["tool.rules-css-layers"],
     "events": [
       {
         "type": "decided",
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
-        "why": "The name is still being chosen."
+        "why": "Owner-prefixed names show at a glance which styles are the product's."
       }
     ]
   },

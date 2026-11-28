@@ -4919,8 +4919,8 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.rules-symbols` | Symbols are derived from backticked names in statements, knobs and errors, feed search and the shared-symbol links, and are never written by hand. |  | decided, repo |  |
 | `tool.rules-config` | One config file holds what's particular to a repo: the title, the rules and ADR folders, the ADR number from which `Rules:` lines are required, the GitHub owner and repo for links, and where the page is written. |  | decided, repo |  |
 | `tool.rules-view-modules` | Each tab is its own module next to a small shell that holds the tabs, the shared filters, the theme and the rule drawer, and `rules:board` inlines them into one self-contained page. |  | decided, repo |  |
-| `tool.rules-product-neutral` | The rules tooling is a product-neutral tool with its own design system; nothing in its code, tokens or components is about Isoloop, and Isoloop uses it only as dev tooling. |  | decided, repo |  |
-| `tool.rules-own-repo` | The rules tooling moves to a repo of its own later, and Isoloop's published packages never depend on it. |  | decided, repo |  |
+| `tool.rules-product-neutral` | The rules registry runs on Archeion, a product-neutral tool with its own design system; nothing in Archeion's code, tokens or components is about Isoloop, and Isoloop uses it only as dev tooling. |  | decided, repo |  |
+| `tool.rules-own-repo` | Archeion moves to a repo of its own later, and Isoloop's published packages never depend on it. |  | decided, repo |  |
 | `tool.rules-theme` | Isoloop's palette is one theme, chosen in `rules.config.json`; a theme sets only the semantic tokens and may bring a webfont. |  | decided, repo |  |
 | `tool.rules-tokens` | Design tokens come in three layers: primitives, semantic tokens and component tokens. Components read only semantic and component tokens, and themes change only the semantic layer. | `3 layers` | decided, repo |  |
 | `tool.rules-chart-slots` | Charts have 8 categorical colour slots, and a chart with more than 8 categories groups the rest. | `8 slots` | decided, repo |  |
@@ -4930,7 +4930,7 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.rules-type-scale` | Type has a 5-step scale (xs, s, m, l, xl) with tabular numbers where digits line up; data views stay at the m step or below. The default font is the system stack, and a theme may swap in a webfont. | `5 steps` | decided, repo |  |
 | `tool.rules-chart-toolkit` | Charts share one toolkit: scales, axes, a legend, a tooltip and SVG helpers. |  | decided, repo |  |
 | `tool.rules-css-layers` | CSS uses `@layer` (reset, tokens, base, layout, components, views), each class is prefixed with its owner, a component or a view, and there are no utility classes. |  | decided, repo |  |
-| `tool.rules-css-prefix` | Until the product has a name, tokens use the placeholder prefix `--rb-` and classes `.rb-`, set in one place so a rename is one mechanical pass. | `--rb-`, `rb-` | decided, repo |  |
+| `tool.rules-css-prefix` | Tokens use the prefix `--ar-` and classes `.ar-`, from Archeion's name, used the same way everywhere so a rename stays one mechanical pass. | `--ar-`, `ar-` | decided, repo |  |
 | `tool.rules-specimen` | `rules:board --specimen` writes a page with every token, type step, layout primitive, component and chart part. |  | decided, repo |  |
 | `tool.rules-ds-tests` | The design system is tested for WCAG AA contrast in both themes, for the literal ban, with unit tests per component, and with a headless smoke test of every view and the specimen at 2 widths in both themes; there are no pixel snapshots. |  | decided, repo |  |
 
@@ -5960,11 +5960,11 @@ History:
 ### `tool.rules-css-prefix`
 
 - **Related:** `tool.rules-css-layers`
-- **Why:** The name is still being chosen.
+- **Why:** Owner-prefixed names show at a glance which styles are the product's.
 
 History:
 
-- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · The name is still being chosen.
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Owner-prefixed names show at a glance which styles are the product's.
 
 ### `tool.rules-specimen`
 
