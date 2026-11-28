@@ -5,6 +5,7 @@
     "status": "proposed",
     "experimental": true,
     "target": "0.4.0",
+    "keywords": ["releases"],
     "events": [
       {
         "type": "proposed",
@@ -22,6 +23,7 @@
     "knob": "`kernel.respond`",
     "related": ["tauri.respond-crosses-main-thread", "tauri.expose-commands"],
     "target": "0.4.0",
+    "keywords": ["compatibility", "grants", "requests", "schemas"],
     "events": [
       {
         "type": "proposed",
@@ -37,6 +39,7 @@
     "status": "proposed",
     "experimental": true,
     "target": "0.4.0",
+    "keywords": ["main-thread"],
     "events": [
       {
         "type": "proposed",
@@ -54,6 +57,7 @@
     "knob": "`exposeCommands`",
     "related": ["tauri.kernel-respond"],
     "target": "0.4.0",
+    "keywords": ["grants"],
     "events": [
       {
         "type": "proposed",
@@ -70,6 +74,7 @@
     "experimental": true,
     "related": ["tauri.native-group-commit", "tauri.storage-off-main-thread"],
     "target": "0.4.0",
+    "keywords": ["durability"],
     "events": [
       {
         "type": "proposed",
@@ -86,6 +91,7 @@
     "experimental": true,
     "values": ["5 ms", "256 records"],
     "target": "0.4.0",
+    "keywords": ["durability", "commits"],
     "events": [
       {
         "type": "proposed",
@@ -101,6 +107,7 @@
     "status": "proposed",
     "experimental": true,
     "target": "0.4.0",
+    "keywords": ["replay"],
     "events": [
       {
         "type": "proposed",
@@ -116,6 +123,7 @@
     "status": "proposed",
     "experimental": true,
     "target": "0.4.0",
+    "keywords": ["main-thread", "trust-boundary"],
     "events": [
       {
         "type": "proposed",
@@ -146,6 +154,7 @@
     "status": "proposed",
     "experimental": true,
     "target": "0.4.0",
+    "keywords": ["measurement"],
     "events": [
       {
         "type": "proposed",
