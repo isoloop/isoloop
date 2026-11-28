@@ -8,6 +8,7 @@
     "code": ["packages/host/src/inspect/inspect.ts"],
     "since": "0.1.0",
     "related": ["insp.one-format"],
+    "keywords": ["host-api"],
     "events": [
       {
         "type": "decided",
@@ -36,6 +37,7 @@
     "experimental": true,
     "code": ["packages/protocol/src/"],
     "since": "0.1.0",
+    "keywords": ["dev-only"],
     "events": [
       {
         "type": "decided",
@@ -65,6 +67,7 @@
     "code": ["packages/host/src/inspect/inspect.ts"],
     "since": "0.1.0",
     "related": ["insp.recent-events"],
+    "keywords": ["measurement", "restart", "host-api", "pools"],
     "events": [
       {
         "type": "decided",
@@ -94,6 +97,7 @@
     "values": ["~1 per second"],
     "code": ["packages/host/src/inspect/inspect.ts"],
     "since": "0.1.0",
+    "keywords": ["budgets", "measurement"],
     "events": [
       {
         "type": "decided",
@@ -122,6 +126,7 @@
     "experimental": true,
     "code": ["packages/protocol/src/messages/control.ts"],
     "since": "0.1.0",
+    "keywords": ["retention", "measurement", "commits"],
     "events": [
       {
         "type": "decided",
@@ -156,6 +161,7 @@
     ],
     "since": "0.1.0",
     "related": ["insp.tap-skipped"],
+    "keywords": ["back-pressure", "bus-restart", "budgets", "measurement"],
     "events": [
       {
         "type": "decided",
@@ -185,6 +191,7 @@
     "knob": "`tap({ onSkipped })`",
     "code": ["packages/host/src/inspect/inspect.ts", "packages/runtime/src/isolate/inspector.ts"],
     "since": "0.1.0",
+    "keywords": ["back-pressure"],
     "events": [
       {
         "type": "decided",
@@ -221,6 +228,7 @@
     "values": ["at most 100"],
     "code": ["packages/protocol/src/messages/control.ts", "packages/host/src/inspect/inspect.ts"],
     "since": "0.1.0",
+    "keywords": ["retention", "budgets"],
     "events": [
       {
         "type": "decided",
@@ -280,6 +288,7 @@
     "code": ["packages/host/src/inspect/memory.ts"],
     "since": "0.1.0",
     "related": ["insp.worker-url-fragment"],
+    "keywords": ["memory-use", "browsers", "measurement"],
     "events": [
       {
         "type": "decided",
@@ -315,6 +324,7 @@
     "experimental": true,
     "code": ["packages/host/src/kernel/loader.ts"],
     "since": "0.1.0",
+    "keywords": ["source-layout", "pools"],
     "events": [
       {
         "type": "decided",
@@ -345,6 +355,7 @@
     "code": ["packages/runtime/src/bootstrap.ts", "packages/protocol/src/messages/isolate.ts"],
     "since": "0.1.0",
     "related": ["insp.no-block-as-suspend"],
+    "keywords": ["blocked-worker", "budgets"],
     "events": [
       {
         "type": "decided",
@@ -404,6 +415,7 @@
     "errors": ["invalid_config"],
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
+    "keywords": ["grants", "errors", "pools"],
     "events": [
       {
         "type": "decided",
@@ -433,6 +445,7 @@
     "code": ["packages/host/src/kernel/kernel.ts", "packages/runtime/src/isolate/inspector.ts"],
     "since": "0.1.0",
     "related": ["insp.no-feed-on-bus"],
+    "keywords": ["bus-restart", "restart"],
     "events": [
       {
         "type": "decided",
@@ -462,6 +475,7 @@
     "code": ["packages/host/src/inspect/inspect.ts", "packages/runtime/src/isolate/inspector.ts"],
     "since": "0.1.0",
     "related": ["insp.no-control-grant"],
+    "keywords": ["blocked-worker", "restart"],
     "events": [
       {
         "type": "decided",
@@ -497,6 +511,7 @@
     "experimental": true,
     "code": ["packages/runtime/src/isolate/inspector.ts"],
     "since": "0.1.0",
+    "keywords": ["grants"],
     "events": [
       {
         "type": "decided",
@@ -554,6 +569,7 @@
     "knob": "`connectDevtools`",
     "code": ["packages/devtools/src/index.ts"],
     "since": "0.1.0",
+    "keywords": ["dev-only", "grants", "own-stack", "placement"],
     "events": [
       {
         "type": "decided",
@@ -583,6 +599,7 @@
     "code": ["packages/devtools/src/views/messages-view.tsx"],
     "since": "0.1.0",
     "related": ["insp.tap-skipped"],
+    "keywords": ["tabs", "back-pressure", "budgets"],
     "events": [
       {
         "type": "decided",
@@ -628,6 +645,7 @@
     "id": "insp.no-feed-on-bus",
     "statement": "The inspection feed doesn't travel over bus topics such as `isoloop.inspect.*`.",
     "status": "rejected",
+    "keywords": ["reserved-names"],
     "events": [
       {
         "type": "rejected",
@@ -641,6 +659,7 @@
     "id": "insp.no-control-grant",
     "statement": "There's no separate grant for kill, block and restart.",
     "status": "rejected",
+    "keywords": ["grants", "blocked-worker", "restart"],
     "events": [
       {
         "type": "rejected",
@@ -654,6 +673,7 @@
     "id": "insp.no-block-as-suspend",
     "statement": "`block` doesn't suspend delivery; it's a real busy loop.",
     "status": "rejected",
+    "keywords": ["blocked-worker", "suspension"],
     "events": [
       {
         "type": "rejected",

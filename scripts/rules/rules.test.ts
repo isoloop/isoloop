@@ -1,15 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { boardData, readBoardSources, renderBoard, renderReadme } from './build.ts';
-import { parseConfig } from './config.ts';
+import { parseConfig, REPO_ROOT } from './config.ts';
 import {
   buildModel,
+  buildSources,
+  codePaths,
   deriveLinks,
+  healthChecks,
+  historyOf,
   keywordEdges,
   keywordGraph,
   keywordNeighbours,
   keywordRules,
   layoutKeywords,
+  pointsOf,
   sectionsOf,
+  sourceFlows,
+  sourceOf,
   symbolsOf,
 } from './model.ts';
 import { checkRules, type CheckInput } from './check.ts';
@@ -20,7 +27,9 @@ import {
   parseAdr,
   parseRef,
   readAnchors,
+  readRegistry,
   readRulesLines,
+  rulesOf,
   unruledSections,
   rulesIn,
   type Registry,
@@ -979,6 +988,188 @@ describe('the derived model', () => {
     expect(near['sup.a']![0]).toMatchObject({ keywords: ['rare'] });
     expect(near['sup.a']!.some((n) => n.id === 'sup.b')).toBe(false);
     expect(near['iso.g']).toBeUndefined();
+  });
+});
+
+const at = (concept: string, r: Rule) => ({ concept, rule: r });
+
+describe('the Sources model', () => {
+  it("flows each rule from its first ADR event's ADR into its concept, split by that event's type", () => {
+    const flows = sourceFlows([
+      at('sup', rule('sup.a')),
+      at('sup', rule('sup.b')),
+      at('dur', rule('dur.a')),
+      at(
+        'sup',
+        rule('sup.c', {
+          status: 'rejected',
+          events: [{ type: 'rejected', date: '2026-11-03', ref: 'adr/0007#alt', why: 'x' }],
+        }),
+      ),
+      at(
+        'ver',
+        rule('ver.a', {
+          repo: true,
+          events: [{ type: 'built', date: '2026-11-03', ref: '#9', why: 'x' }],
+        }),
+      ),
+    ]);
+    expect(flows.map((f) => [f.adr, f.concept, f.type, f.rules])).toEqual([
+      ['', 'ver', 'none', ['ver.a']],
+      ['0007', 'sup', 'decided', ['sup.a', 'sup.b']],
+      ['0007', 'dur', 'decided', ['dur.a']],
+      ['0007', 'sup', 'rejected', ['sup.c']],
+    ]);
+    expect(sourceOf(rule('x.a', { events: [] }))).toBeNull();
+  });
+
+  it('lists every cited path once per rule, most cited first', () => {
+    const paths = codePaths([
+      rule('sup.a', { code: ['a.ts', 'b/'] }),
+      rule('sup.b', { code: ['a.ts', 'a.ts'] }),
+    ]);
+    expect(paths).toEqual([
+      { path: 'a.ts', rules: ['sup.a', 'sup.b'] },
+      { path: 'b/', rules: ['sup.a'] },
+    ]);
+  });
+
+  it('finds where the registry is weak, from the registry and the ADR files alone', () => {
+    const rs = [
+      at('sup', rule('sup.a', { code: ['a.ts'], keywords: ['k'] })),
+      at('sup', rule('sup.b')),
+      at('dur', rule('dur.a', { status: 'decided', target: '0.2.0' })),
+      at(
+        'dur',
+        rule('dur.b', {
+          status: 'rejected',
+          events: [{ type: 'rejected', date: '2026-11-03', ref: 'adr/0007#one', why: 'x' }],
+        }),
+      ),
+      at(
+        'ver',
+        rule('ver.a', {
+          repo: true,
+          events: [{ type: 'built', date: '2026-11-03', ref: '#9', why: 'x' }],
+        }),
+      ),
+    ];
+    const tooCommon = [{ kind: 'section' as const, key: 'adr/0007#one', rules: 20 }];
+    const links = [{ a: 'sup.a', b: 'dur.a', kind: 'related' as const, weight: 1, keys: [] }];
+    const adrFiles = [
+      { file: '0007-bus.md', hasRules: true },
+      { file: '0012-built-apart.md', hasRules: false },
+    ];
+    const by = Object.fromEntries(
+      healthChecks(rs, adrFiles, tooCommon, links).map((h) => [h.id, h]),
+    );
+    expect(by['no-code']?.rules).toEqual(['sup.b', 'dur.a', 'ver.a']);
+    expect(by['no-built']?.rules).toEqual(['sup.a', 'sup.b']);
+    expect(by['coarse-anchor']?.rules).toEqual(['sup.a', 'sup.b', 'dur.a']);
+    expect(by['no-keywords']?.rules).toEqual(['sup.b', 'dur.a', 'ver.a']);
+    expect(by['adr-no-rules']?.items).toEqual(['0012-built-apart.md']);
+    expect(by['concept-unlinked']?.items).toEqual(['ver']);
+  });
+
+  it('builds all three for the page', () => {
+    const rs = [at('sup', rule('sup.a', { code: ['a.ts'] }))];
+    const s = buildSources(rs, [], { links: [], tooCommon: [] });
+    expect(s.flows).toHaveLength(1);
+    expect(s.code).toEqual([{ path: 'a.ts', rules: ['sup.a'] }]);
+    expect(s.health.map((h) => h.id)).toEqual([
+      'no-code',
+      'no-built',
+      'coarse-anchor',
+      'no-keywords',
+      'adr-no-rules',
+      'concept-unlinked',
+    ]);
+  });
+});
+
+describe('as of (amended 2026-11-28)', () => {
+  const shipped = rule('sup.a', {
+    status: 'active',
+    since: '0.1.0',
+    statement: 'Restarts 3 times, then fails.',
+    events: [
+      { type: 'decided', date: '2026-11-03', ref: 'adr/0007#one', why: 'x' },
+      { type: 'built', date: '2026-11-05', ref: '#12', why: 'x' },
+      { type: 'shipped', date: '2026-11-23', ref: 'v0.1.0', why: 'x' },
+      {
+        type: 'amended',
+        date: '2026-11-24',
+        ref: 'adr/0007#one',
+        why: 'x',
+        prev: 'Restarts 3 times in 60 s.',
+      },
+    ],
+  });
+
+  it('rebuilds status, since and wording per day, from the events and `prev`', () => {
+    expect(historyOf(shipped)).toEqual([
+      { date: '2026-11-03', status: 'decided', statement: 'Restarts 3 times in 60 s.' },
+      {
+        date: '2026-11-23',
+        status: 'active',
+        statement: 'Restarts 3 times in 60 s.',
+        since: '0.1.0',
+      },
+      {
+        date: '2026-11-24',
+        status: 'active',
+        statement: 'Restarts 3 times, then fails.',
+        since: '0.1.0',
+      },
+    ]);
+  });
+
+  it('makes a repo rule active on its built event, and takes one snapshot per day', () => {
+    const repoRule = rule('tool.a', {
+      repo: true,
+      status: 'active',
+      events: [
+        { type: 'decided', date: '2026-11-27', ref: 'adr/0026#one', why: 'x' },
+        { type: 'built', date: '2026-11-27', ref: '#483', why: 'x' },
+      ],
+    });
+    expect(historyOf(repoRule).map((s) => [s.date, s.status])).toEqual([['2026-11-27', 'active']]);
+  });
+
+  it('ends on the rule as stored', () => {
+    const r = rule('sup.b', {
+      status: 'withdrawn',
+      events: [
+        { type: 'decided', date: '2026-11-20', ref: 'adr/0001#w', why: 'x' },
+        { type: 'corrected', date: '2026-11-22', ref: 'adr/0001#w', why: 'x' },
+        { type: 'withdrawn', date: '2026-11-22', ref: 'adr/0001#w', why: 'x' },
+      ],
+    });
+    const h = historyOf(r);
+    expect(h[h.length - 1]).toMatchObject({ status: 'withdrawn', statement: r.statement });
+  });
+
+  it('names each day with events, the release shipped that day, and today', () => {
+    const other = rule('sup.c', {
+      events: [{ type: 'decided', date: '2026-11-28', ref: 'adr/0007#one', why: 'x' }],
+    });
+    expect(pointsOf([shipped, other])).toEqual([
+      { id: '2026-11-03', date: '2026-11-03' },
+      { id: '2026-11-05', date: '2026-11-05' },
+      { id: 'v0.1.0', date: '2026-11-23', tag: 'v0.1.0' },
+      { id: '2026-11-24', date: '2026-11-24' },
+      { id: 'today', date: '2026-11-28' },
+    ]);
+  });
+
+  it('keeps every rule in the registry consistent with its own history', () => {
+    const reg = readRegistry(REPO_ROOT);
+    for (const { rule: r } of rulesOf(reg)) {
+      const h = historyOf(r);
+      expect(h.length, r.id).toBeGreaterThan(0);
+      for (let i = 1; i < h.length; i++)
+        expect(h[i]!.date > h[i - 1]!.date, `${r.id}: dates ascend`).toBe(true);
+    }
   });
 });
 
