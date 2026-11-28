@@ -13,29 +13,35 @@
     ]
       .map(([tag, date]) => ({ tag, date }))
       .sort((a, b) => a.date.localeCompare(b.date) || a.tag.localeCompare(b.tag)));
-  const groupOf = (ctx) => (group ??= ctx.load('rb-group') === 'version' ? 'version' : 'day');
+  const groupOf = (ctx) => (group ??= ctx.load('ar-group') === 'version' ? 'version' : 'day');
 
   Rules.view({
     id: 'agenda',
     label: 'Agenda',
     order: 20,
     controls(ctx) {
-      const g = groupOf(ctx);
-      return `<div class="tabs" role="radiogroup" aria-label="Agenda grouping" id="group">
-        <button role="radio" data-g="day" aria-selected="${g === 'day'}">By day</button>
-        <button role="radio" data-g="version" aria-selected="${g === 'version'}">By version</button>
-      </div>`;
+      return AR.Tabs({
+        items: [
+          { id: 'day', label: 'By day' },
+          { id: 'version', label: 'By version' },
+        ],
+        selected: groupOf(ctx),
+        role: 'radio',
+        key: 'g',
+        label: 'Agenda grouping',
+      });
     },
     onClick(e, ctx) {
       const b = e.target.closest('[data-g]');
       if (!b) return false;
       group = b.dataset.g;
-      ctx.save('rb-group', group);
+      ctx.save('ar-group', group);
       ctx.render();
       return true;
     },
     render(ctx) {
-      const { rules, esc, md, cName, refLabel, matches } = ctx;
+      const { html, md } = AR;
+      const { rules, cName, refLabel, matches, eventLabel } = ctx;
       const g = groupOf(ctx);
       const RELEASES = releasesOf(rules);
       const releaseOf = (e) => {
@@ -44,18 +50,26 @@
         return rel ? rel.tag : 'Unreleased';
       };
       const rowsHtml = (list) =>
-        `<div class="rows">${list
-          .map(
-            (e) => `<button class="row" data-id="${esc(e.r.id)}">
-    <span class="ev ${e.type}">${e.type}</span>
-    <span class="what"><b>${esc(e.r.id)}</b><span class="cpt">${esc(cName[e.r.concept] || e.r.concept)}</span><span class="why">${md(e.why)}</span></span>
-    <span class="src">${g === 'version' ? esc(e.date) + ' · ' : ''}${esc(refLabel(e.ref))}</span></button>`,
-          )
-          .join('')}</div>`;
+        html`<div class="ar-agenda-rows">
+          ${list.map(
+            (e) =>
+              html`<button class="ar-agenda-row" data-id="${e.r.id}">
+                ${eventLabel(e.type)}
+                <span class="ar-agenda-what"
+                  ><b>${e.r.id}</b
+                  ><span class="ar-agenda-concept">${cName[e.r.concept] || e.r.concept}</span
+                  ><span class="ar-agenda-why">${md(e.why)}</span></span
+                >
+                <span class="ar-agenda-src"
+                  >${g === 'version' ? e.date + ' · ' : ''}${refLabel(e.ref)}</span
+                >
+              </button>`,
+          )}
+        </div>`;
       const evs = [];
       rules.filter(matches).forEach((r) => r.events.forEach((e) => evs.push({ ...e, r })));
       evs.sort((a, b) => b.date.localeCompare(a.date) || a.r.concept.localeCompare(b.r.concept));
-      if (!evs.length) return '<div class="empty">No events match.</div>';
+      if (!evs.length) return AR.EmptyState({ text: 'No events match.' });
       const groups = new Map();
       for (const e of evs) {
         const k = g === 'version' ? releaseOf(e) : e.date;
@@ -67,21 +81,29 @@
         const order = ['Unreleased', ...RELEASES.map((x) => x.tag).reverse()];
         keys = keys.sort((a, b) => order.indexOf(a) - order.indexOf(b));
       }
-      return `<div class="agenda">${keys
-        .map((k) => {
+      return AR.Stack({
+        gap: '7',
+        children: keys.map((k) => {
           const list = groups.get(k);
           const n = `${list.length} event${list.length > 1 ? 's' : ''}`;
           let h;
           if (g === 'version') {
             const rel = RELEASES.find((x) => x.tag === k);
-            h = `<b>${esc(k)}</b>${rel ? esc(rel.date) + ' · ' : ''}${n}`;
+            h = html`<b>${k}</b>${rel ? rel.date + ' · ' : ''}${n}`;
           } else {
             const dt = new Date(k + 'T00:00:00');
-            h = `<b>${dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</b>${dt.toLocaleDateString('en-GB', { weekday: 'short' })} ${dt.getFullYear()} · ${n}`;
+            h = html`<b>${dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</b
+              >${dt.toLocaleDateString('en-GB', { weekday: 'short' })} ${dt.getFullYear()} · ${n}`;
           }
-          return `<section class="day"><div class="day-h">${h}</div>${rowsHtml(list)}</section>`;
-        })
-        .join('')}</div>`;
+          return AR.Split({
+            gap: '7',
+            side: 'date-col',
+            as: 'section',
+            children: html`<div class="ar-agenda-head">${h}</div>
+              ${rowsHtml(list)}`,
+          });
+        }),
+      });
     },
   });
 })();

@@ -1,0 +1,129 @@
+/* Theme "isoloop": the Isoloop palette, from isoloop.dev's design tokens (paper and ink, graphite in the dark, a blue accent), with Archivo.
+   A theme sets only the semantic tokens (ADR 0026, amended 2026-11-28), for light and dark.
+   Every value is a plain hex or a shadow, so the contrast test can read it. */
+@layer tokens {
+  :root {
+    --ar-bg: #f6f7f9;
+    --ar-surface: #ffffff;
+    --ar-sunk: #e9ecf3;
+    --ar-line: #d5dae2;
+    --ar-border: #7e8696;
+    --ar-fg: #14161c;
+    --ar-muted: #4a5160;
+    --ar-accent: #2f57cc;
+    --ar-accent-soft: #eaeefa;
+    --ar-on-accent: #ffffff;
+    --ar-focus: #2f57cc;
+    --ar-ok: #23793f;
+    --ar-ok-soft: #e9f2ec;
+    --ar-info: #2f57cc;
+    --ar-info-soft: #eaeefa;
+    --ar-warn: #b75400;
+    --ar-warn-soft: #fcf5ef;
+    --ar-off: #5d6472;
+    --ar-off-soft: #e9ecf3;
+    --ar-gone: #6e46c2;
+    --ar-gone-soft: #f0ecf9;
+    --ar-tooltip-bg: #14161c;
+    --ar-tooltip-fg: #ffffff;
+    --ar-grid: #d5dae2;
+    --ar-axis: #4a5160;
+    --ar-cat-1: #2f57cc;
+    --ar-cat-2: #0b7480;
+    --ar-cat-3: #6e46c2;
+    --ar-cat-4: #a62f68;
+    --ar-cat-5: #b75400;
+    --ar-cat-6: #23793f;
+    --ar-cat-7: #b3261e;
+    --ar-cat-8: #5d6472;
+    --ar-cat-other: #7e8696;
+    --ar-shadow: 0 12px 40px #14161c29;
+    --ar-scrim: #0a0f1959;
+    --ar-font-sans: 'Archivo', var(--ar-font-system);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --ar-bg: #171b26;
+      --ar-surface: #1f232d;
+      --ar-sunk: #1b1f29;
+      --ar-line: #343945;
+      --ar-border: #717785;
+      --ar-fg: #e9ecf3;
+      --ar-muted: #aab2c3;
+      --ar-accent: #8aa5ff;
+      --ar-accent-soft: #2a3042;
+      --ar-on-accent: #0d1222;
+      --ar-focus: #8aa5ff;
+      --ar-ok: #6fcf87;
+      --ar-ok-soft: #273436;
+      --ar-info: #8aa5ff;
+      --ar-info-soft: #2a3042;
+      --ar-warn: #f9aa60;
+      --ar-warn-soft: #353032;
+      --ar-off: #9aa2b2;
+      --ar-off-soft: #2a2f3a;
+      --ar-gone: #b79af6;
+      --ar-gone-soft: #2e2f41;
+      --ar-tooltip-bg: #e9ecf3;
+      --ar-tooltip-fg: #1f232d;
+      --ar-grid: #343945;
+      --ar-axis: #aab2c3;
+      --ar-cat-1: #8aa5ff;
+      --ar-cat-2: #4cc6d3;
+      --ar-cat-3: #b79af6;
+      --ar-cat-4: #e58ab4;
+      --ar-cat-5: #f9aa60;
+      --ar-cat-6: #6fcf87;
+      --ar-cat-7: #ff8f86;
+      --ar-cat-8: #9aa2b2;
+      --ar-cat-other: #717785;
+      --ar-shadow: 0 12px 40px #00000080;
+      --ar-scrim: #0000008c;
+      --ar-font-sans: 'Archivo', var(--ar-font-system);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme='dark'] {
+    --ar-bg: #171b26;
+    --ar-surface: #1f232d;
+    --ar-sunk: #1b1f29;
+    --ar-line: #343945;
+    --ar-border: #717785;
+    --ar-fg: #e9ecf3;
+    --ar-muted: #aab2c3;
+    --ar-accent: #8aa5ff;
+    --ar-accent-soft: #2a3042;
+    --ar-on-accent: #0d1222;
+    --ar-focus: #8aa5ff;
+    --ar-ok: #6fcf87;
+    --ar-ok-soft: #273436;
+    --ar-info: #8aa5ff;
+    --ar-info-soft: #2a3042;
+    --ar-warn: #f9aa60;
+    --ar-warn-soft: #353032;
+    --ar-off: #9aa2b2;
+    --ar-off-soft: #2a2f3a;
+    --ar-gone: #b79af6;
+    --ar-gone-soft: #2e2f41;
+    --ar-tooltip-bg: #e9ecf3;
+    --ar-tooltip-fg: #1f232d;
+    --ar-grid: #343945;
+    --ar-axis: #aab2c3;
+    --ar-cat-1: #8aa5ff;
+    --ar-cat-2: #4cc6d3;
+    --ar-cat-3: #b79af6;
+    --ar-cat-4: #e58ab4;
+    --ar-cat-5: #f9aa60;
+    --ar-cat-6: #6fcf87;
+    --ar-cat-7: #ff8f86;
+    --ar-cat-8: #9aa2b2;
+    --ar-cat-other: #717785;
+    --ar-shadow: 0 12px 40px #00000080;
+    --ar-scrim: #0000008c;
+    --ar-font-sans: 'Archivo', var(--ar-font-system);
+    color-scheme: dark;
+  }
+  :root[data-theme='light'] {
+    color-scheme: light;
+  }
+}

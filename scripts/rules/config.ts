@@ -21,8 +21,10 @@ export interface RulesConfig {
   github: { owner: string; repo: string };
   /** Where the published packages live, to read the shared version; empty when there are none. */
   packagesDir: string;
-  /** Where `rules:board` writes the page (gitignore it). */
+  /** Where `rules:board` writes the page (gitignore it); the specimen goes next to it. */
   boardOut: string;
+  /** The theme, a file in scripts/rules/board/ds/themes/. */
+  theme: string;
   /** Derived links between rules. */
   links: { cap: number };
   /** Backticked names that aren't symbols worth linking or searching by. */
@@ -39,6 +41,7 @@ export const DEFAULTS: RulesConfig = {
   github: { owner: '', repo: '' },
   packagesDir: '',
   boardOut: '.rules-board/index.html',
+  theme: 'neutral',
   links: { cap: 12 },
   symbolsIgnore: [],
 };

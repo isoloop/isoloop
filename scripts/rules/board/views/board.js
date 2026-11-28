@@ -4,7 +4,8 @@ Rules.view({
   label: 'Board',
   order: 10,
   render(ctx) {
-    const { rules, concepts, esc, md, fmtDate, refLabel, inForce, STATUS, DIM, matches } = ctx;
+    const { html, md } = AR;
+    const { rules, concepts, fmtDate, refLabel, inForce, DIM, matches, statusPill } = ctx;
     const card = (r) => {
       const last = r.events[r.events.length - 1];
       const built = inForce(r);
@@ -15,24 +16,59 @@ Rules.view({
           : r.target
             ? 'target ' + r.target
             : '';
-      return `<button class="card${DIM.includes(r.status) ? ' dim' : ''}" data-id="${esc(r.id)}">
-    <div class="card-top"><span class="rid">${esc(r.id)}</span><span class="facts">${r.experimental ? '<span class="exp">experimental</span>' : ''}${r.repo ? '<span class="fact">repo</span>' : ''}<span class="st ${r.status}">${STATUS[r.status]}</span></span></div>
-    <p class="stmt">${md(r.statement)}</p>
-    ${r.values && r.values.length ? `<div class="facts">${r.values.map((f) => `<span class="fact">${esc(f)}</span>`).join('')}</div>` : ''}
-    <div class="card-foot"><span>${r.events.length} event${r.events.length > 1 ? 's' : ''} · ${last.type} ${fmtDate(last.date)}</span><span>${esc(ver)}</span></div>
-  </button>`;
+      const dim = DIM.includes(r.status);
+      return AR.Card({
+        as: 'button',
+        dim,
+        attrs: { 'data-id': r.id },
+        top: [
+          html`<span class="ar-board-id">${r.id}</span>`,
+          AR.Cluster({
+            gap: '3',
+            children: html`${r.experimental ? AR.Pill({ text: 'experimental', tone: 'warn', variant: 'outline' }) : ''}${
+              r.repo ? AR.Pill({ text: 'repo', variant: 'code' }) : ''
+            }${statusPill(r)}`,
+          }),
+        ],
+        body: html`<p class="ar-board-statement" ${AR.attrs({ 'data-dim': dim })}>
+            ${md(r.statement)}
+          </p>
+          ${
+            r.values && r.values.length
+              ? AR.Cluster({
+                  gap: '3',
+                  children: r.values.map((f) => AR.Pill({ text: f, variant: 'code' })),
+                })
+              : ''
+          }`,
+        foot: [
+          `${r.events.length} event${r.events.length > 1 ? 's' : ''} · ${last.type} ${fmtDate(last.date)}`,
+          ver,
+        ],
+      });
     };
     if (rules.length === 0)
-      return `<p class="empty-board">No rules yet. Add them to the JSON files in ${esc(ctx.config.rulesDir)}, then run pnpm rules:board again.</p>`;
-    return `<div class="board">${concepts
-      .filter((c) => rules.some((r) => r.concept === c.id))
-      .map((c) => {
-        const rs = rules.filter((r) => r.concept === c.id && matches(r));
-        const total = rules.filter((r) => r.concept === c.id).length;
-        return `<section class="col"><div class="col-h"><h2>${esc(c.name)}</h2><span class="meta">${rs.length}/${total}</span></div>
-      <p class="col-desc">${esc(c.description)}</p>
-      ${rs.length ? rs.map(card).join('') : '<div class="empty">No rules match.</div>'}</section>`;
-      })
-      .join('')}</div>`;
+      return AR.EmptyState({
+        size: 'l',
+        text: `No rules yet. Add them to the JSON files in ${ctx.config.rulesDir}, then run pnpm rules:board again.`,
+      });
+    return AR.Grid({
+      gap: '6',
+      min: 'col-min',
+      children: concepts
+        .filter((c) => rules.some((r) => r.concept === c.id))
+        .map((c) => {
+          const rs = rules.filter((r) => r.concept === c.id && matches(r));
+          const total = rules.filter((r) => r.concept === c.id).length;
+          return html`<section class="ar-stack ar-board-col">
+            <div class="ar-board-head">
+              <h2 class="ar-board-name">${c.name}</h2>
+              <span class="ar-board-count">${rs.length}/${total}</span>
+            </div>
+            <p class="ar-board-desc">${c.description}</p>
+            ${rs.length ? rs.map(card) : AR.EmptyState({ text: 'No rules match.' })}
+          </section>`;
+        }),
+    });
   },
 });

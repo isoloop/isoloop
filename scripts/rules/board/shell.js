@@ -1,9 +1,10 @@
-// The rules page's shell (ADR 0026, amended 2026-11-28): the data, shared
-// helpers, the status filters and search, the tabs (routed by the URL's hash),
-// the theme and the rule drawer. Each view registers itself with
-// `Rules.view({...})` from its own file in views/, and `Rules.start()` runs
-// last. Views get everything through the `ctx` passed to their functions.
+// The rules page's shell (ADR 0026, amended 2026-11-28): the data, the shared
+// status filters and search, the tabs (routed by the URL's hash), the theme
+// switch and the rule drawer, all built from the design system's components.
+// Each view registers itself with `Rules.view({...})` from views/, and
+// `Rules.start()` runs last. Views get everything through `ctx`.
 const Rules = (() => {
+  const { html, raw, md, attrs } = AR;
   const DATA = /*RULES_DATA*/ null || {
     config: { title: 'Rules', rulesDir: 'docs/rules' },
     concepts: [],
@@ -23,25 +24,42 @@ const Rules = (() => {
     rejected: 'Rejected',
     superseded: 'Superseded',
   };
+  /** The tone each status and each event type is shown in. */
+  const STATUS_TONE = {
+    active: 'ok',
+    decided: 'info',
+    proposed: 'warn',
+    withdrawn: 'off',
+    rejected: 'off',
+    superseded: 'gone',
+  };
+  const EVENT_TONE = {
+    decided: 'ok',
+    shipped: 'ok',
+    built: 'ok',
+    amended: 'info',
+    clarified: 'info',
+    proposed: 'warn',
+    reopened: 'warn',
+    corrected: 'gone',
+    removed: 'gone',
+    rejected: 'gone',
+    withdrawn: 'gone',
+    superseded: 'gone',
+  };
   const DIM = ['withdrawn', 'rejected', 'superseded'];
   const byId = Object.fromEntries(
     RULES.flatMap((r) => [[r.id, r], ...(r.aliases || []).map((a) => [a, r])]),
   );
   const cName = Object.fromEntries(CONCEPTS.map((c) => [c.id, c.name]));
-  const esc = (s) =>
-    String(s).replace(
-      /[&<>"]/g,
-      (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m],
-    );
-  const md = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
   const fmtDate = (d) =>
     new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const refLabel = (ref) => (REFS[ref] ? REFS[ref].label : ref);
   const refHtml = (ref) => {
     const r = REFS[ref];
     return r && r.url
-      ? `<a class="ref" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.label)}</a>`
-      : `<span class="ref">${esc(refLabel(ref))}</span>`;
+      ? html`<a class="ar-shell-ref" href="${r.url}" target="_blank" rel="noopener">${r.label}</a>`
+      : html`<span class="ar-shell-ref">${refLabel(ref)}</span>`;
   };
   const inForce = (r) => (r.repo ? r.events.find((e) => e.type === 'built') : undefined);
   const currentWhy = (r) => {
@@ -51,6 +69,9 @@ const Rules = (() => {
     }
     return undefined;
   };
+  const statusPill = (r) => AR.Pill({ text: STATUS[r.status], tone: STATUS_TONE[r.status] });
+  const eventLabel = (type) =>
+    html`<span class="ar-shell-event" ${attrs({ 'data-tone': EVENT_TONE[type] })}>${type}</span>`;
   const load = (k) => {
     try {
       return localStorage.getItem(k);
@@ -86,9 +107,9 @@ const Rules = (() => {
     return hay.includes(state.query);
   }
 
-  // Views, sorted by `order`. A view is { id, label, order, render(ctx) → HTML,
-  // controls?(ctx) → HTML for the header, onClick?(event, ctx) → true when handled,
-  // mount?(ctx) after its HTML is in the page }.
+  // Views, sorted by `order`. A view is { id, label, order, render(ctx) → SafeHtml,
+  // controls?(ctx) → SafeHtml for the header, onClick?(event, ctx) → true when
+  // handled, mount?(ctx) after its HTML is in the page }.
   const views = [];
   let current = null;
   function view(def) {
@@ -109,16 +130,18 @@ const Rules = (() => {
     keywords: DATA.keywords || [],
     model: DATA.model,
     STATUS,
+    STATUS_TONE,
+    EVENT_TONE,
     DIM,
     byId,
     cName,
-    esc,
-    md,
     fmtDate,
     refLabel,
     refHtml,
     inForce,
     currentWhy,
+    statusPill,
+    eventLabel,
     load,
     save,
     state,
@@ -127,40 +150,89 @@ const Rules = (() => {
     openRule: (id) => openRule(id),
   };
 
+  const $ = (id) => document.getElementById(id);
+  function frame() {
+    $('ar-app').innerHTML = String(
+      html`<div class="ar-shell ar-stack" style="--ar-gap: var(--ar-space-7)">
+        <header
+          class="ar-cluster ar-shell-head"
+          style="--ar-gap: var(--ar-space-5) var(--ar-space-8)"
+        >
+          ${AR.Stack({
+            gap: '1',
+            children: html`<h1 class="ar-shell-title" id="title">${DATA.config.title}</h1>
+              <p class="ar-shell-sub">
+                What holds today, one fact per card. Open a card for its values, where it lives in
+                the code, and every decision that touched it.
+              </p>`,
+          })}
+          ${AR.Toolbar({
+            label: 'Page',
+            children: html`<div id="tabs"></div>
+              <div class="ar-toolbar" id="view-controls"></div>
+              ${AR.Tabs({
+                items: [
+                  { id: 'system', label: 'System' },
+                  { id: 'light', label: 'Light' },
+                  { id: 'dark', label: 'Dark' },
+                ],
+                selected: 'system',
+                role: 'radio',
+                key: 't',
+                label: 'Theme',
+              })}`,
+          })}
+        </header>
+        ${AR.Toolbar({
+          label: 'Filters',
+          children: html`${AR.Field({ id: 'q', type: 'search', label: 'Search', hideLabel: true, placeholder: 'Search rules, values, knobs, refs…' })}
+            <div class="ar-cluster" id="filters"></div>`,
+        })}
+        <main id="view"></main>
+        <p class="ar-shell-note" id="note"></p>
+      </div>`,
+    );
+    $('ar-app').querySelector('[role="radiogroup"][aria-label="Theme"]').id = 'theme';
+  }
+
   function renderFilters() {
     const counts = {};
     RULES.forEach((r) => (counts[r.status] = (counts[r.status] || 0) + 1));
-    document.getElementById('filters').innerHTML = Object.keys(STATUS)
-      .map(
-        (s) =>
-          `<button class="chip-f" aria-pressed="${state.on.has(s)}" data-s="${s}"><span class="dot ${s}"></span>${STATUS[s]}<span class="n">${counts[s] || 0}</span></button>`,
-      )
-      .join('');
-  }
-  function renderTabs() {
-    document.getElementById('tabs').innerHTML = views
-      .map(
-        (v) =>
-          `<button role="tab" id="tab-${esc(v.id)}" data-view="${esc(v.id)}" aria-selected="${v === current}">${esc(v.label)}</button>`,
-      )
-      .join('');
+    $('filters').innerHTML = String(
+      html`${Object.keys(STATUS).map((s) =>
+        AR.Chip({
+          label: STATUS[s],
+          pressed: state.on.has(s),
+          count: counts[s] || 0,
+          tone: STATUS_TONE[s],
+          attrs: { 'data-s': s },
+        }),
+      )}`,
+    );
   }
   function render() {
     if (!current) return;
-    renderTabs();
-    const controls = document.getElementById('view-controls');
-    const c = current.controls ? current.controls(ctx) : '';
+    $('tabs').innerHTML = String(
+      AR.Tabs({
+        items: views.map((v) => ({ id: v.id, label: v.label })),
+        selected: current.id,
+        label: 'Views',
+        idPrefix: 'tab-',
+      }),
+    );
+    const controls = $('view-controls');
+    const c = current.controls ? String(current.controls(ctx)) : '';
     controls.innerHTML = c;
     controls.hidden = !c;
     renderFilters();
-    document.getElementById('view').innerHTML = current.render(ctx);
+    $('view').innerHTML = String(current.render(ctx));
     if (current.mount) current.mount(ctx);
   }
   function show(id, remember) {
     const v = views.find((x) => x.id === id) || views[0];
     if (!v) return;
     current = v;
-    if (remember) save('rb-view', v.id);
+    if (remember) save('ar-view', v.id);
     try {
       if (location.hash.slice(1) !== v.id) history.replaceState(null, '', '#' + v.id);
     } catch (e) {}
@@ -171,52 +243,72 @@ const Rules = (() => {
     const r = byId[id];
     if (!r) return;
     const undone = r.status === 'decided' || r.status === 'proposed';
-    const rows = [
+    const code = (list, sep) =>
+      AR.join(
+        list.map((f) => html`<code>${f}</code>`),
+        sep,
+      );
+    const facts = [
       [
         'Status',
-        `<span class="st ${r.status}">${STATUS[r.status]}</span>${r.experimental ? ' <span class="exp">experimental</span>' : ''}`,
+        html`${statusPill(r)}${r.experimental ? html` ${AR.Pill({ text: 'experimental', tone: 'warn', variant: 'outline' })}` : ''}`,
       ],
       inForce(r) && ['In force since', refHtml(inForce(r).ref)],
       r.repo && ['Scope', 'How this repo works, not the published packages'],
-      r.since && ['Since', `<code>${esc(r.since)}</code>`],
-      r.target && ['Target', `<code>${esc(r.target)}</code>${undone ? ' (not released yet)' : ''}`],
-      r.values &&
-        r.values.length && ['Values', r.values.map((f) => `<code>${esc(f)}</code>`).join(' · ')],
+      r.since && ['Since', html`<code>${r.since}</code>`],
+      r.target && ['Target', html`<code>${r.target}</code>${undone ? ' (not released yet)' : ''}`],
+      r.values && r.values.length && ['Values', code(r.values, ' · ')],
       r.knob && ['Change it', md(r.knob)],
-      r.errors &&
-        r.errors.length && [
-          'Errors / events',
-          r.errors.map((f) => `<code>${esc(f)}</code>`).join(' · '),
-        ],
-      r.code && r.code.length && ['Code', r.code.map((f) => `<code>${esc(f)}</code>`).join('<br>')],
-      r.supersededBy && ['Superseded by', `<code>${esc(r.supersededBy)}</code>`],
-      r.aliases &&
-        r.aliases.length && ['Old ids', r.aliases.map((f) => `<code>${esc(f)}</code>`).join(' · ')],
-      ['Concept', esc(cName[r.concept] || r.concept)],
+      r.errors && r.errors.length && ['Errors / events', code(r.errors, ' · ')],
+      r.code && r.code.length && ['Code', code(r.code, raw('<br>'))],
+      r.supersededBy && ['Superseded by', html`<code>${r.supersededBy}</code>`],
+      r.aliases && r.aliases.length && ['Old ids', code(r.aliases, ' · ')],
+      ['Concept', cName[r.concept] || r.concept],
     ].filter(Boolean);
     const why = currentWhy(r);
-    const evs = [...r.events].reverse();
     const links = [...(r.related || []), ...(r.supersededBy ? [r.supersededBy] : [])];
-    document.getElementById('drawer-root').innerHTML = `<div class="scrim" data-close></div>
-  <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="d-id">
-    <div class="d-top"><div><span class="rid" id="d-id">${esc(r.id)}</span><p class="d-stmt">${md(r.statement)}</p>
-      ${why ? `<p class="why-now"><b>Why:</b> ${md(why.why)}</p>` : ''}</div>
-      <button class="close" data-close aria-label="Close">×</button></div>
-    <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
-    <h3 class="sec-h">History · newest first</h3>
-    <ol class="tl">${evs
-      .map(
-        (e) => `<li><div class="rail"><i></i><span></span></div><div class="body">
-      <div class="line1"><span class="ev ${e.type}">${e.type}</span><span class="date">${esc(e.date)}</span>${refHtml(e.ref)}</div>
-      <p class="why">${md(e.why)}</p>${e.prev ? `<p class="prev">Before: ${md(e.prev)}</p>` : ''}</div></li>`,
-      )
-      .join('')}</ol>
-    ${links.length ? `<h3 class="sec-h">Related rules</h3><div class="related">${links.map((x) => `<button data-id="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : ''}
-  </aside>`;
-    document.querySelector('.drawer .close').focus();
+    const history = html`<ol class="ar-shell-history">
+      ${[...r.events].reverse().map(
+        (e) =>
+          html`<li class="ar-shell-history-item">
+            <div class="ar-shell-rail"><i></i><span></span></div>
+            <div class="ar-shell-history-body ar-stack" style="--ar-gap: var(--ar-space-1)">
+              ${AR.Cluster({ gap: '3', children: html`${eventLabel(e.type)}<span class="ar-shell-date">${e.date}</span>${refHtml(e.ref)}` })}
+              <p>${md(e.why)}</p>
+              ${e.prev ? html`<p class="ar-shell-prev">Before: ${md(e.prev)}</p>` : ''}
+            </div>
+          </li>`,
+      )}
+    </ol>`;
+    $('drawer-root').innerHTML = String(
+      AR.Drawer({
+        labelId: 'd-id',
+        title: html`<span class="ar-shell-id">${r.id}</span>
+          <p class="ar-shell-statement">${md(r.statement)}</p>`,
+        lead: why ? html`<p class="ar-shell-why"><b>Why:</b> ${md(why.why)}</p>` : '',
+        facts,
+        sections: [
+          { heading: 'History · newest first', body: history },
+          ...(links.length
+            ? [
+                {
+                  heading: 'Related rules',
+                  body: AR.Cluster({
+                    gap: '3',
+                    children: links.map(
+                      (x) => html`<button class="ar-shell-related" data-id="${x}">${x}</button>`,
+                    ),
+                  }),
+                },
+              ]
+            : []),
+        ],
+      }),
+    );
+    document.querySelector('.ar-drawer-close').focus();
   }
   function closeRule() {
-    document.getElementById('drawer-root').innerHTML = '';
+    $('drawer-root').innerHTML = '';
   }
 
   function setTheme(t) {
@@ -224,30 +316,31 @@ const Rules = (() => {
     if (t === 'system') root.removeAttribute('data-theme');
     else root.setAttribute('data-theme', t);
     document
-      .querySelectorAll('#theme button')
-      .forEach((b) => b.setAttribute('aria-selected', b.dataset.t === t));
-    save('rb-theme', t);
+      .querySelectorAll('#theme [data-t]')
+      .forEach((b) => b.setAttribute('aria-selected', String(b.dataset.t === t)));
+    save('ar-theme', t);
   }
 
   function start() {
     document.title = DATA.config.title;
-    document.getElementById('title').textContent = DATA.config.title;
-    document.getElementById('q').addEventListener('input', (e) => {
+    frame();
+    $('q').addEventListener('input', (e) => {
       state.query = e.target.value.trim().toLowerCase();
       render();
     });
-    document.getElementById('theme').addEventListener('click', (e) => {
-      const b = e.target.closest('button');
-      if (b) setTheme(b.dataset.t);
-    });
     document.addEventListener('click', (e) => {
       if (e.target.closest('a')) return;
+      const th = e.target.closest('[data-t]');
+      if (th) {
+        setTheme(th.dataset.t);
+        return;
+      }
       const tab = e.target.closest('[data-view]');
       if (tab) {
         show(tab.dataset.view, true);
         return;
       }
-      const f = e.target.closest('.chip-f');
+      const f = e.target.closest('[data-s]');
       if (f) {
         const s = f.dataset.s;
         state.on.has(s) ? state.on.delete(s) : state.on.add(s);
@@ -266,10 +359,10 @@ const Rules = (() => {
       if (e.key === 'Escape') closeRule();
     });
     window.addEventListener('hashchange', () => show(location.hash.slice(1), true));
-    setTheme(load('rb-theme') || 'system');
-    document.getElementById('note').textContent =
+    setTheme(load('ar-theme') || 'system');
+    $('note').textContent =
       `${RULES.length} rules in ${CONCEPTS.length} concepts, built from ${DATA.config.rulesDir} by pnpm rules:board.`;
-    show(location.hash.slice(1) || load('rb-view') || '', false);
+    show(location.hash.slice(1) || load('ar-view') || '', false);
   }
 
   return { view, start, ctx };

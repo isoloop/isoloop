@@ -10,6 +10,7 @@
   },
   "packagesDir": "packages",
   "boardOut": ".rules-board/index.html",
+  "theme": "isoloop",
   "links": {
     "cap": 12
   },

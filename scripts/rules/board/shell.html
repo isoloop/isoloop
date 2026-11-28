@@ -4,49 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>/*TITLE*/</title>
-    <!-- The rules page (ADR 0026, amended 2026-11-28). `pnpm rules:board` fills the marks below: the title, the styles (shell.css, then each view's CSS), the data, and the scripts (shell.js, then each view's JS), and writes one self-contained file. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap"
-    />
+    <!-- An Archeion page (ADR 0026, amended 2026-11-28). The build fills the marks:
+         the title, the theme's webfont if it has one, the styles (the design system,
+         the theme, the shell, each view) and the scripts (the design system, the
+         shell, each view, the data), then writes one self-contained file. -->
+    <!--FONT-->
     <style>
       /*STYLES*/
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <header>
-        <div>
-          <h1 id="title"></h1>
-          <p class="sub">
-            What holds today, one fact per card. Open a card for its values, where it lives in the
-            code, and every decision that touched it.
-          </p>
-        </div>
-        <div class="tools">
-          <div class="tabs" role="tablist" id="tabs"></div>
-          <div class="tools" id="view-controls"></div>
-          <div class="tabs" role="radiogroup" aria-label="Theme" id="theme">
-            <button role="radio" data-t="system" aria-selected="true">System</button>
-            <button role="radio" data-t="light" aria-selected="false">Light</button>
-            <button role="radio" data-t="dark" aria-selected="false">Dark</button>
-          </div>
-        </div>
-      </header>
-      <div class="tools">
-        <input
-          class="search"
-          id="q"
-          type="search"
-          placeholder="Search rules, values, knobs, refs…"
-          aria-label="Search"
-        />
-        <div class="tools" id="filters"></div>
-      </div>
-      <main id="view"></main>
-      <p class="note" id="note"></p>
-    </div>
+    <div id="ar-app"></div>
     <div id="drawer-root"></div>
     <script>
       /*SCRIPTS*/

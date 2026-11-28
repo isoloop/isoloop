@@ -1,11 +1,13 @@
 // `pnpm rules:check` (ADR 0026, decision 10): fails when the rules registry
-// could quietly be wrong. It runs in ci.yml next to docs:check, and reads only
+// could quietly be wrong, or when the page's sources write a literal that
+// belongs in a token (amended 2026-11-28). It runs in ci.yml next to docs:check, and reads only
 // files in the repo.
 //
 // Until the backfill is done (decision 11), the ADR side is checked only for
 // the ADRs that have `Rules:` lines; an ADR ref from a rule is always checked.
 import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
+import { literalProblems, readSources } from './literals.ts';
 import { renderReadme } from './build.ts';
 import {
   type Adr,
@@ -330,6 +332,13 @@ function main(): void {
     readme: existsSync(readmePath) ? readFileSync(readmePath, 'utf8') : undefined,
     version: packagesVersion(root),
   });
+  // The literal ban on the page's sources (amended 2026-11-28).
+  const board = join(import.meta.dirname, 'board');
+  problems.push(
+    ...literalProblems(readSources(board), (p) =>
+      relative(root, join(board, p)).split('\\').join('/'),
+    ),
+  );
   const ci = process.env['GITHUB_ACTIONS'] === 'true';
   for (const p of problems)
     console.log(ci ? `::error file=${p.file}::${p.message}` : `error   ${p.file}: ${p.message}`);

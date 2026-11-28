@@ -4,8 +4,8 @@
 // board/shell.html with board/shell.css and shell.js, then every view's CSS and
 // JS from board/views/ (by file name), the registry and the derived model inlined.
 import { spawn } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { CONFIG, REPO_ROOT } from './config.ts';
 import { buildModel } from './model.ts';
 import {
@@ -130,37 +130,72 @@ export function boardData(reg: Registry, adrs: Map<string, Adr>): unknown {
   };
 }
 
-/** The page's sources: the shell, its CSS and JS, and each view's CSS and JS by file name. */
+/** The page's sources, in the order they go into the page. */
 export interface BoardSources {
   shell: string;
   css: string[];
   js: string[];
+  /** The theme's webfont stylesheet, if it has one. */
+  fontHref?: string;
 }
 
 const read = (p: string) => readFileSync(p, 'utf8');
-
-/** Reads the shell and every view from `dir` (board/ by default). */
-export function readBoardSources(dir: string = BOARD_DIR): BoardSources {
-  const views = join(dir, 'views');
-  const files = readdirSync(views);
+const inDir = (dir: string, ext: string) => {
+  const files = readdirSync(dir).filter((f) => f.endsWith(ext));
   files.sort();
-  return {
+  return files.map((f) => read(join(dir, f)));
+};
+
+/** The design system's files, in order (ADR 0026, amended 2026-11-28). */
+export const DS_CSS = ['tokens.css', 'base.css', 'layout.css', 'components.css'];
+export const DS_JS = ['html.js', 'components.js', 'chart.js'];
+
+/**
+ * Reads the page's sources from `dir` (board/ by default): the design system with
+ * the theme after its tokens, the shell, then every view in views/ by file name,
+ * or the specimen in their place.
+ */
+export function readBoardSources(
+  opts: { dir?: string; theme?: string; specimen?: boolean } = {},
+): BoardSources {
+  const dir = opts.dir ?? BOARD_DIR;
+  const theme = opts.theme ?? CONFIG.theme;
+  const ds = join(dir, 'ds');
+  const themeCss = join(ds, 'themes', `${theme}.css`);
+  if (!existsSync(themeCss)) throw new Error(`no theme "${theme}" in ${join(ds, 'themes')}`);
+  const themeJson = join(ds, 'themes', `${theme}.json`);
+  const meta: unknown = existsSync(themeJson) ? JSON.parse(read(themeJson)) : {};
+  const fontHref =
+    typeof meta === 'object' && meta !== null && typeof Reflect.get(meta, 'fontHref') === 'string'
+      ? String(Reflect.get(meta, 'fontHref'))
+      : undefined;
+  const [tokens, ...rest] = DS_CSS.map((f) => read(join(ds, f)));
+  const views = join(dir, 'views');
+  const src: BoardSources = {
     shell: read(join(dir, 'shell.html')),
     css: [
+      tokens!,
+      read(themeCss),
+      ...rest,
       read(join(dir, 'shell.css')),
-      ...files.filter((f) => f.endsWith('.css')).map((f) => read(join(views, f))),
+      ...(opts.specimen ? [read(join(dir, 'specimen.css'))] : inDir(views, '.css')),
     ],
     js: [
+      ...DS_JS.map((f) => read(join(ds, f))),
       read(join(dir, 'shell.js')),
-      ...files.filter((f) => f.endsWith('.js')).map((f) => read(join(views, f))),
+      ...(opts.specimen ? [read(join(dir, 'specimen.js'))] : inDir(views, '.js')),
     ],
   };
+  if (fontHref) src.fontHref = fontHref;
+  return src;
 }
 
 const escHtml = (s: string) =>
   s.replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]!);
 
-/** The page with the title, styles, data and scripts inlined; `</` escaped so no value can close a script. */
+const FONT_MARK = '<!--FONT-->';
+
+/** The page with the title, font, styles, data and scripts inlined; `</` escaped so no value can close a script. */
 export function renderBoard(
   src: BoardSources,
   data: unknown,
@@ -172,11 +207,18 @@ export function renderBoard(
     if (!src.shell.includes(mark)) throw new Error(`board/shell.html: no ${mark} placeholder`);
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
   const script = js.replace(DATA_MARK, () => json).replace(/<\/script/gi, '<\\/script');
+  const font = src.fontHref
+    ? `<link rel="preconnect" href="https://fonts.googleapis.com" />\n    <link rel="stylesheet" href="${escHtml(src.fontHref)}" />`
+    : '';
   return src.shell
     .replace(TITLE_MARK, () => escHtml(title))
+    .replace(FONT_MARK, () => font)
     .replace(STYLES_MARK, () => src.css.join('\n'))
     .replace(SCRIPTS_MARK, () => script);
 }
+
+/** Where `rules:board --specimen` writes the specimen page, next to the board. */
+export const SPECIMEN_OUT: string = join(dirname(CONFIG.boardOut), 'specimen.html');
 
 function open(path: string): void {
   const cmd =
@@ -195,9 +237,17 @@ function main(): void {
   const reg = readRegistry(root);
   const adrs = readAdrs(root);
   if (process.argv.includes('--board')) {
-    const out = join(root, BOARD_OUT);
-    mkdirSync(join(out, '..'), { recursive: true });
-    writeFileSync(out, renderBoard(readBoardSources(), boardData(reg, adrs)));
+    const specimen = process.argv.includes('--specimen');
+    const out = join(root, specimen ? SPECIMEN_OUT : BOARD_OUT);
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(
+      out,
+      renderBoard(
+        readBoardSources({ specimen }),
+        boardData(reg, adrs),
+        specimen ? `${CONFIG.title} · specimen` : CONFIG.title,
+      ),
+    );
     console.log(`rules:board wrote ${relative(process.cwd(), out) || out}`);
     console.log(out);
     if (!process.argv.includes('--no-open')) open(out);
