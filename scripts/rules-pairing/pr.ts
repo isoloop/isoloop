@@ -1,23 +1,27 @@
-// CI: the Rules workflow (.github/workflows/rules.yml, ADR 0026, decision 11).
-// - A PR that changes an ADR must change docs/rules/ too, unless it's
-//   labelled `no-rules` (an edit that changes no fact: a typo, a link). Until
-//   the backfill is done, this applies only to ADRs with `Rules:` lines, on the
-//   base or on the PR.
+// CI: isoloop's Rules workflow (.github/workflows/rules.yml, ADR 0026,
+// decision 11). The registry itself is checked by `archeion check`.
+// - A PR that changes an ADR must change .archeion/rules/ too, unless it's
+//   labelled `no-rules` (an edit that changes no fact: a typo, a link). This
+//   applies to ADRs from 0026 on, and to older ADRs with `Rules:` lines.
 // - Every rule id and alias on the base must still be an id or alias on the
 //   PR: a rule that stops holding changes status, it's never deleted. The
-//   label doesn't skip this.
+//   `no-rules` label doesn't skip this; only `rules-moved` does, for the one
+//   PR that moved Archeion's own rules to sabbz-dev/archeion (ADR 0026,
+//   amended 2026-11-28: the move to Archeion).
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
-import {
-  ADR_DIR,
-  NOT_RULE_FILES,
-  readRulesLines,
-  RULES_DIR,
-  RULES_LINES_FROM,
-  unruledSections,
-} from './registry.ts';
+import { readRulesLines, unruledSections } from './adr-lines.ts';
+
+const ADR_DIR = 'docs/adr';
+const RULES_DIR = '.archeion/rules';
+/** Where the registry was before the move; read on a base from before it. */
+const LEGACY_RULES_DIR = 'docs/rules';
+const RULES_LINES_FROM = '0026';
+const NOT_RULE_FILES = new Set(['concepts.json', 'schema.json', 'keywords.json']);
 
 export const SKIP_LABEL = 'no-rules';
+/** Lets rule ids disappear: only for moving rules to another registry. */
+export const MOVED_LABEL = 'rules-moved';
 
 /** A file's text on the merge base and on the PR, `undefined` where it doesn't exist. */
 export type ReadPair = (path: string) => { base: string | undefined; head: string | undefined };
@@ -27,7 +31,7 @@ export type Decision = { ok: true; message: string } | { ok: false; errors: stri
 const adrNumber = (p: string): string => /(\d{4})-[^/]+\.md$/.exec(p)?.[1] ?? '0000';
 const isAdr = (p: string) => new RegExp(`^${ADR_DIR}/\\d{4}-[^/]+\\.md$`).test(p);
 const isRuleFile = (p: string) => {
-  const m = new RegExp(`^${RULES_DIR}/([^/]+\\.json)$`).exec(p);
+  const m = new RegExp(`^(?:${RULES_DIR}|${LEGACY_RULES_DIR})/([^/]+\\.json)$`).exec(p);
   return m !== null && !NOT_RULE_FILES.has(m[1]!);
 };
 
@@ -80,14 +84,14 @@ export function decide(input: {
   const touchesRules = changed.some((p) => p.startsWith(`${RULES_DIR}/`));
   if (adrs.length > 0 && !touchesRules && !labels.includes(SKIP_LABEL))
     errors.push(
-      `${adrs.join(', ')} changed, but docs/rules/ didn't. Update the rules it adds or changes, or label the PR \`${SKIP_LABEL}\` if the edit changes no fact.`,
+      `${adrs.join(', ')} changed, but ${RULES_DIR}/ didn't. Update the rules it adds or changes, or label the PR \`${SKIP_LABEL}\` if the edit changes no fact.`,
     );
 
   const before = new Set(input.baseRuleFiles.flatMap((p) => idsIn(read(p).base)));
   const after = new Set(input.headRuleFiles.flatMap((p) => idsIn(read(p).head)));
   const gone = [...before].filter((id) => !after.has(id));
   gone.sort();
-  if (gone.length > 0)
+  if (gone.length > 0 && !labels.includes(MOVED_LABEL))
     errors.push(
       `Rule ids removed: ${gone.join(', ')}. A rule that stops holding changes status, and a renamed one keeps its old id in "aliases".`,
     );
@@ -122,20 +126,25 @@ const show = (rev: string, path: string): string | undefined => {
   }
 };
 
-const listRuleFiles = (rev: string): string[] => {
+const listIn = (rev: string, dir: string): string[] => {
   try {
-    // Quiet: the base has no docs/rules/ before the registry lands.
-    return execFileSync('git', ['ls-tree', '--name-only', `${rev}:${RULES_DIR}`], {
+    // Quiet: a folder that doesn't exist at this revision.
+    return execFileSync('git', ['ls-tree', '--name-only', `${rev}:${dir}`], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     })
       .split('\n')
       .filter(Boolean)
-      .map((n) => `${RULES_DIR}/${n}`)
+      .map((n) => `${dir}/${n}`)
       .filter(isRuleFile);
   } catch {
     return [];
   }
+};
+/** The rules files at a revision, in the registry's folder or, before the move, its old one. */
+const listRuleFiles = (rev: string): string[] => {
+  const now = listIn(rev, RULES_DIR);
+  return now.length > 0 ? now : listIn(rev, LEGACY_RULES_DIR);
 };
 
 const get = (o: unknown, k: string): unknown =>

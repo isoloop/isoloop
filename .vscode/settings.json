@@ -11,11 +11,16 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.oxc": "explicit"
   },
-  // Editor hints for the rules registry (ADR 0026); scripts/rules/check.ts validates.
+  // Editor hints for the rules registry (ADR 0026); `archeion check` validates.
   "json.schemas": [
     {
-      "fileMatch": ["docs/rules/*.json", "!docs/rules/concepts.json", "!docs/rules/schema.json"],
-      "url": "./docs/rules/schema.json"
+      "fileMatch": [
+        ".archeion/rules/*.json",
+        "!.archeion/rules/concepts.json",
+        "!.archeion/rules/keywords.json",
+        "!.archeion/rules/schema.json"
+      ],
+      "url": "./.archeion/rules/schema.json"
     }
   ],
   "[markdown]": {

@@ -24,7 +24,7 @@ bench-results/
 !.env.example
 
 # The rules board page, built by pnpm rules:board (ADR 0026)
-/.rules-board/
+/.archeion/web/
 
 # archify diagrams (local)
 /.archify/

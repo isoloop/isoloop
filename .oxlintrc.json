@@ -414,9 +414,6 @@
     "docs/diagrams/viewer-*.js",
     "docs/diagrams/*.mjs",
     "scripts/docs/fence-app/**",
-    // The rules page's browser code, inlined into one HTML page by
-    // scripts/rules/build.ts (ADR 0026); untyped, like the diagram viewers.
-    "scripts/rules/board/**",
     // Codemod fixtures are users' code as it was before and after a step,
     // byte for byte, old APIs included.
     "packages/cli/src/migrate/*/fixtures/**"
