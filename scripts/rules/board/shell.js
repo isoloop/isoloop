@@ -11,7 +11,7 @@ const Rules = (() => {
     rules: [],
     refs: {},
     keywords: [],
-    model: { symbols: {}, links: [], tooCommon: [], keywordRules: {} },
+    model: { symbols: {}, links: [], tooCommon: [], keywordRules: {}, history: {}, points: [] },
   };
   const CONCEPTS = DATA.concepts;
   const RULES = DATA.rules;
@@ -85,8 +85,101 @@ const Rules = (() => {
     } catch (e) {}
   };
 
-  // Shared state: the status filters and the search apply to every view.
-  const state = { query: '', on: new Set(['active', 'decided', 'proposed']) };
+  // Shared state: the status filters and the search apply to every view, and
+  // "as of" to every view that opts in with `asOf: true`.
+  const state = {
+    query: '',
+    on: new Set(['active', 'decided', 'proposed']),
+    asOf: { point: 'today', compare: false, from: null, to: 'today' },
+  };
+
+  // --- As of (ADR 0026, amended 2026-11-28) ------------------------------------
+  // Each rule's snapshots come from the build (model.history), so a point in
+  // time is a lookup. Limits accepted for now: a whole day is one step, earlier
+  // wording comes from `prev`, and only the statement, the status and `since`
+  // have a history; every other field shows today's value.
+  const POINTS = DATA.model.points || [];
+  const HISTORY = DATA.model.history || {};
+  const TODAY = POINTS.length ? POINTS[POINTS.length - 1] : { id: 'today', date: '9999-12-31' };
+  const pointById = Object.fromEntries(POINTS.map((p) => [p.id, p]));
+  const pointOf = (id) => pointById[id] || TODAY;
+  const pointLabel = (p) =>
+    p.id === 'today'
+      ? `Today · ${fmtDate(p.date)}`
+      : p.tag
+        ? `${p.tag} · ${fmtDate(p.date)}`
+        : fmtDate(p.date);
+  const snapshotAt = (id, date) => {
+    let found;
+    for (const s of HISTORY[id] || []) {
+      if (s.date > date) break;
+      found = s;
+    }
+    return found;
+  };
+  /** The rule `r` as it stood at the end of `point`'s day, or undefined if it didn't exist yet. */
+  function ruleAt(r, point) {
+    if (point.id === 'today') return r;
+    const s = snapshotAt(r.id, point.date);
+    if (!s) return undefined;
+    const out = Object.assign({}, r, {
+      status: s.status,
+      statement: s.statement,
+      events: r.events.filter((e) => e.date <= point.date),
+      changedSince: r.events.some((e) => e.date > point.date),
+    });
+    if (s.since) out.since = s.since;
+    else {
+      delete out.since;
+      // Not shipped yet then: the version it later shipped in was its target.
+      if (!r.target && r.since && (s.status === 'decided' || s.status === 'proposed'))
+        out.target = r.since;
+    }
+    return out;
+  }
+  const atCache = new Map();
+  function rulesAt(pointId) {
+    if (!atCache.has(pointId)) {
+      const p = pointOf(pointId);
+      atCache.set(pointId, RULES.map((r) => ruleAt(r, p)).filter(Boolean));
+    }
+    return atCache.get(pointId);
+  }
+  const asOfOn = () => !!(current && current.asOf) && state.asOf.point !== 'today';
+  const visibleRules = () => (asOfOn() ? rulesAt(state.asOf.point) : RULES);
+  /**
+   * What changed between two points: { from, to, items, counts }. Each item is
+   * { rule (today's), before, after (each the rule at that point, or undefined),
+   * kinds: ['added' | 'status' | 'wording' | 'removed'], events (between them) }.
+   */
+  function diff(fromId, toId) {
+    let from = pointOf(fromId);
+    let to = pointOf(toId);
+    if (from.date > to.date) [from, to] = [to, from];
+    const items = [];
+    const counts = { added: 0, status: 0, wording: 0, removed: 0 };
+    for (const r of RULES) {
+      const before = ruleAt(r, from);
+      const after = ruleAt(r, to);
+      const kinds = [];
+      if (!before && after) kinds.push('added');
+      else if (before && !after) kinds.push('removed');
+      else if (before && after) {
+        if (before.status !== after.status) kinds.push('status');
+        if (before.statement !== after.statement) kinds.push('wording');
+      }
+      if (!kinds.length) continue;
+      kinds.forEach((k) => counts[k]++);
+      items.push({
+        rule: r,
+        before,
+        after,
+        kinds,
+        events: r.events.filter((e) => e.date > from.date && e.date <= to.date),
+      });
+    }
+    return { from, to, items, counts };
+  }
   function matches(r) {
     if (!state.on.has(r.status)) return false;
     if (!state.query) return true;
@@ -121,11 +214,29 @@ const Rules = (() => {
     views.sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
   }
 
+  /**
+   * What views read. `rules` follows "as of": in a view registered with
+   * `asOf: true`, while a point other than today is chosen, it holds each rule
+   * as it stood then (status, statement, `since`, the events up to that day,
+   * and `changedSince`), and leaves out rules that didn't exist yet.
+   * `allRules` is always today's registry. `asOf` is the API:
+   *   asOf.on            true while a past point is shown in this view
+   *   asOf.point         the point shown: { id, date, tag? }
+   *   asOf.points        every point, oldest first; the last is today
+   *   asOf.label(point)  "v0.1.0 · 23 Nov", "Today · 28 Nov" or "5 Nov"
+   *   asOf.ruleAt(id, pointId?)  a rule at a point (the shown one by default)
+   *   asOf.changedSince(id)      true if the rule has events after the point
+   *   asOf.diff(fromId, toId)    { from, to, items, counts }, see diff()
+   *   asOf.set(pointId)          show another point and re-render
+   */
   const ctx = {
     data: DATA,
     config: DATA.config,
     concepts: CONCEPTS,
-    rules: RULES,
+    get rules() {
+      return visibleRules();
+    },
+    allRules: RULES,
     refs: REFS,
     keywords: DATA.keywords || [],
     model: DATA.model,
@@ -148,6 +259,26 @@ const Rules = (() => {
     matches,
     render: () => render(),
     openRule: (id) => openRule(id),
+    asOf: {
+      get on() {
+        return asOfOn();
+      },
+      get point() {
+        return asOfOn() ? pointOf(state.asOf.point) : TODAY;
+      },
+      points: POINTS,
+      label: pointLabel,
+      ruleAt: (id, pointId) => {
+        const r = byId[id];
+        return r && ruleAt(r, pointOf(pointId || (asOfOn() ? state.asOf.point : 'today')));
+      },
+      changedSince: (id) => {
+        const r = byId[id];
+        return !!r && asOfOn() && r.events.some((e) => e.date > pointOf(state.asOf.point).date);
+      },
+      diff,
+      set: (pointId) => setPoint(pointId),
+    },
   };
 
   const $ = (id) => document.getElementById(id);
@@ -188,6 +319,7 @@ const Rules = (() => {
           children: html`${AR.Field({ id: 'q', type: 'search', label: 'Search', hideLabel: true, placeholder: 'Search rules, values, knobs, refs…' })}
             <div class="ar-cluster" id="filters"></div>`,
         })}
+        <section class="ar-stack ar-shell-asof" id="as-of" aria-label="As of" hidden></section>
         <main id="view"></main>
         <p class="ar-shell-note" id="note"></p>
       </div>`,
@@ -197,7 +329,7 @@ const Rules = (() => {
 
   function renderFilters() {
     const counts = {};
-    RULES.forEach((r) => (counts[r.status] = (counts[r.status] || 0) + 1));
+    visibleRules().forEach((r) => (counts[r.status] = (counts[r.status] || 0) + 1));
     $('filters').innerHTML = String(
       html`${Object.keys(STATUS).map((s) =>
         AR.Chip({
@@ -225,9 +357,126 @@ const Rules = (() => {
     controls.innerHTML = c;
     controls.hidden = !c;
     renderFilters();
+    renderAsOf();
     $('view').innerHTML = String(current.render(ctx));
     if (current.mount) current.mount(ctx);
   }
+  const KIND_LABEL = {
+    added: 'Added',
+    status: 'Status changed',
+    wording: 'Wording changed',
+    removed: 'Removed',
+  };
+  const KIND_TONE = { added: 'ok', status: 'info', wording: 'warn', removed: 'gone' };
+  function renderChanges() {
+    const pointItems = POINTS.map((p) => ({ id: p.id, label: pointLabel(p) }));
+    const from =
+      state.asOf.from || (state.asOf.point !== 'today' ? state.asOf.point : POINTS[0]?.id);
+    const d = diff(from, state.asOf.to);
+    const shown = d.items.filter((it) => matches(it.after || it.before));
+    const groups = CONCEPTS.map((c) => ({
+      c,
+      items: shown.filter((it) => it.rule.concept === c.id),
+    })).filter((g) => g.items.length);
+    const item = (it) => {
+      const a = it.before;
+      const b = it.after || it.before;
+      return html`<li class="ar-stack ar-shell-change" style="--ar-gap: var(--ar-space-3)">
+        ${AR.Cluster({
+          gap: '3',
+          children: html`<button class="ar-shell-change-id" data-id="${it.rule.id}">
+              ${it.rule.id}
+            </button>
+            ${it.kinds.map((k) => AR.Pill({ text: KIND_LABEL[k], tone: KIND_TONE[k] }))}
+            ${
+              it.kinds.includes('status')
+                ? html`${statusPill(a)}<span class="ar-shell-change-arrow">→</span>${statusPill(b)}`
+                : statusPill(b)
+            }`,
+        })}
+        ${
+          it.kinds.includes('wording')
+            ? AR.BeforeAfter({ before: md(a.statement), after: md(b.statement) })
+            : html`<p class="ar-shell-change-text">${md(b.statement)}</p>`
+        }
+        ${
+          it.events.length
+            ? html`<p class="ar-shell-change-events">
+                ${AR.join(
+                  it.events.map((e) => html`${eventLabel(e.type)} ${fmtDate(e.date)}`),
+                  ' · ',
+                )}
+              </p>`
+            : ''
+        }
+      </li>`;
+    };
+    return html`<div class="ar-stack ar-shell-changes" style="--ar-gap: var(--ar-space-6)">
+      ${AR.Toolbar({
+        label: 'Compare',
+        children: html`${AR.Select({ id: 'as-of-from', label: 'From', options: pointItems, selected: d.from.id })}
+        ${AR.Select({ id: 'as-of-to', label: 'To', options: pointItems, selected: d.to.id })}`,
+      })}
+      ${AR.Cluster({
+        gap: '3',
+        children: Object.keys(KIND_LABEL)
+          .filter((k) => d.counts[k])
+          .map((k) => AR.Pill({ text: `${KIND_LABEL[k]} ${d.counts[k]}`, tone: KIND_TONE[k] })),
+      })}
+      ${
+        groups.length
+          ? groups.map(
+              (g) =>
+                html`<section class="ar-stack" style="--ar-gap: var(--ar-space-4)">
+                  <h2 class="ar-shell-change-concept">${g.c.name} · ${g.items.length}</h2>
+                  <ul class="ar-stack ar-shell-change-list" style="--ar-gap: var(--ar-space-5)">
+                    ${g.items.map(item)}
+                  </ul>
+                </section>`,
+            )
+          : AR.EmptyState({
+              text: `Nothing changed between ${pointLabel(d.from)} and ${pointLabel(d.to)}.`,
+            })
+      }
+    </div>`;
+  }
+  function renderAsOf() {
+    const box = $('as-of');
+    if (!current || !current.asOf || !POINTS.length) {
+      box.hidden = true;
+      box.innerHTML = '';
+      return;
+    }
+    box.hidden = false;
+    const p = pointOf(state.asOf.point);
+    const on = asOfOn();
+    const existed = on ? rulesAt(p.id) : RULES;
+    const changed = on ? existed.filter((r) => r.changedSince).length : 0;
+    const summary = on
+      ? `${existed.length} rules existed on ${pointLabel(p)}. ${changed} changed since · ${RULES.length - existed.length} added later.`
+      : `Showing today: ${RULES.length} rules. Step back to see the registry as it stood on an earlier day or release.`;
+    box.innerHTML = String(
+      html`${AR.Toolbar({
+          label: 'As of',
+          children: html`<span class="ar-shell-asof-label">As of</span> ${AR.Stepper({
+              id: 'as-of-point',
+              label: 'As of',
+              items: POINTS.map((x) => ({ id: x.id, label: pointLabel(x) })),
+              selected: p.id,
+            })}
+            ${on ? AR.Chip({ label: 'Back to today', attrs: { 'data-asof': 'today' } }) : ''}
+            ${AR.Chip({ label: 'Compare', pressed: state.asOf.compare, attrs: { 'data-compare': '' } })}`,
+        })}
+        <p class="ar-shell-asof-summary">${summary}</p>
+        ${state.asOf.compare ? renderChanges() : ''}`,
+    );
+  }
+  function setPoint(id) {
+    state.asOf.point = pointById[id] ? id : 'today';
+    state.asOf.from = null;
+    render();
+  }
+
   function show(id, remember) {
     const v = views.find((x) => x.id === id) || views[0];
     if (!v) return;
@@ -265,6 +514,12 @@ const Rules = (() => {
       r.aliases && r.aliases.length && ['Old ids', code(r.aliases, ' · ')],
       ['Concept', cName[r.concept] || r.concept],
     ].filter(Boolean);
+    const then = asOfOn() ? ruleAt(r, pointOf(state.asOf.point)) : undefined;
+    if (then && (then.status !== r.status || then.statement !== r.statement))
+      facts.unshift([
+        `As of ${pointLabel(pointOf(state.asOf.point))}`,
+        html`${statusPill(then)} ${md(then.statement)}`,
+      ]);
     const why = currentWhy(r);
     const links = [...(r.related || []), ...(r.supersededBy ? [r.supersededBy] : [])];
     const history = html`<ol class="ar-shell-history">
@@ -328,6 +583,25 @@ const Rules = (() => {
       state.query = e.target.value.trim().toLowerCase();
       render();
     });
+    // "As of": while the range is dragged only its label follows; letting go
+    // (or a key) shows the point. The selects pick the compared points.
+    document.addEventListener('input', (e) => {
+      if (e.target.id !== 'as-of-point') return;
+      const p = POINTS[+e.target.value];
+      const out = document.querySelector('output[for="as-of-point"]');
+      if (p && out) out.textContent = pointLabel(p);
+    });
+    document.addEventListener('change', (e) => {
+      if (e.target.id === 'as-of-point' && POINTS[+e.target.value]) {
+        setPoint(POINTS[+e.target.value].id);
+        document.getElementById('as-of-point')?.focus();
+        return;
+      }
+      if (e.target.id === 'as-of-from' || e.target.id === 'as-of-to') {
+        state.asOf[e.target.id === 'as-of-from' ? 'from' : 'to'] = e.target.value;
+        render();
+      }
+    });
     document.addEventListener('click', (e) => {
       if (e.target.closest('a')) return;
       const th = e.target.closest('[data-t]');
@@ -338,6 +612,22 @@ const Rules = (() => {
       const tab = e.target.closest('[data-view]');
       if (tab) {
         show(tab.dataset.view, true);
+        return;
+      }
+      const step = e.target.closest('[data-stepper="as-of-point"]');
+      if (step) {
+        const i = POINTS.findIndex((x) => x.id === pointOf(state.asOf.point).id);
+        const next = POINTS[i + Number(step.dataset.step)];
+        if (next) setPoint(next.id);
+        return;
+      }
+      if (e.target.closest('[data-asof="today"]')) {
+        setPoint('today');
+        return;
+      }
+      if (e.target.closest('[data-compare]')) {
+        state.asOf.compare = !state.asOf.compare;
+        render();
         return;
       }
       const f = e.target.closest('[data-s]');

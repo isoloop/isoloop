@@ -102,6 +102,14 @@
     --ar-table-head: var(--ar-sunk);
     --ar-table-rule: var(--ar-line);
 
+    --ar-stepper-min: 12rem;
+    --ar-stepper-track: var(--ar-line);
+
+    --ar-badge-text: var(--ar-text-xs);
+
+    --ar-compare-bg: var(--ar-sunk);
+    --ar-compare-before: var(--ar-muted);
+
     --ar-tooltip-radius: var(--ar-radius-m);
     --ar-chart-grid: var(--ar-grid);
     --ar-chart-axis: var(--ar-axis);

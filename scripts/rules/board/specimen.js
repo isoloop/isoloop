@@ -268,6 +268,52 @@ Rules.view({
             ],
           }),
         ),
+        section(
+          'Select and stepper',
+          AR.Stack({
+            gap: '5',
+            children: [
+              AR.Select({
+                id: 'specimen-select',
+                label: 'A select',
+                options: [
+                  { id: 'a', label: 'v0.1.0 · 23 Nov' },
+                  { id: 'b', label: 'Today · 28 Nov' },
+                ],
+                selected: 'b',
+              }),
+              AR.Stepper({
+                id: 'specimen-stepper',
+                label: 'A stepper',
+                items: [
+                  { id: 'a', label: '3 Nov' },
+                  { id: 'b', label: 'v0.1.0 · 23 Nov' },
+                  { id: 'c', label: 'Today · 28 Nov' },
+                ],
+                selected: 'b',
+              }),
+            ],
+          }),
+        ),
+        section(
+          'Badge and before/after',
+          AR.Stack({
+            gap: '5',
+            children: [
+              AR.Cluster({
+                gap: '5',
+                children: [
+                  AR.Badge({ text: 'changed since' }),
+                  ...TONES.map((tone) => AR.Badge({ text: tone, tone })),
+                ],
+              }),
+              AR.BeforeAfter({
+                before: 'Restarts 3 times in 60 s.',
+                after: 'Restarts 3 times, then fails.',
+              }),
+            ],
+          }),
+        ),
         section('Charts', AR.Stack({ gap: '7', children: [chart, timeAxis] })),
         section(
           'Drawer',
