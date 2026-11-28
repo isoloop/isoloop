@@ -317,6 +317,153 @@
       items: groups.map((g) => ({ label: g.label, slot: g.slot, value: g.count })),
     });
 
+  // --- Heat: a sequential ramp of 5 steps (--ar-heat-1 … 5) plus empty ----------
+
+  /** The heat step for a count: 0 (none), then 1, 2, 3–4, 5–6, 7+ as steps 1–5. */
+  const heatStep = (count) =>
+    count <= 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : count <= 4 ? 3 : count <= 6 ? 4 : 5;
+  /** The labels for the 5 steps, in order. */
+  const HEAT_LABELS = ['1', '2', '3–4', '5–6', '7+'];
+
+  /**
+   * One heatmap cell: a rect in its heat step, with the count written on it when
+   * it fits. Empty cells are drawn faint and carry no attributes.
+   */
+  function heatCell({ x, y, width, height, count, showCount = true, attrs: a }) {
+    const step = heatStep(count);
+    const box = html`<rect
+      class="ar-heat-cell"
+      x="${n(x)}"
+      y="${n(y)}"
+      width="${n(Math.max(0, width))}"
+      height="${n(Math.max(0, height))}"
+      data-heat="${step}"
+    ></rect>`;
+    if (!step) return box;
+    return html`<g class="ar-heat" ${attrs(a)}
+      >${box}${
+        showCount
+          ? text({
+              x: x + width / 2,
+              y: y + height / 2,
+              value: count,
+              anchor: 'middle',
+              cls: 'ar-heat-count',
+              attrs: { 'data-heat': step, 'dominant-baseline': 'central' },
+            })
+          : ''
+      }</g
+    >`;
+  }
+
+  /** The heat ramp as a legend: none, then each step with its label. */
+  const HeatRamp = ({ label = 'Colour scale' } = {}) =>
+    html`<div
+      class="ar-heat-ramp"
+      role="img"
+      ${attrs({ 'aria-label': `${label}: none, ${HEAT_LABELS.join(', ')}` })}
+    >
+      <span>none</span><i data-heat="0"></i>${HEAT_LABELS.map(
+        (l, i) => html`<i data-heat="${i + 1}" title="${l}"></i>`,
+      )}<span>${HEAT_LABELS[HEAT_LABELS.length - 1]}</span>
+    </div>`;
+
+  // --- Strip and brush: counts per step, with a selected range to drag ----------
+
+  /** The step index under `x` on a strip `width` wide with `count` steps, clamped. */
+  const stripIndex = (x, width, count) =>
+    Math.min(count - 1, Math.max(0, Math.floor((x / (width || 1)) * count)));
+
+  /**
+   * A strip of bars, one per step, with the selected range [a, b] outlined.
+   * `labels` is a list of { index, text } written under the bars.
+   */
+  function strip({ counts, width, height, selected, labels = [], label }) {
+    const max = Math.max(1, ...counts);
+    const step = width / Math.max(1, counts.length);
+    const barH = height - 16;
+    const bars = counts.map((c, i) => {
+      if (!c) return '';
+      const h = Math.max(2, (c / max) * (barH - 4));
+      return html`<rect
+        class="ar-strip-bar"
+        x="${n(i * step + 1)}"
+        y="${n(barH - h)}"
+        width="${n(Math.max(1, step - 2))}"
+        height="${n(h)}"
+      ></rect>`;
+    });
+    const [a, b] = selected || [0, counts.length - 1];
+    const sel = html`<rect
+      class="ar-strip-sel"
+      x="${n(a * step)}"
+      y="0"
+      width="${n((b - a + 1) * step)}"
+      height="${n(barH)}"
+    ></rect>`;
+    const texts = labels.map((l, k) =>
+      text({
+        x: (l.index + 0.5) * step,
+        y: height - 2,
+        value: l.text,
+        anchor: k === 0 ? 'start' : k === labels.length - 1 ? 'end' : 'middle',
+        cls: 'ar-chart-axis',
+      }),
+    );
+    return svg({
+      width,
+      height,
+      label,
+      attrs: { class: 'ar-strip', 'data-steps': counts.length },
+      body: html`${bars}${sel}${texts}`,
+    });
+  }
+
+  /**
+   * Makes a strip from `strip()` draggable: dragging outlines a range, and on
+   * release `onPick([a, b])` gets it (a single click picks the whole strip).
+   */
+  function brush(svgEl, onPick) {
+    if (!svgEl) return;
+    const steps = Number(svgEl.dataset.steps) || 1;
+    const sel = svgEl.querySelector('.ar-strip-sel');
+    const width = svgEl.viewBox.baseVal.width;
+    const at = (ev) => {
+      const r = svgEl.getBoundingClientRect();
+      return stripIndex(((ev.clientX - r.left) / (r.width || 1)) * width, width, steps);
+    };
+    let start = null;
+    svgEl.addEventListener('pointerdown', (ev) => {
+      start = at(ev);
+      svgEl.setPointerCapture(ev.pointerId);
+    });
+    svgEl.addEventListener('pointermove', (ev) => {
+      if (start === null) return;
+      const i = at(ev);
+      const step = width / steps;
+      sel.setAttribute('x', String(Math.min(start, i) * step));
+      sel.setAttribute('width', String((Math.abs(i - start) + 1) * step));
+    });
+    svgEl.addEventListener('pointerup', (ev) => {
+      if (start === null) return;
+      const i = at(ev);
+      const a = Math.min(start, i);
+      const b = Math.max(start, i);
+      start = null;
+      onPick(a === b ? [0, steps - 1] : [a, b]);
+    });
+  }
+
+  /** A length token in pixels, read from the page (for SVG geometry); `fallback` outside a page. */
+  function px(name, fallback) {
+    if (typeof document === 'undefined') return fallback;
+    const style = getComputedStyle(document.documentElement);
+    const value = style.getPropertyValue(`--ar-${name}`).trim();
+    const v = parseFloat(value);
+    if (!Number.isFinite(v)) return fallback;
+    return /rem$/.test(value) ? v * (parseFloat(style.fontSize) || 16) : v;
+  }
+
   AR.chart = {
     ticks,
     scaleLinear,
@@ -337,6 +484,14 @@
     legendFor,
     sankey,
     squarify,
+    heatStep,
+    HEAT_LABELS,
+    heatCell,
+    stripIndex,
+    strip,
+    brush,
+    px,
     raw,
   };
+  AR.HeatRamp = HeatRamp;
 })((globalThis.AR ??= {}));

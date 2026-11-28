@@ -37,6 +37,11 @@
     --ar-cat-7: #b3261e;
     --ar-cat-8: #5d6472;
     --ar-cat-other: #7e8696;
+    --ar-event-decision: #2f57cc;
+    --ar-event-change: #b75400;
+    --ar-event-delivery: #23793f;
+    --ar-event-ending: #6e46c2;
+    --ar-event-correction: #a62f68;
     --ar-shadow: 0 12px 40px #14161c29;
     --ar-scrim: #0a0f1959;
     --ar-font-sans: 'Archivo', var(--ar-font-system);
@@ -77,6 +82,11 @@
       --ar-cat-7: #ff8f86;
       --ar-cat-8: #9aa2b2;
       --ar-cat-other: #717785;
+      --ar-event-decision: #8aa5ff;
+      --ar-event-change: #f9aa60;
+      --ar-event-delivery: #6fcf87;
+      --ar-event-ending: #b79af6;
+      --ar-event-correction: #e58ab4;
       --ar-shadow: 0 12px 40px #00000080;
       --ar-scrim: #0000008c;
       --ar-font-sans: 'Archivo', var(--ar-font-system);
@@ -118,6 +128,11 @@
     --ar-cat-7: #ff8f86;
     --ar-cat-8: #9aa2b2;
     --ar-cat-other: #717785;
+    --ar-event-decision: #8aa5ff;
+    --ar-event-change: #f9aa60;
+    --ar-event-delivery: #6fcf87;
+    --ar-event-ending: #b79af6;
+    --ar-event-correction: #e58ab4;
     --ar-shadow: 0 12px 40px #00000080;
     --ar-scrim: #0000008c;
     --ar-font-sans: 'Archivo', var(--ar-font-system);

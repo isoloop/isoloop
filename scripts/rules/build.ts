@@ -154,7 +154,7 @@ const inDir = (dir: string, ext: string) => {
 
 /** The design system's files, in order (ADR 0026, amended 2026-11-28). */
 export const DS_CSS = ['tokens.css', 'base.css', 'layout.css', 'components.css'];
-export const DS_JS = ['html.js', 'components.js', 'chart.js'];
+export const DS_JS = ['html.js', 'components.js', 'chart.js', 'events.js'];
 
 /**
  * Reads the page's sources from `dir` (board/ by default): the design system with

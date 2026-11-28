@@ -110,6 +110,7 @@ const TEXT_PAIRS: [string, string][] = [
   ['axis', 'surface'],
 ];
 const GRAPHIC_SLOTS = ['1', '2', '3', '4', '5', '6', '7', '8', 'other'];
+const EVENT_FAMILIES = ['decision', 'change', 'delivery', 'ending', 'correction'];
 
 describe('contrast, every theme in light and dark', () => {
   it('has the themes', () => {
@@ -134,6 +135,12 @@ describe('contrast, every theme in light and dark', () => {
       });
       it(`${name} ${mode}: chart slots reach 3:1 against the surface`, () => {
         const low = GRAPHIC_SLOTS.filter((s) => contrast(t[`cat-${s}`]!, t['surface']!) < 3);
+        expect(low).toEqual([]);
+      });
+      it(`${name} ${mode}: event families reach 3:1 against the surface`, () => {
+        const low = EVENT_FAMILIES.filter(
+          (f) => !t[`event-${f}`] || contrast(t[`event-${f}`]!, t['surface']!) < 3,
+        );
         expect(low).toEqual([]);
       });
     }
@@ -488,5 +495,116 @@ describe('the chart toolkit', () => {
         expect(ox > 1e-9 && oy > 1e-9).toBe(false);
       }
     expect(chartFn('squarify')([], { width: 6, height: 4 })).toEqual([]);
+  });
+});
+
+// --- Event symbols, heat and the strip ----------------------------------------
+
+interface EventsApi {
+  TYPES: Record<string, { family: string; shape: string; filled: boolean; label: string }>;
+  ORDER: string[];
+  FAMILIES: string[];
+  eventSymbol: Fn;
+  symbol: Fn;
+  typeOf: Fn;
+}
+const isEvents = (v: unknown): v is EventsApi =>
+  isRec(v) && isRec(v['TYPES']) && Array.isArray(v['ORDER']) && isFn(v['eventSymbol']);
+
+describe('event symbols', () => {
+  const ev = must(AR['events'], isEvents, 'AR.events');
+  it('covers every event type in five families', () => {
+    expect(ev.ORDER).toEqual([
+      'proposed',
+      'decided',
+      'clarified',
+      'amended',
+      'built',
+      'shipped',
+      'withdrawn',
+      'superseded',
+      'rejected',
+      'removed',
+      'reopened',
+      'corrected',
+    ]);
+    expect(new Set(ev.ORDER.map((t) => ev.TYPES[t]!.family))).toEqual(new Set(ev.FAMILIES));
+  });
+  it('tells the types within a family apart by shape or fill', () => {
+    for (const f of ev.FAMILIES) {
+      const looks = ev.ORDER.filter((t) => ev.TYPES[t]!.family === f).map(
+        (t) => `${ev.TYPES[t]!.shape}/${ev.TYPES[t]!.filled}`,
+      );
+      expect(new Set(looks).size).toBe(looks.length);
+    }
+  });
+  it('draws each shape with its family and fill, never a colour', () => {
+    const shapes = ['circle', 'square', 'diamond', 'triangle', 'cross', 'plus'];
+    for (const shape of shapes) {
+      const out = str(ev.symbol({ shape, cx: 5, cy: 5, size: 8, family: 'change', filled: false }));
+      expect(out).toContain('class="ar-symbol"');
+      expect(out).toContain('data-family="change"');
+      expect(out).toContain('data-filled="false"');
+      expect(out).not.toMatch(/#[0-9a-f]{3,6}|fill="[a-z]/i);
+    }
+    expect(str(ev.eventSymbol({ type: 'shipped', cx: 0, cy: 0, size: 8 }))).toContain(
+      'data-family="delivery" data-filled="true"',
+    );
+    expect(str(ev.eventSymbol({ type: 'unknown-type', cx: 0, cy: 0, size: 8 }))).toContain(
+      '<circle',
+    );
+  });
+  it('puts an icon in a chip in place of the dot', () => {
+    const chip = str(
+      fn('Chip')({ label: 'Amended', icon: fn('EventIcon')({ type: 'amended' }), tone: 'ok' }),
+    );
+    expect(chip).toContain('class="ar-symbol-icon"');
+    expect(chip).not.toContain('ar-dot');
+  });
+});
+
+describe('heat and the strip', () => {
+  it('maps counts to heat steps', () => {
+    const step = chartFn('heatStep');
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 30].map((c) => step(c))).toEqual([0, 1, 2, 3, 3, 4, 4, 5, 5]);
+  });
+  it('draws a heat cell with its step and count, and an empty cell plain', () => {
+    const cell = str(
+      chartFn('heatCell')({
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 20,
+        count: 5,
+        attrs: { 'data-cell': 'k' },
+      }),
+    );
+    expect(cell).toContain('data-cell="k"');
+    expect(cell).toContain('class="ar-heat-cell"');
+    expect(cell).toContain('data-heat="4"');
+    expect(cell).toContain('>5</text>');
+    const empty = str(chartFn('heatCell')({ x: 0, y: 0, width: 20, height: 20, count: 0 }));
+    expect(empty).toBe(
+      '<rect class="ar-heat-cell" x="0" y="0" width="20" height="20" data-heat="0"></rect>',
+    );
+  });
+  it('lists every heat step in the ramp', () => {
+    const ramp = str(fn('HeatRamp')({ label: 'Count' }));
+    for (const s of ['0', '1', '2', '3', '4', '5']) expect(ramp).toContain(`data-heat="${s}"`);
+  });
+  it('finds the step under a point, clamped to the strip', () => {
+    const at = chartFn('stripIndex');
+    expect(at(0, 100, 10)).toBe(0);
+    expect(at(55, 100, 10)).toBe(5);
+    expect(at(100, 100, 10)).toBe(9);
+    expect(at(-5, 100, 10)).toBe(0);
+  });
+  it('draws a strip with one bar per non-zero step and the range outlined', () => {
+    const out = str(
+      chartFn('strip')({ counts: [1, 0, 3, 2], width: 40, height: 56, selected: [1, 2] }),
+    );
+    expect(out.match(/class="ar-strip-bar"/g)).toHaveLength(3);
+    expect(out).toContain('class="ar-strip-sel" x="10" y="0" width="20"');
+    expect(out).toContain('data-steps="4"');
   });
 });
