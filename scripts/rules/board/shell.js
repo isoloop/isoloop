@@ -96,8 +96,9 @@ const Rules = (() => {
   // --- As of (ADR 0026, amended 2026-11-28) ------------------------------------
   // Each rule's snapshots come from the build (model.history), so a point in
   // time is a lookup. Limits accepted for now: a whole day is one step, earlier
-  // wording comes from `prev`, and only the statement, the status and `since`
-  // have a history; every other field shows today's value.
+  // wording comes from `prev`, and only the statement and the status have a
+  // history (`since` follows the shipped event that set the status); every
+  // other field shows today's value.
   const POINTS = DATA.model.points || [];
   const HISTORY = DATA.model.history || {};
   const TODAY = POINTS.length ? POINTS[POINTS.length - 1] : { id: 'today', date: '9999-12-31' };

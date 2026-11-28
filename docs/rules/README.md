@@ -5796,7 +5796,7 @@ History:
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · Accepted for now: storing times and every field's earlier value is left for later.
-- 2026-11-28 · built · [#513](https://github.com/isoloop/isoloop/issues/513) · "As of" is built with these limits: a day per step, wording from `prev`, history for the statement, status and `since` only.
+- 2026-11-28 · built · [#513](https://github.com/isoloop/isoloop/issues/513) · "As of" is built with these limits: a day per step, wording from `prev`, history for the statement and the status only (`since` follows the shipped event).
 
 ### `tool.rules-links`
 

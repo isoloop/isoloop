@@ -38,8 +38,10 @@ export interface Model {
 
 /**
  * A rule as it stood from the end of `date` on, until its next snapshot. Only
- * the statement, the status and `since` have a history (ADR 0026, amended
- * 2026-11-28): earlier wording comes from `prev`, and a whole day is one step.
+ * the statement and the status have a history (ADR 0026, amended 2026-11-28):
+ * earlier wording comes from `prev`, and a whole day is one step. `since` isn't
+ * a history of its own: it's the release named by the `shipped` event that
+ * made the status active.
  */
 export interface Snapshot {
   date: string;
@@ -69,7 +71,7 @@ const STATUS_AFTER: Partial<Record<EventType, Status>> = {
 };
 
 /**
- * A rule's snapshots, one per day its status, statement or `since` changed. The
+ * A rule's snapshots, one per day its status or statement changed. The
  * statement on a day is the `prev` of the first amendment or clarification
  * after it, or today's statement. The last snapshot always matches the rule as
  * stored, so the newest point shows the registry exactly.

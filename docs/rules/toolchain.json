@@ -1826,7 +1826,7 @@
         "type": "built",
         "date": "2026-11-28",
         "ref": "#513",
-        "why": "\"As of\" is built with these limits: a day per step, wording from `prev`, history for the statement, status and `since` only."
+        "why": "\"As of\" is built with these limits: a day per step, wording from `prev`, history for the statement and the status only (`since` follows the shipped event)."
       }
     ],
     "code": ["scripts/rules/model.ts", "scripts/rules/board/shell.js"]
