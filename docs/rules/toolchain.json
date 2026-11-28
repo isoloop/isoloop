@@ -108,6 +108,7 @@
     "status": "active",
     "repo": true,
     "related": ["tool.rules-never-deleted", "tool.rule-ids-kept"],
+    "keywords": ["placement"],
     "events": [
       {
         "type": "decided",
@@ -239,6 +240,7 @@
     "statement": "An event's `ref` is something a reader can open on GitHub: `adr/NNNN#anchor` for an ADR heading (the anchor is required), `#N` or `repo#N` for a PR or an issue, or `vX.Y.Z` for a release tag. Each event type takes only the ref kinds in decision 6's table, and grilling notes and agent memory are never a source.",
     "status": "active",
     "repo": true,
+    "keywords": ["releases"],
     "events": [
       {
         "type": "decided",
@@ -289,6 +291,7 @@
     "status": "active",
     "repo": true,
     "code": ["docs/rules/schema.json", "scripts/rules/check.ts"],
+    "keywords": ["schemas"],
     "events": [
       {
         "type": "decided",
@@ -353,6 +356,7 @@
     "repo": true,
     "knob": "`pnpm rules:check`",
     "code": ["scripts/rules/check.ts", ".github/workflows/ci.yml"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "decided",
@@ -448,6 +452,7 @@
     "status": "active",
     "repo": true,
     "code": ["AGENTS.md"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "decided",
@@ -470,6 +475,7 @@
     "repo": true,
     "knob": "`pnpm rules:ship <version>`",
     "code": ["scripts/rules/ship.ts"],
+    "keywords": ["releases"],
     "events": [
       {
         "type": "decided",
@@ -492,6 +498,7 @@
     "repo": true,
     "knob": "`pnpm rules:build`",
     "code": ["scripts/rules/build.ts"],
+    "keywords": ["commits"],
     "events": [
       {
         "type": "decided",
@@ -560,6 +567,7 @@
     "statement": "Rules for the existing ADRs are added one concept per PR, each reviewed by the maintainer. Supervision, Durability and Versioning & releases go first.",
     "status": "active",
     "repo": true,
+    "keywords": ["durability", "releases"],
     "events": [
       {
         "type": "decided",
@@ -621,6 +629,7 @@
     "statement": "The rules registry is internal tooling outside the milestones, and its PRs take the `no-changeset` label.",
     "status": "active",
     "repo": true,
+    "keywords": ["releases"],
     "events": [
       {
         "type": "decided",
@@ -643,6 +652,7 @@
     "repo": true,
     "code": ["scripts/rules/check.ts"],
     "related": ["tool.rules-ship"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "decided",
@@ -664,6 +674,7 @@
     "status": "active",
     "repo": true,
     "related": ["tool.rules-ship"],
+    "keywords": ["releases"],
     "events": [
       {
         "type": "decided",
@@ -730,6 +741,7 @@
     "repo": true,
     "code": [".github/workflows/ci.yml"],
     "related": ["tool.ci-docs-only-paths", "tool.ci-docs-only-required-checks", "tool.ci-nightly"],
+    "keywords": ["requests", "measurement"],
     "events": [
       {
         "type": "decided",
@@ -753,6 +765,7 @@
     "values": ["docs/**", "**/*.md", ".changeset/**", ".claude/**"],
     "code": [".github/workflows/ci.yml"],
     "related": ["tool.ci-docs-only"],
+    "keywords": ["requests", "releases"],
     "events": [
       {
         "type": "decided",
@@ -775,6 +788,7 @@
     "repo": true,
     "code": [".github/workflows/ci.yml"],
     "related": ["tool.ci-docs-only"],
+    "keywords": ["ci", "requests"],
     "events": [
       {
         "type": "decided",
@@ -797,6 +811,7 @@
     "repo": true,
     "code": [".github/workflows/ci.yml"],
     "related": ["tool.ci-docs-only"],
+    "keywords": ["ci", "errors", "releases"],
     "events": [
       {
         "type": "decided",
@@ -820,6 +835,7 @@
     "values": ["03:00 UTC daily"],
     "code": [".github/workflows/nightly.yml"],
     "related": ["tool.ci-nightly-quiet-skip", "tool.ci-nightly-issue", "tool.ci-docs-only"],
+    "keywords": ["ci", "measurement"],
     "events": [
       {
         "type": "decided",
@@ -842,6 +858,7 @@
     "repo": true,
     "code": [".github/workflows/nightly.yml"],
     "related": ["tool.ci-nightly"],
+    "keywords": ["back-pressure", "ci", "commits"],
     "events": [
       {
         "type": "decided",
@@ -865,6 +882,7 @@
     "values": ["label: nightly-failure"],
     "code": [".github/workflows/nightly.yml"],
     "related": ["tool.ci-nightly"],
+    "keywords": ["ci", "commits"],
     "events": [
       {
         "type": "decided",
@@ -886,6 +904,7 @@
     "status": "rejected",
     "repo": true,
     "related": ["tool.ci-docs-only"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "rejected",
@@ -925,6 +944,7 @@
     "repo": true,
     "values": ["Node 26"],
     "code": [".nvmrc"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "decided",
@@ -970,6 +990,7 @@
     "repo": true,
     "code": [".oxlintrc.json", ".oxfmtrc.json"],
     "related": ["tool.lint-errors-only", "tool.format-settings", "tool.no-eslint"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "decided",
@@ -990,6 +1011,7 @@
     "statement": "The repo doesn't use ESLint, typescript-eslint or Prettier.",
     "status": "rejected",
     "related": ["tool.oxc-lint-format"],
+    "keywords": ["own-stack"],
     "events": [
       {
         "type": "rejected",
@@ -1026,6 +1048,7 @@
     "status": "active",
     "repo": true,
     "code": ["vitest.config.ts", "playwright.config.ts"],
+    "keywords": ["browsers", "measurement"],
     "events": [
       {
         "type": "decided",
@@ -1048,6 +1071,7 @@
     "repo": true,
     "code": ["package.json"],
     "related": ["tool.no-git-hooks"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "decided",
@@ -1069,6 +1093,7 @@
     "status": "active",
     "repo": true,
     "related": ["tool.root-scripts"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "decided",
@@ -1112,6 +1137,7 @@
     "status": "active",
     "repo": true,
     "code": ["tsconfig.base.json", "vitest.config.ts"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "decided",
@@ -1133,6 +1159,7 @@
     "status": "active",
     "repo": true,
     "code": [".oxlintrc.json", "packages/bus/tsconfig.json"],
+    "keywords": ["errors", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -1154,6 +1181,7 @@
     "status": "active",
     "repo": true,
     "code": [".oxlintrc.json"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "decided",
@@ -1199,6 +1227,7 @@
     "code": ["tsconfig.base.json"],
     "since": "0.1.0",
     "related": ["tool.unsupported-browser"],
+    "keywords": ["browsers"],
     "events": [
       {
         "type": "decided",
@@ -1229,6 +1258,7 @@
     "code": ["packages/host/src/kernel/features.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["tool.browser-baseline"],
+    "keywords": ["browsers", "lifecycle", "durability", "errors"],
     "events": [
       {
         "type": "decided",
@@ -1280,6 +1310,7 @@
     "values": ["weekly", "3-day cooldown"],
     "code": [".github/dependabot.yml"],
     "related": ["tool.exact-pins"],
+    "keywords": ["timeouts", "releases"],
     "events": [
       {
         "type": "decided",
@@ -1303,6 +1334,7 @@
     "values": ["minimumReleaseAge 4320 min", "strictPeerDependencies"],
     "code": ["pnpm-workspace.yaml", ".github/workflows/ci.yml"],
     "related": ["tool.exact-pins"],
+    "keywords": ["blocked-worker", "commits"],
     "events": [
       {
         "type": "decided",
@@ -1346,6 +1378,7 @@
     "status": "active",
     "repo": true,
     "code": [".vscode/settings.json", ".vscode/extensions.json"],
+    "keywords": ["commits"],
     "events": [
       {
         "type": "decided",
@@ -1367,6 +1400,7 @@
     "status": "active",
     "repo": true,
     "code": [".github/workflows/ci.yml", ".github/actions/install-browsers"],
+    "keywords": ["ci", "measurement"],
     "events": [
       {
         "type": "decided",
@@ -1393,6 +1427,7 @@
     "statement": "The repo uses no NX, turbo or Vite+ task graph.",
     "status": "rejected",
     "related": ["tool.pnpm-workspaces"],
+    "keywords": ["own-stack"],
     "events": [
       {
         "type": "rejected",
@@ -1515,6 +1550,7 @@
     "statement": "A file that moves keeps its name, and a move changes nothing in `dist` except tsdown's source-path comments.",
     "status": "active",
     "repo": true,
+    "keywords": ["placement"],
     "events": [
       {
         "type": "decided",
@@ -1578,6 +1614,7 @@
     "code": ["packages/runtime/package.json", "scripts/check-exports.ts"],
     "since": "0.1.0",
     "related": ["tool.esm-only", "tool.bundle-budgets"],
+    "keywords": ["observability"],
     "events": [
       {
         "type": "decided",
@@ -1607,6 +1644,7 @@
     "values": ["+5%", "0.5 KB steps"],
     "code": ["bench/bundle-size/bundle-size.ts", "bench/bundle-size/budgets.json"],
     "related": ["tool.side-effects"],
+    "keywords": ["budgets", "measurement"],
     "events": [
       {
         "type": "decided",
@@ -1629,6 +1667,7 @@
     "repo": true,
     "code": [".oxlintrc.json"],
     "related": ["tool.no-barrels", "tool.lint-errors-only"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "decided",
@@ -1673,6 +1712,7 @@
     "repo": true,
     "code": [".oxlintrc.json"],
     "related": ["tool.dependency-rules", "tool.dom-halves"],
+    "keywords": ["rendering"],
     "events": [
       {
         "type": "decided",
@@ -1795,7 +1835,7 @@
   {
     "id": "tool.rules-sources",
     "statement": "The Sources tab shows which ADRs feed which concepts, a treemap of the `code` paths rules cite, and a Health list of where the registry is weak.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "related": ["tool.rules-tabs"],
     "events": [
@@ -1804,13 +1844,24 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "It shows where facts come from, where they live in the code, and what the registry is missing."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#515",
+        "why": "The Sources tab, with Code and Health, is in force from this PR."
       }
+    ],
+    "code": [
+      "scripts/rules/board/views/sources.js",
+      "scripts/rules/model.ts",
+      "scripts/rules/board/ds/chart.js"
     ]
   },
   {
     "id": "tool.rules-as-of",
     "statement": "Board, Agenda and Hive have an \"as of\" option that rebuilds each rule as it stood on a chosen date or release, and a diff that lists what changed between two points.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "related": ["tool.rules-as-of-limits"],
     "events": [
@@ -1819,13 +1870,20 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "Seeing what held at a release, and what changed since, answers what a release changed in facts rather than commits."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#513",
+        "why": "The \"as of\" option and the Changes panel are built on Board, Agenda and Hive."
       }
-    ]
+    ],
+    "code": ["scripts/rules/model.ts", "scripts/rules/board/shell.js"]
   },
   {
     "id": "tool.rules-as-of-limits",
     "statement": "\"As of\" places a whole day at once, since events have no time; earlier wording comes from `prev`, which is free text; only the statement and the status have a history.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "related": ["tool.rules-as-of"],
     "events": [
@@ -1834,8 +1892,15 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "Accepted for now: storing times and every field's earlier value is left for later."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#513",
+        "why": "\"As of\" is built within these limits: a day per step, wording from `prev`, history for the statement and the status only (`since` follows the shipped event)."
       }
-    ]
+    ],
+    "code": ["scripts/rules/model.ts", "scripts/rules/board/shell.js"]
   },
   {
     "id": "tool.rules-links",
