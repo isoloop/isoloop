@@ -3,6 +3,9 @@
 // switch and the rule drawer, all built from the design system's components.
 // Each view registers itself with `Rules.view({...})` from views/, and
 // `Rules.start()` runs last. Views get everything through `ctx`.
+// Shared filters: the statuses, the search, the keywords (a rule must carry
+// every chosen one) and one symbol. Any element with `data-kw="<id>"` toggles a
+// keyword filter and `data-sym="<name>"` picks a symbol, from any view or the drawer.
 const Rules = (() => {
   const { html, raw, md, attrs } = AR;
   const DATA = /*RULES_DATA*/ null || {
@@ -11,7 +14,14 @@ const Rules = (() => {
     rules: [],
     refs: {},
     keywords: [],
-    model: { symbols: {}, links: [], tooCommon: [], keywordRules: {} },
+    model: {
+      symbols: {},
+      links: [],
+      tooCommon: [],
+      keywordRules: {},
+      keywordGraph: { width: 1000, height: 600, nodes: [], edges: [] },
+      keywordNeighbours: {},
+    },
   };
   const CONCEPTS = DATA.concepts;
   const RULES = DATA.rules;
@@ -85,10 +95,26 @@ const Rules = (() => {
     } catch (e) {}
   };
 
-  // Shared state: the status filters and the search apply to every view.
-  const state = { query: '', on: new Set(['active', 'decided', 'proposed']) };
-  function matches(r) {
+  // Shared state: the status filters, the search, the keywords and the symbol apply to every view.
+  const KEYWORDS = DATA.keywords || [];
+  const kwLabel = Object.fromEntries(KEYWORDS.map((k) => [k.id, k.label]));
+  const SYMBOLS = [...new Set(Object.values(DATA.model.symbols || {}).flat())].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  const state = {
+    query: '',
+    on: new Set(['active', 'decided', 'proposed']),
+    keywords: new Set(),
+    symbol: '',
+  };
+  /** Whether a rule passes the shared filters; `ignoreKeywords` skips the keyword and symbol filters. */
+  function matches(r, opts = {}) {
     if (!state.on.has(r.status)) return false;
+    if (!opts.ignoreKeywords) {
+      for (const k of state.keywords) if (!(r.keywords || []).includes(k)) return false;
+      if (state.symbol && !((DATA.model.symbols || {})[r.id] || []).includes(state.symbol))
+        return false;
+    }
     if (!state.query) return true;
     const hay = [
       r.id,
@@ -109,7 +135,9 @@ const Rules = (() => {
 
   // Views, sorted by `order`. A view is { id, label, order, render(ctx) → SafeHtml,
   // controls?(ctx) → SafeHtml for the header, onClick?(event, ctx) → true when
-  // handled, mount?(ctx) after its HTML is in the page }.
+  // handled, mount?(ctx) after its HTML is in the page, drawer?(rule, ctx) →
+  // { facts?: [[term, value]], sections?: [{ heading, body }] } added to every
+  // rule's drawer, whichever tab is open }.
   const views = [];
   let current = null;
   function view(def) {
@@ -127,7 +155,9 @@ const Rules = (() => {
     concepts: CONCEPTS,
     rules: RULES,
     refs: REFS,
-    keywords: DATA.keywords || [],
+    keywords: KEYWORDS,
+    kwLabel,
+    symbols: SYMBOLS,
     model: DATA.model,
     STATUS,
     STATUS_TONE,
@@ -148,6 +178,13 @@ const Rules = (() => {
     matches,
     render: () => render(),
     openRule: (id) => openRule(id),
+    show: (id) => show(id, true),
+    /** Filters every view to one keyword and shows the Board. */
+    filterKeyword: (id) => {
+      state.keywords = new Set([id]);
+      closeRule();
+      show('board', true);
+    },
   };
 
   const $ = (id) => document.getElementById(id);
@@ -186,8 +223,25 @@ const Rules = (() => {
         ${AR.Toolbar({
           label: 'Filters',
           children: html`${AR.Field({ id: 'q', type: 'search', label: 'Search', hideLabel: true, placeholder: 'Search rules, values, knobs, refs…' })}
-            <div class="ar-cluster" id="filters"></div>`,
+            <div class="ar-cluster" id="filters"></div>
+            ${
+              SYMBOLS.length
+                ? html`${AR.Field({ id: 'sym', type: 'search', label: 'Symbol', hideLabel: true, placeholder: 'Pick a symbol…', list: 'sym-list' })}
+                    <datalist id="sym-list">
+                      ${SYMBOLS.map((x) => html`<option value="${x}"></option>`)}
+                    </datalist>`
+                : ''
+            }`,
         })}
+        ${
+          KEYWORDS.some((k) => (DATA.model.keywordRules[k.id] || []).length)
+            ? html`<details class="ar-shell-kw" id="kw-filter">
+                <summary class="ar-shell-kw-summary">Keywords</summary>
+                <div class="ar-cluster" id="kw-chips"></div>
+              </details>`
+            : ''
+        }
+        <div class="ar-cluster" id="active-filters" hidden></div>
         <main id="view"></main>
         <p class="ar-shell-note" id="note"></p>
       </div>`,
@@ -210,6 +264,41 @@ const Rules = (() => {
       )}`,
     );
   }
+  function renderKeywordFilters() {
+    const chips = $('kw-chips');
+    if (chips)
+      chips.innerHTML = String(
+        html`${KEYWORDS.filter((k) => (DATA.model.keywordRules[k.id] || []).length).map((k) =>
+          AR.Chip({
+            label: k.label,
+            pressed: state.keywords.has(k.id),
+            count: DATA.model.keywordRules[k.id].length,
+            attrs: { 'data-kw': k.id, title: k.definition },
+          }),
+        )}`,
+      );
+    const active = $('active-filters');
+    const parts = [
+      ...[...state.keywords].map((k) =>
+        AR.Chip({
+          label: html`Keyword: ${kwLabel[k] || k} ×`,
+          pressed: true,
+          attrs: { 'data-kw': k },
+        }),
+      ),
+      ...(state.symbol
+        ? [
+            AR.Chip({
+              label: html`Symbol: <code>${state.symbol}</code> ×`,
+              pressed: true,
+              attrs: { 'data-sym-clear': '' },
+            }),
+          ]
+        : []),
+    ];
+    active.innerHTML = String(html`${parts}`);
+    active.hidden = parts.length === 0;
+  }
   function render() {
     if (!current) return;
     $('tabs').innerHTML = String(
@@ -225,6 +314,7 @@ const Rules = (() => {
     controls.innerHTML = c;
     controls.hidden = !c;
     renderFilters();
+    renderKeywordFilters();
     $('view').innerHTML = String(current.render(ctx));
     if (current.mount) current.mount(ctx);
   }
@@ -267,6 +357,9 @@ const Rules = (() => {
     ].filter(Boolean);
     const why = currentWhy(r);
     const links = [...(r.related || []), ...(r.supersededBy ? [r.supersededBy] : [])];
+    // Views may add facts and sections to the drawer through `drawer(rule, ctx)`.
+    const extra = views.map((v) => (v.drawer ? v.drawer(r, ctx) || {} : {}));
+    facts.push(...extra.flatMap((x) => x.facts || []));
     const history = html`<ol class="ar-shell-history">
       ${[...r.events].reverse().map(
         (e) =>
@@ -302,6 +395,7 @@ const Rules = (() => {
                 },
               ]
             : []),
+          ...extra.flatMap((x) => x.sections || []),
         ],
       }),
     );
@@ -309,6 +403,13 @@ const Rules = (() => {
   }
   function closeRule() {
     $('drawer-root').innerHTML = '';
+  }
+
+  function setSymbol(x) {
+    state.symbol = SYMBOLS.includes(x) ? x : '';
+    const f = $('sym');
+    if (f) f.value = state.symbol;
+    render();
   }
 
   function setTheme(t) {
@@ -328,6 +429,11 @@ const Rules = (() => {
       state.query = e.target.value.trim().toLowerCase();
       render();
     });
+    const symField = $('sym');
+    if (symField)
+      symField.addEventListener('change', (e) => {
+        if (SYMBOLS.includes(e.target.value) || e.target.value === '') setSymbol(e.target.value);
+      });
     document.addEventListener('click', (e) => {
       if (e.target.closest('a')) return;
       const th = e.target.closest('[data-t]');
@@ -352,6 +458,26 @@ const Rules = (() => {
         return;
       }
       if (current && current.onClick && current.onClick(e, ctx)) return;
+      const kw = e.target.closest('[data-kw]');
+      if (kw) {
+        const k = kw.dataset.kw;
+        if (kw.closest('.ar-drawer')) {
+          closeRule();
+          state.keywords = new Set([k]);
+        } else state.keywords.has(k) ? state.keywords.delete(k) : state.keywords.add(k);
+        render();
+        return;
+      }
+      const sym = e.target.closest('[data-sym]');
+      if (sym) {
+        setSymbol(sym.dataset.sym);
+        closeRule();
+        return;
+      }
+      if (e.target.closest('[data-sym-clear]')) {
+        setSymbol('');
+        return;
+      }
       const t = e.target.closest('[data-id]');
       if (t) openRule(t.dataset.id);
     });
