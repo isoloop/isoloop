@@ -1,0 +1,150 @@
+/* The Keywords tab (owner: keywords): the map, its side panel, the glossary,
+   and the keyword and symbol buttons it adds to the drawer. */
+@layer views {
+  /* The map scrolls sideways inside its own box on a narrow screen. */
+  .ar-keywords-main {
+    min-width: 0;
+  }
+  .ar-keywords-scroll {
+    overflow-x: auto;
+  }
+  .ar-keywords-map {
+    min-width: var(--ar-chart-min-width);
+  }
+  .ar-keywords-edge {
+    stroke: var(--ar-chart-edge);
+    stroke-width: var(--ar-hairline);
+  }
+  .ar-keywords-edge[data-strength='2'] {
+    stroke-width: var(--ar-rule);
+  }
+  .ar-keywords-edge[data-strength='3'] {
+    stroke-width: calc(var(--ar-rule) * 2);
+  }
+  .ar-keywords-edge[data-on],
+  .ar-keywords-map[data-hover] .ar-keywords-edge[data-near] {
+    stroke: var(--ar-chart-edge-on);
+  }
+  .ar-keywords-node {
+    cursor: pointer;
+  }
+  .ar-keywords-node:focus-visible {
+    outline: var(--ar-rule) solid var(--ar-focus);
+  }
+  .ar-keywords-node[data-faded],
+  .ar-keywords-map[data-hover] .ar-keywords-node:not([data-near]),
+  .ar-keywords-map[data-hover] .ar-keywords-edge:not([data-near]) {
+    opacity: var(--ar-chart-faded);
+  }
+  .ar-keywords-node[data-on] .ar-chart-mark {
+    stroke: var(--ar-fg);
+    stroke-width: var(--ar-rule);
+  }
+  .ar-keywords-label {
+    fill: var(--ar-fg);
+    font-size: var(--ar-text-xs);
+    paint-order: stroke;
+    stroke: var(--ar-chart-halo);
+    stroke-width: var(--ar-space-2);
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
+
+  /* The side panel and the glossary. */
+  .ar-keywords-panel {
+    min-width: 0;
+  }
+  .ar-keywords-title {
+    font-size: var(--ar-text-l);
+    font-weight: var(--ar-weight-bold);
+  }
+  .ar-keywords-def {
+    font-size: var(--ar-text-m);
+  }
+  .ar-keywords-aliases,
+  .ar-keywords-count {
+    font-size: var(--ar-text-s);
+    color: var(--ar-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .ar-keywords-group-name {
+    font-size: var(--ar-text-xs);
+    font-weight: var(--ar-weight-bold);
+    letter-spacing: var(--ar-tracking-caps);
+    text-transform: uppercase;
+    color: var(--ar-muted);
+  }
+  .ar-keywords-name {
+    font: inherit;
+    font-weight: var(--ar-weight-bold);
+    color: var(--ar-accent);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    text-align: start;
+  }
+  .ar-keywords-more > summary {
+    cursor: pointer;
+    font-size: var(--ar-text-s);
+    color: var(--ar-muted);
+  }
+  .ar-keywords-more[open] > summary {
+    margin-bottom: var(--ar-space-4);
+  }
+
+  /* A rule in a list: its id, its statement and, in the drawer, what it shares. */
+  .ar-keywords-rule {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ar-space-1);
+    width: 100%;
+    text-align: start;
+    font: inherit;
+    color: inherit;
+    background: var(--ar-surface);
+    border: var(--ar-hairline) solid var(--ar-line);
+    border-radius: var(--ar-radius-m);
+    padding: var(--ar-space-4) var(--ar-space-5);
+    cursor: pointer;
+  }
+  .ar-keywords-rule:hover {
+    border-color: var(--ar-accent);
+  }
+  .ar-keywords-rule-id {
+    font-family: var(--ar-font-mono);
+    font-size: var(--ar-text-xs);
+    color: var(--ar-muted);
+    overflow-wrap: anywhere;
+  }
+  .ar-keywords-rule-text {
+    font-size: var(--ar-text-s);
+  }
+  .ar-keywords-rule-why {
+    font-size: var(--ar-text-xs);
+    color: var(--ar-muted);
+  }
+
+  /* Buttons: an action, a keyword tag and a symbol. */
+  .ar-keywords-action,
+  .ar-keywords-tag,
+  .ar-keywords-sym {
+    font: inherit;
+    font-size: var(--ar-text-s);
+    color: var(--ar-accent);
+    background: var(--ar-surface);
+    border: var(--ar-hairline) solid var(--ar-line);
+    border-radius: var(--ar-radius-round);
+    padding: var(--ar-space-1) var(--ar-space-5);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .ar-keywords-sym {
+    border-radius: var(--ar-radius-s);
+  }
+  .ar-keywords-action:hover,
+  .ar-keywords-tag:hover,
+  .ar-keywords-sym:hover {
+    border-color: var(--ar-accent);
+  }
+}

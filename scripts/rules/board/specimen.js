@@ -183,6 +183,25 @@ Rules.view({
                 children: html`<div class="ar-specimen-box">Side</div>
                   <div class="ar-specimen-box">Main</div>`,
               }),
+              html`<p>Split, side at the end</p>`,
+              AR.Split({
+                gap: '5',
+                end: true,
+                children: html`<div class="ar-specimen-box">Main</div>
+                  <div class="ar-specimen-box">Side</div>`,
+              }),
+            ],
+          }),
+        ),
+        section(
+          'Share bar',
+          AR.ShareBar({
+            label: 'Sample shares',
+            parts: [
+              { key: 'a', label: 'One', value: 5, slot: 1 },
+              { key: 'b', label: 'Two', value: 3, slot: 2 },
+              { key: 'c', label: 'Three', value: 2, slot: 3 },
+              { key: 'd', label: 'Other', value: 1, slot: 'other' },
             ],
           }),
         ),

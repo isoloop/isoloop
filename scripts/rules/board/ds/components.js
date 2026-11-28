@@ -47,7 +47,10 @@
       ]),
       o,
     );
-  /** A fixed side (a token, e.g. 'date-col') and the rest; stacks when narrow. */
+  /**
+   * A fixed side (a token, e.g. 'date-col') and the rest; stacks when narrow.
+   * The side comes first unless `end` is set, which puts it after the rest.
+   */
   const Split = (o = {}) =>
     layout(
       'ar-split',
@@ -55,7 +58,7 @@
         ['gap', gapVar(o.gap)],
         ['side', o.side && `var(--ar-${token(o.side, 'side')})`],
       ]),
-      o,
+      { ...o, attrs: { 'data-end': Boolean(o.end), ...o.attrs } },
     );
 
   // --- Components -------------------------------------------------------------
@@ -210,14 +213,17 @@
   const EmptyState = ({ text, size }) =>
     html`<p class="ar-empty" ${attrs({ 'data-size': size === 'l' ? 'l' : null })}>${text}</p>`;
 
-  /** Field: { id, label, type, placeholder, value, hideLabel }. */
-  const Field = ({ id, label, type = 'text', placeholder, value, hideLabel = false }) =>
+  /** Field: { id, label, type, placeholder, value, hideLabel, list: a <datalist> id to pick from }. */
+  const Field = ({ id, label, type = 'text', placeholder, value, hideLabel = false, list }) =>
     html`<label class="ar-field" ${attrs({ for: id })}
       ><span class="ar-field-label" ${attrs({ 'data-hidden': hideLabel })}>${label}</span
-      ><input class="ar-field-input" ${attrs({ id, type, placeholder, value })}
+      ><input
+        class="ar-field-input"
+        ${attrs({ id, type, placeholder, value, list, autocomplete: list ? 'off' : null })}
     /></label>`;
 
   /**
+<<<<<<< HEAD
    * Select: { id, label, options: [{ id, label }], selected, hideLabel }. A
    * native select, so the keyboard and screen readers work as everywhere.
    */
@@ -292,6 +298,29 @@
         <p class="ar-compare-text">${after}</p>
       </div>
     </div>`;
+=======
+   * ShareBar: one bar split into parts by value, each in a chart slot.
+   * { label, parts: [{ key, label, value, slot }] }. Each part's title names it.
+   */
+  const ShareBar = ({ label, parts }) => {
+    const total = parts.reduce((n, p) => n + (p.value || 0), 0);
+    return html`<div class="ar-sharebar" role="img" ${attrs({ 'aria-label': label })}>
+      ${parts
+        .filter((p) => p.value > 0)
+        .map(
+          (p) =>
+            html`<span
+              class="ar-sharebar-part"
+              ${attrs({
+                'data-slot': p.slot,
+                style: `--ar-share: ${Number(p.value)}`,
+                title: `${p.label}: ${p.value} of ${total}`,
+              })}
+            ></span>`,
+        )}
+    </div>`;
+  };
+>>>>>>> origin/main
 
   /** Toolbar: { label, children }. */
   const Toolbar = ({ label, children, attrs: a }) =>
@@ -357,10 +386,14 @@
     Legend,
     EmptyState,
     Field,
+<<<<<<< HEAD
     Select,
     Stepper,
     Badge,
     BeforeAfter,
+=======
+    ShareBar,
+>>>>>>> origin/main
     Toolbar,
     ChartFrame,
     Tooltip,

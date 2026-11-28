@@ -223,6 +223,7 @@ describe('layout primitives', () => {
     expect(str(fn('Cluster')({ justify: 'space-between', children: '' }))).toContain(
       '--ar-justify: space-between',
     );
+    expect(str(fn('Split')({ side: 'col-min', end: true, children: '' }))).toContain('data-end');
     expect(() => fn('Stack')({ gap: '4px; color: red' })).toThrow(/isn't a token name/);
     expect(() => fn('Stack')({ as: 'div onclick' })).toThrow(/bad tag/);
   });
@@ -326,6 +327,9 @@ describe('components', () => {
     expect(f).toContain('<label class="ar-field" for="q">');
     expect(f).toContain('class="ar-field-label" data-hidden>Search');
     expect(f).toContain('id="q" type="search"');
+    const listed = str(fn('Field')({ id: 's', label: 'Symbol', list: 'syms' }));
+    expect(listed).toContain('list="syms" autocomplete="off"');
+    expect(f).not.toContain('autocomplete');
     expect(str(fn('Toolbar')({ label: 'Tools', children: 'x' }))).toBe(
       '<div class="ar-toolbar" role="toolbar" aria-label="Tools">x</div>',
     );
@@ -336,6 +340,7 @@ describe('components', () => {
     );
     expect(str(fn('Tooltip')({ content: 'Tip' }))).toContain('role="tooltip" data-static>Tip');
   });
+<<<<<<< HEAD
 
   it('Select marks the selected option and escapes labels', () => {
     const s = str(
@@ -384,6 +389,23 @@ describe('components', () => {
     expect(ba).toContain(
       'data-side="after"><span class="ar-compare-label">After</span><p class="ar-compare-text">New</p>',
     );
+=======
+  it('ShareBar sizes each part by its value, in its slot, and skips empty parts', () => {
+    const h = str(
+      fn('ShareBar')({
+        label: 'Shares',
+        parts: [
+          { key: 'a', label: 'A <b>', value: 3, slot: 1 },
+          { key: 'b', label: 'B', value: 0, slot: 2 },
+          { key: 'c', label: 'C', value: 1, slot: 'other' },
+        ],
+      }),
+    );
+    expect(h).toMatch(/^<div class="ar-sharebar" role="img" aria-label="Shares">/);
+    expect(h).toContain('data-slot="1" style="--ar-share: 3" title="A &lt;b&gt;: 3 of 4"');
+    expect(h).toContain('data-slot="other" style="--ar-share: 1" title="C: 1 of 4"');
+    expect(h).not.toContain('data-slot="2"');
+>>>>>>> origin/main
   });
 });
 

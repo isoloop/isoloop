@@ -52,8 +52,12 @@
     grid-template-columns: var(--ar-side, var(--ar-date-col)) minmax(0, 1fr);
     gap: var(--ar-gap, var(--ar-space-7));
   }
+  .ar-split[data-end] {
+    grid-template-columns: minmax(0, 1fr) var(--ar-side, var(--ar-date-col));
+  }
   @media (max-width: 640px) {
-    .ar-split {
+    .ar-split,
+    .ar-split[data-end] {
       grid-template-columns: minmax(0, 1fr);
     }
   }

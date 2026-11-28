@@ -122,6 +122,7 @@
     padding: var(--ar-space-1) var(--ar-space-4);
     cursor: pointer;
   }
+<<<<<<< HEAD
 
   /* As of: the point stepper, its summary and the Changes panel. */
   .ar-shell-asof {
@@ -184,5 +185,21 @@
   .ar-shell-change-events {
     font-size: var(--ar-text-xs);
     color: var(--ar-muted);
+=======
+  /* The keyword filters: a fold of chips, and the filters in force. */
+  .ar-shell-kw {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ar-space-4);
+  }
+  .ar-shell-kw-summary {
+    cursor: pointer;
+    font-size: var(--ar-text-s);
+    color: var(--ar-muted);
+    width: max-content;
+  }
+  .ar-shell-kw[open] > .ar-shell-kw-summary {
+    margin-bottom: var(--ar-space-4);
+>>>>>>> origin/main
   }
 }
