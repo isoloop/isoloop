@@ -173,6 +173,22 @@ Rules.view({
       note: 'Sample data.',
     });
 
+    // Marks in tones (statuses, events) rather than slots, placed in polar coordinates.
+    const toneDots = AR.ChartFrame({
+      title: 'Marks in tones, placed by angle',
+      body: AR.chart.svg({
+        width: 200,
+        height: 200,
+        label: 'Tone marks around a circle',
+        body: html`<g transform="translate(100 100)">
+          ${TONES.map((tone, i) => {
+            const [cx, cy] = AR.chart.polar(70, -Math.PI / 2 + (2 * Math.PI * i) / TONES.length);
+            return AR.chart.circle({ cx, cy, r: 8, tone });
+          })}
+        </g>`,
+      }),
+    });
+
     return AR.Stack({
       gap: '9',
       children: [
@@ -283,6 +299,13 @@ Rules.view({
                 tone: 'warn',
                 attrs: { 'data-specimen': '1' },
               }),
+              AR.Chip({
+                label: 'With a chart swatch',
+                pressed: true,
+                count: 7,
+                slot: 2,
+                attrs: { 'data-specimen': '1' },
+              }),
             ],
           }),
         ),
@@ -321,9 +344,18 @@ Rules.view({
         ),
         section(
           'Legend',
-          AR.Legend({
-            label: 'Sample legend',
-            items: SLOTS.map((sl) => ({ label: 'Slot ' + sl, slot: sl, value: 10 })),
+          AR.Stack({
+            gap: '4',
+            children: [
+              AR.Legend({
+                label: 'Sample legend',
+                items: SLOTS.map((sl) => ({ label: 'Slot ' + sl, slot: sl, value: 10 })),
+              }),
+              AR.Legend({
+                label: 'A legend in tones',
+                items: TONES.map((tone) => ({ label: tone, tone })),
+              }),
+            ],
           }),
         ),
         section('Tooltip', AR.Tooltip({ content: 'A tooltip, placed in flow here.' })),
@@ -338,7 +370,10 @@ Rules.view({
             ],
           }),
         ),
-        section('Charts', AR.Stack({ gap: '7', children: [chart, timeAxis, sankey, treemap] })),
+        section(
+          'Charts',
+          AR.Stack({ gap: '7', children: [chart, timeAxis, toneDots, sankey, treemap] }),
+        ),
         section(
           'Drawer',
           html`<p>

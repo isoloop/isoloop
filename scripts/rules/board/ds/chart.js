@@ -91,20 +91,46 @@
       height="${n(Math.max(0, height))}"
       ${attrs({ 'data-slot': slot, ...a })}
     ></rect>`;
-  const circle = ({ cx, cy, r, slot, cls = 'ar-chart-mark', attrs: a }) =>
+  const circle = ({ cx, cy, r, slot, tone, cls = 'ar-chart-mark', attrs: a }) =>
     html`<circle
       class="${cls}"
       cx="${n(cx)}"
       cy="${n(cy)}"
       r="${n(r)}"
-      ${attrs({ 'data-slot': slot, ...a })}
+      ${attrs({ 'data-slot': slot, 'data-tone': tone, ...a })}
     ></circle>`;
   const text = ({ x, y, value, anchor = 'start', cls = 'ar-chart-label', attrs: a }) =>
     html`<text class="${cls}" x="${n(x)}" y="${n(y)}" text-anchor="${anchor}" ${attrs(a)}
       >${value}</text
     >`;
-  const path = ({ d, slot, cls = 'ar-chart-mark', attrs: a }) =>
-    html`<path class="${cls}" d="${d}" fill="none" ${attrs({ 'data-slot': slot, ...a })}></path>`;
+  const path = ({ d, slot, tone, cls = 'ar-chart-mark', attrs: a }) =>
+    html`<path
+      class="${cls}"
+      d="${d}"
+      fill="none"
+      ${attrs({ 'data-slot': slot, 'data-tone': tone, ...a })}
+    ></path>`;
+
+  /** A point at radius `r` and angle `a` (radians, 0 = east, clockwise on screen) from the centre. */
+  const polar = (r, a) => [n(r * Math.cos(a)), n(r * Math.sin(a))];
+
+  /**
+   * A CSS length in pixels: '12px' → 12, '18rem' → 18 × `rootPx`. Anything else
+   * (an empty value, a keyword) gives `fallback`.
+   */
+  function toPx(value, rootPx = 16, fallback = 0) {
+    const m = /^\s*(-?[\d.]+)(px|rem)\s*$/.exec(String(value || ''));
+    if (!m) return fallback;
+    const v = Number(m[1]);
+    return m[2] === 'rem' ? v * rootPx : v;
+  }
+
+  /** A size token (`--ar-<name>`) in pixels, read from the page; `fallback` where there's no page. */
+  function px(name, fallback = 0) {
+    if (typeof document === 'undefined' || typeof getComputedStyle !== 'function') return fallback;
+    const root = getComputedStyle(document.documentElement);
+    return toPx(root.getPropertyValue('--ar-' + name), toPx(root.fontSize, 16, 16), fallback);
+  }
 
   /** An axis along the bottom at `y`, from `scale` (with ticks()), each label from `format`. */
   function axisBottom({ scale, y, count, format = String, size = 4, values }) {
@@ -302,6 +328,9 @@
     circle,
     text,
     path,
+    polar,
+    toPx,
+    px,
     axisBottom,
     axisLeft,
     slots,
