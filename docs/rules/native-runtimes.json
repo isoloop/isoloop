@@ -7,6 +7,7 @@
     "values": ["default: 'worker'"],
     "related": ["native.three-runtimes"],
     "target": "2.0.0",
+    "keywords": ["placement"],
     "events": [
       {
         "type": "proposed",
@@ -67,6 +68,7 @@
     "status": "proposed",
     "experimental": true,
     "target": "2.0.0",
+    "keywords": ["replay", "heartbeat", "toolchain", "restart"],
     "events": [
       {
         "type": "proposed",
@@ -82,6 +84,7 @@
     "status": "proposed",
     "experimental": true,
     "target": "2.0.0",
+    "keywords": ["grants"],
     "events": [
       {
         "type": "proposed",
@@ -98,6 +101,7 @@
     "experimental": true,
     "related": ["native.capability-handles"],
     "target": "2.0.0",
+    "keywords": ["trust-boundary"],
     "events": [
       {
         "type": "proposed",

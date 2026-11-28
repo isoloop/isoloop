@@ -6,6 +6,7 @@
     "code": ["packages/host/src/bus/controller.ts"],
     "since": "0.1.0",
     "related": ["bus.grants-enforced", "bus.host-subscriptions", "bus.no-main-thread-routing"],
+    "keywords": ["main-thread", "commits", "own-stack"],
     "events": [
       {
         "type": "decided",
@@ -28,6 +29,7 @@
     "code": ["packages/bus/src/broker/broker.ts"],
     "since": "0.1.0",
     "related": ["bus.direct-ports"],
+    "keywords": ["grants", "own-stack"],
     "events": [
       {
         "type": "decided",
@@ -50,6 +52,7 @@
     "code": ["packages/host/src/bus/controller.ts"],
     "since": "0.1.0",
     "related": ["bus.combined-commits"],
+    "keywords": ["suspension", "commits", "restart"],
     "events": [
       {
         "type": "decided",
@@ -72,6 +75,7 @@
     "code": ["packages/host/src/bus/controller.ts"],
     "since": "0.1.0",
     "related": ["bus.reserved-ids", "bus.direct-ports"],
+    "keywords": ["reserved-names", "commits", "own-stack", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -95,6 +99,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["bus.host-subscriptions"],
+    "keywords": ["reserved-names"],
     "events": [
       {
         "type": "decided",
@@ -115,6 +120,7 @@
     "statement": "We don't route records through a bus bridge on the main thread.",
     "status": "rejected",
     "related": ["bus.direct-ports"],
+    "keywords": ["main-thread"],
     "events": [
       {
         "type": "rejected",
@@ -164,6 +170,7 @@
     ],
     "since": "0.1.0",
     "related": ["bus.commit-interval", "bus.commit-early", "bus.redelivery-window"],
+    "keywords": ["timeouts", "commits", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -195,6 +202,7 @@
     "code": ["packages/protocol/src/topics/commits.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["bus.combined-commits"],
+    "keywords": ["lifecycle", "timeouts", "commits", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -224,6 +232,7 @@
     "code": ["packages/protocol/src/topics/commits.ts"],
     "since": "0.1.0",
     "related": ["bus.combined-commits"],
+    "keywords": ["back-pressure", "commits"],
     "events": [
       {
         "type": "decided",
@@ -252,6 +261,7 @@
     "code": ["packages/runtime/src/bus/bus-client.ts"],
     "since": "0.1.0",
     "related": ["bus.combined-commits", "bus.offsets-kept"],
+    "keywords": ["lifecycle", "suspension", "commits", "restart"],
     "events": [
       {
         "type": "decided",
@@ -280,6 +290,7 @@
     "code": ["packages/runtime/src/bus/bus-client.ts"],
     "since": "0.1.0",
     "related": ["bus.redelivery-window", "bus.old-connection-commits"],
+    "keywords": ["bus-restart", "durability", "commits", "restart"],
     "events": [
       {
         "type": "decided",
@@ -308,6 +319,7 @@
     "code": ["packages/runtime/src/bus/bus-client.ts"],
     "since": "0.1.0",
     "related": ["bus.combined-commits", "bus.manual-commit"],
+    "keywords": ["commits", "errors"],
     "events": [
       {
         "type": "decided",
@@ -330,6 +342,7 @@
     "values": ["up to one interval (100 ms by default)"],
     "since": "0.1.0",
     "related": ["bus.combined-commits", "bus.no-commits-after-reattach"],
+    "keywords": ["delivery", "blocked-worker", "lifecycle", "commits"],
     "events": [
       {
         "type": "decided",
@@ -352,6 +365,7 @@
     "code": ["packages/bus/src/broker/broker.ts", "packages/protocol/src/topics/commits.ts"],
     "since": "0.1.0",
     "related": ["bus.combined-commits", "bus.partial-delivery", "bus.group-resume"],
+    "keywords": ["delivery", "commits"],
     "events": [
       {
         "type": "decided",
@@ -380,6 +394,7 @@
     "code": ["packages/bus/src/broker/broker.ts"],
     "since": "0.1.0",
     "related": ["bus.group-commit-seq"],
+    "keywords": ["replay", "commits"],
     "events": [
       {
         "type": "decided",
@@ -408,6 +423,7 @@
     "code": ["packages/runtime/src/bus/bus-client.ts"],
     "since": "0.1.0",
     "related": ["bus.settled", "bus.group-commit-seq"],
+    "keywords": ["commits"],
     "events": [
       {
         "type": "decided",
@@ -436,6 +452,7 @@
     "code": ["packages/runtime/src/bus/bus-client.ts"],
     "since": "0.1.0",
     "related": ["bus.no-commits-after-reattach", "bus.group-commit-seq"],
+    "keywords": ["delivery", "bus-restart", "commits", "restart"],
     "events": [
       {
         "type": "decided",
@@ -464,6 +481,7 @@
     "code": ["packages/bus/src/broker/broker.ts", "packages/protocol/src/topics/commits.ts"],
     "since": "0.1.0",
     "related": ["bus.group-commit-seq", "bus.no-attempt-limit"],
+    "keywords": ["commits"],
     "events": [
       {
         "type": "decided",
@@ -491,6 +509,7 @@
     "status": "active",
     "since": "0.1.0",
     "related": ["bus.partial-delivery", "bus.redelivery-window"],
+    "keywords": ["crash-loop", "commits"],
     "events": [
       {
         "type": "decided",
@@ -525,6 +544,7 @@
     "statement": "A `publish` to a memory topic doesn't resolve as soon as it's sent with only failures reported later: it waits for the bus's result, like any publish.",
     "status": "rejected",
     "related": ["bus.combined-commits"],
+    "keywords": ["memory-topic"],
     "events": [
       {
         "type": "rejected",
