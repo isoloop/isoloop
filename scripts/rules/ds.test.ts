@@ -325,6 +325,33 @@ describe('components', () => {
 
 // --- The chart toolkit -------------------------------------------------------
 
+interface Box {
+  key: string;
+  value: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+interface Node {
+  key: string;
+  value: number;
+  x: number;
+  y: number;
+  h: number;
+}
+interface Ribbon {
+  from: string;
+  to: string;
+  y0: number;
+  y1: number;
+  h: number;
+  d: string;
+}
+const isBoxes = (v: unknown): v is Box[] => Array.isArray(v);
+const isSankey = (v: unknown): v is { left: Node[]; right: Node[]; flows: Ribbon[] } =>
+  isRec(v) && Array.isArray(v['left']) && Array.isArray(v['flows']);
+
 describe('the chart toolkit', () => {
   it('picks round ticks', () => {
     expect(chartFn('ticks')(0, 25, 5)).toEqual([0, 5, 10, 15, 20, 25]);
@@ -376,5 +403,61 @@ describe('the chart toolkit', () => {
       '<svg viewBox="0 0 10 5" role="img" aria-label="L"><rect class="ar-chart-mark" x="0" y="0" width="1" height="2" data-slot="3"></rect></svg>',
     );
     expect(svg).not.toMatch(/#[0-9a-f]{3,6}|fill="[a-z]/i);
+  });
+
+  it('lays a Sankey: nodes sized by their flows, ribbons stacked on both sides', () => {
+    const lay = must(
+      chartFn('sankey')({
+        left: [
+          { key: 'a', label: 'A' },
+          { key: 'b', label: 'B' },
+          { key: 'unused', label: 'U' },
+        ],
+        right: [{ key: 'x', label: 'X' }],
+        flows: [
+          { from: 'a', to: 'x', value: 3 },
+          { from: 'b', to: 'x', value: 1 },
+        ],
+        width: 100,
+        height: 46,
+        nodeWidth: 8,
+        gap: 6,
+      }),
+      isSankey,
+    );
+    expect(lay.left.map((nd) => nd.key)).toEqual(['a', 'b']);
+    expect(lay.left[0]).toMatchObject({ value: 3, x: 0, y: 0, h: 30 });
+    expect(lay.left[1]).toMatchObject({ value: 1, y: 36, h: 10 });
+    expect(lay.right[0]).toMatchObject({ value: 4, x: 92, y: 0, h: 40 });
+    expect(lay.flows.map((f) => [f.y0, f.y1, f.h])).toEqual([
+      [0, 0, 30],
+      [36, 30, 10],
+    ]);
+    expect(lay.flows[0]?.d).toMatch(/^M8,0C50,0 50,0 92,0L92,30C/);
+  });
+
+  it('squarifies a treemap that fills its box with no overlap, biggest first', () => {
+    const items = [6, 6, 4, 3, 2, 2, 1, 0].map((value, i) => ({ key: `k${i}`, value }));
+    const cells = must(chartFn('squarify')(items, { width: 6, height: 4 }), isBoxes);
+    expect(cells).toHaveLength(7);
+    expect(cells[0]?.key).toBe('k0');
+    const area = cells.reduce((s, c) => s + c.width * c.height, 0);
+    expect(area).toBeCloseTo(24);
+    for (const c of cells) {
+      expect(c.width * c.height).toBeCloseTo(c.value);
+      expect(c.x).toBeGreaterThanOrEqual(-1e-9);
+      expect(c.y).toBeGreaterThanOrEqual(-1e-9);
+      expect(c.x + c.width).toBeLessThanOrEqual(6 + 1e-9);
+      expect(c.y + c.height).toBeLessThanOrEqual(4 + 1e-9);
+    }
+    for (let i = 0; i < cells.length; i++)
+      for (let j = i + 1; j < cells.length; j++) {
+        const a = cells[i]!;
+        const b = cells[j]!;
+        const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+        const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+        expect(ox > 1e-9 && oy > 1e-9).toBe(false);
+      }
+    expect(chartFn('squarify')([], { width: 6, height: 4 })).toEqual([]);
   });
 });

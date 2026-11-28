@@ -105,5 +105,14 @@
     --ar-tooltip-radius: var(--ar-radius-m);
     --ar-chart-grid: var(--ar-grid);
     --ar-chart-axis: var(--ar-axis);
+    /* Sankey ribbons and treemap cells: faint at rest, stronger when traced. */
+    --ar-ribbon-rest: 0.35;
+    --ar-ribbon-on: 0.75;
+    --ar-ribbon-off: 0.08;
+    --ar-cell-rest: 0.55;
+    --ar-cell-on: 0.9;
+    --ar-cell-gap: var(--ar-hairline);
+    /* A long list inside a card scrolls past this height. */
+    --ar-list-max: 24rem;
   }
 }

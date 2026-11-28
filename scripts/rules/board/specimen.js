@@ -103,6 +103,76 @@ Rules.view({
       }),
     });
 
+    // A sample Sankey: three sources into two targets, coloured by kind.
+    const sk = AR.chart.sankey({
+      left: [
+        { key: 'a', label: 'Source A' },
+        { key: 'b', label: 'Source B' },
+        { key: 'c', label: 'Source C' },
+      ],
+      right: [
+        { key: 'x', label: 'Target X' },
+        { key: 'y', label: 'Target Y' },
+      ],
+      flows: [
+        { from: 'a', to: 'x', value: 6, kind: 'one' },
+        { from: 'a', to: 'y', value: 2, kind: 'two' },
+        { from: 'b', to: 'x', value: 3, kind: 'one' },
+        { from: 'c', to: 'y', value: 4, kind: 'three' },
+      ],
+      width: W - 160,
+      height: 150,
+    });
+    const kinds = AR.chart.slots([
+      { key: 'one', label: 'One', count: 9 },
+      { key: 'two', label: 'Two', count: 2 },
+      { key: 'three', label: 'Three', count: 4 },
+    ]);
+    const sankey = AR.ChartFrame({
+      title: 'A Sankey',
+      sub: 'sankey() lays out nodes and ribbons; ribbons are paths with the ar-chart-ribbon class.',
+      legend: AR.chart.legendFor(kinds.groups, 'Kinds'),
+      body: AR.chart.svg({
+        width: W,
+        height: 160,
+        label: 'Sample Sankey',
+        body: html`<g transform="translate(70 4)"
+          >${sk.flows.map((f) =>
+            AR.chart.path({ d: f.d, slot: kinds.slotOf(f.kind), cls: 'ar-chart-ribbon' }),
+          )}${[...sk.left, ...sk.right].map((nd) =>
+            AR.chart.rect({ x: nd.x, y: nd.y, width: 8, height: nd.h, cls: 'ar-chart-node' }),
+          )}${sk.left.map((nd) =>
+            AR.chart.text({ x: -6, y: nd.y + nd.h / 2 + 4, value: nd.label, anchor: 'end' }),
+          )}${sk.right.map((nd) =>
+            AR.chart.text({ x: nd.x + 14, y: nd.y + nd.h / 2 + 4, value: nd.label }),
+          )}</g
+        >`,
+      }),
+      note: 'Sample data.',
+    });
+
+    // A sample treemap: squarify() places cells as close to square as it can.
+    const tm = AR.chart.squarify(
+      cats.map((c) => ({ key: c.key, value: c.count })),
+      { width: W, height: 200 },
+    );
+    const treemap = AR.ChartFrame({
+      title: 'A treemap',
+      sub: 'Cells use the ar-chart-cell class and a slot.',
+      body: AR.chart.svg({
+        width: W,
+        height: 200,
+        label: 'Sample treemap',
+        body: tm.map(
+          (c) =>
+            html`${AR.chart.rect({ x: c.x, y: c.y, width: c.width, height: c.height, slot: s.slotOf(c.key), cls: 'ar-chart-cell' })}${AR.chart.text(
+              { x: c.x + 4, y: c.y + 14, value: c.key.toUpperCase() + ' ' + c.value },
+            )}`,
+        ),
+      }),
+      note: 'Sample data.',
+    });
+
     return AR.Stack({
       gap: '9',
       children: [
@@ -268,7 +338,7 @@ Rules.view({
             ],
           }),
         ),
-        section('Charts', AR.Stack({ gap: '7', children: [chart, timeAxis] })),
+        section('Charts', AR.Stack({ gap: '7', children: [chart, timeAxis, sankey, treemap] })),
         section(
           'Drawer',
           html`<p>

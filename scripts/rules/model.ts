@@ -134,6 +134,160 @@ export function keywordRules(
   return out;
 }
 
+// --- Sources, code and health (the Sources tab) -------------------------------
+
+/** Where a rule's first ADR event points, or `null` when no event cites an ADR. */
+export function sourceOf(rule: Rule): { adr: string; type: string } | null {
+  for (const e of rule.events) {
+    const ref = parseRef(e.ref);
+    if (ref?.kind === 'adr') return { adr: ref.number, type: e.type };
+  }
+  return null;
+}
+
+/** Rules flowing from one ADR into one concept, split by the type of that first ADR event. */
+export interface Flow {
+  /** An ADR number, or '' for rules that cite no ADR. */
+  adr: string;
+  concept: string;
+  type: string;
+  rules: string[];
+}
+
+/** One flow per (ADR, concept, first event type), biggest first within each ADR. */
+export function sourceFlows(rules: readonly RuleIn[]): Flow[] {
+  const by = new Map<string, Flow>();
+  for (const { concept, rule } of rules) {
+    const src = sourceOf(rule);
+    const adr = src?.adr ?? '';
+    const type = src?.type ?? 'none';
+    const k = `${adr}\u0000${concept}\u0000${type}`;
+    const f = by.get(k) ?? { adr, concept, type, rules: [] };
+    f.rules.push(rule.id);
+    by.set(k, f);
+  }
+  const out = [...by.values()];
+  out.sort(
+    (a, b) =>
+      a.adr.localeCompare(b.adr) ||
+      b.rules.length - a.rules.length ||
+      a.concept.localeCompare(b.concept),
+  );
+  return out;
+}
+
+/** A code path and the rules citing it. Folders end in '/', as written in the registry. */
+export interface CodePath {
+  path: string;
+  rules: string[];
+}
+
+/** Every cited path with its rules, most cited first. */
+export function codePaths(rules: readonly Rule[]): CodePath[] {
+  const by = new Map<string, string[]>();
+  for (const r of rules)
+    for (const p of new Set(r.code ?? [])) {
+      const list = by.get(p) ?? [];
+      list.push(r.id);
+      by.set(p, list);
+    }
+  const out = [...by].map(([path, ids]) => ({ path, rules: ids }));
+  out.sort((a, b) => b.rules.length - a.rules.length || a.path.localeCompare(b.path));
+  return out;
+}
+
+/** One weakness in the registry: a title, what it means, and the rules or other items it lists. */
+export interface HealthCheck {
+  id: string;
+  title: string;
+  hint: string;
+  /** Rule ids, when the check is about rules. */
+  rules?: string[];
+  /** Other items (ADR files, concept ids), when it isn't. */
+  items?: string[];
+}
+
+/** A rule as the page gets it: with its concept. */
+export interface RuleIn {
+  concept: string;
+  rule: Rule;
+}
+
+const ENDED = new Set(['rejected', 'withdrawn', 'superseded']);
+
+/**
+ * Where the registry is weak, computed from the registry and the ADR files
+ * alone: nothing here knows about any one repo. Checks with nothing to list
+ * are kept, so the page can say they're clear.
+ */
+export function healthChecks(
+  rules: readonly RuleIn[],
+  adrs: readonly { file: string; hasRules: boolean }[],
+  tooCommon: readonly CommonKey[],
+  links: readonly Link[],
+): HealthCheck[] {
+  const live = rules.filter(({ rule }) => !ENDED.has(rule.status));
+  const coarse = new Set(tooCommon.filter((c) => c.kind === 'section').map((c) => c.key));
+  const conceptOf = new Map(rules.map(({ concept, rule }) => [rule.id, concept]));
+  const linked = new Set<string>();
+  for (const l of links)
+    if (l.kind === 'related' && conceptOf.get(l.a) !== conceptOf.get(l.b)) {
+      linked.add(conceptOf.get(l.a)!);
+      linked.add(conceptOf.get(l.b)!);
+    }
+  const concepts = [...new Set(rules.map((r) => r.concept))];
+  return [
+    {
+      id: 'no-code',
+      title: 'No code path',
+      hint: 'Active or decided rules that name no file or folder, so nobody can check them against the code.',
+      rules: live
+        .filter(
+          ({ rule }) =>
+            (rule.status === 'active' || rule.status === 'decided') && !rule.code?.length,
+        )
+        .map(({ rule }) => rule.id),
+    },
+    {
+      id: 'no-built',
+      title: 'Shipped with no built event',
+      hint: 'Active rules about the packages that go straight from decided to shipped, with no PR that built them.',
+      rules: live
+        .filter(
+          ({ rule }) =>
+            rule.status === 'active' && !rule.repo && !rule.events.some((e) => e.type === 'built'),
+        )
+        .map(({ rule }) => rule.id),
+    },
+    {
+      id: 'coarse-anchor',
+      title: 'Coarse ADR anchors',
+      hint: 'Rules citing an ADR section shared by more rules than the link cap, so the ref doesn’t point at one decision.',
+      rules: live
+        .filter(({ rule }) => sectionsOf(rule).some((s) => coarse.has(s)))
+        .map(({ rule }) => rule.id),
+    },
+    {
+      id: 'no-keywords',
+      title: 'No keywords',
+      hint: 'Rules not tagged with any keyword yet, so they don’t show on the Keywords tab.',
+      rules: live.filter(({ rule }) => !rule.keywords?.length).map(({ rule }) => rule.id),
+    },
+    {
+      id: 'adr-no-rules',
+      title: 'ADRs with no Rules: lines',
+      hint: 'ADRs that name no rule, so no fact on the board traces back to them.',
+      items: adrs.filter((a) => !a.hasRules).map((a) => a.file),
+    },
+    {
+      id: 'concept-unlinked',
+      title: 'Concepts with no written link to another concept',
+      hint: 'Every connection to other concepts is derived; no `related` link crosses over by hand.',
+      items: concepts.filter((c) => !linked.has(c)),
+    },
+  ];
+}
+
 /** Everything the views read beyond the registry itself. */
 export function buildModel(
   rules: readonly Rule[],
@@ -145,4 +299,23 @@ export function buildModel(
   for (const r of rules) symbols[r.id] = symbolsOf(r, ignore);
   const { links, tooCommon } = deriveLinks(rules, { cap: opts.cap, symbols });
   return { symbols, links, tooCommon, keywordRules: keywordRules(rules, vocab) };
+}
+
+/** What the Sources tab reads: flows from ADRs into concepts, cited code paths, and the health checks. */
+export interface Sources {
+  flows: Flow[];
+  code: CodePath[];
+  health: HealthCheck[];
+}
+
+export function buildSources(
+  rules: readonly RuleIn[],
+  adrs: readonly { file: string; hasRules: boolean }[],
+  model: Pick<Model, 'links' | 'tooCommon'>,
+): Sources {
+  return {
+    flows: sourceFlows(rules),
+    code: codePaths(rules.map((r) => r.rule)),
+    health: healthChecks(rules, adrs, model.tooCommon, model.links),
+  };
 }
