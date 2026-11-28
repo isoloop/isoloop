@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { CONFIG, REPO_ROOT } from './config.ts';
-import { buildModel } from './model.ts';
+import { buildModel, buildSources } from './model.ts';
 import {
   type Adr,
   conceptsOf,
@@ -117,16 +117,22 @@ export function boardData(reg: Registry, adrs: Map<string, Adr>): unknown {
     }
   const keywords = keywordsOf(reg);
   const rules = all.map(({ rule }) => rule);
+  const model = buildModel(rules, keywords, {
+    cap: CONFIG.links.cap,
+    symbolsIgnore: CONFIG.symbolsIgnore,
+  });
+  // readAdrs reads the ADR files in name order, so the list is in number order.
+  const adrList = [...adrs.values()].map((a) => ({
+    file: a.file,
+    hasRules: a.rulesIds.length > 0,
+  }));
   return {
-    config: { title: CONFIG.title, rulesDir: CONFIG.rulesDir },
+    config: { title: CONFIG.title, rulesDir: CONFIG.rulesDir, adrDir: CONFIG.adrDir },
     concepts: conceptsOf(reg),
     rules: all.map(({ concept, rule }) => Object.assign({}, rule, { concept })),
     refs,
     keywords,
-    model: buildModel(rules, keywords, {
-      cap: CONFIG.links.cap,
-      symbolsIgnore: CONFIG.symbolsIgnore,
-    }),
+    model: { ...model, sources: buildSources(all, adrList, model) },
   };
 }
 
