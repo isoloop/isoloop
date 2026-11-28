@@ -36,6 +36,7 @@
     "errors": ["routing_disabled"],
     "code": ["packages/host/src/router/router.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
+    "keywords": ["errors", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -66,6 +67,7 @@
     "code": ["packages/host/src/router/router.ts"],
     "since": "0.1.0",
     "related": ["route.base-path-warning", "route.resolver"],
+    "keywords": ["host-api"],
     "events": [
       {
         "type": "decided",
@@ -95,6 +97,7 @@
     "code": ["packages/host/src/router/router.ts"],
     "since": "0.1.0",
     "related": ["route.base-path"],
+    "keywords": ["dev-only"],
     "events": [
       {
         "type": "decided",
@@ -124,6 +127,7 @@
     "code": ["packages/protocol/src/topics/route.ts", "packages/host/src/router/router.ts"],
     "since": "0.1.0",
     "related": ["route.publish-points", "route.state-dropped"],
+    "keywords": ["retention", "reserved-names", "keys"],
     "events": [
       {
         "type": "decided",
@@ -152,6 +156,7 @@
     "errors": ["route:state_dropped"],
     "code": ["packages/host/src/router/router.ts"],
     "since": "0.1.0",
+    "keywords": ["observability"],
     "events": [
       {
         "type": "decided",
@@ -180,6 +185,7 @@
     "code": ["packages/host/src/router/router.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["route.sync-route"],
+    "keywords": ["bus-restart", "restart", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -236,6 +242,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["route.no-history-patching"],
+    "keywords": ["host-api"],
     "events": [
       {
         "type": "decided",
@@ -264,6 +271,7 @@
     "errors": ["forbidden"],
     "code": ["packages/bus/src/server/server.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
+    "keywords": ["reserved-names", "grants", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -294,6 +302,7 @@
     "errors": ["forbidden"],
     "code": ["packages/host/src/kernel/kernel.ts", "packages/runtime/src/isolate/host-calls.ts"],
     "since": "0.1.0",
+    "keywords": ["grants", "errors"],
     "events": [
       {
         "type": "decided",
@@ -323,6 +332,7 @@
     "code": ["packages/host/src/router/router.ts"],
     "since": "0.1.0",
     "related": ["route.base-path", "route.link-clicks"],
+    "keywords": ["errors"],
     "events": [
       {
         "type": "decided",
@@ -352,6 +362,7 @@
     "code": ["packages/host/src/router/router.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["route.navigate-result"],
+    "keywords": ["host-api"],
     "events": [
       {
         "type": "decided",
@@ -381,6 +392,7 @@
     "errors": ["navigate_failed", "route:navigate_error", "timeout"],
     "code": ["packages/host/src/router/router.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
+    "keywords": ["observability", "timeouts", "errors"],
     "events": [
       {
         "type": "decided",
@@ -436,6 +448,7 @@
     "code": ["packages/host/src/render/isoloop-dom.ts"],
     "since": "0.1.0",
     "related": ["route.resolver"],
+    "keywords": ["rendering", "releases"],
     "events": [
       {
         "type": "decided",
@@ -464,6 +477,7 @@
     "code": ["packages/host/src/router/router.ts"],
     "since": "0.1.0",
     "related": ["route.navigate-grant"],
+    "keywords": ["grants", "keys"],
     "events": [
       {
         "type": "decided",
@@ -503,6 +517,7 @@
     "statement": "The kernel doesn't detect host navigations by patching `history.pushState` or through the Navigation API.",
     "status": "rejected",
     "related": ["route.sync-route"],
+    "keywords": ["releases"],
     "events": [
       {
         "type": "rejected",
