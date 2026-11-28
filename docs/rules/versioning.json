@@ -299,7 +299,7 @@
   },
   {
     "id": "ver.patch-branch",
-    "statement": "A patch to the current release during a preview cycle comes from a `release/0.x` branch, cut from the latest `v0.x.y` tag only when a fix is needed.",
+    "statement": "A patch to the current release comes from its `release/0.N` branch, cut at `v0.N.0` when the minor ships. Fixes collect there as cherry-picks from `main`, and a patch ships when the maintainer stages it.",
     "status": "active",
     "repo": true,
     "code": ["scripts/release/rules.ts"],
@@ -321,12 +321,19 @@
         "date": "2026-11-24",
         "ref": "#420",
         "why": "`release.yml` releases from `release/0.1` as well as `main`, for 0.1.1."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-28",
+        "ref": "adr/0019#5-patches-during-a-preview-cycle",
+        "why": "Fixes can collect on the live line without a release each time, and isoloop/web uses the same branch model for the live site.",
+        "prev": "A patch to the current release during a preview cycle comes from a `release/0.x` branch, cut from the latest `v0.x.y` tag only when a fix is needed."
       }
     ]
   },
   {
     "id": "ver.fix-main-first",
-    "statement": "A fix goes to `main` first. Its backport to the release branch is its own PR, with its own regression test.",
+    "statement": "A fix goes to `main` first. It reaches the release branch as a cherry-pick, or the same fix redone by hand where the pick doesn't apply, in its own PR that links the `main` PR, with its own regression test.",
     "status": "active",
     "repo": true,
     "related": ["ver.patch-branch", "ver.small-backports"],
@@ -343,6 +350,13 @@
         "date": "2026-11-23",
         "ref": "#396",
         "why": "In force from the amendment's PR."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-28",
+        "ref": "adr/0019#5-patches-during-a-preview-cycle",
+        "why": "The release branch always exists now, so the link to the `main` PR is what shows a fix isn't missing from the next minor.",
+        "prev": "A fix goes to `main` first. Its backport to the release branch is its own PR, with its own regression test."
       }
     ]
   },
@@ -438,7 +452,7 @@
   {
     "id": "ver.no-standing-branches",
     "statement": "There's no standing `release/0.x` branch for every minor.",
-    "status": "rejected",
+    "status": "superseded",
     "related": ["ver.patch-branch"],
     "events": [
       {
@@ -446,8 +460,15 @@
         "date": "2026-11-23",
         "ref": "adr/0019#alternatives-considered",
         "why": "Why not keep a branch per minor? It costs a ruleset, CI, a Changesets state and hand cherry-picks every week, for a line users are told to leave."
+      },
+      {
+        "type": "superseded",
+        "date": "2026-11-28",
+        "ref": "adr/0019#alternatives-considered",
+        "why": "The current minor's branch now always exists; there's still one at a time."
       }
-    ]
+    ],
+    "supersededBy": "ver.patch-branch"
   },
   {
     "id": "ver.tag-per-version",
