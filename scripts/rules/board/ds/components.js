@@ -223,6 +223,82 @@
     /></label>`;
 
   /**
+   * Select: { id, label, options: [{ id, label }], selected, hideLabel }. A
+   * native select, so the keyboard and screen readers work as everywhere.
+   */
+  const Select = ({ id, label, options, selected, hideLabel = false }) =>
+    html`<label class="ar-field" ${attrs({ for: id })}
+      ><span class="ar-field-label" ${attrs({ 'data-hidden': hideLabel })}>${label}</span
+      ><select class="ar-field-input ar-select" ${attrs({ id })}>
+        ${options.map(
+          (o) =>
+            html`<option ${attrs({ value: o.id, selected: o.id === selected })}>
+              ${o.label}
+            </option>`,
+        )}
+      </select></label
+    >`;
+
+  /**
+   * Stepper: a range over ordered items with previous and next buttons.
+   * { id, label, items: [{ id, label }], selected }. The range's value is the
+   * index; the buttons carry `data-stepper` (the id) and `data-step` (−1 or 1),
+   * and are disabled at the ends. The current item's label is in an <output>.
+   */
+  function Stepper({ id, label, items, selected }) {
+    const i = Math.max(
+      0,
+      items.findIndex((it) => it.id === selected),
+    );
+    const last = items.length - 1;
+    const step = (dir, text, name, off) =>
+      html`<button
+        class="ar-stepper-step"
+        type="button"
+        ${attrs({ 'data-stepper': id, 'data-step': dir, 'aria-label': name, disabled: off })}
+      >
+        ${text}
+      </button>`;
+    return html`<div class="ar-stepper" role="group" ${attrs({ 'aria-label': label })}>
+      ${step('-1', '‹', 'Earlier', i <= 0)}
+      <input
+        class="ar-stepper-range"
+        type="range"
+        ${attrs({
+          id,
+          min: 0,
+          max: last,
+          step: 1,
+          value: i,
+          'aria-label': label,
+          'aria-valuetext': items[i] ? items[i].label : '',
+        })}
+      />
+      ${step('1', '›', 'Later', i >= last)}
+      <output class="ar-stepper-value" ${attrs({ for: id })}
+        >${items[i] ? items[i].label : ''}</output
+      >
+    </div>`;
+  }
+
+  /** Badge: a small marker that a thing has a state worth noticing. { text, tone }. */
+  const Badge = ({ text, tone = 'accent' }) =>
+    html`<span class="ar-badge" ${attrs({ 'data-tone': tone })}>${text}</span>`;
+
+  /** BeforeAfter: two versions side by side. { before, after, labels: [before, after] }. */
+  const BeforeAfter = ({ before, after, labels = ['Before', 'After'] }) =>
+    html`<div class="ar-compare">
+      <div class="ar-compare-side" data-side="before">
+        <span class="ar-compare-label">${labels[0]}</span>
+        <p class="ar-compare-text">${before}</p>
+      </div>
+      <div class="ar-compare-side" data-side="after">
+        <span class="ar-compare-label">${labels[1]}</span>
+        <p class="ar-compare-text">${after}</p>
+      </div>
+    </div>`;
+
+  /**
    * ShareBar: one bar split into parts by value, each in a chart slot.
    * { label, parts: [{ key, label, value, slot }] }. Each part's title names it.
    */
@@ -309,6 +385,10 @@
     Legend,
     EmptyState,
     Field,
+    Select,
+    Stepper,
+    Badge,
+    BeforeAfter,
     ShareBar,
     Toolbar,
     ChartFrame,

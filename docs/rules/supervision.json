@@ -8,6 +8,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["sup.blocked-after", "sup.kill-after"],
+    "keywords": ["heartbeat", "timeouts", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -38,6 +39,7 @@
     "code": ["packages/host/src/supervisor/machine.ts"],
     "since": "0.1.0",
     "related": ["sup.kill-after"],
+    "keywords": ["heartbeat", "blocked-worker", "timeouts", "restart"],
     "events": [
       {
         "type": "decided",
@@ -69,6 +71,7 @@
     "code": ["packages/host/src/supervisor/machine.ts"],
     "since": "0.1.0",
     "related": ["sup.lag-clock", "sup.restart-window"],
+    "keywords": ["heartbeat", "blocked-worker", "timeouts", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -100,6 +103,7 @@
     "code": ["packages/host/src/supervisor/machine.ts"],
     "since": "0.1.0",
     "related": ["sup.lag-clock"],
+    "keywords": ["lifecycle", "heartbeat", "timeouts", "errors"],
     "events": [
       {
         "type": "decided",
@@ -131,6 +135,7 @@
     "code": ["packages/host/src/supervisor/machine.ts", "packages/host/src/supervisor/timers.ts"],
     "since": "0.1.0",
     "related": ["sup.short-runs", "sup.backoff", "sup.bus-restart-limit"],
+    "keywords": ["crash-loop", "observability", "timeouts", "restart"],
     "events": [
       {
         "type": "decided",
@@ -162,6 +167,7 @@
     "code": ["packages/host/src/supervisor/machine.ts"],
     "since": "0.1.1",
     "related": ["sup.restart-window", "sup.healthy-after", "sup.failed-message"],
+    "keywords": ["crash-loop", "lifecycle", "heartbeat", "timeouts"],
     "events": [
       {
         "type": "decided",
@@ -192,6 +198,7 @@
     "code": ["packages/host/src/supervisor/machine.ts", "packages/host/src/kernel/kernel.ts"],
     "target": "0.2.0",
     "related": ["sup.short-runs", "sup.healthy-after-valid"],
+    "keywords": ["crash-loop", "timeouts", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -216,6 +223,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "target": "0.2.0",
     "related": ["sup.healthy-after"],
+    "keywords": ["crash-loop", "lifecycle", "timeouts", "errors"],
     "events": [
       {
         "type": "decided",
@@ -240,6 +248,7 @@
     "code": ["packages/host/src/supervisor/timers.ts"],
     "since": "0.1.0",
     "related": ["sup.restart-window", "sup.short-runs"],
+    "keywords": ["crash-loop", "budgets", "timeouts", "restart"],
     "events": [
       {
         "type": "decided",
@@ -276,6 +285,7 @@
     "code": ["packages/host/src/supervisor/machine.ts"],
     "since": "0.1.1",
     "related": ["sup.short-runs"],
+    "keywords": ["crash-loop", "restart"],
     "events": [
       {
         "type": "decided",
@@ -308,6 +318,7 @@
     ],
     "target": "0.2.0",
     "related": ["sup.lag-clock-cap", "sup.lag-clock-scope", "sup.kill-after", "sup.ready-timeout"],
+    "keywords": ["blocked-worker", "lifecycle", "heartbeat", "measurement"],
     "events": [
       {
         "type": "decided",
@@ -331,6 +342,7 @@
     "code": ["packages/host/src/supervisor/machine.ts"],
     "target": "0.2.0",
     "related": ["sup.lag-clock"],
+    "keywords": ["blocked-worker", "budgets", "lifecycle", "heartbeat"],
     "events": [
       {
         "type": "decided",
@@ -353,6 +365,7 @@
     "code": ["packages/host/src/supervisor/machine.ts"],
     "target": "0.2.0",
     "related": ["sup.lag-clock"],
+    "keywords": ["crash-loop", "blocked-worker", "lifecycle", "heartbeat"],
     "events": [
       {
         "type": "decided",
@@ -373,6 +386,7 @@
     "statement": "For `readyTimeoutMs` after an isolate's `ready`, a blocked isolate is killed only after `readyTimeoutMs` without a beat, not `killAfterMs`.",
     "status": "superseded",
     "supersededBy": "sup.lag-clock",
+    "keywords": ["blocked-worker", "lifecycle", "heartbeat", "timeouts"],
     "events": [
       {
         "type": "decided",
@@ -404,6 +418,7 @@
     "id": "sup.no-sibling-detector",
     "statement": "The supervisor doesn't judge a silent worker against its siblings (holding kills while most workers are silent).",
     "status": "rejected",
+    "keywords": ["blocked-worker"],
     "events": [
       {
         "type": "rejected",
@@ -417,6 +432,7 @@
     "id": "sup.no-cpu-beat",
     "statement": "Workers don't send a beat counted in CPU time.",
     "status": "rejected",
+    "keywords": ["heartbeat"],
     "events": [
       {
         "type": "rejected",
@@ -436,6 +452,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["sup.no-device-budget", "sup.no-hard-worker-limit", "sup.no-budget-suspend"],
+    "keywords": ["dev-only", "budgets", "suspension", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -465,6 +482,7 @@
     "code": ["packages/host/src/kernel/kernel.ts", "packages/host/src/supervisor/machine.ts"],
     "since": "0.1.0",
     "related": ["sup.worker-budget", "sup.restart-window"],
+    "keywords": ["memory-use", "crash-loop", "suspension", "errors"],
     "events": [
       {
         "type": "decided",
@@ -490,6 +508,7 @@
     "id": "sup.no-device-budget",
     "statement": "The worker budget isn't derived from the device (for example cores × 4).",
     "status": "rejected",
+    "keywords": ["budgets"],
     "events": [
       {
         "type": "rejected",
@@ -516,6 +535,7 @@
     "id": "sup.no-budget-suspend",
     "statement": "Passing the worker budget doesn't suspend isolates. Memory is freed only after a real `spawn_failed`.",
     "status": "rejected",
+    "keywords": ["budgets", "suspension", "errors"],
     "events": [
       {
         "type": "rejected",
@@ -532,6 +552,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["sup.clocks-reset-on-show"],
+    "keywords": ["tabs", "browsers", "blocked-worker"],
     "events": [
       {
         "type": "decided",
@@ -560,6 +581,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["sup.hidden-tab"],
+    "keywords": ["browsers", "replay", "heartbeat", "restart"],
     "events": [
       {
         "type": "decided",
@@ -589,6 +611,7 @@
     "code": ["packages/host/src/bus/controller.ts"],
     "since": "0.1.0",
     "related": ["sup.bus-restart-limit"],
+    "keywords": ["blocked-worker", "bus-restart", "lifecycle", "heartbeat"],
     "events": [
       {
         "type": "decided",
@@ -620,6 +643,7 @@
     "code": ["packages/host/src/bus/controller.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["sup.bus-supervised", "sup.restart-window", "sup.short-runs"],
+    "keywords": ["crash-loop", "bus-restart", "observability", "errors"],
     "events": [
       {
         "type": "decided",

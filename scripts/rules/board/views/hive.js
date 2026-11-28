@@ -144,6 +144,7 @@
         cy: g.pos[r.id].xy[1],
         r: g.pos[r.id].size,
         tone: ctx.STATUS_TONE[r.status],
+        changed: !!r.changedSince,
         cls: 'ar-chart-mark ar-hive-dot',
         attrs: { 'data-id': r.id, 'data-dim': ctx.DIM.includes(r.status) },
       }),
@@ -170,7 +171,15 @@
       <p class="ar-hive-hint">
         Each axis is a concept, with its oldest rule at the centre and its newest at the tip. Hover
         a dot or an axis to trace its links; click a dot to open the rule.
-      </p>`;
+      </p>
+      ${
+        ctx.asOf.on
+          ? html`<p class="ar-hive-hint">
+              As of ${ctx.asOf.label(ctx.asOf.point)}: ringed dots changed since.
+              ${AR.Badge({ text: `${m.visible.filter((r) => r.changedSince).length} changed since` })}
+            </p>`
+          : ''
+      }`;
   }
   function ruleFocus(ctx, r, neighbours) {
     const { html, md } = AR;
@@ -182,6 +191,7 @@
     }
     const list = KINDS.filter((k) => per[k.id]);
     return html`<p class="ar-hive-id">${r.id}</p>
+      ${r.changedSince ? AR.Badge({ text: 'changed since' }) : ''}
       <p>${md(r.statement)}</p>
       ${AR.Legend({
         label: 'Links of this rule',
@@ -215,6 +225,10 @@
     id: 'hive',
     label: 'Hive',
     order: 30,
+    // "As of": ctx.rules holds the rules as they stood, so rules that didn't
+    // exist yet drop out; rules changed since are ringed (the chart's
+    // "changed since" mark). Links come from today's registry, as the ADR accepts.
+    asOf: true,
     onClick(e, ctx) {
       const k = e.target.closest('[data-hive-kind]');
       const i = e.target.closest('[data-hive-inside]');
@@ -347,7 +361,7 @@
     const focusRule = (id) => {
       clear();
       svg.setAttribute('data-focus', '');
-      const r = ctx.byId[id];
+      const r = ctx.asOf.ruleAt(id) || ctx.byId[id];
       hot(dots.get(id));
       const near = adj.get(id) || [];
       for (const { other, k } of near) {
