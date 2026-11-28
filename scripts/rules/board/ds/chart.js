@@ -91,13 +91,14 @@
       height="${n(Math.max(0, height))}"
       ${attrs({ 'data-slot': slot, ...a })}
     ></rect>`;
-  const circle = ({ cx, cy, r, slot, tone, cls = 'ar-chart-mark', attrs: a }) =>
+  /** A dot; `changed` rings it in the design system's "changed since" mark. */
+  const circle = ({ cx, cy, r, slot, tone, changed = false, cls = 'ar-chart-mark', attrs: a }) =>
     html`<circle
       class="${cls}"
       cx="${n(cx)}"
       cy="${n(cy)}"
       r="${n(r)}"
-      ${attrs({ 'data-slot': slot, 'data-tone': tone, ...a })}
+      ${attrs({ 'data-slot': slot, 'data-tone': tone, 'data-changed': changed, ...a })}
     ></circle>`;
   const text = ({ x, y, value, anchor = 'start', cls = 'ar-chart-label', attrs: a }) =>
     html`<text class="${cls}" x="${n(x)}" y="${n(y)}" text-anchor="${anchor}" ${attrs(a)}
@@ -197,6 +198,117 @@
     }
     if (other) groups.push(other);
     return { slotOf: (k) => map.get(k) ?? 'other', groups };
+  }
+
+  /**
+   * A two-column Sankey layout. left and right: [{ key, label }] in the order to
+   * stack them; flows: [{ from, to, value, ...rest }]. Nodes are sized by their
+   * flows' total; each flow becomes a ribbon between its two nodes, stacked in
+   * flow order on both sides. Returns { left, right, flows } with geometry:
+   * nodes { key, label, value, x, y, h }, flows { ...flow, y0, y1, h, d }.
+   * `d` is the ribbon's closed path, drawn with path({ d, slot, cls }).
+   */
+  function sankey({ left, right, flows, width, height, nodeWidth = 8, gap = 6 }) {
+    const total = flows.reduce((s, f) => s + f.value, 0) || 1;
+    const sum = (key, side) =>
+      flows.reduce((s, f) => s + (f[side === 'left' ? 'from' : 'to'] === key ? f.value : 0), 0);
+    const usedL = left.filter((nd) => sum(nd.key, 'left') > 0);
+    const usedR = right.filter((nd) => sum(nd.key, 'right') > 0);
+    // One scale for both sides, set by the side with more gaps, so every ribbon fits both ends.
+    const k =
+      Math.min(
+        height - gap * Math.max(0, usedL.length - 1),
+        height - gap * Math.max(0, usedR.length - 1),
+      ) / total;
+    const place = (used, side, x) => {
+      let y = 0;
+      return used.map((nd) => {
+        const value = sum(nd.key, side);
+        const node = { ...nd, value, x, y, h: value * k, k };
+        y += node.h + gap;
+        return node;
+      });
+    };
+    const L = place(usedL, 'left', 0);
+    const R = place(usedR, 'right', width - nodeWidth);
+    const at = (list) => new Map(list.map((nd) => [nd.key, { node: nd, next: nd.y }]));
+    const lAt = at(L);
+    const rAt = at(R);
+    const x0 = nodeWidth;
+    const x1 = width - nodeWidth;
+    const mid = (x0 + x1) / 2;
+    const out = [];
+    for (const f of flows) {
+      const a = lAt.get(f.from);
+      const b = rAt.get(f.to);
+      if (!a || !b || !(f.value > 0)) continue;
+      const h = f.value * a.node.k;
+      const y0 = a.next;
+      const y1 = b.next;
+      a.next += h;
+      b.next += h;
+      const d =
+        `M${n(x0)},${n(y0)}C${n(mid)},${n(y0)} ${n(mid)},${n(y1)} ${n(x1)},${n(y1)}` +
+        `L${n(x1)},${n(y1 + h)}C${n(mid)},${n(y1 + h)} ${n(mid)},${n(y0 + h)} ${n(x0)},${n(y0 + h)}Z`;
+      out.push({ ...f, y0, y1, h, d });
+    }
+    return { left: L, right: R, flows: out };
+  }
+
+  /**
+   * A squarified treemap (Bruls, Huizing and van Wijk): items [{ value, ...rest }]
+   * laid into { x, y, width, height } so each cell is as square as possible.
+   * Returns the items with x, y, width and height, biggest first; zero values are dropped.
+   */
+  function squarify(items, { x = 0, y = 0, width, height }) {
+    const list = items.filter((it) => it.value > 0).sort((a, b) => b.value - a.value);
+    const total = list.reduce((s, it) => s + it.value, 0);
+    if (!total || width <= 0 || height <= 0) return [];
+    const scale = (width * height) / total;
+    const out = [];
+    let box = { x, y, w: width, h: height };
+    let row = [];
+    const worst = (r, side) => {
+      const s = r.reduce((t, it) => t + it.value * scale, 0);
+      let max = 0;
+      for (const it of r) {
+        const a = it.value * scale;
+        max = Math.max(max, (side * side * a) / (s * s), (s * s) / (side * side * a));
+      }
+      return max;
+    };
+    const lay = (r) => {
+      const s = r.reduce((t, it) => t + it.value * scale, 0);
+      if (box.w >= box.h) {
+        const w = s / box.h;
+        let yy = box.y;
+        for (const it of r) {
+          const h = (it.value * scale) / w;
+          out.push({ ...it, x: box.x, y: yy, width: w, height: h });
+          yy += h;
+        }
+        box = { x: box.x + w, y: box.y, w: box.w - w, h: box.h };
+      } else {
+        const h = s / box.w;
+        let xx = box.x;
+        for (const it of r) {
+          const w = (it.value * scale) / h;
+          out.push({ ...it, x: xx, y: box.y, width: w, height: h });
+          xx += w;
+        }
+        box = { x: box.x, y: box.y + h, w: box.w, h: box.h - h };
+      }
+    };
+    for (const it of list) {
+      const side = Math.min(box.w, box.h);
+      if (row.length && worst([...row, it], side) > worst(row, side)) {
+        lay(row);
+        row = [];
+      }
+      row.push(it);
+    }
+    if (row.length) lay(row);
+    return out;
   }
 
   /** A Legend from slot groups. */
@@ -371,6 +483,8 @@
     axisLeft,
     slots,
     legendFor,
+    sankey,
+    squarify,
     heatStep,
     HEAT_LABELS,
     heatCell,

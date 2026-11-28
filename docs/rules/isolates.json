@@ -28,6 +28,7 @@
     "code": ["packages/host/src/kernel/kernel.ts", "packages/runtime/src/isolate/vanilla.ts"],
     "since": "0.1.0",
     "related": ["iso.unit"],
+    "keywords": ["lifecycle", "frameworks", "restart", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -52,6 +53,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.placement-host", "iso.no-worker-identity"],
+    "keywords": ["own-stack", "placement", "pools"],
     "events": [
       {
         "type": "decided",
@@ -81,6 +83,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.own-worker"],
+    "keywords": ["own-stack", "placement", "pools"],
     "events": [
       {
         "type": "decided",
@@ -103,6 +106,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.own-worker"],
+    "keywords": ["keys", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -126,6 +130,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.unit", "iso.headless-no-dom", "iso.headless-no-surface-calls"],
+    "keywords": ["rendering"],
     "events": [
       {
         "type": "decided",
@@ -148,6 +153,7 @@
     "code": ["packages/runtime/src/isolate/vanilla.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.surface-optional"],
+    "keywords": ["compatibility", "rendering", "releases"],
     "events": [
       {
         "type": "decided",
@@ -171,6 +177,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.surface-optional"],
+    "keywords": ["measurement", "errors", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -212,6 +219,7 @@
     "errors": ["isolate:crash", "isolate:failed"],
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
+    "keywords": ["replay", "heartbeat"],
     "events": [
       {
         "type": "decided",
@@ -262,6 +270,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.suspend-idle", "iso.suspend-steps", "iso.wake"],
+    "keywords": ["tabs", "browsers", "suspension", "timeouts"],
     "events": [
       {
         "type": "decided",
@@ -290,6 +299,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.suspend-opt-in", "iso.keep-awake"],
+    "keywords": ["tabs", "suspension", "timeouts", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -320,6 +330,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.suspend-idle"],
+    "keywords": ["dev-only", "suspension", "observability", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -348,6 +359,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.no-snapshot-api", "iso.wake-replay"],
+    "keywords": ["lifecycle", "suspension", "commits"],
     "events": [
       {
         "type": "decided",
@@ -376,6 +388,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.wake-queue", "iso.wake-on-bus-restart", "iso.no-wake-every-record"],
+    "keywords": ["replay", "suspension", "requests", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -406,6 +419,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.wake"],
+    "keywords": ["trust-boundary", "suspension", "rendering", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -434,6 +448,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.wake"],
+    "keywords": ["replay", "bus-restart", "suspension", "restart"],
     "events": [
       {
         "type": "decided",
@@ -462,6 +477,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.suspend-steps", "iso.suspend-retention-warning"],
+    "keywords": ["back-pressure", "replay", "suspension", "commits"],
     "events": [
       {
         "type": "decided",
@@ -490,6 +506,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["iso.wake-replay"],
+    "keywords": ["retention", "dev-only", "suspension"],
     "events": [
       {
         "type": "decided",
@@ -515,6 +532,7 @@
     "id": "iso.no-auto-suspend",
     "statement": "Isolates aren't suspended automatically, even when every subscription is durable.",
     "status": "rejected",
+    "keywords": ["suspension", "durability"],
     "events": [
       {
         "type": "rejected",
@@ -528,6 +546,7 @@
     "id": "iso.no-snapshot-api",
     "statement": "There's no snapshot API for a suspended isolate's state.",
     "status": "rejected",
+    "keywords": ["suspension"],
     "events": [
       {
         "type": "rejected",
@@ -541,6 +560,7 @@
     "id": "iso.no-wake-every-record",
     "statement": "A record doesn't wake suspended visual isolates.",
     "status": "rejected",
+    "keywords": ["suspension"],
     "events": [
       {
         "type": "rejected",
