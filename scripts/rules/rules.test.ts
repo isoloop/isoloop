@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { boardData, renderBoard, renderReadme } from './build.ts';
+import { boardData, readBoardSources, renderBoard, renderReadme } from './build.ts';
+import { parseConfig } from './config.ts';
+import { buildModel, deriveLinks, keywordRules, sectionsOf, symbolsOf } from './model.ts';
 import { checkRules, type CheckInput } from './check.ts';
 import { decide, idsIn } from './pr.ts';
 import {
@@ -613,13 +615,17 @@ describe('rules:build', () => {
     const r = rules();
     r.sup[0]!.statement = 'A </script> in a statement.';
     const html = renderBoard(
-      '<script>const D = /*RULES_DATA*/null;</script>',
+      {
+        shell: '<title>/*TITLE*/</title><style>/*STYLES*/</style><script>/*SCRIPTS*/</script>',
+        css: [],
+        js: ['const D = /*RULES_DATA*/null;'],
+      },
       boardData(registry(r), adrs()),
     );
     expect(html).not.toContain('</script> in');
     expect(html).toContain('\\u003c/script> in');
     const data: unknown = JSON.parse(
-      html.slice(html.indexOf('= ') + 2, html.lastIndexOf(';</script>')),
+      html.slice(html.indexOf('= ') + 2, html.indexOf(';\nRules.start();')),
     );
     expect(data).toMatchObject({
       refs: {
@@ -631,8 +637,40 @@ describe('rules:build', () => {
     });
   });
 
-  it('refuses a template with no placeholder', () => {
-    expect(() => renderBoard('<p>no data</p>', {})).toThrow(/placeholder/);
+  it('refuses sources with a placeholder missing', () => {
+    expect(() => renderBoard({ shell: '<p>no data</p>', css: [], js: ['x'] }, {})).toThrow(
+      /placeholder/,
+    );
+    expect(() =>
+      renderBoard({ shell: '<p>no marks</p>', css: [], js: ['/*RULES_DATA*/null'] }, {}),
+    ).toThrow(/placeholder/);
+  });
+
+  it('builds the real page: the shell, then every view, then start()', () => {
+    const src = readBoardSources();
+    const html = renderBoard(src, boardData(registry(), adrs()), 'A & B');
+    expect(html).toContain('<title>A &amp; B</title>');
+    expect(html).not.toMatch(/\/\*(TITLE|STYLES|SCRIPTS|RULES_DATA)\*\//);
+    for (const id of ['board', 'agenda']) expect(html).toContain(`id: '${id}'`);
+    expect(html.indexOf('const Rules =')).toBeLessThan(html.indexOf("id: 'board'"));
+    expect(html.trimEnd()).toMatch(/Rules\.start\(\);\s*<\/script>\s*<\/body>\s*<\/html>$/);
+  });
+
+  it('adds the derived model and the keywords to the page data', () => {
+    const r = rules();
+    const data = boardData(
+      {
+        ...registry(r),
+        keywords: [
+          { id: 'crash-loop', label: 'Crash loop', definition: 'Keeps crashing.', aliases: [] },
+        ],
+      },
+      adrs(),
+    );
+    expect(data).toMatchObject({
+      keywords: [{ id: 'crash-loop' }],
+      model: { keywordRules: { 'crash-loop': [] } },
+    });
   });
 });
 
@@ -797,5 +835,160 @@ describe('the Rules workflow', () => {
     ]);
     expect(idsIn('{')).toEqual([]);
     expect(idsIn(undefined)).toEqual([]);
+  });
+});
+
+const rule = (id: string, over: Partial<Rule> = {}): Rule => ({
+  id,
+  statement: 'A rule.',
+  status: 'active',
+  events: [{ type: 'decided', date: '2026-11-03', ref: 'adr/0007#one', why: 'Because.' }],
+  ...over,
+});
+
+describe('the derived model', () => {
+  it('takes symbols from backticks in the statement and knob, and the errors', () => {
+    const r = rule('sup.a', {
+      statement: 'Restarts at most `maxRestarts` times, then `isolate failed` and `main`.',
+      knob: '`KernelConfig.supervisor`',
+      errors: ['bus_unavailable'],
+    });
+    expect(symbolsOf(r, new Set(['main']))).toEqual([
+      'maxRestarts',
+      'KernelConfig.supervisor',
+      'bus_unavailable',
+    ]);
+  });
+
+  it('reads the ADR sections a rule cites, anchors only', () => {
+    const r = rule('sup.a', {
+      events: [
+        { type: 'decided', date: '2026-11-03', ref: 'adr/0007#one', why: 'x' },
+        { type: 'built', date: '2026-11-04', ref: '#12', why: 'x' },
+        { type: 'amended', date: '2026-11-05', ref: 'adr/0007#one', why: 'x', prev: 'y' },
+      ],
+    });
+    expect(sectionsOf(r)).toEqual(['adr/0007#one']);
+  });
+
+  it('links written pairs once with weight 1, through aliases', () => {
+    const a = rule('sup.a', { related: ['sup.old-b'] });
+    const b = rule('sup.b', { aliases: ['sup.old-b'], related: ['sup.a'] });
+    const { links } = deriveLinks([a, b], { cap: 12, symbols: {} });
+    const related = links.filter((l) => l.kind === 'related');
+    expect(related).toEqual([{ a: 'sup.a', b: 'sup.b', kind: 'related', weight: 1, keys: [] }]);
+  });
+
+  it('weighs a shared key 1/(n−1) and lists a key past the cap', () => {
+    const three = ['sup.a', 'sup.b', 'sup.c'].map((id) => rule(id, { code: ['x.ts'] }));
+    const { links } = deriveLinks(three, { cap: 12, symbols: {} });
+    const code = links.filter((l) => l.kind === 'code');
+    expect(code).toHaveLength(3);
+    for (const l of code) expect(l.weight).toBeCloseTo(0.5);
+    const many = Array.from({ length: 4 }, (_, i) => rule(`sup.r${i}`, { code: ['k.ts'] }));
+    const capped = deriveLinks(many, { cap: 3, symbols: {} });
+    expect(capped.links.filter((l) => l.kind === 'code')).toEqual([]);
+    expect(capped.tooCommon.filter((k) => k.kind === 'code')).toEqual([
+      { kind: 'code', key: 'k.ts', rules: 4 },
+    ]);
+  });
+
+  it('adds up the weights of several shared keys of one kind', () => {
+    const a = rule('sup.a', { code: ['x.ts', 'y.ts'] });
+    const b = rule('sup.b', { code: ['x.ts', 'y.ts'] });
+    const { links } = deriveLinks([a, b], { cap: 12, symbols: {} });
+    expect(links.find((l) => l.kind === 'code')).toMatchObject({
+      weight: 2,
+      keys: ['x.ts', 'y.ts'],
+    });
+    const sec = links.find((l) => l.kind === 'section');
+    expect(sec).toMatchObject({ keys: ['adr/0007#one'], weight: 1 });
+  });
+
+  it("lists each keyword's rules, with no rules for an unused keyword", () => {
+    const vocab = [
+      { id: 'crash-loop', label: 'Crash loop', definition: 'x', aliases: [] },
+      { id: 'tabs', label: 'Tabs', definition: 'x', aliases: [] },
+    ];
+    const rs = [
+      rule('sup.a', { keywords: ['crash-loop'] }),
+      rule('sup.b', { keywords: ['crash-loop'] }),
+    ];
+    expect(keywordRules(rs, vocab)).toEqual({ 'crash-loop': ['sup.a', 'sup.b'], tabs: [] });
+    expect(
+      buildModel(rs, vocab, { cap: 12, symbolsIgnore: [] }).keywordRules['crash-loop'],
+    ).toEqual(['sup.a', 'sup.b']);
+  });
+});
+
+const vocab = [
+  {
+    id: 'crash-loop',
+    label: 'Crash loop',
+    definition: 'Keeps crashing.',
+    aliases: ['restart limit'],
+  },
+];
+const run = (keywords: unknown, change: (r: Raw) => void = () => {}): string[] => {
+  const r = rules();
+  change(raw(r.sup[0]));
+  const reg = { ...registry(r), keywords };
+  return messages(input(reg));
+};
+
+describe('keywords in rules:check', () => {
+  it('passes a rule naming a known keyword', () => {
+    expect(run(vocab, (r) => (r['keywords'] = ['crash-loop']))).toEqual([]);
+  });
+
+  it('fails on an unknown keyword', () => {
+    expect(run(vocab, (r) => (r['keywords'] = ['nope']))).toContain(
+      'docs/rules/supervision.json: sup.restart-limit: keyword "nope" isn\'t in docs/rules/keywords.json',
+    );
+  });
+
+  it('fails on a malformed vocabulary', () => {
+    const out = run([
+      { id: 'Bad Id', label: '', aliases: 'x', extra: 1 },
+      { id: 'tabs', label: 'Tabs', definition: 'x', aliases: [] },
+      { id: 'tabs', label: 'Tabs', definition: 'x', aliases: [] },
+    ]);
+    expect(out).toEqual(
+      expect.arrayContaining([
+        'docs/rules/keywords.json: keyword 1: unknown field "extra"',
+        'docs/rules/keywords.json: keyword 1: "label" must be a non-empty string',
+        'docs/rules/keywords.json: keyword 1: "definition" must be a non-empty string',
+        'docs/rules/keywords.json: keyword 1: "aliases" must be an array of strings',
+        'docs/rules/keywords.json: keyword 1: id must be kebab-case',
+        'docs/rules/keywords.json: keyword id "tabs" is used twice',
+      ]),
+    );
+    expect(run({ parseError: 'bad' })).toContain('docs/rules/keywords.json: not valid JSON: bad');
+    expect(run({})).toContain('docs/rules/keywords.json: must be an array of keywords');
+  });
+
+  it('fails on a rule whose keywords field is not a list of strings', () => {
+    expect(run(vocab, (r) => (r['keywords'] = 'crash-loop'))).toContain(
+      'docs/rules/supervision.json: sup.restart-limit: "keywords" must be an array of strings',
+    );
+  });
+});
+
+describe('the config', () => {
+  it('merges over the defaults', () => {
+    const c = parseConfig({ title: 'X rules', github: { owner: 'o' }, links: { cap: 20 } });
+    expect(c.title).toBe('X rules');
+    expect(c.github).toEqual({ owner: 'o', repo: '' });
+    expect(c.links.cap).toBe(20);
+    expect(c.rulesDir).toBe('docs/rules');
+  });
+
+  it('refuses unknown fields and wrong types', () => {
+    expect(() => parseConfig({ nope: 1 })).toThrow(/unknown field "nope"/);
+    expect(() => parseConfig({ title: 3 })).toThrow(/"title" must be a string/);
+    expect(() => parseConfig({ github: { owner: 1 } })).toThrow(/"github.owner" must be a string/);
+    expect(() => parseConfig({ github: { x: 'y' } })).toThrow(/unknown field "github.x"/);
+    expect(() => parseConfig({ symbolsIgnore: [1] })).toThrow(/array of strings/);
+    expect(() => parseConfig([])).toThrow(/must be an object/);
   });
 });

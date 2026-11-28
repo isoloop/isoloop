@@ -13,6 +13,7 @@ import {
   CONCEPTS_FILE,
   EVENT_TYPES,
   isVersion,
+  KEYWORDS_FILE,
   packagesVersion,
   parseRef,
   type Problem,
@@ -20,6 +21,7 @@ import {
   readAdrs,
   readRegistry,
   REF_KINDS,
+  RULES_DIR,
   RULES_LINES_FROM,
   type Registry,
   STATUSES,
@@ -61,10 +63,13 @@ const RULE_FIELDS = new Set([
   'related',
   'supersededBy',
   'aliases',
+  'keywords',
   'events',
 ]);
 const EVENT_FIELDS = new Set(['type', 'date', 'ref', 'why', 'prev']);
 const CONCEPT_FIELDS = new Set(['id', 'prefix', 'name', 'description', 'order']);
+const KEYWORD_FIELDS = new Set(['id', 'label', 'definition', 'aliases']);
+const KEYWORD_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export function checkRules(input: CheckInput): Problem[] {
   const { reg, adrs, exists } = input;
@@ -101,7 +106,34 @@ export function checkRules(input: CheckInput): Problem[] {
     });
   for (const id of prefixOf.keys())
     if (!reg.files.some((f) => f.concept === id))
-      at(CONCEPTS_FILE, `concept "${id}" has no file docs/rules/${id}.json`);
+      at(CONCEPTS_FILE, `concept "${id}" has no file ${RULES_DIR}/${id}.json`);
+
+  // The keyword vocabulary (amended 2026-11-28), optional.
+  const keywordIds = new Set<string>();
+  if (reg.keywords !== undefined) {
+    if (isObj(reg.keywords) && 'parseError' in reg.keywords)
+      at(KEYWORDS_FILE, `not valid JSON: ${String(reg.keywords['parseError'])}`);
+    else if (!Array.isArray(reg.keywords)) at(KEYWORDS_FILE, 'must be an array of keywords');
+    else
+      reg.keywords.forEach((k: unknown, i) => {
+        const where = `keyword ${i + 1}`;
+        if (!isObj(k)) {
+          at(KEYWORDS_FILE, `${where}: must be an object`);
+          return;
+        }
+        for (const f of Object.keys(k))
+          if (!KEYWORD_FIELDS.has(f)) at(KEYWORDS_FILE, `${where}: unknown field "${f}"`);
+        for (const f of ['id', 'label', 'definition'])
+          if (!isStr(k[f])) at(KEYWORDS_FILE, `${where}: "${f}" must be a non-empty string`);
+        if (!isStrArr(k['aliases']))
+          at(KEYWORDS_FILE, `${where}: "aliases" must be an array of strings`);
+        if (isStr(k['id'])) {
+          if (!KEYWORD_ID.test(k['id'])) at(KEYWORDS_FILE, `${where}: id must be kebab-case`);
+          if (keywordIds.has(k['id'])) at(KEYWORDS_FILE, `keyword id "${k['id']}" is used twice`);
+          keywordIds.add(k['id']);
+        }
+      });
+  }
 
   // Rules, pass 1: shape, and every id and alias.
   const owner = new Map<string, string>(); // id or alias → file
@@ -133,7 +165,7 @@ export function checkRules(input: CheckInput): Problem[] {
         else if (prefixOf.get(f.concept) !== m[1])
           at(
             f.path,
-            `${name}: prefix "${m[1]}" belongs in docs/rules/${conceptOfPrefix.get(m[1]!)}.json`,
+            `${name}: prefix "${m[1]}" belongs in ${RULES_DIR}/${conceptOfPrefix.get(m[1]!)}.json`,
           );
       }
       if (!isStr(r['statement'])) at(f.path, `${name}: "statement" must be a non-empty string`);
@@ -142,7 +174,7 @@ export function checkRules(input: CheckInput): Problem[] {
       for (const k of ['experimental', 'repo'])
         if (k in r && typeof r[k] !== 'boolean')
           at(f.path, `${name}: "${k}" must be true or false`);
-      for (const k of ['values', 'errors', 'code', 'related', 'aliases'])
+      for (const k of ['values', 'errors', 'code', 'related', 'aliases', 'keywords'])
         if (k in r && !isStrArr(r[k])) at(f.path, `${name}: "${k}" must be an array of strings`);
       for (const k of ['knob', 'supersededBy'])
         if (k in r && !isStr(r[k])) at(f.path, `${name}: "${k}" must be a non-empty string`);
@@ -174,6 +206,9 @@ export function checkRules(input: CheckInput): Problem[] {
         if (!known(id)) at(file, `${name}: related "${id}" doesn't exist`);
     if (isStr(r['supersededBy']) && !ids.has(r['supersededBy']))
       at(file, `${name}: supersededBy "${r['supersededBy']}" doesn't exist`);
+    if (isStrArr(r['keywords']))
+      for (const k of r['keywords'])
+        if (!keywordIds.has(k)) at(file, `${name}: keyword "${k}" isn't in ${KEYWORDS_FILE}`);
     if (isStrArr(r['code']))
       for (const p of r['code'])
         if (!exists(p)) at(file, `${name}: code path "${p}" doesn't exist`);

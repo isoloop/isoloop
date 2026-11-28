@@ -3,13 +3,19 @@
 // needs a dependency.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { CONFIG } from './config.ts';
 
-export const RULES_DIR = 'docs/rules';
-export const ADR_DIR = 'docs/adr';
+export const RULES_DIR: string = CONFIG.rulesDir;
+export const ADR_DIR: string = CONFIG.adrDir;
 export const README = `${RULES_DIR}/README.md`;
 export const CONCEPTS_FILE = `${RULES_DIR}/concepts.json`;
-/** Files in docs/rules that hold no rules. */
-export const NOT_RULE_FILES = new Set(['concepts.json', 'schema.json']);
+export const KEYWORDS_FILE = `${RULES_DIR}/keywords.json`;
+/** Files in the rules folder that hold no rules. */
+export const NOT_RULE_FILES: Set<string> = new Set([
+  'concepts.json',
+  'schema.json',
+  'keywords.json',
+]);
 
 /** Decision 5. */
 export const STATUSES = [
@@ -79,7 +85,17 @@ export interface Rule {
   related?: string[];
   supersededBy?: string;
   aliases?: string[];
+  /** Ids from the keyword vocabulary (amended 2026-11-28). */
+  keywords?: string[];
   events: RuleEvent[];
+}
+
+/** One entry of the keyword vocabulary in `keywords.json` (amended 2026-11-28). */
+export interface Keyword {
+  id: string;
+  label: string;
+  definition: string;
+  aliases: string[];
 }
 
 export interface Concept {
@@ -103,6 +119,8 @@ export interface RuleFile {
 export interface Registry {
   concepts: unknown;
   files: RuleFile[];
+  /** `keywords.json`, parsed; `undefined` when the file is missing. */
+  keywords?: unknown;
 }
 
 /** An ADR file: its number, file name, text, heading anchors and `Rules:` ids. */
@@ -116,7 +134,7 @@ export interface Adr {
 }
 
 /** From this ADR on, every decision and amendment has a `Rules:` line from the start (decision 11). */
-export const RULES_LINES_FROM = '0026';
+export const RULES_LINES_FROM: string = CONFIG.rulesLinesFrom;
 
 export interface Problem {
   file: string;
@@ -151,7 +169,8 @@ export function parseRef(ref: string): Ref | undefined {
   return undefined;
 }
 
-const GITHUB = 'https://github.com/isoloop';
+const GITHUB = `https://github.com/${CONFIG.github.owner}`;
+const REPO = CONFIG.github.repo;
 
 /** Where a ref points, for the board (absolute) or the README (`relativeAdr` from docs/rules). */
 export function refUrl(ref: Ref, adrs: Map<string, Adr>, relativeAdr: boolean): string | undefined {
@@ -160,11 +179,11 @@ export function refUrl(ref: Ref, adrs: Map<string, Adr>, relativeAdr: boolean): 
     if (!adr) return undefined;
     const base = relativeAdr
       ? `../adr/${adr.file}`
-      : `${GITHUB}/isoloop/blob/main/${ADR_DIR}/${adr.file}`;
+      : `${GITHUB}/${REPO}/blob/main/${ADR_DIR}/${adr.file}`;
     return ref.anchor ? `${base}#${ref.anchor}` : base;
   }
-  if (ref.kind === 'issue') return `${GITHUB}/${ref.repo ?? 'isoloop'}/issues/${ref.number}`;
-  return `${GITHUB}/isoloop/releases/tag/${ref.tag}`;
+  if (ref.kind === 'issue') return `${GITHUB}/${ref.repo ?? REPO}/issues/${ref.number}`;
+  return `${GITHUB}/${REPO}/releases/tag/${ref.tag}`;
 }
 
 /** A short label: `ADR 0007 · 1. Supervise the bus like an isolate`, `#390`, `v0.1.0`. */
@@ -361,7 +380,28 @@ export function readRegistry(root: string): Registry {
     }
     files.push({ path, concept: name.slice(0, -'.json'.length), data });
   }
-  return { concepts, files };
+  const kwPath = join(root, KEYWORDS_FILE);
+  if (!existsSync(kwPath)) return { concepts, files };
+  let keywords: unknown;
+  try {
+    keywords = JSON.parse(readFileSync(kwPath, 'utf8'));
+  } catch (e) {
+    keywords = { parseError: e instanceof Error ? e.message : String(e) };
+  }
+  return { concepts, files, keywords };
+}
+
+/** The vocabulary's entries that are well formed; check.ts reports the rest. */
+export function keywordsOf(reg: Registry): Keyword[] {
+  if (!Array.isArray(reg.keywords)) return [];
+  return reg.keywords.filter(
+    (k): k is Keyword =>
+      isRec(k) &&
+      typeof k['id'] === 'string' &&
+      typeof k['label'] === 'string' &&
+      typeof k['definition'] === 'string' &&
+      Array.isArray(k['aliases']),
+  );
 }
 
 // --- Versions -----------------------------------------------------------------
@@ -398,7 +438,8 @@ export function compareVersions(a: string, b: string): number {
 /** The fixed group's version, from the public packages' manifests (undefined when they differ). */
 export function packagesVersion(root: string): string | undefined {
   const versions = new Set<string>();
-  const dir = join(root, 'packages');
+  if (!CONFIG.packagesDir) return undefined;
+  const dir = join(root, CONFIG.packagesDir);
   if (!existsSync(dir)) return undefined;
   for (const d of readdirSync(dir, { withFileTypes: true })) {
     if (!d.isDirectory()) continue;

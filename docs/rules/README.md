@@ -5132,7 +5132,7 @@ History:
 ### `tool.rules-board`
 
 - **Change it:** `pnpm rules:board`
-- **Code:** `scripts/rules/build.ts`, `scripts/rules/board.html`
+- **Code:** `scripts/rules/build.ts`, `scripts/rules/board/`
 - **Why:** The board is the view for reading across concepts and over time.
 
 History:

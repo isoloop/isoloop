@@ -500,7 +500,7 @@
     "status": "active",
     "repo": true,
     "knob": "`pnpm rules:board`",
-    "code": ["scripts/rules/build.ts", "scripts/rules/board.html"],
+    "code": ["scripts/rules/build.ts", "scripts/rules/board/"],
     "events": [
       {
         "type": "decided",
