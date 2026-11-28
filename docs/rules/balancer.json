@@ -7,6 +7,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.own-pools", "bal.no-kernel-policy"],
+    "keywords": ["main-thread", "placement"],
     "events": [
       {
         "type": "decided",
@@ -36,6 +37,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.opt-in", "bal.reserved-prefix"],
+    "keywords": ["reserved-names", "placement", "host-api", "pools"],
     "events": [
       {
         "type": "decided",
@@ -65,6 +67,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["bal.own-pools"],
+    "keywords": ["reserved-names", "errors", "host-api", "pools"],
     "events": [
       {
         "type": "decided",
@@ -94,6 +97,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.move-is-restart"],
+    "keywords": ["placement", "releases"],
     "events": [
       {
         "type": "decided",
@@ -125,6 +129,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.unmeasured-quarantine"],
+    "keywords": ["measurement"],
     "events": [
       {
         "type": "decided",
@@ -153,6 +158,7 @@
     "code": ["packages/runtime/src/pools/busy.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["bal.attribution", "bal.beat-event"],
+    "keywords": ["heartbeat", "measurement", "host-api", "pools"],
     "events": [
       {
         "type": "decided",
@@ -181,6 +187,7 @@
     "code": ["packages/runtime/src/pools/busy.ts"],
     "since": "0.1.0",
     "related": ["bal.framework-attribution", "bal.shared-split", "bal.busy-ms"],
+    "keywords": ["timeouts"],
     "events": [
       {
         "type": "decided",
@@ -209,6 +216,7 @@
     "code": ["packages/runtime/src/pools/busy.ts"],
     "since": "0.1.0",
     "related": ["bal.attribution", "bal.no-profiler"],
+    "keywords": ["frameworks", "observability", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -236,6 +244,7 @@
     "status": "active",
     "since": "0.1.0",
     "related": ["bal.unexplained-lag", "bal.reported-busy"],
+    "keywords": ["heartbeat"],
     "events": [
       {
         "type": "decided",
@@ -281,6 +290,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.bisect", "bal.reported-busy"],
+    "keywords": ["measurement", "placement", "pools"],
     "events": [
       {
         "type": "decided",
@@ -316,6 +326,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["bal.decision-cadence", "bal.busy-ms"],
+    "keywords": ["heartbeat", "measurement", "observability", "pools"],
     "events": [
       {
         "type": "decided",
@@ -346,6 +357,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.beat-event"],
+    "keywords": ["heartbeat", "pools"],
     "events": [
       {
         "type": "decided",
@@ -384,6 +396,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.crash-quarantine", "bal.alone-spike"],
+    "keywords": ["heartbeat"],
     "events": [
       {
         "type": "decided",
@@ -422,6 +435,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.full", "bal.predicted-load"],
+    "keywords": ["heartbeat", "placement", "pools"],
     "events": [
       {
         "type": "decided",
@@ -452,6 +466,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.sustained", "bal.predicted-load"],
+    "keywords": ["measurement", "placement", "pools"],
     "events": [
       {
         "type": "decided",
@@ -482,6 +497,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.behind-event", "bal.reported-busy"],
+    "keywords": ["back-pressure", "budgets", "own-stack", "placement"],
     "events": [
       {
         "type": "decided",
@@ -525,6 +541,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.backlog-trigger"],
+    "keywords": ["observability", "placement", "pools"],
     "events": [
       {
         "type": "decided",
@@ -555,6 +572,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.shared-split", "bal.unexplained-lag"],
+    "keywords": ["heartbeat", "measurement"],
     "events": [
       {
         "type": "decided",
@@ -584,6 +602,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.second-spike", "bal.bisect"],
+    "keywords": ["restart", "pools"],
     "events": [
       {
         "type": "decided",
@@ -613,6 +632,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.bisect"],
+    "keywords": ["placement", "restart", "pools"],
     "events": [
       {
         "type": "decided",
@@ -643,6 +663,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.unexplained-lag", "bal.no-quarantine-all-killed"],
+    "keywords": ["blocked-worker", "budgets", "restart", "pools"],
     "events": [
       {
         "type": "decided",
@@ -686,6 +707,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.second-spike"],
+    "keywords": ["placement", "pools"],
     "events": [
       {
         "type": "decided",
@@ -717,6 +739,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.full", "bal.cap"],
+    "keywords": ["budgets", "measurement", "own-stack", "placement"],
     "events": [
       {
         "type": "decided",
@@ -747,6 +770,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.measure-loads", "bal.move-budget"],
+    "keywords": ["measurement", "placement"],
     "events": [
       {
         "type": "decided",
@@ -778,6 +802,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.cap-claimed", "bal.predicted-load"],
+    "keywords": ["reserved-names", "budgets", "own-stack", "placement"],
     "events": [
       {
         "type": "decided",
@@ -814,6 +839,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.cap"],
+    "keywords": ["budgets", "placement", "pools"],
     "events": [
       {
         "type": "decided",
@@ -842,6 +868,7 @@
     "experimental": true,
     "since": "0.1.0",
     "related": ["bal.predicted-load"],
+    "keywords": ["placement"],
     "events": [
       {
         "type": "decided",
@@ -865,6 +892,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.backlog-outranks", "bal.cap"],
+    "keywords": ["reserved-names", "budgets", "own-stack", "pools"],
     "events": [
       {
         "type": "decided",
@@ -895,6 +923,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.quarantine-split", "bal.backlog-trigger"],
+    "keywords": ["back-pressure", "placement", "pools"],
     "events": [
       {
         "type": "decided",
@@ -937,6 +966,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.repeat-offenders"],
+    "keywords": ["timeouts", "placement"],
     "events": [
       {
         "type": "decided",
@@ -975,6 +1005,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.leave-quarantine"],
+    "keywords": ["crash-loop", "budgets", "timeouts"],
     "events": [
       {
         "type": "decided",
@@ -1017,6 +1048,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.cooldown", "bal.arrived"],
+    "keywords": ["retention", "placement", "restart", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -1047,6 +1079,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.move-budget"],
+    "keywords": ["budgets", "timeouts", "placement", "pools"],
     "events": [
       {
         "type": "decided",
@@ -1076,6 +1109,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.move-budget"],
+    "keywords": ["placement", "pools"],
     "events": [
       {
         "type": "decided",
@@ -1106,6 +1140,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.moves-that-help", "bal.cooldown"],
+    "keywords": ["budgets", "measurement", "placement"],
     "events": [
       {
         "type": "decided",
@@ -1148,6 +1183,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.move-is-restart"],
+    "keywords": ["heartbeat", "placement"],
     "events": [
       {
         "type": "decided",
@@ -1179,6 +1215,7 @@
     "code": ["packages/balancer/src/balancer/balancer.ts"],
     "since": "0.1.0",
     "related": ["bal.predicted-load", "bal.move-budget"],
+    "keywords": ["back-pressure", "measurement", "pools"],
     "events": [
       {
         "type": "decided",
@@ -1231,6 +1268,7 @@
     "statement": "The kernel has no placement policy such as `pool: 'auto'`.",
     "status": "rejected",
     "related": ["bal.opt-in"],
+    "keywords": ["placement", "pools"],
     "events": [
       {
         "type": "rejected",
@@ -1245,6 +1283,7 @@
     "statement": "React render time doesn't come from `<Profiler>`.",
     "status": "rejected",
     "related": ["bal.framework-attribution"],
+    "keywords": ["own-stack", "frameworks", "rendering"],
     "events": [
       {
         "type": "rejected",
@@ -1259,6 +1298,7 @@
     "statement": "The balancer isn't an isolate with a grant to spawn and stop.",
     "status": "rejected",
     "related": ["bal.opt-in"],
+    "keywords": ["grants"],
     "events": [
       {
         "type": "rejected",
@@ -1273,6 +1313,7 @@
     "statement": "The balancer doesn't read backlogs from the bus; the app reports them.",
     "status": "rejected",
     "related": ["bal.backlog-trigger"],
+    "keywords": ["back-pressure"],
     "events": [
       {
         "type": "rejected",
@@ -1287,6 +1328,7 @@
     "statement": "A killed pool's members aren't all sent to the quarantine.",
     "status": "rejected",
     "related": ["bal.bisect"],
+    "keywords": ["blocked-worker", "pools"],
     "events": [
       {
         "type": "rejected",
