@@ -1,0 +1,344 @@
+[
+  {
+    "id": "crash-loop",
+    "label": "Crash loop",
+    "definition": "An isolate or the bus worker that keeps crashing, and the limits that stop it restarting forever.",
+    "aliases": [
+      "restart limit",
+      "maxRestarts",
+      "short run",
+      "withinMs",
+      "healthyAfterMs",
+      "restart window"
+    ]
+  },
+  {
+    "id": "restart",
+    "label": "Restart",
+    "definition": "Starting an isolate, a pool or the bus worker again after a crash, a hang or on request.",
+    "aliases": ["restarted"]
+  },
+  {
+    "id": "heartbeat",
+    "label": "Heartbeat",
+    "definition": "The periodic beat a worker sends, and the lag and busy time measured from it.",
+    "aliases": ["beat", "lagMs", "everyMs", "blockedAfterMs", "killAfterMs", "lag clock"]
+  },
+  {
+    "id": "blocked-worker",
+    "label": "Blocked worker",
+    "definition": "A worker whose event loop stops answering, and how it's detected, killed or simulated.",
+    "aliases": ["stops responding", "busy-loop", "block", "blocked", "hang", "kill"]
+  },
+  {
+    "id": "bus-restart",
+    "label": "Bus restart",
+    "definition": "What happens to isolates, topics and publishes when the bus worker crashes and comes back.",
+    "aliases": ["bus crash", "reattach", "bus_restart", "bus:failed", "bus_unavailable"]
+  },
+  {
+    "id": "back-pressure",
+    "label": "Back-pressure",
+    "definition": "Limits that stop a fast producer or reader from swamping a slow one: credit, backlog, caps and buffers.",
+    "aliases": ["credit", "backlog", "unanswered calls", "maxPerSec", "inbox limit", "skipped"]
+  },
+  {
+    "id": "delivery",
+    "label": "Delivery guarantees",
+    "definition": "How many times a record reaches a subscriber, in what order, and what happens when one is lost.",
+    "aliases": [
+      "at least once",
+      "redeliver",
+      "dedup",
+      "exactly once",
+      "in publish order",
+      "idempotent",
+      "sequence number"
+    ]
+  },
+  {
+    "id": "commits",
+    "label": "Offsets and commits",
+    "definition": "How a reader records which records it has settled, and where it resumes from.",
+    "aliases": ["commit", "offset", "autoCommit"]
+  },
+  {
+    "id": "replay",
+    "label": "Replay",
+    "definition": "Reading a topic's retained history again: on subscribe, after a wake, after a restart.",
+    "aliases": ["resubscribe", "from: 'earliest'"]
+  },
+  {
+    "id": "retention",
+    "label": "Retention",
+    "definition": "How much of a topic's log is kept, and what a reader sees when records age out.",
+    "aliases": ["last-n", "compacted", "retained", "evict", "time` topic"]
+  },
+  {
+    "id": "durability",
+    "label": "Durability",
+    "definition": "Keeping a topic's log across a bus crash, a page reload or a discarded tab.",
+    "aliases": ["persistent", "OPFS", "durab", "flush", "segment"]
+  },
+  {
+    "id": "memory-topic",
+    "label": "Memory topics",
+    "definition": "Topics whose log lives only in the bus worker's memory, and what they lose.",
+    "aliases": ["memory topic", "'memory'", "memory"]
+  },
+  {
+    "id": "grants",
+    "label": "Grants",
+    "definition": "Permissions in an isolate's manifest: which topics it may read or write and which host calls it may make.",
+    "aliases": ["navigate grant", "inspect: true"]
+  },
+  {
+    "id": "trust-boundary",
+    "label": "Trust boundary",
+    "definition": "What isolate code can and can't reach: sanitising, untrusted events, tokens, shared realms.",
+    "aliases": ["sanitis", "untrusted", "isTrusted", "token", "Origin", "read each other", "frozen"]
+  },
+  {
+    "id": "schemas",
+    "label": "Schemas and validation",
+    "definition": "How topic values are described, validated and stored as the schema's output.",
+    "aliases": ["schema", "validat", "Standard Schema", "unchecked<"]
+  },
+  {
+    "id": "migration",
+    "label": "Migration",
+    "definition": "Moving data or code across a breaking change: topic versions, seeds and codemods.",
+    "aliases": ["migrat", "seed", "codemod", "major version", "breaking"]
+  },
+  {
+    "id": "compatibility",
+    "label": "Compatibility",
+    "definition": "Which versions of the host, the isolates and the formats work together.",
+    "aliases": [
+      "seam",
+      "FLOOR",
+      "requires",
+      "too-old",
+      "too_old",
+      "renderFmt",
+      "fmt",
+      "built apart",
+      "older host",
+      "new host"
+    ]
+  },
+  {
+    "id": "pools",
+    "label": "Pools",
+    "definition": "Several isolates sharing one worker, and what they share as a result.",
+    "aliases": []
+  },
+  {
+    "id": "placement",
+    "label": "Placement",
+    "definition": "Where an isolate runs (its own worker, a pool, a balancer pool) and how it moves.",
+    "aliases": ["moved", "own worker", "manifest names a pool"]
+  },
+  {
+    "id": "suspension",
+    "label": "Suspension",
+    "definition": "Stopping idle isolates to free memory, and waking them when needed.",
+    "aliases": ["suspend", "waking", "keepAwake", "idle"]
+  },
+  {
+    "id": "lifecycle",
+    "label": "Lifecycle",
+    "definition": "The steps of an isolate's or the kernel's life: start, ready, stop, shutdown.",
+    "aliases": ["ready", "shutdown", "graceful", "grace", "onShutdown", "createKernel"]
+  },
+  {
+    "id": "timeouts",
+    "label": "Timeouts and windows",
+    "definition": "Every time limit a rule sets: timeouts, windows, intervals and cooldowns.",
+    "aliases": ["timeout", "time out", "cooldown", "quiet window", "restart window"]
+  },
+  {
+    "id": "measurement",
+    "label": "Measurement",
+    "definition": "How load, memory and time are measured, and what the numbers are for.",
+    "aliases": ["busyMs", "measur", "metrics", "bench", "%"]
+  },
+  {
+    "id": "memory-use",
+    "label": "Memory use",
+    "definition": "How much memory workers and isolates cost, and how it's measured.",
+    "aliases": [
+      "measureUserAgentSpecificMemory",
+      "heap",
+      "framework copy",
+      "share less memory",
+      "free memory",
+      "quota"
+    ]
+  },
+  {
+    "id": "budgets",
+    "label": "Budgets and caps",
+    "definition": "Hard and soft limits on counts and sizes: worker budgets, caps, bundle budgets.",
+    "aliases": ["budget", "cap", "capped", "maxWorkers"]
+  },
+  {
+    "id": "frameworks",
+    "label": "Frameworks",
+    "definition": "How React, Preact and other UI frameworks plug in through adapters and hooks.",
+    "aliases": [
+      "React",
+      "Preact",
+      "useTopic",
+      "useWatch",
+      "usePublish",
+      "adapter",
+      "Vue",
+      "Svelte",
+      "Solid"
+    ]
+  },
+  {
+    "id": "rendering",
+    "label": "Rendering",
+    "definition": "How a worker-side DOM reaches the page: records, the applier and the compositor.",
+    "aliases": ["render", "surface", "isoloop-dom", "DOM", "compositor", "applier"]
+  },
+  {
+    "id": "main-thread",
+    "label": "Main thread",
+    "definition": "What runs on the page's main thread, and what is kept off it.",
+    "aliases": ["main-thread"]
+  },
+  {
+    "id": "host-api",
+    "label": "Host API",
+    "definition": "What the app's host code calls on the kernel.",
+    "aliases": ["KernelConfig"]
+  },
+  {
+    "id": "requests",
+    "label": "Request and reply",
+    "definition": "Asking an isolate for an answer through a requestable topic.",
+    "aliases": ["reply", "requestable", "no_responder"]
+  },
+  {
+    "id": "keys",
+    "label": "Keys",
+    "definition": "Per-key values on a topic: keyed records, watches per key, the null key.",
+    "aliases": ["keyed", "null key"]
+  },
+  {
+    "id": "observability",
+    "label": "Observability",
+    "definition": "Seeing inside a running app: the inspection feed, devtools, events and metrics.",
+    "aliases": ["inspect", "devtools", "tap", "ring buffer", "emits", "kernel event"]
+  },
+  {
+    "id": "dev-only",
+    "label": "Development only",
+    "definition": "Behaviour that exists only in development builds or tools.",
+    "aliases": ["dev warning", "dev MCP", "production build", "dev"]
+  },
+  {
+    "id": "browsers",
+    "label": "Browser differences",
+    "definition": "Where Chromium, Firefox and WebKit behave differently, and the baseline Isoloop needs.",
+    "aliases": [
+      "Firefox",
+      "Safari",
+      "Chromium",
+      "WebKit",
+      "Baseline",
+      "private window",
+      "unsupported_browser",
+      "hidden tab",
+      "Page Lifecycle"
+    ]
+  },
+  {
+    "id": "tabs",
+    "label": "Tabs",
+    "definition": "Behaviour across several tabs of the same app.",
+    "aliases": ["Web Lock"]
+  },
+  {
+    "id": "errors",
+    "label": "Error codes",
+    "definition": "Rules that define an error code an API rejects or throws with.",
+    "aliases": ["throws"]
+  },
+  {
+    "id": "own-stack",
+    "label": "Own the stack",
+    "definition": "Places where Isoloop builds its own piece instead of taking a library or platform feature.",
+    "aliases": [
+      "no rendering dependency",
+      "doesn't use",
+      "own server",
+      "its own",
+      "no dependency",
+      "own codec"
+    ]
+  },
+  {
+    "id": "releases",
+    "label": "Releases",
+    "definition": "How versions are numbered, staged, approved, tagged and supported.",
+    "aliases": [
+      "npm",
+      "changeset",
+      "version PR",
+      "patch",
+      "minor",
+      "latest",
+      "dist-tag",
+      "deprecat"
+    ]
+  },
+  {
+    "id": "ci",
+    "label": "CI checks",
+    "definition": "What continuous integration checks on a pull request, on main and at night.",
+    "aliases": [
+      "CI",
+      "rules:check",
+      "docs:check",
+      "workflow",
+      "nightly",
+      "steward",
+      "lint",
+      "check fails",
+      "required check"
+    ]
+  },
+  {
+    "id": "source-layout",
+    "label": "Source layout",
+    "definition": "How packages, entries and source folders are organised.",
+    "aliases": ["src/", "entry", "entries", "barrel", "sideEffects", "kebab-case"]
+  },
+  {
+    "id": "toolchain",
+    "label": "Build toolchain",
+    "definition": "The tools the repo builds, lints, formats and tests with.",
+    "aliases": [
+      "pnpm",
+      "TypeScript",
+      "tsdown",
+      "oxlint",
+      "oxfmt",
+      "Vitest",
+      "Playwright",
+      "Node",
+      "Corepack",
+      "Prettier"
+    ]
+  },
+  {
+    "id": "reserved-names",
+    "label": "Reserved names",
+    "definition": "Names and prefixes the runtime keeps for itself, and what happens if an app uses one.",
+    "aliases": ["reserved", "balancer-"]
+  }
+]

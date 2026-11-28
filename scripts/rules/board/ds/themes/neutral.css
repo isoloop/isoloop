@@ -1,0 +1,126 @@
+/* Theme "neutral": the default, a plain grey palette with an indigo accent and the system font.
+   A theme sets only the semantic tokens (ADR 0026, amended 2026-11-28), for light and dark.
+   Every value is a plain hex or a shadow, so the contrast test can read it. */
+@layer tokens {
+  :root {
+    --ar-bg: #f7f7f8;
+    --ar-surface: #ffffff;
+    --ar-sunk: #eeeef1;
+    --ar-line: #dcdce2;
+    --ar-border: #8a8a96;
+    --ar-fg: #18181b;
+    --ar-muted: #52525b;
+    --ar-accent: #4338ca;
+    --ar-accent-soft: #ecebfa;
+    --ar-on-accent: #ffffff;
+    --ar-focus: #4338ca;
+    --ar-ok: #15803d;
+    --ar-ok-soft: #f1f7f3;
+    --ar-info: #1d4ed8;
+    --ar-info-soft: #e8edfb;
+    --ar-warn: #b45309;
+    --ar-warn-soft: #faf5f0;
+    --ar-off: #52525b;
+    --ar-off-soft: #eeeef1;
+    --ar-gone: #6d28d9;
+    --ar-gone-soft: #f0eafb;
+    --ar-tooltip-bg: #18181b;
+    --ar-tooltip-fg: #ffffff;
+    --ar-grid: #dcdce2;
+    --ar-axis: #52525b;
+    --ar-cat-1: #1d4ed8;
+    --ar-cat-2: #0f766e;
+    --ar-cat-3: #6d28d9;
+    --ar-cat-4: #be185d;
+    --ar-cat-5: #b45309;
+    --ar-cat-6: #15803d;
+    --ar-cat-7: #b91c1c;
+    --ar-cat-8: #52525b;
+    --ar-cat-other: #8a8a96;
+    --ar-shadow: 0 12px 40px #18181b29;
+    --ar-scrim: #18181b59;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --ar-bg: #121214;
+      --ar-surface: #1c1c20;
+      --ar-sunk: #17171a;
+      --ar-line: #2e2e34;
+      --ar-border: #71717a;
+      --ar-fg: #ececf0;
+      --ar-muted: #a1a1aa;
+      --ar-accent: #a5b4fc;
+      --ar-accent-soft: #2a2b36;
+      --ar-on-accent: #18181b;
+      --ar-focus: #a5b4fc;
+      --ar-ok: #4ade80;
+      --ar-ok-soft: #212f2a;
+      --ar-info: #93c5fd;
+      --ar-info-soft: #282d36;
+      --ar-warn: #fbbf24;
+      --ar-warn-soft: #322c20;
+      --ar-off: #a1a1aa;
+      --ar-off-soft: #2a2a30;
+      --ar-gone: #c4b5fd;
+      --ar-gone-soft: #2d2b36;
+      --ar-tooltip-bg: #ececf0;
+      --ar-tooltip-fg: #1c1c20;
+      --ar-grid: #2e2e34;
+      --ar-axis: #a1a1aa;
+      --ar-cat-1: #93c5fd;
+      --ar-cat-2: #5eead4;
+      --ar-cat-3: #c4b5fd;
+      --ar-cat-4: #f9a8d4;
+      --ar-cat-5: #fbbf24;
+      --ar-cat-6: #4ade80;
+      --ar-cat-7: #fca5a5;
+      --ar-cat-8: #a1a1aa;
+      --ar-cat-other: #71717a;
+      --ar-shadow: 0 12px 40px #00000080;
+      --ar-scrim: #0000008c;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme='dark'] {
+    --ar-bg: #121214;
+    --ar-surface: #1c1c20;
+    --ar-sunk: #17171a;
+    --ar-line: #2e2e34;
+    --ar-border: #71717a;
+    --ar-fg: #ececf0;
+    --ar-muted: #a1a1aa;
+    --ar-accent: #a5b4fc;
+    --ar-accent-soft: #2a2b36;
+    --ar-on-accent: #18181b;
+    --ar-focus: #a5b4fc;
+    --ar-ok: #4ade80;
+    --ar-ok-soft: #212f2a;
+    --ar-info: #93c5fd;
+    --ar-info-soft: #282d36;
+    --ar-warn: #fbbf24;
+    --ar-warn-soft: #322c20;
+    --ar-off: #a1a1aa;
+    --ar-off-soft: #2a2a30;
+    --ar-gone: #c4b5fd;
+    --ar-gone-soft: #2d2b36;
+    --ar-tooltip-bg: #ececf0;
+    --ar-tooltip-fg: #1c1c20;
+    --ar-grid: #2e2e34;
+    --ar-axis: #a1a1aa;
+    --ar-cat-1: #93c5fd;
+    --ar-cat-2: #5eead4;
+    --ar-cat-3: #c4b5fd;
+    --ar-cat-4: #f9a8d4;
+    --ar-cat-5: #fbbf24;
+    --ar-cat-6: #4ade80;
+    --ar-cat-7: #fca5a5;
+    --ar-cat-8: #a1a1aa;
+    --ar-cat-other: #71717a;
+    --ar-shadow: 0 12px 40px #00000080;
+    --ar-scrim: #0000008c;
+    color-scheme: dark;
+  }
+  :root[data-theme='light'] {
+    color-scheme: light;
+  }
+}

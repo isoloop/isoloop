@@ -21,7 +21,7 @@
   },
   {
     "id": "tool.rule-fields",
-    "statement": "A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `repo`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy` and `aliases`.",
+    "statement": "A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `repo`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy`, `aliases` and `keywords`.",
     "status": "active",
     "repo": true,
     "code": ["docs/rules/schema.json", "scripts/rules/check.ts"],
@@ -44,6 +44,19 @@
         "date": "2026-11-27",
         "ref": "#483",
         "why": "In force from the PR that built the rules registry."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "Rules can name keywords from the vocabulary.",
+        "prev": "A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `repo`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy` and `aliases`."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "The `keywords` field is checked from this PR on."
       }
     ]
   },
@@ -496,11 +509,11 @@
   },
   {
     "id": "tool.rules-board",
-    "statement": "`pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. It has the Board, a rule drawer and the Agenda by day or by version.",
+    "statement": "`pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. The page is a shell with one tab per view, built from Archeion's design system; it has the Board, a rule drawer and the Agenda by day or by version.",
     "status": "active",
     "repo": true,
     "knob": "`pnpm rules:board`",
-    "code": ["scripts/rules/build.ts", "scripts/rules/board.html"],
+    "code": ["scripts/rules/build.ts", "scripts/rules/board/"],
     "events": [
       {
         "type": "decided",
@@ -513,6 +526,19 @@
         "date": "2026-11-27",
         "ref": "#483",
         "why": "In force from the PR that built the rules registry."
+      },
+      {
+        "type": "amended",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "The page is now a shell with view modules on Archeion's design system.",
+        "prev": "`pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. It has the Board, a rule drawer and the Agenda by day or by version."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "The shell and the design system are in force from this PR."
       }
     ]
   },
@@ -1780,9 +1806,10 @@
   {
     "id": "tool.rules-links",
     "statement": "Links between rules are derived when the page is built, in four kinds: `related` and `supersededBy`, the same ADR section, a shared symbol, and a shared `code` path.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "values": ["4 kinds"],
+    "code": ["scripts/rules/model.ts"],
     "related": ["tool.rules-link-cap", "tool.rules-link-weight", "tool.rules-symbols"],
     "events": [
       {
@@ -1790,15 +1817,22 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "Written `related` links never cross concepts, so the links between concepts come from what rules already share."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-link-cap",
     "statement": "A key shared by more than 12 rules makes no links; the page lists it instead.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "values": ["12 rules"],
+    "code": ["scripts/rules/model.ts", "rules.config.json"],
     "related": ["tool.rules-links"],
     "events": [
       {
@@ -1806,15 +1840,22 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "Without a cap, a file such as the kernel's links almost every rule to every other."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-link-weight",
     "statement": "A link from a key shared by n rules weighs 1/(n−1), so a narrow key counts more than a broad one.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "values": ["1/(n−1)"],
+    "code": ["scripts/rules/model.ts"],
     "related": ["tool.rules-links"],
     "events": [
       {
@@ -1822,15 +1863,22 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "Broad keys still connect rules, but a pair that shares a rare key is the stronger tie."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-keywords-file",
     "statement": "Keywords are a fixed vocabulary in `docs/rules/keywords.json`, each with an id, a label, a one-line definition and aliases. A rule names its keywords in an optional `keywords` field, and `rules:check` fails on an unknown one.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "values": ["42 keywords to start"],
+    "code": ["docs/rules/keywords.json", "scripts/rules/check.ts"],
     "related": ["tool.rules-keyword-review", "tool.rule-fields"],
     "events": [
       {
@@ -1838,6 +1886,12 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "Free tags drift; a vocabulary with definitions doubles as a glossary."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
@@ -1859,8 +1913,9 @@
   {
     "id": "tool.rules-symbols",
     "statement": "Symbols are derived from backticked names in statements, knobs and errors, feed search and the shared-symbol links, and are never written by hand.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
+    "code": ["scripts/rules/model.ts"],
     "related": ["tool.rules-links"],
     "events": [
       {
@@ -1868,14 +1923,21 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "With hundreds of names, symbols work as search, not as filters."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-config",
     "statement": "One config file holds what's particular to a repo: the title, the rules and ADR folders, the ADR number from which `Rules:` lines are required, the GitHub owner and repo for links, and where the page is written.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
+    "code": ["rules.config.json", "scripts/rules/config.ts"],
     "related": ["tool.rules-view-modules"],
     "events": [
       {
@@ -1883,14 +1945,21 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "The scripts hold nothing about Isoloop, so the tooling can move to another repo unchanged."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-view-modules",
     "statement": "Each tab is its own module next to a small shell that holds the tabs, the shared filters, the theme and the rule drawer, and `rules:board` inlines them into one self-contained page.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
+    "code": ["scripts/rules/board/shell.js", "scripts/rules/board/views/"],
     "related": ["tool.rules-tabs", "tool.rules-board"],
     "events": [
       {
@@ -1898,14 +1967,21 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "Views are built and changed one at a time without touching the others."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-product-neutral",
     "statement": "The rules registry runs on Archeion, a product-neutral tool with its own design system; nothing in Archeion's code, tokens or components is about Isoloop, and Isoloop uses it only as dev tooling.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
+    "code": ["scripts/rules/board/ds/"],
     "related": ["tool.rules-own-repo", "tool.rules-theme", "tool.rules-config"],
     "events": [
       {
@@ -1913,6 +1989,12 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "It's meant to work for any repo's ADRs, so Isoloop is one user of it, not its subject."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
@@ -1934,8 +2016,9 @@
   {
     "id": "tool.rules-theme",
     "statement": "Isoloop's palette is one theme, chosen in `rules.config.json`; a theme sets only the semantic tokens and may bring a webfont.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
+    "code": ["scripts/rules/board/ds/themes/", "rules.config.json"],
     "related": ["tool.rules-tokens", "tool.rules-config"],
     "events": [
       {
@@ -1943,15 +2026,22 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "Keeping the product's own look separate from Isoloop's lets another repo pick its own theme."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-tokens",
     "statement": "Design tokens come in three layers: primitives, semantic tokens and component tokens. Components read only semantic and component tokens, and themes change only the semantic layer.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "values": ["3 layers"],
+    "code": ["scripts/rules/board/ds/tokens.css"],
     "related": ["tool.rules-theme", "tool.rules-literal-ban"],
     "events": [
       {
@@ -1959,15 +2049,22 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "One place per kind of decision: raw values, what a value is for, and what one component uses."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-chart-slots",
     "statement": "Charts have 8 categorical colour slots, and a chart with more than 8 categories groups the rest.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "values": ["8 slots"],
+    "code": ["scripts/rules/board/ds/chart.js"],
     "related": ["tool.rules-chart-toolkit"],
     "events": [
       {
@@ -1975,14 +2072,21 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "More than 8 colours can't be told apart reliably."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-literal-ban",
     "statement": "`rules:check` fails on a colour, a font size, a font family or a spacing value written in a component or a view, outside the files on one allowlist.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
+    "code": ["scripts/rules/literals.ts"],
     "related": ["tool.rules-tokens", "tool.rules-ds-tests"],
     "events": [
       {
@@ -1990,14 +2094,21 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "Literals in components are how a design system drifts."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-components",
     "statement": "Components are plain functions that return HTML through an `html` tagged template, which escapes every value; `raw()` marks HTML that's already safe. There's no framework.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
+    "code": ["scripts/rules/board/ds/html.js", "scripts/rules/board/ds/components.js"],
     "related": ["tool.rules-layout-primitives"],
     "events": [
       {
@@ -2005,15 +2116,22 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "Escaping by default closes the injection holes string building leaves, with no dependency."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-layout-primitives",
     "statement": "Layout uses four primitives, Stack, Cluster, Grid and Split, spaced with `gap`; a component never sets its own outer margin.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "values": ["4 primitives"],
+    "code": ["scripts/rules/board/ds/layout.css", "scripts/rules/board/ds/components.js"],
     "related": ["tool.rules-components"],
     "events": [
       {
@@ -2021,15 +2139,22 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "Spacing belongs to the parent, so components fit anywhere without margin fights."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-type-scale",
     "statement": "Type has a 5-step scale (xs, s, m, l, xl) with tabular numbers where digits line up; data views stay at the m step or below. The default font is the system stack, and a theme may swap in a webfont.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "values": ["5 steps"],
+    "code": ["scripts/rules/board/ds/tokens.css"],
     "related": ["tool.rules-theme"],
     "events": [
       {
@@ -2037,14 +2162,21 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "Dense data reads better small and aligned, and a system font needs no download."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-chart-toolkit",
     "statement": "Charts share one toolkit: scales, axes, a legend, a tooltip and SVG helpers.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
+    "code": ["scripts/rules/board/ds/chart.js"],
     "related": ["tool.rules-chart-slots"],
     "events": [
       {
@@ -2052,14 +2184,21 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "Each view drawing its own axes would look and behave differently."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-css-layers",
     "statement": "CSS uses `@layer` (reset, tokens, base, layout, components, views), each class is prefixed with its owner, a component or a view, and there are no utility classes.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
+    "code": ["scripts/rules/board/ds/tokens.css"],
     "related": ["tool.rules-css-prefix"],
     "events": [
       {
@@ -2067,15 +2206,22 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "Layers settle precedence without specificity fights, and owner prefixes show where a style comes from."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-css-prefix",
     "statement": "Tokens use the prefix `--ar-` and classes `.ar-`, from Archeion's name, used the same way everywhere so a rename stays one mechanical pass.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "values": ["--ar-", "ar-"],
+    "code": ["scripts/rules/board/ds/tokens.css"],
     "related": ["tool.rules-css-layers"],
     "events": [
       {
@@ -2083,14 +2229,21 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "Owner-prefixed names show at a glance which styles are the product's."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-specimen",
     "statement": "`rules:board --specimen` writes a page with every token, type step, layout primitive, component and chart part.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
+    "code": ["scripts/rules/board/specimen.js"],
     "related": ["tool.rules-ds-tests"],
     "events": [
       {
@@ -2098,14 +2251,21 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "One page to review the design system without opening every view."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   },
   {
     "id": "tool.rules-ds-tests",
     "statement": "The design system is tested for WCAG AA contrast in both themes, for the literal ban, with unit tests per component, and with a headless smoke test of every view and the specimen at 2 widths in both themes; there are no pixel snapshots.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
+    "code": ["scripts/rules/ds.test.ts", "scripts/rules/smoke.ts"],
     "related": ["tool.rules-literal-ban", "tool.rules-specimen"],
     "events": [
       {
@@ -2113,6 +2273,12 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-design-system",
         "why": "These catch what breaks in practice (unreadable colours, drift, broken markup, overflow, errors) without snapshots that fail on every intended change."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#510",
+        "why": "In force from the PR that built Archeion's design system, the page shell and the build-time model."
       }
     ]
   }

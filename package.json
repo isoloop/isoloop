@@ -36,6 +36,7 @@
     "rules:check": "node scripts/rules/check.ts",
     "rules:build": "node scripts/rules/build.ts",
     "rules:board": "node scripts/rules/build.ts --board",
+    "rules:smoke": "node scripts/rules/smoke.ts",
     "rules:ship": "node scripts/rules/ship.ts"
   },
   "devDependencies": {

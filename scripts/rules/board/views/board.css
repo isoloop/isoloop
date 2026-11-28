@@ -1,0 +1,34 @@
+/* The Board tab (owner: board). */
+@layer views {
+  .ar-board-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--ar-space-4);
+    padding: 0 var(--ar-space-1) var(--ar-space-2);
+    border-bottom: var(--ar-rule) solid var(--ar-line);
+  }
+  .ar-board-name {
+    font-size: var(--ar-text-l);
+    font-weight: var(--ar-weight-bold);
+  }
+  .ar-board-count,
+  .ar-board-id {
+    font-family: var(--ar-font-mono);
+    font-size: var(--ar-text-s);
+    color: var(--ar-muted);
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+  }
+  .ar-board-desc {
+    color: var(--ar-muted);
+    font-size: var(--ar-text-s);
+  }
+  .ar-board-statement {
+    font-size: var(--ar-text-m);
+  }
+  .ar-board-statement[data-dim] {
+    text-decoration: line-through;
+    text-decoration-color: var(--ar-off);
+  }
+}

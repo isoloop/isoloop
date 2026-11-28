@@ -1,0 +1,84 @@
+/* The Agenda tab (owner: agenda). */
+@layer views {
+  .ar-agenda-head {
+    font-family: var(--ar-font-mono);
+    font-size: var(--ar-text-s);
+    color: var(--ar-muted);
+    padding-top: var(--ar-space-5);
+    font-variant-numeric: tabular-nums;
+  }
+  .ar-agenda-head b {
+    display: block;
+    font-family: var(--ar-font-sans);
+    font-size: var(--ar-text-m);
+    font-weight: var(--ar-weight-bold);
+    color: var(--ar-fg);
+  }
+  .ar-agenda-rows {
+    display: flex;
+    flex-direction: column;
+    border: var(--ar-hairline) solid var(--ar-line);
+    border-radius: var(--ar-radius-l);
+    background: var(--ar-surface);
+    overflow: hidden;
+    min-width: 0;
+  }
+  .ar-agenda-row {
+    display: grid;
+    grid-template-columns: var(--ar-type-col) minmax(0, 1fr) auto;
+    gap: var(--ar-space-2) var(--ar-space-6);
+    padding: var(--ar-space-5) var(--ar-space-6);
+    border: 0;
+    border-top: var(--ar-hairline) solid var(--ar-line);
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    width: 100%;
+  }
+  .ar-agenda-row:first-child {
+    border-top: 0;
+  }
+  .ar-agenda-row:hover {
+    background: var(--ar-sunk);
+  }
+  .ar-agenda-what {
+    min-width: 0;
+  }
+  .ar-agenda-what b {
+    font-weight: var(--ar-weight-medium);
+  }
+  .ar-agenda-why {
+    color: var(--ar-muted);
+    display: block;
+  }
+  .ar-agenda-src {
+    font-family: var(--ar-font-mono);
+    font-size: var(--ar-text-s);
+    color: var(--ar-muted);
+    white-space: nowrap;
+  }
+  .ar-agenda-concept {
+    font-size: var(--ar-text-xs);
+    color: var(--ar-muted);
+    border: var(--ar-hairline) solid var(--ar-line);
+    border-radius: var(--ar-radius-round);
+    padding: 0 var(--ar-space-3);
+    margin-left: var(--ar-space-3);
+    white-space: nowrap;
+  }
+  @media (max-width: 640px) {
+    .ar-agenda-head {
+      padding: 0 0 var(--ar-space-3);
+    }
+    .ar-agenda-head b {
+      display: inline;
+      margin-right: var(--ar-space-4);
+    }
+    .ar-agenda-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .ar-agenda-src {
+      white-space: normal;
+    }
+  }
+}
