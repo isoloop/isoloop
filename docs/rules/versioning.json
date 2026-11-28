@@ -43,6 +43,7 @@
     "code": ["packages/host/src/render/compositor.ts"],
     "since": "0.1.0",
     "related": ["ver.project-name"],
+    "keywords": ["reserved-names", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -92,6 +93,7 @@
     "statement": "Each app in `isoloop/web` (`plant-v*`, `markets-v*`, `processor-v*`, `site-v*`) has its own version, apart from the library's, and the maintainer pushes its tags.",
     "status": "active",
     "repo": true,
+    "keywords": ["own-stack"],
     "events": [
       {
         "type": "decided",
@@ -156,6 +158,7 @@
     "status": "active",
     "repo": true,
     "related": ["ver.previews"],
+    "keywords": ["placement"],
     "events": [
       {
         "type": "decided",
@@ -177,6 +180,7 @@
     "status": "active",
     "since": "0.1.0",
     "related": ["ver.patch-on-0x", "ver.codemod-rule"],
+    "keywords": ["compatibility", "migration", "frameworks", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -198,6 +202,7 @@
     "status": "active",
     "since": "0.1.0",
     "related": ["ver.minor-on-0x"],
+    "keywords": ["compatibility", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -219,6 +224,7 @@
     "status": "decided",
     "target": "1.0.0",
     "related": ["ver.no-major-below-1"],
+    "keywords": ["compatibility"],
     "events": [
       {
         "type": "decided",
@@ -324,6 +330,7 @@
     "status": "active",
     "repo": true,
     "related": ["ver.patch-branch", "ver.small-backports"],
+    "keywords": ["own-stack"],
     "events": [
       {
         "type": "decided",
@@ -368,6 +375,7 @@
     "values": ["main", "release/0.1"],
     "code": ["scripts/release/rules.ts", ".github/workflows/release.yml"],
     "related": ["ver.patch-branch"],
+    "keywords": ["own-stack"],
     "events": [
       {
         "type": "decided",
@@ -411,6 +419,7 @@
     "repo": true,
     "code": ["scripts/release/rules.ts"],
     "related": ["ver.latest-only"],
+    "keywords": ["placement"],
     "events": [
       {
         "type": "decided",
@@ -447,6 +456,7 @@
     "repo": true,
     "code": ["scripts/release/finish.ts", ".github/workflows/release.yml"],
     "related": ["ver.release-workflow", "ver.no-tag-first"],
+    "keywords": ["commits"],
     "events": [
       {
         "type": "decided",
@@ -519,6 +529,7 @@
     "values": ["dry run by default"],
     "code": [".github/workflows/release.yml"],
     "related": ["ver.stage-approve-finish", "ver.tag-per-version"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "decided",
@@ -564,6 +575,7 @@
     "repo": true,
     "code": ["scripts/release/rules.ts"],
     "related": ["ver.stage-approve-finish"],
+    "keywords": ["observability"],
     "events": [
       {
         "type": "decided",
@@ -657,6 +669,7 @@
     "values": ["label: release-1.0"],
     "code": ["scripts/ci/changeset-check.ts", ".github/workflows/changeset.yml"],
     "related": ["ver.minor-on-0x", "ver.semver-from-1"],
+    "keywords": ["ci"],
     "events": [
       {
         "type": "decided",
@@ -828,6 +841,7 @@
     "statement": "Each minor's changesets name its breaking changes and how to migrate. The steward checks it.",
     "status": "active",
     "repo": true,
+    "keywords": ["migration", "ci"],
     "events": [
       {
         "type": "decided",
@@ -849,6 +863,7 @@
     "status": "active",
     "repo": true,
     "related": ["ver.codemod-gate", "ver.migrate-command", "ver.experimental-codemods"],
+    "keywords": ["migration"],
     "events": [
       {
         "type": "decided",
@@ -871,6 +886,7 @@
     "repo": true,
     "code": ["scripts/ci/changeset-check.ts"],
     "related": ["ver.codemod-rule"],
+    "keywords": ["migration", "source-layout"],
     "events": [
       {
         "type": "decided",
@@ -894,6 +910,7 @@
     "code": ["packages/cli/src/migrate/run.ts"],
     "target": "0.2.0",
     "related": ["ver.codemod-rule", "ver.migrate-comments", "ver.codemod-parser"],
+    "keywords": ["migration"],
     "events": [
       {
         "type": "decided",
@@ -916,6 +933,7 @@
     "code": ["packages/cli/src/migrate/"],
     "target": "0.2.0",
     "related": ["ver.migrate-command"],
+    "keywords": ["migration"],
     "events": [
       {
         "type": "decided",
@@ -938,6 +956,7 @@
     "code": ["packages/cli/src/migrate/parser.ts", "packages/cli/src/migrate/edit.ts"],
     "target": "0.2.0",
     "related": ["ver.migrate-command"],
+    "keywords": ["migration", "toolchain"],
     "events": [
       {
         "type": "decided",
@@ -959,6 +978,7 @@
     "status": "active",
     "repo": true,
     "related": ["ver.experimental", "ver.codemod-rule"],
+    "keywords": ["migration"],
     "events": [
       {
         "type": "decided",
@@ -980,6 +1000,7 @@
     "status": "decided",
     "repo": true,
     "related": ["ver.codemod-rule"],
+    "keywords": ["migration", "measurement"],
     "events": [
       {
         "type": "decided",

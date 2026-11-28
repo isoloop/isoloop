@@ -1,8 +1,10 @@
 // The Board tab: concepts as columns, rules as cards (ADR 0026, decision 15).
+// It follows "as of": cards show each rule as it stood, marked if it changed since.
 Rules.view({
   id: 'board',
   label: 'Board',
   order: 10,
+  asOf: true,
   render(ctx) {
     const { html, md } = AR;
     const { rules, concepts, fmtDate, refLabel, inForce, DIM, matches, statusPill } = ctx;
@@ -25,7 +27,7 @@ Rules.view({
           html`<span class="ar-board-id">${r.id}</span>`,
           AR.Cluster({
             gap: '3',
-            children: html`${r.experimental ? AR.Pill({ text: 'experimental', tone: 'warn', variant: 'outline' }) : ''}${
+            children: html`${r.changedSince ? AR.Badge({ text: 'changed since' }) : ''}${r.experimental ? AR.Pill({ text: 'experimental', tone: 'warn', variant: 'outline' }) : ''}${
               r.repo ? AR.Pill({ text: 'repo', variant: 'code' }) : ''
             }${statusPill(r)}`,
           }),
