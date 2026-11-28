@@ -4907,7 +4907,7 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.rules-tabs` | The rules page has six tabs, routed by the URL's hash: Board, Agenda, Hive, Keywords, Timeline and Sources. | `6 tabs` | decided, repo |  |
 | `tool.rules-hive` | The Hive tab draws one axis per concept and a dot per rule, ordered by first event date and coloured by status, with links as curves between axes. |  | active, repo | in force since [#511](https://github.com/isoloop/isoloop/issues/511) |
 | `tool.rules-keywords-tab` | The Keywords tab holds the keyword glossary, each keyword with its definition and its rules by concept, and the keyword map, which joins keywords that tag the same rules. |  | decided, repo |  |
-| `tool.rules-timeline` | The Timeline tab shows every event in one lane per concept, by date, with release tags as lines, and a Churn heatmap counts `amended`, `clarified` and `corrected` events per concept and day. |  | decided, repo |  |
+| `tool.rules-timeline` | The Timeline tab shows every event in one lane per concept, by date, with release tags as lines, and a Churn heatmap counts `amended`, `clarified` and `corrected` events per concept and day. |  | active, repo | in force since [#512](https://github.com/isoloop/isoloop/issues/512) |
 | `tool.rules-sources` | The Sources tab shows which ADRs feed which concepts, a treemap of the `code` paths rules cite, and a Health list of where the registry is weak. |  | decided, repo |  |
 | `tool.rules-as-of` | Board, Agenda and Hive have an "as of" option that rebuilds each rule as it stood on a chosen date or release, and a diff that lists what changed between two points. |  | decided, repo |  |
 | `tool.rules-as-of-limits` | "As of" places a whole day at once, since events have no time; earlier wording comes from `prev`, which is free text; only the statement and the status have a history. |  | decided, repo |  |
@@ -5758,12 +5758,14 @@ History:
 
 ### `tool.rules-timeline`
 
+- **Code:** `scripts/rules/board/views/timeline.js`, `scripts/rules/board/ds/events.js`
 - **Related:** `tool.rules-tabs`
 - **Why:** It shows when decisions were made and where they keep changing.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · It shows when decisions were made and where they keep changing.
+- 2026-11-28 · built · [#512](https://github.com/isoloop/isoloop/issues/512) · The Timeline tab, with Churn, built on the design system.
 
 ### `tool.rules-sources`
 
