@@ -122,6 +122,69 @@
     padding: var(--ar-space-1) var(--ar-space-4);
     cursor: pointer;
   }
+
+  /* As of: the point stepper, its summary and the Changes panel. */
+  .ar-shell-asof {
+    --ar-gap: var(--ar-space-4);
+    padding: var(--ar-space-5) var(--ar-space-6);
+    border: var(--ar-hairline) solid var(--ar-line);
+    border-radius: var(--ar-radius-l);
+    background: var(--ar-surface);
+  }
+  .ar-shell-asof-label {
+    font-size: var(--ar-text-s);
+    font-weight: var(--ar-weight-medium);
+    color: var(--ar-muted);
+    letter-spacing: var(--ar-tracking-caps);
+    text-transform: uppercase;
+  }
+  .ar-shell-asof .ar-stepper {
+    flex: 1 1 var(--ar-field-min);
+  }
+  .ar-shell-asof-summary {
+    font-size: var(--ar-text-s);
+    color: var(--ar-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .ar-shell-changes {
+    border-top: var(--ar-hairline) solid var(--ar-line);
+    padding-top: var(--ar-space-6);
+  }
+  .ar-shell-change-concept {
+    font-size: var(--ar-text-m);
+    font-weight: var(--ar-weight-bold);
+  }
+  .ar-shell-change-list {
+    list-style: none;
+    padding: 0;
+  }
+  .ar-shell-change {
+    padding-bottom: var(--ar-space-5);
+    border-bottom: var(--ar-hairline) solid var(--ar-line);
+    min-width: 0;
+  }
+  .ar-shell-change-id {
+    font-family: var(--ar-font-mono);
+    font-size: var(--ar-text-s);
+    color: var(--ar-accent);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+  }
+  .ar-shell-change-arrow {
+    color: var(--ar-muted);
+  }
+  .ar-shell-change-text {
+    font-size: var(--ar-text-s);
+    max-width: var(--ar-measure);
+    overflow-wrap: anywhere;
+  }
+  .ar-shell-change-events {
+    font-size: var(--ar-text-xs);
+    color: var(--ar-muted);
+  }
   /* The keyword filters: a fold of chips, and the filters in force. */
   .ar-shell-kw {
     display: flex;
