@@ -1,6 +1,6 @@
 # ADR 0026: Rules registry
 
-- **Status:** Accepted 2026-11-27 (proposed the same day), from a grilling with the maintainer (Q1–Q31, yes to all), with a `superseded` event and `Rules:` lines required from ADR 0026 on, added in review. Amended 2026-11-27 (accepted the same day), from the four open points of the infrastructure PR (#483), grilled yes to all: every ADR ref names a heading (decision 6), rules about the repo (decisions 2, 5 and 10), when `rules:ship` is due (decision 13) and what counts as a decision (decision 9). Amended 2026-11-28 (accepted the same day), from the maintainer's review of the view prototypes: the views and their tabs, an "as of" option, derived links, keywords, a config file and one module per view (decisions 2 and 15). Amended again 2026-11-28 (accepted the same day), from a grilling on the design system (Q1–Q11 and Q15, yes to all): the tool becomes Archeion, a product-neutral tool with its own design system, Isoloop's palette as one theme, token layers, a literal ban, components, layout and type rules, a chart toolkit, a specimen page and its tests (decision 15).
+- **Status:** Accepted 2026-11-27 (proposed the same day), from a grilling with the maintainer (Q1–Q31, yes to all), with a `superseded` event and `Rules:` lines required from ADR 0026 on, added in review. Amended 2026-11-27 (accepted the same day), from the four open points of the infrastructure PR (#483), grilled yes to all: every ADR ref names a heading (decision 6), rules about the repo (decisions 2, 5 and 10), when `rules:ship` is due (decision 13) and what counts as a decision (decision 9). Amended 2026-11-28 (accepted the same day), from the maintainer's review of the view prototypes: the views and their tabs, an "as of" option, derived links, keywords, a config file and one module per view (decisions 2 and 15). Amended again 2026-11-28 (accepted the same day), from a grilling on the design system (Q1–Q11 and Q15, yes to all): the tool becomes Archeion, a product-neutral tool with its own design system, Isoloop's palette as one theme, token layers, a literal ban, components, layout and type rules, a chart toolkit, a specimen page and its tests (decision 15). Amended 2026-11-28: the move to Archeion (proposed, pending review).
 - **Date:** 2026-11-27
 - **Plan:** none. This is internal tooling for the repo, not a milestone, and it ships nothing to npm.
 - **Touches:** every ADR (each decision gains a `Rules:` line), [ADR 0019](0019-versioning-and-releases.md) (version PRs run `rules:ship`), [ADR 0009](0009-toolchain.md) (scripts run on Node with no new dependency).
@@ -22,7 +22,7 @@ The forces:
 
 1. **A rule is one fact:** one default or one behaviour, as it holds today. "The bus worker restarts at most 3 times in 60 s" and "a crash after a short healthy run counts" are two rules. When one ADR section holds three facts, it becomes three rules, linked through `related`.
 
-   Rules: `tool.rule-one-fact`
+   Rules: `tool.rules-own-repo`
 2. **A rule's fields:**
 
    | Field | Required | Holds |
@@ -44,14 +44,14 @@ The forces:
 
    Amended 2026-11-27: a rule may also carry `repo: true` ([rules about the repo](#amended-2026-11-27-rules-about-the-repo)).
 
-   Rules: `tool.rule-fields`
+   Rules: `tool.rules-own-repo`
 
 3. **The statement follows [`docs/writing.md`](../writing.md),** and gets the prose check during the backfill like other copy. The why isn't in the statement: the current why is the newest `decided`, `amended` or `clarified` event's `why`, so there's no separate field to drift from the history.
 
-   Rules: `tool.statement-form`, `tool.current-why`
+   Rules: `tool.rules-own-repo`
 4. **Ids** are `<prefix>.<slug>`. The prefix names the concept (decision 7). An id never changes: a renamed or moved rule gets a new id and keeps the old one in `aliases`, so links from ADRs keep working. A rule that stops holding changes status. It's never deleted.
 
-   Rules: `tool.ids-never-change`, `tool.rules-never-deleted`
+   Rules: `tool.rules-own-repo`
 5. **Six statuses:**
    - **`active`:** accepted and shipped;
    - **`decided`:** accepted, not shipped yet;
@@ -64,7 +64,7 @@ The forces:
 
    Amended 2026-11-27: a repo rule is `active` from its `built` event ([rules about the repo](#amended-2026-11-27-rules-about-the-repo)).
 
-   Rules: `tool.rule-statuses`, `tool.rejected-rules`
+   Rules: `tool.rules-own-repo`
 6. **Events.** Twelve types. Each has a `type`, a `date` (`YYYY-MM-DD`), a `ref` and a one-line `why`:
 
    | Type | Means | `ref` |
@@ -86,7 +86,7 @@ The forces:
 
    Amended 2026-11-27: an ADR ref always names a heading ([every ADR ref names a heading](#amended-2026-11-27-every-adr-ref-names-a-heading)).
 
-   Rules: `tool.event-types`, `tool.event-prev`, `tool.event-refs`
+   Rules: `tool.rules-own-repo`
 
 ### Where rules live
 
@@ -114,7 +114,7 @@ The forces:
 
    A concept is added in a normal PR.
 
-   Rules: `tool.rule-concepts`
+   Rules: `tool.rules-own-repo`
 8. **Files.** JSON, one file per concept, so a PR's diff stays inside the concept it touches:
    ```
    docs/rules/
@@ -126,7 +126,7 @@ The forces:
    ```
    `scripts/rules/check.ts` does its own validation; there's no validator library.
 
-   Rules: `tool.rules-json`
+   Rules: `tool.rules-own-repo`
 9. **The registry is the source of truth.** ADRs stay the story of why. Each decision and each amendment in an ADR ends with one line naming the rules it adds or changes:
    ```md
    Rules: `sup.restart-limit`, `sup.short-runs`
@@ -135,7 +135,7 @@ The forces:
 
    Clarified 2026-11-27: which parts of an ADR count as decisions ([what counts as a decision](#clarified-2026-11-27-what-counts-as-a-decision)).
 
-   Rules: `tool.registry-source`, `tool.rules-lines`
+   Rules: `tool.rules-lines`
 
 ### Checks
 
@@ -154,7 +154,7 @@ The forces:
 
     Amended 2026-11-27: it also checks repo rules ([rules about the repo](#amended-2026-11-27-rules-about-the-repo)).
 
-    Rules: `tool.rules-check`
+    Rules: `tool.rules-own-repo`
 11. **`rules.yml`**, a workflow of its own like `changeset.yml`, so adding or removing its label re-runs only this check:
     - a PR that changes `docs/adr/**` must change `docs/rules/**`, unless it has the `no-rules` label. That label is for edits that change no fact (typos, links), and an agent may add it, like `no-changeset`;
     - it fails if an id or alias on `main` is missing from the PR.
@@ -177,14 +177,14 @@ The forces:
 
 14. **`pnpm rules:build`** writes `docs/rules/README.md`, which is committed: one section per concept, each with a table (id, statement, values, status, `since` or `target`) and then each rule's history as a short list (date, type, ref, why). It's the version agents and GitHub readers use.
 
-    Rules: `tool.rules-readme`
+    Rules: `tool.rules-own-repo`
 15. **`pnpm rules:board`** writes one self-contained HTML page, with the data inlined and no server, to a gitignored path, prints the path and opens it. The template is `scripts/rules/board.html`, taken from the demo built while this ADR was grilled. It has:
     - **Board:** concepts as columns, rules as cards (id, status, statement, values, events count, `since`), with status filters and a search over ids, values, knobs and refs. Rejected, withdrawn and superseded rules are dimmed.
     - **Rule drawer:** the fields first, then the current why, then the history newest first, with `prev` as a "Before:" line, then the related rules.
     - **Agenda:** every event by day, newest first, with a "by version" toggle that groups events under the release they shipped in, or under "Unreleased". A "rules as of version X" view comes later.
     - The page fills the window's width, uses isoloop.dev's palette (`packages/ui/src/tokens.css` in `isoloop/web`) and has a System, Light and Dark switch.
 
-    Rules: `tool.rules-board`
+    Rules: `tool.rules-own-repo`
 
 ### Rollout
 
@@ -212,7 +212,7 @@ Open point 1 of #483, grilled 2026-11-27, yes. It amends decision 6's `ref`:
 - **A PR or an issue** is `#390`, or `web#285` in another isoloop repo. **A release tag** is `vX.Y.Z`.
 - **Each event type takes only the ref kinds in decision 6's table.** `rules:check` fails on any other ref, on an ADR ref with no anchor, and on an anchor the ADR doesn't have.
 
-Rules: `tool.event-refs`
+Rules: `tool.rules-own-repo`
 
 ### Clarified 2026-11-27: when `rules:ship` is due
 
@@ -221,7 +221,7 @@ Open point 4 of #483, grilled 2026-11-27, yes. It records decision 13 as built:
 - **`rules:check` fails when a `decided` or `proposed` rule's `target` is at or below the packages' version.** A preview such as `0.2.0-next.3` is below `0.2.0`, so previews never trigger it. The version PR that sets `0.2.0` does.
 - **A patch from a `release/0.x` branch** ([ADR 0019](0019-versioning-and-releases.md), decision 5) runs `rules:ship` in that branch's version PR, so its `shipped` event is made on the branch. The event comes to `main` with the backport.
 
-Rules: `tool.rules-ship-due`, `tool.rules-ship-patches`
+Rules: `tool.rules-ship-patches`
 
 ### Amended 2026-11-27: rules about the repo
 
@@ -233,7 +233,7 @@ Open point 8 of #483, grilled 2026-11-27, yes. It amends decisions 2, 5 and 10:
 - **`rules:check` fails** when a repo rule has `since`, `target` or a `shipped` event, or is `active` with no `built` event.
 - **This ADR's own `tool.*` rules are repo rules,** in force since #483.
 
-Rules: `tool.repo-rules`, `tool.rule-fields`, `tool.rule-statuses`, `tool.rules-check`
+Rules: `tool.rules-own-repo`
 
 ### Clarified 2026-11-27: what counts as a decision
 
@@ -245,7 +245,7 @@ Open point 9 of #483, grilled 2026-11-27, yes. It clarifies decision 9 and the t
 - **Any heading that says "amended"** is an amendment, up to the next heading of the same or a higher level.
 - **A `Rules:` line inside a code fence doesn't count.**
 
-Rules: `tool.rules-lines-sections`
+Rules: `tool.rules-own-repo`
 
 ### Amended 2026-11-28: views, links, keywords and config
 
@@ -266,7 +266,7 @@ From the prototypes reviewed on 2026-11-28 (a hive plot, keywords, a keyword map
 
 The board's existing rules change in the PRs that build each part, so each one says what holds once it's built.
 
-Rules: `tool.rules-tabs`, `tool.rules-hive`, `tool.rules-keywords-tab`, `tool.rules-timeline`, `tool.rules-sources`, `tool.rules-as-of`, `tool.rules-as-of-limits`, `tool.rules-links`, `tool.rules-link-cap`, `tool.rules-link-weight`, `tool.rules-keywords-file`, `tool.rules-keyword-review`, `tool.rules-symbols`, `tool.rules-config`, `tool.rules-view-modules`
+Rules: `tool.rules-keyword-review`
 
 ### Amended 2026-11-28: design system
 
@@ -291,7 +291,19 @@ Grilled with the maintainer on 2026-11-28 (Q1–Q11 and Q15, yes to all) before 
 
   There are no pixel snapshots.
 
-Rules: `tool.rules-product-neutral`, `tool.rules-own-repo`, `tool.rules-theme`, `tool.rules-tokens`, `tool.rules-chart-slots`, `tool.rules-literal-ban`, `tool.rules-components`, `tool.rules-layout-primitives`, `tool.rules-type-scale`, `tool.rules-chart-toolkit`, `tool.rules-css-layers`, `tool.rules-css-prefix`, `tool.rules-specimen`, `tool.rules-ds-tests`
+Rules: `tool.rules-product-neutral`, `tool.rules-own-repo`, `tool.rules-theme`
+
+### Amended 2026-11-28: the move to Archeion
+
+The tool moved to its own repo, [sabbz-dev/archeion](https://github.com/sabbz-dev/archeion), with its history, and isoloop installs it as `@sabbz/archeion`, a root devDependency. Grilled with the maintainer on 2026-11-28 (A1–A16 in the Archeion grill, yes to all). It amends decisions 8, 11, 14, 15 and 17, and the amendments above:
+
+- **What moved.** The decisions about how the tool works (the format, the checks, the generated files, the views and the design system) are now Archeion's own ADRs, 0003 to 0006, and their 45 rules are in Archeion's registry. They left this registry in one PR, labelled `rules-moved`. The `Rules:` lines above that named only moved rules now name `tool.rules-own-repo`, the rule that says where they live.
+- **The registry's folder** is `.archeion/` (Archeion's default layout): `archeion.json` (the config that was `rules.config.json`), `rules/` (what was `docs/rules/`), `state.json`, and `web/`, gitignored. Isoloop's theme is `.archeion/isoloop.css`.
+- **The scripts call Archeion:** `pnpm rules:check` runs `archeion check`, `rules:build` runs `archeion build`, `rules:board` runs `archeion serve`, and `rules:ship` runs `archeion ship`.
+- **The Rules workflow stays isoloop's,** in `scripts/rules-pairing/`. It reads `.archeion/rules/`, and a PR labelled `rules-moved` may remove rule ids, for moving rules to another registry. The `no-rules` label still doesn't.
+- **Isoloop's published packages never depend on Archeion.**
+
+Rules: `tool.rules-own-repo`, `tool.rule-ids-kept`, `tool.adr-pairing`, `tool.agents-md-rules`, `tool.rules-theme`
 
 ## Consequences
 

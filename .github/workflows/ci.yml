@@ -149,8 +149,6 @@ jobs:
         with:
           browsers: chromium firefox webkit
       - run: pnpm test:browser
-      # The rules page and its specimen in Chromium, 2 widths × 2 themes (ADR 0026, amended 2026-11-28).
-      - run: pnpm rules:smoke
 
   # A matrix job skipped at the job level reports one unexpanded `e2e` check, and
   # the required `e2e (chromium)`, `e2e (firefox)` and `e2e (webkit)` would stay

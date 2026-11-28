@@ -33,16 +33,16 @@
     "release:status": "changeset status",
     "docs:check": "node scripts/docs/check.ts",
     "docs:api": "node scripts/docs/api.ts",
-    "rules:check": "node scripts/rules/check.ts",
-    "rules:build": "node scripts/rules/build.ts",
-    "rules:board": "node scripts/rules/build.ts --board",
-    "rules:smoke": "node scripts/rules/smoke.ts",
-    "rules:ship": "node scripts/rules/ship.ts"
+    "rules:check": "archeion check",
+    "rules:build": "archeion build",
+    "rules:board": "archeion serve",
+    "rules:ship": "archeion ship"
   },
   "devDependencies": {
     "@changesets/cli": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@playwright/test": "catalog:",
+    "@sabbz/archeion": "0.1.0-next.0",
     "@types/node": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "oxfmt": "catalog:",

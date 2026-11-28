@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/isoloop/isoloop/blob/main/docs/rules/schema.json",
+  "$id": "https://github.com/isoloop/isoloop/blob/main/.archeion/rules/schema.json",
   "title": "A concept's rules (ADR 0026)",
-  "description": "Editor hints only: scripts/rules/check.ts does the validation.",
+  "description": "Editor hints only: `archeion check` does the validation.",
   "type": "array",
   "items": {
     "type": "object",
