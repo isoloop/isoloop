@@ -436,4 +436,117 @@
     fill: var(--ar-swatch, var(--ar-cat-other));
     stroke: var(--ar-swatch, var(--ar-cat-other));
   }
+
+  /* Symbols: event marks, coloured by their family, filled or outlined. */
+  [data-family='decision'] {
+    --ar-family: var(--ar-event-decision);
+  }
+  [data-family='change'] {
+    --ar-family: var(--ar-event-change);
+  }
+  [data-family='delivery'] {
+    --ar-family: var(--ar-event-delivery);
+  }
+  [data-family='ending'] {
+    --ar-family: var(--ar-event-ending);
+  }
+  [data-family='correction'] {
+    --ar-family: var(--ar-event-correction);
+  }
+  .ar-symbol {
+    fill: var(--ar-family, var(--ar-muted));
+    stroke: var(--ar-family, var(--ar-muted));
+    stroke-width: var(--ar-hairline);
+  }
+  .ar-symbol[data-filled='false'] {
+    fill: var(--ar-surface);
+    stroke-width: var(--ar-symbol-stroke);
+  }
+  .ar-symbol[data-line] {
+    fill: none;
+    stroke-width: var(--ar-symbol-stroke);
+  }
+  .ar-symbol-icon {
+    width: var(--ar-marker);
+    height: var(--ar-marker);
+    flex: none;
+    overflow: visible;
+  }
+
+  /* Heat: cells and the ramp, from the --ar-heat-* steps. */
+  [data-heat='0'] {
+    --ar-heat-fill: var(--ar-heat-0);
+  }
+  [data-heat='1'] {
+    --ar-heat-fill: var(--ar-heat-1);
+  }
+  [data-heat='2'] {
+    --ar-heat-fill: var(--ar-heat-2);
+  }
+  [data-heat='3'] {
+    --ar-heat-fill: var(--ar-heat-3);
+  }
+  [data-heat='4'] {
+    --ar-heat-fill: var(--ar-heat-4);
+  }
+  [data-heat='5'] {
+    --ar-heat-fill: var(--ar-heat-5);
+  }
+  .ar-heat-cell {
+    fill: var(--ar-heat-fill);
+    rx: var(--ar-radius-s);
+  }
+  .ar-heat-cell[data-heat='0'] {
+    opacity: 0.6;
+  }
+  .ar-heat {
+    cursor: pointer;
+  }
+  .ar-heat:hover .ar-heat-cell,
+  .ar-heat[aria-selected='true'] .ar-heat-cell {
+    stroke: var(--ar-fg);
+    stroke-width: var(--ar-rule);
+  }
+  .ar-heat-count {
+    fill: var(--ar-heat-on-low);
+    font-size: var(--ar-text-xs);
+    font-weight: var(--ar-weight-bold);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  .ar-heat-count[data-heat='4'],
+  .ar-heat-count[data-heat='5'] {
+    fill: var(--ar-heat-on-high);
+  }
+  .ar-heat-ramp {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ar-space-2);
+    font-size: var(--ar-text-xs);
+    color: var(--ar-muted);
+  }
+  .ar-heat-ramp i {
+    width: var(--ar-space-6);
+    height: var(--ar-space-5);
+    border-radius: var(--ar-radius-s);
+    background: var(--ar-heat-fill);
+  }
+
+  /* Strip: a brushable row of count bars with the selected range outlined. */
+  .ar-strip {
+    width: 100%;
+    height: var(--ar-strip-height);
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+  }
+  .ar-strip-bar {
+    fill: var(--ar-strip-bar);
+  }
+  .ar-strip-sel {
+    fill: var(--ar-accent-soft);
+    fill-opacity: 0.5;
+    stroke: var(--ar-strip-sel);
+    stroke-width: var(--ar-rule);
+  }
 }

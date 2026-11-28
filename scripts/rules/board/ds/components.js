@@ -95,10 +95,10 @@
   /** Dot: a small marker in a tone. */
   const Dot = ({ tone }) => html`<span class="ar-dot" ${attrs({ 'data-tone': tone })}></span>`;
 
-  /** Chip: a toggle. { label, pressed, count, tone (for a dot), attrs }. */
-  const Chip = ({ label, pressed = false, count, tone, attrs: a }) =>
+  /** Chip: a toggle. { label, pressed, count, tone (for a dot), icon (SafeHtml, in place of the dot), attrs }. */
+  const Chip = ({ label, pressed = false, count, tone, icon, attrs: a }) =>
     html`<button class="ar-chip" ${attrs({ 'aria-pressed': String(pressed), ...a })}>
-      ${tone ? Dot({ tone }) : ''}${label}${
+      ${icon || (tone ? Dot({ tone }) : '')}${label}${
         count === undefined ? '' : html`<span class="ar-chip-count">${count}</span>`
       }
     </button>`;

@@ -270,6 +270,55 @@ Rules.view({
         ),
         section('Charts', AR.Stack({ gap: '7', children: [chart, timeAxis] })),
         section(
+          'Event symbols',
+          AR.Stack({
+            gap: '5',
+            children: [
+              html`<p>
+                Five families, one colour each (--ar-event-*); shape and fill tell the types apart.
+              </p>`,
+              AR.Cluster({
+                gap: '4',
+                children: AR.events.ORDER.map((type) =>
+                  AR.Chip({
+                    label: AR.events.typeOf(type).label,
+                    icon: AR.EventIcon({ type }),
+                    pressed: true,
+                  }),
+                ),
+              }),
+            ],
+          }),
+        ),
+        section(
+          'Heat and strip',
+          AR.Stack({
+            gap: '5',
+            children: [
+              AR.HeatRamp({ label: 'Count' }),
+              AR.chart.svg({
+                width: 7 * 30,
+                height: 30,
+                label: 'Heat cells, counts 0 to 8',
+                body: [0, 1, 2, 3, 5, 6, 8].map((count, i) =>
+                  AR.chart.heatCell({ x: i * 30 + 1, y: 1, width: 28, height: 28, count }),
+                ),
+              }),
+              AR.chart.strip({
+                counts: [2, 5, 0, 9, 3, 1, 7, 4, 0, 6],
+                width: W,
+                height: 56,
+                selected: [3, 6],
+                labels: [
+                  { index: 0, text: 'first' },
+                  { index: 9, text: 'last' },
+                ],
+                label: 'A strip with a selected range',
+              }),
+            ],
+          }),
+        ),
+        section(
           'Drawer',
           html`<p>
             Open the drawer from a card on the rules page; its markup is AR.Drawer({ title, lead,
