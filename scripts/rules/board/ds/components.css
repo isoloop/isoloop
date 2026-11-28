@@ -295,6 +295,21 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* ShareBar: one bar split into parts, each sized by --ar-share and coloured by its slot. */
+  .ar-sharebar {
+    display: flex;
+    gap: var(--ar-sharebar-gap);
+    height: var(--ar-sharebar-height);
+    min-width: 0;
+    border-radius: var(--ar-sharebar-radius);
+    overflow: hidden;
+    background: var(--ar-sunk);
+  }
+  .ar-sharebar-part {
+    flex: var(--ar-share, 1) 1 0;
+    background: var(--ar-swatch, var(--ar-cat-other));
+  }
+
   /* Tooltip: one floating box per page, placed by AR.tooltip. */
   .ar-tooltip {
     position: fixed;

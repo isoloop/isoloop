@@ -105,5 +105,16 @@
     --ar-tooltip-radius: var(--ar-radius-m);
     --ar-chart-grid: var(--ar-grid);
     --ar-chart-axis: var(--ar-axis);
+    /* A chart's quiet and highlighted lines, and the halo that keeps labels readable over them. */
+    --ar-chart-edge: var(--ar-line);
+    --ar-chart-edge-on: var(--ar-accent);
+    --ar-chart-halo: var(--ar-surface);
+    --ar-chart-faded: 0.18;
+    /* The narrowest a wide chart draws; below it, the chart scrolls in its own box. */
+    --ar-chart-min-width: 44rem;
+
+    --ar-sharebar-height: var(--ar-space-3);
+    --ar-sharebar-radius: var(--ar-radius-s);
+    --ar-sharebar-gap: var(--ar-hairline);
   }
 }
