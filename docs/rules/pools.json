@@ -7,6 +7,7 @@
     "code": ["packages/host/src/kernel/kernel.ts", "packages/runtime/src/bootstrap.ts"],
     "since": "0.1.0",
     "related": ["pool.shared-globals", "pool.shared-fate", "pool.no-heuristic-pooling"],
+    "keywords": ["own-stack"],
     "events": [
       {
         "type": "decided",
@@ -48,6 +49,7 @@
     "code": ["packages/runtime/src/bootstrap.ts"],
     "since": "0.1.0",
     "related": ["pool.opt-in", "pool.shared-dom"],
+    "keywords": ["trust-boundary", "blocked-worker"],
     "events": [
       {
         "type": "decided",
@@ -76,6 +78,7 @@
     "code": ["packages/host/src/supervisor/machine.ts"],
     "since": "0.1.0",
     "related": ["pool.attributed-errors", "pool.crash-counts"],
+    "keywords": ["blocked-worker", "own-stack", "restart"],
     "events": [
       {
         "type": "decided",
@@ -104,6 +107,7 @@
     "code": ["packages/runtime/src/bootstrap.ts"],
     "since": "0.1.0",
     "related": ["pool.shared-fate"],
+    "keywords": ["lifecycle", "frameworks", "restart", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -132,6 +136,7 @@
     "code": ["packages/host/src/supervisor/machine.ts"],
     "since": "0.1.1",
     "related": ["pool.shared-fate"],
+    "keywords": ["heartbeat", "own-stack", "restart"],
     "events": [
       {
         "type": "decided",
@@ -159,6 +164,7 @@
     "status": "active",
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
+    "keywords": ["dev-only", "suspension"],
     "events": [
       {
         "type": "decided",
@@ -187,6 +193,7 @@
     "code": ["packages/runtime/src/pools/freeze.ts"],
     "since": "0.1.0",
     "related": ["pool.protected-properties"],
+    "keywords": ["trust-boundary"],
     "events": [
       {
         "type": "decided",
@@ -215,6 +222,7 @@
     "code": ["packages/runtime/src/pools/freeze.ts"],
     "since": "0.1.0",
     "related": ["pool.frozen-builtins", "pool.no-ses-allowlist"],
+    "keywords": ["trust-boundary", "errors"],
     "events": [
       {
         "type": "decided",
@@ -240,6 +248,7 @@
     "id": "pool.no-ses-allowlist",
     "statement": "The pool freeze doesn't use SES's default override list as an allow-list.",
     "status": "rejected",
+    "keywords": ["own-stack", "trust-boundary"],
     "events": [
       {
         "type": "rejected",
@@ -255,6 +264,7 @@
     "status": "active",
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
+    "keywords": ["grants", "host-api"],
     "events": [
       {
         "type": "decided",
@@ -283,6 +293,7 @@
     "code": ["packages/dom/src/worker/dom.ts"],
     "since": "0.1.0",
     "related": ["pool.records-per-member", "pool.shared-dom"],
+    "keywords": ["rendering"],
     "events": [
       {
         "type": "decided",
@@ -311,6 +322,7 @@
     "code": ["packages/dom/src/worker/dom.ts"],
     "since": "0.1.0",
     "related": ["pool.no-cross-member-move", "pool.host-applier"],
+    "keywords": ["own-stack", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -339,6 +351,7 @@
     "code": ["packages/dom/src/worker/dom.ts"],
     "since": "0.1.0",
     "related": ["pool.records-per-member"],
+    "keywords": ["errors", "placement"],
     "events": [
       {
         "type": "decided",
@@ -367,6 +380,7 @@
     "code": ["packages/dom/src/worker/dom.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["pool.records-per-member"],
+    "keywords": ["budgets", "placement", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -401,6 +415,7 @@
     "status": "active",
     "code": ["packages/dom/src/worker/dom.ts", "packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
+    "keywords": ["measurement"],
     "events": [
       {
         "type": "decided",
@@ -429,6 +444,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["pool.one-document", "pool.shared-globals"],
+    "keywords": ["trust-boundary", "rendering"],
     "events": [
       {
         "type": "decided",
@@ -455,6 +471,7 @@
     "statement": "React and Preact members may share a pool.",
     "status": "active",
     "since": "0.1.0",
+    "keywords": ["frameworks"],
     "events": [
       {
         "type": "decided",
@@ -511,6 +528,7 @@
     "code": ["packages/runtime/src/bootstrap.ts"],
     "since": "0.1.0",
     "related": ["pool.stop-member"],
+    "keywords": ["lifecycle", "suspension", "commits"],
     "events": [
       {
         "type": "decided",
@@ -544,6 +562,7 @@
     "statement": "Isolates built apart from the host can join a pool. They bring their own framework copy, so they share less memory.",
     "status": "active",
     "since": "0.1.0",
+    "keywords": ["memory-use", "compatibility"],
     "events": [
       {
         "type": "decided",
@@ -566,6 +585,7 @@
     "knob": "`usePortalRoot()`",
     "code": ["packages/react/src/isolate/context.ts", "packages/preact/src/isolate/context.ts"],
     "since": "0.1.0",
+    "keywords": ["frameworks", "own-stack", "rendering"],
     "events": [
       {
         "type": "decided",
