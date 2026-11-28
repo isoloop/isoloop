@@ -4850,7 +4850,7 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.rules-same-pr` | Whoever changes an ADR updates its rules in the same PR. The steward treats rules that don't match the ADR as a must-fix. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.rules-ship` | `pnpm rules:ship <version>` runs in the version PR. Each rule whose `target` is that version becomes `active`, with `since` set, a `shipped` event and no `target`. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.rules-readme` | `pnpm rules:build` writes `docs/rules/README.md`, which is committed: per concept, a table of rules, then each rule's history. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
-| `tool.rules-board` | `pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. The page is a shell with one tab per view, built from Archeion's design system; it has the Board, a rule drawer, the Agenda by day or by version, and the Keywords tab. Keyword chips and a symbol picker filter every tab, and the drawer lists a rule's keywords, its symbols and the rules in other concepts that share its keywords. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-board` | `pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. The page is a shell with one tab per view, built from Archeion's design system; it has the Board, a rule drawer, the Agenda by day or by version, the Hive and the Keywords tab. Keyword chips and a symbol picker filter every tab, and the drawer lists a rule's keywords, its symbols and the rules in other concepts that share its keywords. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.rules-backfill` | Rules for the existing ADRs are added one concept per PR, each reviewed by the maintainer. Supervision, Durability and Versioning & releases go first. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.agents-md-rules` | `AGENTS.md` sends agents to `docs/rules/README.md` for what holds today. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.rules-scope` | The registry covers this repo's ADRs only. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
@@ -4905,7 +4905,7 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.dom-imports` | `runtime` may import only `@isoloop/dom/worker`, `host` only `@isoloop/dom/host` and only in `render/isoloop-dom.ts`, `protocol`, `bus` and `codec` never import `dom`, and `dom` imports no other `@isoloop/*` package. |  | active, repo | in force since [#29](https://github.com/isoloop/isoloop/issues/29) |
 | `tool.dom-halves` | `dom`'s four source folders (`shared`, `worker`, `host`, `testing`) are each type-checked with their own tsconfig and `lib`. `worker` and `host` import `shared` but not each other. |  | active, repo | in force since [#29](https://github.com/isoloop/isoloop/issues/29) |
 | `tool.rules-tabs` | The rules page has six tabs, routed by the URL's hash: Board, Agenda, Hive, Keywords, Timeline and Sources. | `6 tabs` | decided, repo |  |
-| `tool.rules-hive` | The Hive tab draws one axis per concept and a dot per rule, ordered by first event date and coloured by status, with links as curves between axes. |  | decided, repo |  |
+| `tool.rules-hive` | The Hive tab draws one axis per concept and a dot per rule, ordered by first event date and coloured by status, with links as curves between axes. |  | active, repo | in force since [#511](https://github.com/isoloop/isoloop/issues/511) |
 | `tool.rules-keywords-tab` | The Keywords tab holds the keyword glossary, each keyword with its definition and its rules by concept, and the keyword map, which joins keywords that tag the same rules. |  | active, repo | in force since [#514](https://github.com/isoloop/isoloop/issues/514) |
 | `tool.rules-timeline` | The Timeline tab shows every event in one lane per concept, by date, with release tags as lines, and a Churn heatmap counts `amended`, `clarified` and `corrected` events per concept and day. |  | decided, repo |  |
 | `tool.rules-sources` | The Sources tab shows which ADRs feed which concepts, a treemap of the `code` paths rules cite, and a Health list of where the registry is weak. |  | decided, repo |  |
@@ -5740,12 +5740,14 @@ History:
 
 ### `tool.rules-hive`
 
+- **Code:** `scripts/rules/board/views/hive.js`, `scripts/rules/board/views/hive.css`
 - **Related:** `tool.rules-links`, `tool.rules-tabs`
 - **Why:** It shows which concepts connect, and exploring one rule's links by hover reads well.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · It shows which concepts connect, and exploring one rule's links by hover reads well.
+- 2026-11-28 · built · [#511](https://github.com/isoloop/isoloop/issues/511) · The Hive tab is on the board, built on the design system and the model's links.
 
 ### `tool.rules-keywords-tab`
 

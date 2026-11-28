@@ -290,6 +290,9 @@
     border-radius: var(--ar-radius-s);
     background: var(--ar-swatch, var(--ar-cat-other));
   }
+  .ar-legend-swatch[data-tone] {
+    background: var(--ar-tone);
+  }
   .ar-legend-value {
     color: var(--ar-fg);
     font-variant-numeric: tabular-nums;
@@ -450,5 +453,10 @@
   .ar-chart-mark {
     fill: var(--ar-swatch, var(--ar-cat-other));
     stroke: var(--ar-swatch, var(--ar-cat-other));
+  }
+  /* A mark in a semantic tone (status, event) instead of a category slot. */
+  .ar-chart-mark[data-tone] {
+    fill: var(--ar-tone);
+    stroke: var(--ar-tone);
   }
 }
