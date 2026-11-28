@@ -1900,5 +1900,220 @@
         "why": "Views are built and changed one at a time without touching the others."
       }
     ]
+  },
+  {
+    "id": "tool.rules-product-neutral",
+    "statement": "The rules tooling is a product-neutral tool with its own design system; nothing in its code, tokens or components is about Isoloop, and Isoloop uses it only as dev tooling.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-own-repo", "tool.rules-theme", "tool.rules-config"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "It's meant to work for any repo's ADRs, so Isoloop is one user of it, not its subject."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-own-repo",
+    "statement": "The rules tooling moves to a repo of its own later, and Isoloop's published packages never depend on it.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-product-neutral"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "It's dev tooling for the repo; nothing a user installs should pull it in."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-theme",
+    "statement": "Isoloop's palette is one theme, chosen in `rules.config.json`; a theme sets only the semantic tokens and may bring a webfont.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-tokens", "tool.rules-config"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Keeping the product's own look separate from Isoloop's lets another repo pick its own theme."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-tokens",
+    "statement": "Design tokens come in three layers: primitives, semantic tokens and component tokens. Components read only semantic and component tokens, and themes change only the semantic layer.",
+    "status": "decided",
+    "repo": true,
+    "values": ["3 layers"],
+    "related": ["tool.rules-theme", "tool.rules-literal-ban"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "One place per kind of decision: raw values, what a value is for, and what one component uses."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-chart-slots",
+    "statement": "Charts have 8 categorical colour slots, and a chart with more than 8 categories groups the rest.",
+    "status": "decided",
+    "repo": true,
+    "values": ["8 slots"],
+    "related": ["tool.rules-chart-toolkit"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "More than 8 colours can't be told apart reliably."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-literal-ban",
+    "statement": "`rules:check` fails on a colour, a font size, a font family or a spacing value written in a component or a view, outside the files on one allowlist.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-tokens", "tool.rules-ds-tests"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Literals in components are how a design system drifts."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-components",
+    "statement": "Components are plain functions that return HTML through an `html` tagged template, which escapes every value; `raw()` marks HTML that's already safe. There's no framework.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-layout-primitives"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Escaping by default closes the injection holes string building leaves, with no dependency."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-layout-primitives",
+    "statement": "Layout uses four primitives, Stack, Cluster, Grid and Split, spaced with `gap`; a component never sets its own outer margin.",
+    "status": "decided",
+    "repo": true,
+    "values": ["4 primitives"],
+    "related": ["tool.rules-components"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Spacing belongs to the parent, so components fit anywhere without margin fights."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-type-scale",
+    "statement": "Type has a 5-step scale (xs, s, m, l, xl) with tabular numbers where digits line up; data views stay at the m step or below. The default font is the system stack, and a theme may swap in a webfont.",
+    "status": "decided",
+    "repo": true,
+    "values": ["5 steps"],
+    "related": ["tool.rules-theme"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Dense data reads better small and aligned, and a system font needs no download."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-chart-toolkit",
+    "statement": "Charts share one toolkit: scales, axes, a legend, a tooltip and SVG helpers.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-chart-slots"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Each view drawing its own axes would look and behave differently."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-css-layers",
+    "statement": "CSS uses `@layer` (reset, tokens, base, layout, components, views), each class is prefixed with its owner, a component or a view, and there are no utility classes.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-css-prefix"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Layers settle precedence without specificity fights, and owner prefixes show where a style comes from."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-css-prefix",
+    "statement": "Until the product has a name, tokens use the placeholder prefix `--rb-` and classes `.rb-`, set in one place so a rename is one mechanical pass.",
+    "status": "decided",
+    "repo": true,
+    "values": ["--rb-", "rb-"],
+    "related": ["tool.rules-css-layers"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "The name is still being chosen."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-specimen",
+    "statement": "`rules:board --specimen` writes a page with every token, type step, layout primitive, component and chart part.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-ds-tests"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "One page to review the design system without opening every view."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-ds-tests",
+    "statement": "The design system is tested for WCAG AA contrast in both themes, for the literal ban, with unit tests per component, and with a headless smoke test of every view and the specimen at 2 widths in both themes; there are no pixel snapshots.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-literal-ban", "tool.rules-specimen"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "These catch what breaks in practice (unreadable colours, drift, broken markup, overflow, errors) without snapshots that fail on every intended change."
+      }
+    ]
   }
 ]

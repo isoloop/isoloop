@@ -4919,6 +4919,20 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.rules-symbols` | Symbols are derived from backticked names in statements, knobs and errors, feed search and the shared-symbol links, and are never written by hand. |  | decided, repo |  |
 | `tool.rules-config` | One config file holds what's particular to a repo: the title, the rules and ADR folders, the ADR number from which `Rules:` lines are required, the GitHub owner and repo for links, and where the page is written. |  | decided, repo |  |
 | `tool.rules-view-modules` | Each tab is its own module next to a small shell that holds the tabs, the shared filters, the theme and the rule drawer, and `rules:board` inlines them into one self-contained page. |  | decided, repo |  |
+| `tool.rules-product-neutral` | The rules tooling is a product-neutral tool with its own design system; nothing in its code, tokens or components is about Isoloop, and Isoloop uses it only as dev tooling. |  | decided, repo |  |
+| `tool.rules-own-repo` | The rules tooling moves to a repo of its own later, and Isoloop's published packages never depend on it. |  | decided, repo |  |
+| `tool.rules-theme` | Isoloop's palette is one theme, chosen in `rules.config.json`; a theme sets only the semantic tokens and may bring a webfont. |  | decided, repo |  |
+| `tool.rules-tokens` | Design tokens come in three layers: primitives, semantic tokens and component tokens. Components read only semantic and component tokens, and themes change only the semantic layer. | `3 layers` | decided, repo |  |
+| `tool.rules-chart-slots` | Charts have 8 categorical colour slots, and a chart with more than 8 categories groups the rest. | `8 slots` | decided, repo |  |
+| `tool.rules-literal-ban` | `rules:check` fails on a colour, a font size, a font family or a spacing value written in a component or a view, outside the files on one allowlist. |  | decided, repo |  |
+| `tool.rules-components` | Components are plain functions that return HTML through an `html` tagged template, which escapes every value; `raw()` marks HTML that's already safe. There's no framework. |  | decided, repo |  |
+| `tool.rules-layout-primitives` | Layout uses four primitives, Stack, Cluster, Grid and Split, spaced with `gap`; a component never sets its own outer margin. | `4 primitives` | decided, repo |  |
+| `tool.rules-type-scale` | Type has a 5-step scale (xs, s, m, l, xl) with tabular numbers where digits line up; data views stay at the m step or below. The default font is the system stack, and a theme may swap in a webfont. | `5 steps` | decided, repo |  |
+| `tool.rules-chart-toolkit` | Charts share one toolkit: scales, axes, a legend, a tooltip and SVG helpers. |  | decided, repo |  |
+| `tool.rules-css-layers` | CSS uses `@layer` (reset, tokens, base, layout, components, views), each class is prefixed with its owner, a component or a view, and there are no utility classes. |  | decided, repo |  |
+| `tool.rules-css-prefix` | Until the product has a name, tokens use the placeholder prefix `--rb-` and classes `.rb-`, set in one place so a rename is one mechanical pass. | `--rb-`, `rb-` | decided, repo |  |
+| `tool.rules-specimen` | `rules:board --specimen` writes a page with every token, type step, layout primitive, component and chart part. |  | decided, repo |  |
+| `tool.rules-ds-tests` | The design system is tested for WCAG AA contrast in both themes, for the literal ban, with unit tests per component, and with a headless smoke test of every view and the specimen at 2 widths in both themes; there are no pixel snapshots. |  | decided, repo |  |
 
 ### `tool.rule-one-fact`
 
@@ -5843,6 +5857,132 @@ History:
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · Views are built and changed one at a time without touching the others.
+
+### `tool.rules-product-neutral`
+
+- **Related:** `tool.rules-own-repo`, `tool.rules-theme`, `tool.rules-config`
+- **Why:** It's meant to work for any repo's ADRs, so Isoloop is one user of it, not its subject.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · It's meant to work for any repo's ADRs, so Isoloop is one user of it, not its subject.
+
+### `tool.rules-own-repo`
+
+- **Related:** `tool.rules-product-neutral`
+- **Why:** It's dev tooling for the repo; nothing a user installs should pull it in.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · It's dev tooling for the repo; nothing a user installs should pull it in.
+
+### `tool.rules-theme`
+
+- **Related:** `tool.rules-tokens`, `tool.rules-config`
+- **Why:** Keeping the product's own look separate from Isoloop's lets another repo pick its own theme.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Keeping the product's own look separate from Isoloop's lets another repo pick its own theme.
+
+### `tool.rules-tokens`
+
+- **Related:** `tool.rules-theme`, `tool.rules-literal-ban`
+- **Why:** One place per kind of decision: raw values, what a value is for, and what one component uses.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · One place per kind of decision: raw values, what a value is for, and what one component uses.
+
+### `tool.rules-chart-slots`
+
+- **Related:** `tool.rules-chart-toolkit`
+- **Why:** More than 8 colours can't be told apart reliably.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · More than 8 colours can't be told apart reliably.
+
+### `tool.rules-literal-ban`
+
+- **Related:** `tool.rules-tokens`, `tool.rules-ds-tests`
+- **Why:** Literals in components are how a design system drifts.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Literals in components are how a design system drifts.
+
+### `tool.rules-components`
+
+- **Related:** `tool.rules-layout-primitives`
+- **Why:** Escaping by default closes the injection holes string building leaves, with no dependency.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Escaping by default closes the injection holes string building leaves, with no dependency.
+
+### `tool.rules-layout-primitives`
+
+- **Related:** `tool.rules-components`
+- **Why:** Spacing belongs to the parent, so components fit anywhere without margin fights.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Spacing belongs to the parent, so components fit anywhere without margin fights.
+
+### `tool.rules-type-scale`
+
+- **Related:** `tool.rules-theme`
+- **Why:** Dense data reads better small and aligned, and a system font needs no download.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Dense data reads better small and aligned, and a system font needs no download.
+
+### `tool.rules-chart-toolkit`
+
+- **Related:** `tool.rules-chart-slots`
+- **Why:** Each view drawing its own axes would look and behave differently.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Each view drawing its own axes would look and behave differently.
+
+### `tool.rules-css-layers`
+
+- **Related:** `tool.rules-css-prefix`
+- **Why:** Layers settle precedence without specificity fights, and owner prefixes show where a style comes from.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Layers settle precedence without specificity fights, and owner prefixes show where a style comes from.
+
+### `tool.rules-css-prefix`
+
+- **Related:** `tool.rules-css-layers`
+- **Why:** The name is still being chosen.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · The name is still being chosen.
+
+### `tool.rules-specimen`
+
+- **Related:** `tool.rules-ds-tests`
+- **Why:** One page to review the design system without opening every view.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · One page to review the design system without opening every view.
+
+### `tool.rules-ds-tests`
+
+- **Related:** `tool.rules-literal-ban`, `tool.rules-specimen`
+- **Why:** These catch what breaks in practice (unreadable colours, drift, broken markup, overflow, errors) without snapshots that fail on every intended change.
+
+History:
+
+- 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · These catch what breaks in practice (unreadable colours, drift, broken markup, overflow, errors) without snapshots that fail on every intended change.
 
 ## Derived topics
 
