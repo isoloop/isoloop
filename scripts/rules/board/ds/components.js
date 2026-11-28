@@ -98,11 +98,14 @@
   /** Dot: a small marker in a tone. */
   const Dot = ({ tone }) => html`<span class="ar-dot" ${attrs({ 'data-tone': tone })}></span>`;
 
-  /** Chip: a toggle. { label, pressed, count, tone (for a dot), slot (for a chart swatch), attrs }. */
-  const Chip = ({ label, pressed = false, count, tone, slot, attrs: a }) =>
+  /**
+   * Chip: a toggle. { label, pressed, count, tone (for a dot), slot (for a chart
+   * swatch), icon (SafeHtml, in place of the dot or swatch), attrs }.
+   */
+  const Chip = ({ label, pressed = false, count, tone, slot, icon, attrs: a }) =>
     html`<button class="ar-chip" ${attrs({ 'aria-pressed': String(pressed), ...a })}>
-      ${tone ? Dot({ tone }) : ''}${
-        slot === undefined
+      ${icon || (tone ? Dot({ tone }) : '')}${
+        icon || slot === undefined
           ? ''
           : html`<span class="ar-legend-swatch" ${attrs({ 'data-slot': slot })}></span>`
       }${label}${count === undefined ? '' : html`<span class="ar-chip-count">${count}</span>`}

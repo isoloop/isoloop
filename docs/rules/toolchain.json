@@ -509,7 +509,7 @@
   },
   {
     "id": "tool.rules-board",
-    "statement": "`pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. The page is a shell with one tab per view, built from Archeion's design system; it has the Board, a rule drawer, the Agenda by day or by version, the Hive and the Keywords tab. Keyword chips and a symbol picker filter every tab, and the drawer lists a rule's keywords, its symbols and the rules in other concepts that share its keywords.",
+    "statement": "`pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. The page is a shell with one tab per view, built from Archeion's design system; it has the Board, a rule drawer, the Agenda by day or by version, the Hive, the Keywords tab and the Timeline. Keyword chips and a symbol picker filter every tab, and the drawer lists a rule's keywords, its symbols and the rules in other concepts that share its keywords.",
     "status": "active",
     "repo": true,
     "knob": "`pnpm rules:board`",
@@ -1773,7 +1773,7 @@
   {
     "id": "tool.rules-timeline",
     "statement": "The Timeline tab shows every event in one lane per concept, by date, with release tags as lines, and a Churn heatmap counts `amended`, `clarified` and `corrected` events per concept and day.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "related": ["tool.rules-tabs"],
     "events": [
@@ -1782,8 +1782,15 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "It shows when decisions were made and where they keep changing."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#512",
+        "why": "The Timeline tab, with Churn, built on the design system."
       }
-    ]
+    ],
+    "code": ["scripts/rules/board/views/timeline.js", "scripts/rules/board/ds/events.js"]
   },
   {
     "id": "tool.rules-sources",
