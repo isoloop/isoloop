@@ -23,6 +23,8 @@ interface Slots {
 const isRec = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 const isFn = (v: unknown): v is Fn => typeof v === 'function';
 const isScale = (v: unknown): v is Scale => typeof v === 'function';
+const isPoint = (v: unknown): v is [number, number] =>
+  Array.isArray(v) && v.length === 2 && v.every((x) => typeof x === 'number');
 const isSafe = (v: unknown): v is Safe => isRec(v) && typeof v['html'] === 'string';
 const isSlots = (v: unknown): v is Slots =>
   isRec(v) && Array.isArray(v['groups']) && typeof v['slotOf'] === 'function';
@@ -253,6 +255,9 @@ describe('components', () => {
     expect(chip).toContain('aria-pressed="true" data-s="x"');
     expect(chip).toContain('<span class="ar-dot" data-tone="ok"></span>L');
     expect(chip).toContain('<span class="ar-chip-count">3</span>');
+    expect(str(fn('Chip')({ label: 'K', slot: 2 }))).toContain(
+      '<span class="ar-legend-swatch" data-slot="2"></span>K',
+    );
   });
   it('Card renders as a button or a block, with rows and dimming', () => {
     const c = str(
@@ -304,6 +309,9 @@ describe('components', () => {
     expect(str(fn('Legend')({ items: [{ label: 'A', slot: 2, value: 5 }] }))).toContain(
       '<span class="ar-legend-swatch" data-slot="2"></span>A<span class="ar-legend-value">5</span>',
     );
+    expect(str(fn('Legend')({ items: [{ label: 'B', tone: 'ok' }] }))).toContain(
+      '<span class="ar-legend-swatch" data-tone="ok"></span>B',
+    );
     expect(str(fn('EmptyState')({ text: 'None', size: 'l' }))).toBe(
       '<p class="ar-empty" data-size="l">None</p>',
     );
@@ -326,6 +334,27 @@ describe('components', () => {
 // --- The chart toolkit -------------------------------------------------------
 
 describe('the chart toolkit', () => {
+  it('draws marks in a slot or a tone', () => {
+    expect(str(chartFn('circle')({ cx: 1, cy: 2, r: 3, tone: 'warn' }))).toContain(
+      'r="3" data-tone="warn"',
+    );
+    expect(str(chartFn('circle')({ cx: 1, cy: 2, r: 3, slot: 4 }))).toContain('data-slot="4"');
+    expect(str(chartFn('path')({ d: 'M0,0', tone: 'ok' }))).toContain('data-tone="ok"');
+  });
+  it('places points in polar coordinates', () => {
+    expect(chartFn('polar')(10, 0)).toEqual([10, 0]);
+    const [x, y] = must(chartFn('polar')(10, Math.PI / 2), isPoint, 'point');
+    expect(Math.abs(x)).toBeLessThan(0.01);
+    expect(y).toBe(10);
+  });
+  it('reads token lengths in pixels', () => {
+    expect(chartFn('toPx')('12px')).toBe(12);
+    expect(chartFn('toPx')('18rem', 16)).toBe(288);
+    expect(chartFn('toPx')(' 2.5px ')).toBe(2.5);
+    expect(chartFn('toPx')('auto', 16, 7)).toBe(7);
+    // No page in the test VM, so px() falls back.
+    expect(chartFn('px')('space-5', 12)).toBe(12);
+  });
   it('picks round ticks', () => {
     expect(chartFn('ticks')(0, 25, 5)).toEqual([0, 5, 10, 15, 20, 25]);
     expect(chartFn('ticks')(0, 1, 4)).toEqual([0, 0.2, 0.4, 0.6, 0.8, 1]);
