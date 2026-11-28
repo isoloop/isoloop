@@ -1,6 +1,6 @@
 # ADR 0019: Versioning and releases
 
-- **Status:** Accepted (2026-11-17), after grilling (Q1–Q12, yes to all). Amended on 2026-11-22 for releases the maintainer approves on npm (*How a version is released* in decision 6, with the version table and decisions 5 and 7 to match); grilled the same day (Q1–Q13, yes to all). Amended on 2026-11-23 for what is supported (decision 5's branch rules and the new decision 9); grilled that day (Q1–Q13, yes to all). Its code follows each amendment's acceptance. The branch release path was built on 2026-11-24 for 0.1.1 (#420, with `release/0.1` cut from `v0.1.0`). Amended on 2026-11-24 for codemods (the new decision 10, #427); grilled that day (yes to all). Its tooling is built in 0.2, before the first breaking change lands on `main`.
+- **Status:** Accepted (2026-11-17), after grilling (Q1–Q12, yes to all). Amended on 2026-11-22 for releases the maintainer approves on npm (*How a version is released* in decision 6, with the version table and decisions 5 and 7 to match); grilled the same day (Q1–Q13, yes to all). Amended on 2026-11-23 for what is supported (decision 5's branch rules and the new decision 9); grilled that day (Q1–Q13, yes to all). Its code follows each amendment's acceptance. The branch release path was built on 2026-11-24 for 0.1.1 (#420, with `release/0.1` cut from `v0.1.0`). Amended on 2026-11-24 for codemods (the new decision 10, #427); grilled that day (yes to all). Its tooling is built in 0.2, before the first breaking change lands on `main`. Amended on 2026-11-28 for standing release branches (decision 5 and the alternatives), from the branch-model grilling that day (Q1–Q6, yes to all), with `isoloop/web` taking the same model.
 - **Date:** 2026-11-17
 - **Builds on:** [ADR 0011](0011-dom-package.md) decision 8 (one Changesets `fixed` group), [ADR 0012](0012-isolates-built-apart.md) (the isolate seam and its `[FLOOR, VERSION]` check), and the release steps of #221 (Changesets pre mode `next`, the version PR, the Prerelease workflow).
 - **Plan:** [M4d](../plans/m4d-release.md), item 2's "semver policy for the protocol version vs package versions".
@@ -75,7 +75,7 @@ Rules: `ver.experimental`, `ver.experimental-marked`, `ver.experimental-exit`
 
 Pre mode applies to the whole repo, so while `main` previews `0.2.0-next.N`, it can't release a `0.1.1`.
 
-- **When a fix for the current release is needed,** cut `release/0.1` from the latest `v0.1.x` tag, backport the fix, and release the next patch from that branch. Its version PR and its release go through the same checks.
+- **When a fix for the current release is needed,** cut `release/0.1` from the latest `v0.1.x` tag, backport the fix, and release the next patch from that branch. Its version PR and its release go through the same checks. *(Amended 2026-11-28: `release/0.N` always exists, from the minor's release on. It's cut at `v0.N.0` when that minor ships (`release/0.1` was cut from `v0.1.0` on 2026-11-24) and collects fixes as they merge on `main`: each is cherry-picked, or redone by hand where the pick doesn't apply, in a PR that links the `main` PR. Several fixes can collect on it; a patch ships only when the maintainer stages it from the branch. Cutting `release/0.N+1` admits it by exact name, as below, and the previous branch is deleted when its minor gives up `latest`.)*
 - **The fix goes to `main` first (amended 2026-11-23).** The backport is its own PR into the branch, a cherry-pick or a fresh fix for the older code, with its own regression test. CI and the steward run on it like on any PR.
 - **Only a small backport is made (amended 2026-11-23).** If the fix doesn't apply as a small, reviewable change, it ships in the next minor, which is brought forward if it's urgent.
 - **Such a branch is admitted when it's cut (amended 2026-11-22).** Until then only `main` can stage (decision 6). Cutting one includes adding it to the `npm` environment by its exact name and giving it a ruleset. A pattern such as `release/*` won't do: version-PR branches have names that match it, and no ruleset protects them.
@@ -189,7 +189,7 @@ Rules: `ver.codemod-rule`, `ver.codemod-gate`, `ver.migrate-command`, `ver.migra
 - **A version can be on npm without its tag** until `finish` runs (amended 2026-11-22).
 - **The isolate seam check stays sound on 0.x** at the cost of one rule: a seam addition waits for a minor.
 - **`@experimental` stays a real promise** without freezing the balancer or WebMCP at 1.0. Users of those APIs must read the changelog at each minor.
-- **A `release/0.x` branch, when there is one, is a second place to apply fixes.** Backports are by hand, and only small ones are made (decision 5).
+- **A `release/0.x` branch, when there is one, is a second place to apply fixes.** Backports are by hand, and only small ones are made (decision 5). *(Amended 2026-11-28: there always is one, the current minor's.)*
 - **Users of an old version get no patch** (amended 2026-11-23). They upgrade to `latest`, and on 0.x that may mean taking a breaking minor.
 - **An urgent fix can wait for an unfinished minor** (amended 2026-11-23), when the fix is too large to backport.
 - **More steps for the maintainer** around the first 0.1.0: `pre exit`, the version PR, the stage, the approvals and `finish`, then `pre enter next` for the next cycle (amended 2026-11-22).
@@ -197,7 +197,7 @@ Rules: `ver.codemod-rule`, `ver.codemod-gate`, `ver.migrate-command`, `ver.migra
 
 ## Alternatives considered
 
-- **A standing `release/0.x` branch for every minor** (amendment of 2026-11-23). Rejected: it costs a ruleset, CI, a Changesets state and hand cherry-picks every week, for a line we've told people to leave.
+- **A standing `release/0.x` branch for every minor** (amendment of 2026-11-23). Rejected: it costs a ruleset, CI, a Changesets state and hand cherry-picks every week, for a line we've told people to leave. *(Taken 2026-11-28, for the current minor only: fixes collect on its branch without a release each time, and `isoloop/web` uses the same branch for the live site. The cherry-picks are the cost; there's still one branch at a time.)*
 - **Support the previous minor for a window** (amendment of 2026-11-23). Rejected for 0.x, where a minor may break anything; revisited at 1.0.
 - **Keep `0.0.0-next.<sha>`,** perhaps with a timestamp. It needs no version PR, but it never leads to a release, and only a timestamp would fix the order, which Changesets doesn't produce.
 - **Publish every merge to `main` as a snapshot** (`0.1.0-next-<date>`). Fewer steps, but changelogs would have no sections, and the web repo would chase builds nobody chose.

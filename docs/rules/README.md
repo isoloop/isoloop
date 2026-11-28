@@ -4312,13 +4312,13 @@ Version numbers, what a release may change, and how a version ships. Prefix `ver
 | `ver.experimental` | An `@experimental` API may change or be removed in any minor, before and after 1.0. |  | active | since `0.1.0` |
 | `ver.experimental-marked` | Each `@experimental` API is marked `@experimental` in its TSDoc, and a change to it is called out in the changelog. |  | active | since `0.1.0` |
 | `ver.experimental-exit` | An API leaves `@experimental` through a decision recorded in its ADR. From then on it follows the minor and patch rules. |  | active, repo | in force since [#229](https://github.com/isoloop/isoloop/issues/229) |
-| `ver.patch-branch` | A patch to the current release during a preview cycle comes from a `release/0.x` branch, cut from the latest `v0.x.y` tag only when a fix is needed. |  | active, repo | in force since [#420](https://github.com/isoloop/isoloop/issues/420) |
-| `ver.fix-main-first` | A fix goes to `main` first. Its backport to the release branch is its own PR, with its own regression test. |  | active, repo | in force since [#396](https://github.com/isoloop/isoloop/issues/396) |
+| `ver.patch-branch` | A patch to the current release comes from its `release/0.N` branch, cut at `v0.N.0` when the minor ships. Fixes collect there as cherry-picks from `main`, and a patch ships when the maintainer stages it. |  | active, repo | in force since [#420](https://github.com/isoloop/isoloop/issues/420) |
+| `ver.fix-main-first` | A fix goes to `main` first. It reaches the release branch as a cherry-pick, or the same fix redone by hand where the pick doesn't apply, in its own PR that links the `main` PR, with its own regression test. |  | active, repo | in force since [#396](https://github.com/isoloop/isoloop/issues/396) |
 | `ver.small-backports` | Only a small, reviewable backport goes to a release branch. A larger fix ships in the next minor, brought forward if it's urgent. |  | active, repo | in force since [#396](https://github.com/isoloop/isoloop/issues/396) |
 | `ver.release-branch-admitted` | A release branch can stage only once it's admitted: added to the `npm` environment by its exact name, with a ruleset of its own. `release.yml` accepts `main` and that branch by exact name. | `main`, `release/0.1` | active, repo | in force since [#420](https://github.com/isoloop/isoloop/issues/420) |
 | `ver.release-branch-lifetime` | One release branch exists at a time. It's deleted when the next minor takes `latest`, keeps its tags, and is never merged back into `main`. |  | active, repo | in force since [#396](https://github.com/isoloop/isoloop/issues/396) |
 | `ver.no-older-line-patch` | No patch is released for an older line. `release.yml` refuses a version that would move `latest` or `next` back. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
-| `ver.no-standing-branches` | There's no standing `release/0.x` branch for every minor. |  | rejected |  |
+| `ver.no-standing-branches` | There's no standing `release/0.x` branch for every minor. |  | superseded |  |
 | `ver.tag-per-version` | Every published version has an annotated tag `v<version>` on the commit it was built from, made by the `finish` run after the publish. Pushing a tag starts nothing. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
 | `ver.no-tag-first` | A release isn't started by pushing its tag. |  | rejected |  |
 | `ver.github-releases` | Each release from 0.1.0 on gets a GitHub Release, made by `finish`; previews get none. Its text is `.github/releases/<version>.md` where that file exists, and the changelog sections otherwise. |  | active, repo | in force since [#373](https://github.com/isoloop/isoloop/issues/373) |
@@ -4489,22 +4489,24 @@ History:
 
 - **Code:** `scripts/release/rules.ts`
 - **Related:** `ver.fix-main-first`, `ver.release-branch-admitted`, `ver.release-branch-lifetime`, `ver.no-standing-branches`
-- **Why:** Pre mode applies to the whole repo, so `main` can't release a patch while it previews the next minor.
+- **Why:** Fixes can collect on the live line without a release each time, and isoloop/web uses the same branch model for the live site.
 
 History:
 
 - 2026-11-17 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · Pre mode applies to the whole repo, so `main` can't release a patch while it previews the next minor.
 - 2026-11-24 · built · [#420](https://github.com/isoloop/isoloop/issues/420) · `release.yml` releases from `release/0.1` as well as `main`, for 0.1.1.
+- 2026-11-28 · amended · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · Fixes can collect on the live line without a release each time, and isoloop/web uses the same branch model for the live site. Before: A patch to the current release during a preview cycle comes from a `release/0.x` branch, cut from the latest `v0.x.y` tag only when a fix is needed.
 
 ### `ver.fix-main-first`
 
 - **Related:** `ver.patch-branch`, `ver.small-backports`
-- **Why:** A fix that skips `main` comes back as a regression in the next minor.
+- **Why:** The release branch always exists now, so the link to the `main` PR is what shows a fix isn't missing from the next minor.
 
 History:
 
 - 2026-11-23 · decided · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · A fix that skips `main` comes back as a regression in the next minor.
 - 2026-11-23 · built · [#396](https://github.com/isoloop/isoloop/issues/396) · In force from the amendment's PR.
+- 2026-11-28 · amended · [ADR 0019 · 5. Patches during a preview cycle](../adr/0019-versioning-and-releases.md#5-patches-during-a-preview-cycle) · The release branch always exists now, so the link to the `main` PR is what shows a fix isn't missing from the next minor. Before: A fix goes to `main` first. Its backport to the release branch is its own PR, with its own regression test.
 
 ### `ver.small-backports`
 
@@ -4550,11 +4552,13 @@ History:
 
 ### `ver.no-standing-branches`
 
+- **Superseded by:** `ver.patch-branch`
 - **Related:** `ver.patch-branch`
 
 History:
 
 - 2026-11-23 · rejected · [ADR 0019 · Alternatives considered](../adr/0019-versioning-and-releases.md#alternatives-considered) · Why not keep a branch per minor? It costs a ruleset, CI, a Changesets state and hand cherry-picks every week, for a line users are told to leave.
+- 2026-11-28 · superseded · [ADR 0019 · Alternatives considered](../adr/0019-versioning-and-releases.md#alternatives-considered) · The current minor's branch now always exists; there's still one at a time.
 
 ### `ver.tag-per-version`
 
