@@ -1,6 +1,6 @@
 # ADR 0026: Rules registry
 
-- **Status:** Accepted 2026-11-27 (proposed the same day), from a grilling with the maintainer (Q1–Q31, yes to all), with a `superseded` event and `Rules:` lines required from ADR 0026 on, added in review. Amended 2026-11-27 (accepted the same day), from the four open points of the infrastructure PR (#483), grilled yes to all: every ADR ref names a heading (decision 6), rules about the repo (decisions 2, 5 and 10), when `rules:ship` is due (decision 13) and what counts as a decision (decision 9).
+- **Status:** Accepted 2026-11-27 (proposed the same day), from a grilling with the maintainer (Q1–Q31, yes to all), with a `superseded` event and `Rules:` lines required from ADR 0026 on, added in review. Amended 2026-11-27 (accepted the same day), from the four open points of the infrastructure PR (#483), grilled yes to all: every ADR ref names a heading (decision 6), rules about the repo (decisions 2, 5 and 10), when `rules:ship` is due (decision 13) and what counts as a decision (decision 9). Amended 2026-11-28 (accepted the same day), from the maintainer's review of the view prototypes: the views and their tabs, an "as of" option, derived links, keywords, a config file and one module per view (decisions 2 and 15). Amended again 2026-11-28 (accepted the same day), from a grilling on the design system (Q1–Q11 and Q15, yes to all): the tool becomes Archeion, a product-neutral tool with its own design system, Isoloop's palette as one theme, token layers, a literal ban, components, layout and type rules, a chart toolkit, a specimen page and its tests (decision 15).
 - **Date:** 2026-11-27
 - **Plan:** none. This is internal tooling for the repo, not a milestone, and it ships nothing to npm.
 - **Touches:** every ADR (each decision gains a `Rules:` line), [ADR 0019](0019-versioning-and-releases.md) (version PRs run `rules:ship`), [ADR 0009](0009-toolchain.md) (scripts run on Node with no new dependency).
@@ -246,6 +246,52 @@ Open point 9 of #483, grilled 2026-11-27, yes. It clarifies decision 9 and the t
 - **A `Rules:` line inside a code fence doesn't count.**
 
 Rules: `tool.rules-lines-sections`
+
+### Amended 2026-11-28: views, links, keywords and config
+
+From the prototypes reviewed on 2026-11-28 (a hive plot, keywords, a keyword map, a timeline with churn, a version slider with a diff, and sources with code and health), approved by the maintainer. A matrix with a chord diagram and a honeycomb were built and not taken. It amends decisions 2 and 15:
+
+- **The page has six tabs,** routed by the URL's hash. This replaces the list in decision 15:
+  - **Board** and **Agenda**, as in decision 15;
+  - **Hive:** a hive plot, one axis per concept and a dot per rule, with links drawn as curves between axes;
+  - **Keywords:** the keyword glossary and the keyword map;
+  - **Timeline:** every event in one lane per concept, with a **Churn** heatmap of `amended`, `clarified` and `corrected` events per concept and day;
+  - **Sources:** where rules come from (ADRs into concepts), where they live in the code (a treemap of `code` paths) and a **Health** list of where the registry is weak.
+- **An "as of" option on Board, Agenda and Hive** rebuilds each rule as it stood on a chosen date or release, and a diff lists what changed between two points. It has known limits, accepted for now: events have a date and no time, so a point includes its whole day; earlier wording comes from `prev`, which is free text; and only the statement and the status have a history.
+- **Links are derived when the page is built,** in four kinds: `related` and `supersededBy`; two rules citing the same ADR section; a shared symbol; a shared `code` path. A key shared by more than 12 rules makes no links, and the page lists it instead. A link from a key shared by n rules weighs 1/(n−1), so a narrow key counts more than a broad one.
+- **Keywords are a fixed vocabulary** in `docs/rules/keywords.json`: an id, a label, a one-line definition and aliases. A rule may name keywords in a new optional `keywords` field, and `rules:check` fails on an unknown one. The first vocabulary is the 42 keywords of the reviewed prototype. The maintainer reviews the keywords on each concept's rules, one concept per PR, like the backfill.
+- **Symbols are derived,** from backticked names in statements, knobs and errors. They feed search and the shared-symbol links, and are never written by hand.
+- **One config file** holds what's particular to a repo: the title, the rules and ADR folders, the ADR number from which `Rules:` lines are required, the GitHub owner and repo for links, and where the page is written. The scripts hold nothing about Isoloop, so the tooling can move to another repo unchanged.
+- **Each view is its own module** next to a small shell that holds the tabs, the shared filters, the theme and the rule drawer. `rules:board` still writes one self-contained page.
+
+The board's existing rules change in the PRs that build each part, so each one says what holds once it's built.
+
+Rules: `tool.rules-tabs`, `tool.rules-hive`, `tool.rules-keywords-tab`, `tool.rules-timeline`, `tool.rules-sources`, `tool.rules-as-of`, `tool.rules-as-of-limits`, `tool.rules-links`, `tool.rules-link-cap`, `tool.rules-link-weight`, `tool.rules-keywords-file`, `tool.rules-keyword-review`, `tool.rules-symbols`, `tool.rules-config`, `tool.rules-view-modules`
+
+### Amended 2026-11-28: design system
+
+Grilled with the maintainer on 2026-11-28 (Q1–Q11 and Q15, yes to all) before any view is built. It amends decision 15 and the previous amendment:
+
+- **The tool is a separate product, Archeion, with its own design system.** The rules registry is Isoloop's use of it. Archeion is product-neutral: nothing in its code, tokens or components is about Isoloop. Isoloop uses it only as dev tooling, its published packages never depend on it, and it moves to a repo of its own later.
+- **Isoloop's palette is one theme,** chosen in `rules.config.json`. A theme sets only the semantic tokens and may bring a webfont.
+- **Tokens come in three layers:** primitives (raw values: colours, space, radius, type), semantic tokens (what a value is for: background, text, accent, status) and component tokens (what one component uses). Components read only semantic and component tokens. There are 8 categorical chart slots.
+- **Literals are banned outside the token files.** `rules:check` fails on a colour, a font size, a font family or a spacing value written in a component or a view, except in the files on one allowlist.
+- **Components are plain functions** that return HTML through an `html` tagged template. It escapes every value, and `raw()` marks HTML that's already safe. There's no framework.
+- **Layout uses four primitives,** Stack, Cluster, Grid and Split, spaced with `gap`. A component never sets its own outer margin.
+- **Type has a 5-step scale** (xs, s, m, l, xl), with tabular numbers wherever digits line up. Data views stay at the m step or below. The default font is the system stack, and a theme may swap in a webfont.
+- **Charts share one toolkit:** scales, axes, a legend, a tooltip and SVG helpers. A chart with more than 8 categories groups the rest.
+- **CSS uses `@layer`** (reset, tokens, base, layout, components, views). Each class is prefixed with its owner, a component or a view. There are no utility classes.
+- **The prefix comes from Archeion's name:** `--ar-` for tokens and `.ar-` for classes, used the same way everywhere so a rename stays one mechanical pass.
+- **A specimen page,** written by `rules:board --specimen`, shows every token, type step, layout primitive, component and chart part.
+- **Tests:**
+  - contrast at WCAG AA for every text and background pair, in both themes;
+  - the literal ban;
+  - unit tests for each component;
+  - a headless smoke test of every view and the specimen at 2 widths in both themes, checking for console errors and sideways scroll.
+
+  There are no pixel snapshots.
+
+Rules: `tool.rules-product-neutral`, `tool.rules-own-repo`, `tool.rules-theme`, `tool.rules-tokens`, `tool.rules-chart-slots`, `tool.rules-literal-ban`, `tool.rules-components`, `tool.rules-layout-primitives`, `tool.rules-type-scale`, `tool.rules-chart-toolkit`, `tool.rules-css-layers`, `tool.rules-css-prefix`, `tool.rules-specimen`, `tool.rules-ds-tests`
 
 ## Consequences
 

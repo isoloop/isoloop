@@ -1670,5 +1670,450 @@
         "why": "`@isoloop/dom`, the render bridge `isoloop-dom@1`."
       }
     ]
+  },
+  {
+    "id": "tool.rules-tabs",
+    "statement": "The rules page has six tabs, routed by the URL's hash: Board, Agenda, Hive, Keywords, Timeline and Sources.",
+    "status": "decided",
+    "repo": true,
+    "values": ["6 tabs"],
+    "related": ["tool.rules-board", "tool.rules-view-modules"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "The prototypes showed each question needs its own view: what holds, what changed, what connects, which ideas cut across, when, and where from."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-hive",
+    "statement": "The Hive tab draws one axis per concept and a dot per rule, ordered by first event date and coloured by status, with links as curves between axes.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-links", "tool.rules-tabs"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "It shows which concepts connect, and exploring one rule's links by hover reads well."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-keywords-tab",
+    "statement": "The Keywords tab holds the keyword glossary, each keyword with its definition and its rules by concept, and the keyword map, which joins keywords that tag the same rules.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-keywords-file", "tool.rules-tabs"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "Keywords group ideas that cut across concepts, and the map shows how those ideas cluster."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-timeline",
+    "statement": "The Timeline tab shows every event in one lane per concept, by date, with release tags as lines, and a Churn heatmap counts `amended`, `clarified` and `corrected` events per concept and day.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-tabs"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "It shows when decisions were made and where they keep changing."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-sources",
+    "statement": "The Sources tab shows which ADRs feed which concepts, a treemap of the `code` paths rules cite, and a Health list of where the registry is weak.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-tabs"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "It shows where facts come from, where they live in the code, and what the registry is missing."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-as-of",
+    "statement": "Board, Agenda and Hive have an \"as of\" option that rebuilds each rule as it stood on a chosen date or release, and a diff that lists what changed between two points.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-as-of-limits"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "Seeing what held at a release, and what changed since, answers what a release changed in facts rather than commits."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-as-of-limits",
+    "statement": "\"As of\" places a whole day at once, since events have no time; earlier wording comes from `prev`, which is free text; only the statement and the status have a history.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-as-of"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "Accepted for now: storing times and every field's earlier value is left for later."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-links",
+    "statement": "Links between rules are derived when the page is built, in four kinds: `related` and `supersededBy`, the same ADR section, a shared symbol, and a shared `code` path.",
+    "status": "decided",
+    "repo": true,
+    "values": ["4 kinds"],
+    "related": ["tool.rules-link-cap", "tool.rules-link-weight", "tool.rules-symbols"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "Written `related` links never cross concepts, so the links between concepts come from what rules already share."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-link-cap",
+    "statement": "A key shared by more than 12 rules makes no links; the page lists it instead.",
+    "status": "decided",
+    "repo": true,
+    "values": ["12 rules"],
+    "related": ["tool.rules-links"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "Without a cap, a file such as the kernel's links almost every rule to every other."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-link-weight",
+    "statement": "A link from a key shared by n rules weighs 1/(n−1), so a narrow key counts more than a broad one.",
+    "status": "decided",
+    "repo": true,
+    "values": ["1/(n−1)"],
+    "related": ["tool.rules-links"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "Broad keys still connect rules, but a pair that shares a rare key is the stronger tie."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-keywords-file",
+    "statement": "Keywords are a fixed vocabulary in `docs/rules/keywords.json`, each with an id, a label, a one-line definition and aliases. A rule names its keywords in an optional `keywords` field, and `rules:check` fails on an unknown one.",
+    "status": "decided",
+    "repo": true,
+    "values": ["42 keywords to start"],
+    "related": ["tool.rules-keyword-review", "tool.rule-fields"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "Free tags drift; a vocabulary with definitions doubles as a glossary."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-keyword-review",
+    "statement": "The maintainer reviews the keywords on each concept's rules, one concept per PR.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-keywords-file", "tool.rules-backfill"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "Keywords tagged in bulk by a script over-matched common words; narrow keywords need judgement to place."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-symbols",
+    "statement": "Symbols are derived from backticked names in statements, knobs and errors, feed search and the shared-symbol links, and are never written by hand.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-links"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "With hundreds of names, symbols work as search, not as filters."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-config",
+    "statement": "One config file holds what's particular to a repo: the title, the rules and ADR folders, the ADR number from which `Rules:` lines are required, the GitHub owner and repo for links, and where the page is written.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-view-modules"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "The scripts hold nothing about Isoloop, so the tooling can move to another repo unchanged."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-view-modules",
+    "statement": "Each tab is its own module next to a small shell that holds the tabs, the shared filters, the theme and the rule drawer, and `rules:board` inlines them into one self-contained page.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-tabs", "tool.rules-board"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
+        "why": "Views are built and changed one at a time without touching the others."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-product-neutral",
+    "statement": "The rules registry runs on Archeion, a product-neutral tool with its own design system; nothing in Archeion's code, tokens or components is about Isoloop, and Isoloop uses it only as dev tooling.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-own-repo", "tool.rules-theme", "tool.rules-config"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "It's meant to work for any repo's ADRs, so Isoloop is one user of it, not its subject."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-own-repo",
+    "statement": "Archeion moves to a repo of its own later, and Isoloop's published packages never depend on it.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-product-neutral"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "It's dev tooling for the repo; nothing a user installs should pull it in."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-theme",
+    "statement": "Isoloop's palette is one theme, chosen in `rules.config.json`; a theme sets only the semantic tokens and may bring a webfont.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-tokens", "tool.rules-config"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Keeping the product's own look separate from Isoloop's lets another repo pick its own theme."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-tokens",
+    "statement": "Design tokens come in three layers: primitives, semantic tokens and component tokens. Components read only semantic and component tokens, and themes change only the semantic layer.",
+    "status": "decided",
+    "repo": true,
+    "values": ["3 layers"],
+    "related": ["tool.rules-theme", "tool.rules-literal-ban"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "One place per kind of decision: raw values, what a value is for, and what one component uses."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-chart-slots",
+    "statement": "Charts have 8 categorical colour slots, and a chart with more than 8 categories groups the rest.",
+    "status": "decided",
+    "repo": true,
+    "values": ["8 slots"],
+    "related": ["tool.rules-chart-toolkit"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "More than 8 colours can't be told apart reliably."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-literal-ban",
+    "statement": "`rules:check` fails on a colour, a font size, a font family or a spacing value written in a component or a view, outside the files on one allowlist.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-tokens", "tool.rules-ds-tests"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Literals in components are how a design system drifts."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-components",
+    "statement": "Components are plain functions that return HTML through an `html` tagged template, which escapes every value; `raw()` marks HTML that's already safe. There's no framework.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-layout-primitives"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Escaping by default closes the injection holes string building leaves, with no dependency."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-layout-primitives",
+    "statement": "Layout uses four primitives, Stack, Cluster, Grid and Split, spaced with `gap`; a component never sets its own outer margin.",
+    "status": "decided",
+    "repo": true,
+    "values": ["4 primitives"],
+    "related": ["tool.rules-components"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Spacing belongs to the parent, so components fit anywhere without margin fights."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-type-scale",
+    "statement": "Type has a 5-step scale (xs, s, m, l, xl) with tabular numbers where digits line up; data views stay at the m step or below. The default font is the system stack, and a theme may swap in a webfont.",
+    "status": "decided",
+    "repo": true,
+    "values": ["5 steps"],
+    "related": ["tool.rules-theme"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Dense data reads better small and aligned, and a system font needs no download."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-chart-toolkit",
+    "statement": "Charts share one toolkit: scales, axes, a legend, a tooltip and SVG helpers.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-chart-slots"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Each view drawing its own axes would look and behave differently."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-css-layers",
+    "statement": "CSS uses `@layer` (reset, tokens, base, layout, components, views), each class is prefixed with its owner, a component or a view, and there are no utility classes.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-css-prefix"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Layers settle precedence without specificity fights, and owner prefixes show where a style comes from."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-css-prefix",
+    "statement": "Tokens use the prefix `--ar-` and classes `.ar-`, from Archeion's name, used the same way everywhere so a rename stays one mechanical pass.",
+    "status": "decided",
+    "repo": true,
+    "values": ["--ar-", "ar-"],
+    "related": ["tool.rules-css-layers"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "Owner-prefixed names show at a glance which styles are the product's."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-specimen",
+    "statement": "`rules:board --specimen` writes a page with every token, type step, layout primitive, component and chart part.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-ds-tests"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "One page to review the design system without opening every view."
+      }
+    ]
+  },
+  {
+    "id": "tool.rules-ds-tests",
+    "statement": "The design system is tested for WCAG AA contrast in both themes, for the literal ban, with unit tests per component, and with a headless smoke test of every view and the specimen at 2 widths in both themes; there are no pixel snapshots.",
+    "status": "decided",
+    "repo": true,
+    "related": ["tool.rules-literal-ban", "tool.rules-specimen"],
+    "events": [
+      {
+        "type": "decided",
+        "date": "2026-11-28",
+        "ref": "adr/0026#amended-2026-11-28-design-system",
+        "why": "These catch what breaks in practice (unreadable colours, drift, broken markup, overflow, errors) without snapshots that fail on every intended change."
+      }
+    ]
   }
 ]
