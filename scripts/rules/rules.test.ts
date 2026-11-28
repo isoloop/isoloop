@@ -7,7 +7,11 @@ import {
   codePaths,
   deriveLinks,
   healthChecks,
+  keywordEdges,
+  keywordGraph,
+  keywordNeighbours,
   keywordRules,
+  layoutKeywords,
   sectionsOf,
   sourceFlows,
   sourceOf,
@@ -929,6 +933,57 @@ describe('the derived model', () => {
     expect(
       buildModel(rs, vocab, { cap: 12, symbolsIgnore: [] }).keywordRules['crash-loop'],
     ).toEqual(['sup.a', 'sup.b']);
+  });
+
+  it("ties keywords by shared rules, weighted by √(n_a × n_b), keeping each one's strongest", () => {
+    const edges = keywordEdges({ a: ['r1', 'r2'], b: ['r1', 'r2', 'r3', 'r4'], c: ['r9'], d: [] });
+    expect(edges).toEqual([{ a: 'a', b: 'b', shared: 2, weight: 2 / Math.sqrt(8) }]);
+    const many = Object.fromEntries(
+      ['k1', 'k2', 'k3', 'k4', 'k5', 'k6'].map((k) => [k, ['shared', k]]),
+    );
+    const capped = keywordEdges(many, 2);
+    for (const k of Object.keys(many))
+      expect(capped.filter((e) => e.a === k || e.b === k).length).toBeGreaterThanOrEqual(1);
+    expect(capped.length).toBeLessThan(15);
+  });
+
+  it('places keywords the same way every time, inside the plane, skipping unused ones', () => {
+    const counts = { a: 5, b: 2, c: 1, unused: 0 };
+    const edges = keywordEdges({ a: ['r1', 'r2'], b: ['r1', 'r2'], c: ['r3'] });
+    const labels = { a: 'A', b: 'B', c: 'C' };
+    const one = layoutKeywords(counts, edges, labels);
+    expect(one).toEqual(layoutKeywords(counts, edges, labels));
+    expect(one.map((n) => n.id)).toEqual(['a', 'b', 'c']);
+    for (const n of one) {
+      expect(n.x).toBeGreaterThanOrEqual(0);
+      expect(n.x).toBeLessThanOrEqual(1000);
+      expect(n.y).toBeGreaterThanOrEqual(0);
+      expect(n.y).toBeLessThanOrEqual(600);
+    }
+    expect(one.find((n) => n.id === 'a')!.r).toBeGreaterThan(one.find((n) => n.id === 'c')!.r);
+    expect(layoutKeywords({}, [], {})).toEqual([]);
+    expect(keywordGraph({}, []).nodes).toEqual([]);
+  });
+
+  it('finds rules in other concepts sharing keywords, rare keywords first', () => {
+    const rs = [
+      rule('sup.a', { keywords: ['rare', 'common'] }),
+      rule('sup.b', { keywords: ['rare', 'common'] }),
+      rule('bus.c', { keywords: ['common'] }),
+      rule('dur.d', { keywords: ['rare'] }),
+      rule('bus.e', { keywords: ['common'] }),
+      rule('bus.f', { keywords: ['common'] }),
+      rule('iso.g'),
+    ];
+    const by = keywordRules(rs, [
+      { id: 'rare', label: 'Rare', definition: 'x', aliases: [] },
+      { id: 'common', label: 'Common', definition: 'x', aliases: [] },
+    ]);
+    const near = keywordNeighbours(rs, by, 2);
+    expect(near['sup.a']!.map((n) => n.id)).toEqual(['dur.d', 'bus.c']);
+    expect(near['sup.a']![0]).toMatchObject({ keywords: ['rare'] });
+    expect(near['sup.a']!.some((n) => n.id === 'sup.b')).toBe(false);
+    expect(near['iso.g']).toBeUndefined();
   });
 });
 

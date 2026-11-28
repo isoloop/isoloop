@@ -30,6 +30,42 @@ export interface Model {
   tooCommon: CommonKey[];
   /** Each keyword's rule ids, in registry order. */
   keywordRules: Record<string, string[]>;
+  /** The keyword map: keywords placed on a plane, joined where they tag the same rules. */
+  keywordGraph: KeywordGraph;
+  /** For each rule with keywords, the rules in other concepts that share the most telling ones. */
+  keywordNeighbours: Record<string, KeywordNeighbour[]>;
+}
+
+/** A keyword on the map: its rule count, its place and its radius, in the graph's own units. */
+export interface KeywordNode {
+  id: string;
+  n: number;
+  x: number;
+  y: number;
+  r: number;
+}
+
+/** Two keywords that tag `shared` rules; `weight` is shared / √(n_a × n_b), from 0 to 1. */
+export interface KeywordEdge {
+  a: string;
+  b: string;
+  shared: number;
+  weight: number;
+}
+
+export interface KeywordGraph {
+  /** The plane's size; a view scales it to fit. */
+  width: number;
+  height: number;
+  nodes: KeywordNode[];
+  edges: KeywordEdge[];
+}
+
+/** A rule elsewhere that shares keywords with this one, ranked by how rare the shared keywords are. */
+export interface KeywordNeighbour {
+  id: string;
+  keywords: string[];
+  score: number;
 }
 
 const BACKTICKS = /`([^`]+)`/g;
@@ -288,6 +324,185 @@ export function healthChecks(
   ];
 }
 
+/** The concept part of an id: rules in one concept share it. */
+const prefixOf = (id: string) => id.slice(0, id.indexOf('.'));
+
+/**
+ * Edges between keywords that tag the same rules. Each keyword keeps its
+ * `perNode` strongest edges (by weight, then shared count, then id), so a
+ * keyword used everywhere can't tie itself to every other one.
+ */
+export function keywordEdges(
+  byKeyword: Record<string, readonly string[]>,
+  perNode = 4,
+): KeywordEdge[] {
+  const ids = Object.keys(byKeyword).filter((k) => byKeyword[k]!.length > 0);
+  const sets = new Map(ids.map((k) => [k, new Set(byKeyword[k])]));
+  const all: KeywordEdge[] = [];
+  for (let i = 0; i < ids.length; i++)
+    for (let j = i + 1; j < ids.length; j++) {
+      const a = sets.get(ids[i]!)!;
+      const b = sets.get(ids[j]!)!;
+      let shared = 0;
+      for (const r of a) if (b.has(r)) shared++;
+      if (shared === 0) continue;
+      const [x, y] = ids[i]! < ids[j]! ? [ids[i]!, ids[j]!] : [ids[j]!, ids[i]!];
+      all.push({ a: x, b: y, shared, weight: shared / Math.sqrt(a.size * b.size) });
+    }
+  const rank = (p: KeywordEdge, q: KeywordEdge) =>
+    q.weight - p.weight || q.shared - p.shared || (p.a + p.b).localeCompare(q.a + q.b);
+  const keep = new Set<KeywordEdge>();
+  for (const k of ids) {
+    const mine = all.filter((e) => e.a === k || e.b === k);
+    mine.sort(rank);
+    for (const e of mine.slice(0, perNode)) keep.add(e);
+  }
+  const out = [...keep];
+  out.sort(rank);
+  return out;
+}
+
+/** One decimal place, so the page data stays small and stable. */
+const round1 = (v: number) => Math.round(v * 10) / 10;
+
+/** How wide a label is, roughly, in the graph's units: enough to keep labels apart. */
+const labelWidth = (label: string) => label.length * 7 + 8;
+
+/**
+ * Places keywords on a plane with a fixed number of steps from fixed starting
+ * points, so the same registry always gives the same map. Keywords that share
+ * rules pull together, every pair pushes apart, and a node keeps room for its
+ * label. No randomness and no library.
+ */
+export function layoutKeywords(
+  counts: Record<string, number>,
+  edges: readonly KeywordEdge[],
+  labels: Record<string, string>,
+  size: { width: number; height: number } = { width: 1000, height: 600 },
+): KeywordNode[] {
+  const ids = Object.keys(counts).filter((k) => counts[k]! > 0);
+  ids.sort();
+  if (ids.length === 0) return [];
+  const { width: W, height: H } = size;
+  const max = Math.max(...ids.map((k) => counts[k]!));
+  const radius = (k: string) => 6 + 14 * Math.sqrt(counts[k]! / max);
+  const room = (k: string) => Math.max(radius(k), labelWidth(labels[k] ?? k) / 2) + 6;
+  const pos = new Map<string, { x: number; y: number }>();
+  ids.forEach((k, i) => {
+    const a = (2 * Math.PI * i) / ids.length;
+    pos.set(k, { x: W / 2 + (W / 3) * Math.cos(a), y: H / 2 + (H / 3) * Math.sin(a) });
+  });
+  const ideal = Math.sqrt((W * H) / ids.length) * 0.6;
+  let heat = W / 8;
+  for (let step = 0; step < 400; step++) {
+    const move = new Map(ids.map((k) => [k, { x: 0, y: 0 }]));
+    for (let i = 0; i < ids.length; i++)
+      for (let j = i + 1; j < ids.length; j++) {
+        const p = pos.get(ids[i]!)!;
+        const q = pos.get(ids[j]!)!;
+        let dx = p.x - q.x;
+        let dy = p.y - q.y;
+        let d = Math.hypot(dx, dy);
+        if (d < 0.01) {
+          dx = 0.01 * (i - j);
+          dy = 0.01;
+          d = Math.hypot(dx, dy);
+        }
+        const min = room(ids[i]!) + room(ids[j]!);
+        const push = (ideal * ideal) / d + (d < min ? (min - d) * 4 : 0);
+        const fx = (dx / d) * push;
+        const fy = (dy / d) * push;
+        move.get(ids[i]!)!.x += fx;
+        move.get(ids[i]!)!.y += fy;
+        move.get(ids[j]!)!.x -= fx;
+        move.get(ids[j]!)!.y -= fy;
+      }
+    for (const e of edges) {
+      const p = pos.get(e.a);
+      const q = pos.get(e.b);
+      if (!p || !q) continue;
+      const dx = p.x - q.x;
+      const dy = p.y - q.y;
+      const d = Math.max(0.01, Math.hypot(dx, dy));
+      const pull = ((d * d) / ideal) * (0.3 + e.weight);
+      move.get(e.a)!.x -= (dx / d) * pull;
+      move.get(e.a)!.y -= (dy / d) * pull;
+      move.get(e.b)!.x += (dx / d) * pull;
+      move.get(e.b)!.y += (dy / d) * pull;
+    }
+    for (const k of ids) {
+      const p = pos.get(k)!;
+      const m = move.get(k)!;
+      m.x += (W / 2 - p.x) * 0.05 * (ideal / 10);
+      m.y += (H / 2 - p.y) * 0.05 * (ideal / 10);
+      const len = Math.max(0.01, Math.hypot(m.x, m.y));
+      p.x += (m.x / len) * Math.min(len, heat);
+      p.y += (m.y / len) * Math.min(len, heat);
+    }
+    heat = Math.max(1, heat * 0.985);
+  }
+  // Fit the result into the plane, keeping room for the outermost labels.
+  const xs = ids.map((k) => pos.get(k)!.x);
+  const ys = ids.map((k) => pos.get(k)!.y);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const padX = 70;
+  const padY = 40;
+  const sx = (W - 2 * padX) / Math.max(1, x1 - x0);
+  const sy = (H - 2 * padY) / Math.max(1, y1 - y0);
+  return ids.map((k) => ({
+    id: k,
+    n: counts[k]!,
+    x: round1(padX + (pos.get(k)!.x - x0) * sx),
+    y: round1(padY + (pos.get(k)!.y - y0) * sy),
+    r: round1(radius(k)),
+  }));
+}
+
+/** The keyword map: the strongest edges and the placed nodes. */
+export function keywordGraph(
+  byKeyword: Record<string, readonly string[]>,
+  vocab: readonly Keyword[],
+): KeywordGraph {
+  const size = { width: 1000, height: 600 };
+  const edges = keywordEdges(byKeyword);
+  const counts = Object.fromEntries(Object.entries(byKeyword).map(([k, rs]) => [k, rs.length]));
+  const labels = Object.fromEntries(vocab.map((k) => [k.id, k.label]));
+  return { ...size, nodes: layoutKeywords(counts, edges, labels, size), edges };
+}
+
+/**
+ * For each rule, up to `limit` rules in other concepts that share its keywords.
+ * A shared keyword counts 1/log2(1 + n) for a keyword on n rules, so rare
+ * keywords say more than common ones.
+ */
+export function keywordNeighbours(
+  rules: readonly Rule[],
+  byKeyword: Record<string, readonly string[]>,
+  limit = 8,
+): Record<string, KeywordNeighbour[]> {
+  const out: Record<string, KeywordNeighbour[]> = {};
+  for (const r of rules) {
+    if (!r.keywords?.length) continue;
+    const found = new Map<string, KeywordNeighbour>();
+    for (const k of r.keywords) {
+      const others = byKeyword[k] ?? [];
+      const w = 1 / Math.log2(1 + others.length);
+      for (const id of others) {
+        if (id === r.id || prefixOf(id) === prefixOf(r.id)) continue;
+        const n = found.get(id) ?? { id, keywords: [], score: 0 };
+        n.keywords.push(k);
+        n.score += w;
+        found.set(id, n);
+      }
+    }
+    for (const n of found.values()) n.score = Math.round(n.score * 1000) / 1000;
+    const list = [...found.values()];
+    list.sort((p, q) => q.score - p.score || p.id.localeCompare(q.id));
+    if (list.length) out[r.id] = list.slice(0, limit);
+  }
+  return out;
+}
+
 /** Everything the views read beyond the registry itself. */
 export function buildModel(
   rules: readonly Rule[],
@@ -298,7 +513,15 @@ export function buildModel(
   const symbols: Record<string, string[]> = {};
   for (const r of rules) symbols[r.id] = symbolsOf(r, ignore);
   const { links, tooCommon } = deriveLinks(rules, { cap: opts.cap, symbols });
-  return { symbols, links, tooCommon, keywordRules: keywordRules(rules, vocab) };
+  const byKeyword = keywordRules(rules, vocab);
+  return {
+    symbols,
+    links,
+    tooCommon,
+    keywordRules: byKeyword,
+    keywordGraph: keywordGraph(byKeyword, vocab),
+    keywordNeighbours: keywordNeighbours(rules, byKeyword),
+  };
 }
 
 /** What the Sources tab reads: flows from ADRs into concepts, cited code paths, and the health checks. */

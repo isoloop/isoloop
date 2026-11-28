@@ -122,4 +122,19 @@
     padding: var(--ar-space-1) var(--ar-space-4);
     cursor: pointer;
   }
+  /* The keyword filters: a fold of chips, and the filters in force. */
+  .ar-shell-kw {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ar-space-4);
+  }
+  .ar-shell-kw-summary {
+    cursor: pointer;
+    font-size: var(--ar-text-s);
+    color: var(--ar-muted);
+    width: max-content;
+  }
+  .ar-shell-kw[open] > .ar-shell-kw-summary {
+    margin-bottom: var(--ar-space-4);
+  }
 }
