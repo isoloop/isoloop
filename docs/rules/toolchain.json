@@ -1753,7 +1753,7 @@
   {
     "id": "tool.rules-timeline",
     "statement": "The Timeline tab shows every event in one lane per concept, by date, with release tags as lines, and a Churn heatmap counts `amended`, `clarified` and `corrected` events per concept and day.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "related": ["tool.rules-tabs"],
     "events": [
@@ -1762,8 +1762,15 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "It shows when decisions were made and where they keep changing."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#512",
+        "why": "The Timeline tab, with Churn, built on the design system."
       }
-    ]
+    ],
+    "code": ["scripts/rules/board/views/timeline.js", "scripts/rules/board/ds/events.js"]
   },
   {
     "id": "tool.rules-sources",
