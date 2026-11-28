@@ -1,4 +1,5 @@
 // The Agenda tab: every event, newest first, by day or by release (ADR 0026, decision 15).
+// It follows "as of": at a past point, only the events up to that day.
 (() => {
   let group = null;
   // Releases, from the shipped events: an event belongs to the first release dated on or after it.
@@ -19,6 +20,7 @@
     id: 'agenda',
     label: 'Agenda',
     order: 20,
+    asOf: true,
     controls(ctx) {
       return AR.Tabs({
         items: [
@@ -43,7 +45,7 @@
       const { html, md } = AR;
       const { rules, cName, refLabel, matches, eventLabel } = ctx;
       const g = groupOf(ctx);
-      const RELEASES = releasesOf(rules);
+      const RELEASES = releasesOf(ctx.allRules);
       const releaseOf = (e) => {
         if (e.type === 'shipped') return e.ref;
         const rel = RELEASES.find((x) => x.date >= e.date);
