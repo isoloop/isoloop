@@ -95,12 +95,17 @@
   /** Dot: a small marker in a tone. */
   const Dot = ({ tone }) => html`<span class="ar-dot" ${attrs({ 'data-tone': tone })}></span>`;
 
-  /** Chip: a toggle. { label, pressed, count, tone (for a dot), icon (SafeHtml, in place of the dot), attrs }. */
-  const Chip = ({ label, pressed = false, count, tone, icon, attrs: a }) =>
+  /**
+   * Chip: a toggle. { label, pressed, count, tone (for a dot), slot (for a chart
+   * swatch), icon (SafeHtml, in place of the dot or swatch), attrs }.
+   */
+  const Chip = ({ label, pressed = false, count, tone, slot, icon, attrs: a }) =>
     html`<button class="ar-chip" ${attrs({ 'aria-pressed': String(pressed), ...a })}>
-      ${icon || (tone ? Dot({ tone }) : '')}${label}${
-        count === undefined ? '' : html`<span class="ar-chip-count">${count}</span>`
-      }
+      ${icon || (tone ? Dot({ tone }) : '')}${
+        icon || slot === undefined
+          ? ''
+          : html`<span class="ar-legend-swatch" ${attrs({ 'data-slot': slot })}></span>`
+      }${label}${count === undefined ? '' : html`<span class="ar-chip-count">${count}</span>`}
     </button>`;
 
   /**
@@ -184,13 +189,17 @@
     </div>`;
   }
 
-  /** Legend: { items: [{ label, slot: 1-8 | 'other', value }], label }. */
+  /** Legend: { items: [{ label, slot: 1-8 | 'other', or tone: ok|info|…, value }], label }. */
   const Legend = ({ items, label }) =>
     html`<ul class="ar-legend" ${attrs({ 'aria-label': label })}>
       ${items.map(
         (it) =>
           html`<li class="ar-legend-item">
-            <span class="ar-legend-swatch" ${attrs({ 'data-slot': it.slot })}></span>${it.label}${
+            <span
+              class="ar-legend-swatch"
+              ${attrs({ 'data-slot': it.tone ? null : it.slot, 'data-tone': it.tone })}
+            ></span
+            >${it.label}${
               it.value === undefined ? '' : html` <span class="ar-legend-value">${it.value}</span>`
             }
           </li>`,
