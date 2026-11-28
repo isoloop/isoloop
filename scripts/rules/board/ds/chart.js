@@ -91,13 +91,14 @@
       height="${n(Math.max(0, height))}"
       ${attrs({ 'data-slot': slot, ...a })}
     ></rect>`;
-  const circle = ({ cx, cy, r, slot, tone, cls = 'ar-chart-mark', attrs: a }) =>
+  /** A dot; `changed` rings it in the design system's "changed since" mark. */
+  const circle = ({ cx, cy, r, slot, tone, changed = false, cls = 'ar-chart-mark', attrs: a }) =>
     html`<circle
       class="${cls}"
       cx="${n(cx)}"
       cy="${n(cy)}"
       r="${n(r)}"
-      ${attrs({ 'data-slot': slot, 'data-tone': tone, ...a })}
+      ${attrs({ 'data-slot': slot, 'data-tone': tone, 'data-changed': changed, ...a })}
     ></circle>`;
   const text = ({ x, y, value, anchor = 'start', cls = 'ar-chart-label', attrs: a }) =>
     html`<text class="${cls}" x="${n(x)}" y="${n(y)}" text-anchor="${anchor}" ${attrs(a)}

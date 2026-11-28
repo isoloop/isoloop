@@ -183,7 +183,7 @@ Rules.view({
         body: html`<g transform="translate(100 100)">
           ${TONES.map((tone, i) => {
             const [cx, cy] = AR.chart.polar(70, -Math.PI / 2 + (2 * Math.PI * i) / TONES.length);
-            return AR.chart.circle({ cx, cy, r: 8, tone });
+            return AR.chart.circle({ cx, cy, r: 8, tone, changed: i === 0 });
           })}
         </g>`,
       }),
@@ -386,6 +386,52 @@ Rules.view({
             children: [
               AR.Field({ id: 'specimen-field', label: 'A field', placeholder: 'Type…' }),
               AR.Chip({ label: 'A chip' }),
+            ],
+          }),
+        ),
+        section(
+          'Select and stepper',
+          AR.Stack({
+            gap: '5',
+            children: [
+              AR.Select({
+                id: 'specimen-select',
+                label: 'A select',
+                options: [
+                  { id: 'a', label: 'v0.1.0 · 23 Nov' },
+                  { id: 'b', label: 'Today · 28 Nov' },
+                ],
+                selected: 'b',
+              }),
+              AR.Stepper({
+                id: 'specimen-stepper',
+                label: 'A stepper',
+                items: [
+                  { id: 'a', label: '3 Nov' },
+                  { id: 'b', label: 'v0.1.0 · 23 Nov' },
+                  { id: 'c', label: 'Today · 28 Nov' },
+                ],
+                selected: 'b',
+              }),
+            ],
+          }),
+        ),
+        section(
+          'Badge and before/after',
+          AR.Stack({
+            gap: '5',
+            children: [
+              AR.Cluster({
+                gap: '5',
+                children: [
+                  AR.Badge({ text: 'changed since' }),
+                  ...TONES.map((tone) => AR.Badge({ text: tone, tone })),
+                ],
+              }),
+              AR.BeforeAfter({
+                before: 'Restarts 3 times in 60 s.',
+                after: 'Restarts 3 times, then fails.',
+              }),
             ],
           }),
         ),

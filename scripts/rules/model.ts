@@ -1,7 +1,7 @@
 // What the rules page derives from the registry when it's built (ADR 0026,
 // amended 2026-11-28): symbols, links between rules, and each keyword's rules.
 // The views read the result; nothing here is written back to the registry.
-import { parseRef, type Keyword, type Rule } from './registry.ts';
+import { type EventType, parseRef, type Keyword, type Rule, type Status } from './registry.ts';
 
 export type LinkKind = 'related' | 'section' | 'symbol' | 'code';
 
@@ -30,6 +30,10 @@ export interface Model {
   tooCommon: CommonKey[];
   /** Each keyword's rule ids, in registry order. */
   keywordRules: Record<string, string[]>;
+  /** Each rule's states over time, oldest first, by rule id ("as of", amended 2026-11-28). */
+  history: Record<string, Snapshot[]>;
+  /** The points "as of" can show, oldest first; the last one is today. */
+  points: Point[];
   /** The keyword map: keywords placed on a plane, joined where they tag the same rules. */
   keywordGraph: KeywordGraph;
   /** For each rule with keywords, the rules in other concepts that share the most telling ones. */
@@ -66,6 +70,108 @@ export interface KeywordNeighbour {
   id: string;
   keywords: string[];
   score: number;
+}
+
+/**
+ * A rule as it stood from the end of `date` on, until its next snapshot. Only
+ * the statement and the status have a history (ADR 0026, amended 2026-11-28):
+ * earlier wording comes from `prev`, and a whole day is one step. `since` isn't
+ * a history of its own: it's the release named by the `shipped` event that
+ * made the status active.
+ */
+export interface Snapshot {
+  date: string;
+  status: Status;
+  statement: string;
+  since?: string;
+}
+
+/** A point in time "as of" can show: a day with events, named after its release if one shipped that day. */
+export interface Point {
+  /** The release tag, `today` for the newest point, or the date. */
+  id: string;
+  date: string;
+  /** The release shipped that day, if any. */
+  tag?: string;
+}
+
+/** The status each event type leaves a rule in; `built` and `shipped` are handled apart. */
+const STATUS_AFTER: Partial<Record<EventType, Status>> = {
+  proposed: 'proposed',
+  decided: 'decided',
+  reopened: 'proposed',
+  rejected: 'rejected',
+  withdrawn: 'withdrawn',
+  removed: 'withdrawn',
+  superseded: 'superseded',
+};
+
+/**
+ * A rule's snapshots, one per day its status or statement changed. The
+ * statement on a day is the `prev` of the first amendment or clarification
+ * after it, or today's statement. The last snapshot always matches the rule as
+ * stored, so the newest point shows the registry exactly.
+ */
+export function historyOf(rule: Rule): Snapshot[] {
+  const events = [...rule.events];
+  events.sort((x, y) => x.date.localeCompare(y.date));
+  const wording = events.filter((e) => (e.type === 'amended' || e.type === 'clarified') && e.prev);
+  const statementOn = (date: string) => wording.find((e) => e.date > date)?.prev ?? rule.statement;
+  const out: Snapshot[] = [];
+  let status: Status | undefined;
+  let since: string | undefined;
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i]!;
+    const after = STATUS_AFTER[e.type];
+    if (after) status = after;
+    else if (e.type === 'built' && rule.repo) status = 'active';
+    else if (e.type === 'shipped') {
+      status = 'active';
+      since ??= e.ref.replace(/^v/, '');
+    }
+    if (events[i + 1]?.date === e.date) continue; // one snapshot per day
+    const snap: Snapshot = {
+      date: e.date,
+      status: status ?? rule.status,
+      statement: statementOn(e.date),
+    };
+    if (since !== undefined) snap.since = since;
+    const last = out[out.length - 1];
+    if (
+      last &&
+      last.status === snap.status &&
+      last.statement === snap.statement &&
+      last.since === snap.since
+    )
+      continue;
+    out.push(snap);
+  }
+  const last = out[out.length - 1];
+  if (last) {
+    last.status = rule.status;
+    last.statement = rule.statement;
+    if (rule.since !== undefined) last.since = rule.since;
+    else delete last.since;
+  }
+  return out;
+}
+
+/** Every day with an event, oldest first, named after the release shipped that day; the newest is `today`. */
+export function pointsOf(rules: readonly Rule[]): Point[] {
+  const tags = new Map<string, string>();
+  const days = new Set<string>();
+  for (const r of rules)
+    for (const e of r.events) {
+      days.add(e.date);
+      if (e.type === 'shipped' && !tags.has(e.date)) tags.set(e.date, e.ref);
+    }
+  const sorted = [...days];
+  sorted.sort();
+  return sorted.map((date, i) => {
+    const tag = tags.get(date);
+    const id = i === sorted.length - 1 ? 'today' : (tag ?? date);
+    return tag ? { id, date, tag } : { id, date };
+  });
 }
 
 const BACKTICKS = /`([^`]+)`/g;
@@ -514,6 +620,8 @@ export function buildModel(
   for (const r of rules) symbols[r.id] = symbolsOf(r, ignore);
   const { links, tooCommon } = deriveLinks(rules, { cap: opts.cap, symbols });
   const byKeyword = keywordRules(rules, vocab);
+  const history: Record<string, Snapshot[]> = {};
+  for (const r of rules) history[r.id] = historyOf(r);
   return {
     symbols,
     links,
@@ -521,6 +629,8 @@ export function buildModel(
     keywordRules: byKeyword,
     keywordGraph: keywordGraph(byKeyword, vocab),
     keywordNeighbours: keywordNeighbours(rules, byKeyword),
+    history,
+    points: pointsOf(rules),
   };
 }
 

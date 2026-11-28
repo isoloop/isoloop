@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { boardData, readBoardSources, renderBoard, renderReadme } from './build.ts';
-import { parseConfig } from './config.ts';
+import { parseConfig, REPO_ROOT } from './config.ts';
 import {
   buildModel,
   buildSources,
   codePaths,
   deriveLinks,
   healthChecks,
+  historyOf,
   keywordEdges,
   keywordGraph,
   keywordNeighbours,
   keywordRules,
   layoutKeywords,
+  pointsOf,
   sectionsOf,
   sourceFlows,
   sourceOf,
@@ -25,7 +27,9 @@ import {
   parseAdr,
   parseRef,
   readAnchors,
+  readRegistry,
   readRulesLines,
+  rulesOf,
   unruledSections,
   rulesIn,
   type Registry,
@@ -1080,6 +1084,92 @@ describe('the Sources model', () => {
       'adr-no-rules',
       'concept-unlinked',
     ]);
+  });
+});
+
+describe('as of (amended 2026-11-28)', () => {
+  const shipped = rule('sup.a', {
+    status: 'active',
+    since: '0.1.0',
+    statement: 'Restarts 3 times, then fails.',
+    events: [
+      { type: 'decided', date: '2026-11-03', ref: 'adr/0007#one', why: 'x' },
+      { type: 'built', date: '2026-11-05', ref: '#12', why: 'x' },
+      { type: 'shipped', date: '2026-11-23', ref: 'v0.1.0', why: 'x' },
+      {
+        type: 'amended',
+        date: '2026-11-24',
+        ref: 'adr/0007#one',
+        why: 'x',
+        prev: 'Restarts 3 times in 60 s.',
+      },
+    ],
+  });
+
+  it('rebuilds status, since and wording per day, from the events and `prev`', () => {
+    expect(historyOf(shipped)).toEqual([
+      { date: '2026-11-03', status: 'decided', statement: 'Restarts 3 times in 60 s.' },
+      {
+        date: '2026-11-23',
+        status: 'active',
+        statement: 'Restarts 3 times in 60 s.',
+        since: '0.1.0',
+      },
+      {
+        date: '2026-11-24',
+        status: 'active',
+        statement: 'Restarts 3 times, then fails.',
+        since: '0.1.0',
+      },
+    ]);
+  });
+
+  it('makes a repo rule active on its built event, and takes one snapshot per day', () => {
+    const repoRule = rule('tool.a', {
+      repo: true,
+      status: 'active',
+      events: [
+        { type: 'decided', date: '2026-11-27', ref: 'adr/0026#one', why: 'x' },
+        { type: 'built', date: '2026-11-27', ref: '#483', why: 'x' },
+      ],
+    });
+    expect(historyOf(repoRule).map((s) => [s.date, s.status])).toEqual([['2026-11-27', 'active']]);
+  });
+
+  it('ends on the rule as stored', () => {
+    const r = rule('sup.b', {
+      status: 'withdrawn',
+      events: [
+        { type: 'decided', date: '2026-11-20', ref: 'adr/0001#w', why: 'x' },
+        { type: 'corrected', date: '2026-11-22', ref: 'adr/0001#w', why: 'x' },
+        { type: 'withdrawn', date: '2026-11-22', ref: 'adr/0001#w', why: 'x' },
+      ],
+    });
+    const h = historyOf(r);
+    expect(h[h.length - 1]).toMatchObject({ status: 'withdrawn', statement: r.statement });
+  });
+
+  it('names each day with events, the release shipped that day, and today', () => {
+    const other = rule('sup.c', {
+      events: [{ type: 'decided', date: '2026-11-28', ref: 'adr/0007#one', why: 'x' }],
+    });
+    expect(pointsOf([shipped, other])).toEqual([
+      { id: '2026-11-03', date: '2026-11-03' },
+      { id: '2026-11-05', date: '2026-11-05' },
+      { id: 'v0.1.0', date: '2026-11-23', tag: 'v0.1.0' },
+      { id: '2026-11-24', date: '2026-11-24' },
+      { id: 'today', date: '2026-11-28' },
+    ]);
+  });
+
+  it('keeps every rule in the registry consistent with its own history', () => {
+    const reg = readRegistry(REPO_ROOT);
+    for (const { rule: r } of rulesOf(reg)) {
+      const h = historyOf(r);
+      expect(h.length, r.id).toBeGreaterThan(0);
+      for (let i = 1; i < h.length; i++)
+        expect(h[i]!.date > h[i - 1]!.date, `${r.id}: dates ascend`).toBe(true);
+    }
   });
 });
 
