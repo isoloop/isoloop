@@ -340,6 +340,56 @@ describe('components', () => {
     );
     expect(str(fn('Tooltip')({ content: 'Tip' }))).toContain('role="tooltip" data-static>Tip');
   });
+
+  it('Select marks the selected option and escapes labels', () => {
+    const s = str(
+      fn('Select')({
+        id: 'to',
+        label: 'To',
+        options: [
+          { id: 'a', label: 'A <b>' },
+          { id: 'b', label: 'B' },
+        ],
+        selected: 'b',
+      }),
+    );
+    expect(s).toContain('<label class="ar-field" for="to">');
+    expect(s).toContain('<select class="ar-field-input ar-select" id="to">');
+    expect(s).toContain('<option value="a">A &lt;b&gt;</option>');
+    expect(s).toContain('<option value="b" selected>B</option>');
+  });
+
+  it('Stepper ranges over the items, labels the current one and disables the ends', () => {
+    const items = [
+      { id: 'a', label: '3 Nov' },
+      { id: 'b', label: 'v0.1.0' },
+    ];
+    const first = str(fn('Stepper')({ id: 'p', label: 'As of', items, selected: 'a' }));
+    expect(first).toContain('role="group" aria-label="As of"');
+    expect(first).toContain('min="0" max="1" step="1" value="0"');
+    expect(first).toContain('aria-valuetext="3 Nov"');
+    expect(first).toContain('data-stepper="p" data-step="-1" aria-label="Earlier" disabled');
+    expect(first).not.toContain('aria-label="Later" disabled');
+    expect(first).toContain('<output class="ar-stepper-value" for="p">3 Nov</output>');
+    const last = str(fn('Stepper')({ id: 'p', label: 'As of', items, selected: 'b' }));
+    expect(last).toContain('aria-label="Later" disabled');
+    expect(last).toContain('value="1"');
+  });
+
+  it('Badge and BeforeAfter', () => {
+    expect(str(fn('Badge')({ text: 'changed since' }))).toBe(
+      '<span class="ar-badge" data-tone="accent">changed since</span>',
+    );
+    expect(str(fn('Badge')({ text: 'x', tone: 'warn' }))).toContain('data-tone="warn"');
+    const ba = str(fn('BeforeAfter')({ before: 'Old <i>', after: 'New' }));
+    expect(ba).toContain(
+      'data-side="before"><span class="ar-compare-label">Before</span><p class="ar-compare-text">Old &lt;i&gt;</p>',
+    );
+    expect(ba).toContain(
+      'data-side="after"><span class="ar-compare-label">After</span><p class="ar-compare-text">New</p>',
+    );
+  });
+
   it('ShareBar sizes each part by its value, in its slot, and skips empty parts', () => {
     const h = str(
       fn('ShareBar')({
@@ -360,12 +410,43 @@ describe('components', () => {
 
 // --- The chart toolkit -------------------------------------------------------
 
+interface Box {
+  key: string;
+  value: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+interface Node {
+  key: string;
+  value: number;
+  x: number;
+  y: number;
+  h: number;
+}
+interface Ribbon {
+  from: string;
+  to: string;
+  y0: number;
+  y1: number;
+  h: number;
+  d: string;
+}
+const isBoxes = (v: unknown): v is Box[] => Array.isArray(v);
+const isSankey = (v: unknown): v is { left: Node[]; right: Node[]; flows: Ribbon[] } =>
+  isRec(v) && Array.isArray(v['left']) && Array.isArray(v['flows']);
+
 describe('the chart toolkit', () => {
   it('draws marks in a slot or a tone', () => {
     expect(str(chartFn('circle')({ cx: 1, cy: 2, r: 3, tone: 'warn' }))).toContain(
       'r="3" data-tone="warn"',
     );
     expect(str(chartFn('circle')({ cx: 1, cy: 2, r: 3, slot: 4 }))).toContain('data-slot="4"');
+    expect(str(chartFn('circle')({ cx: 1, cy: 2, r: 3, tone: 'ok', changed: true }))).toContain(
+      'data-tone="ok" data-changed',
+    );
+    expect(str(chartFn('circle')({ cx: 1, cy: 2, r: 3 }))).not.toContain('data-changed');
     expect(str(chartFn('path')({ d: 'M0,0', tone: 'ok' }))).toContain('data-tone="ok"');
   });
   it('places points in polar coordinates', () => {
@@ -432,6 +513,62 @@ describe('the chart toolkit', () => {
       '<svg viewBox="0 0 10 5" role="img" aria-label="L"><rect class="ar-chart-mark" x="0" y="0" width="1" height="2" data-slot="3"></rect></svg>',
     );
     expect(svg).not.toMatch(/#[0-9a-f]{3,6}|fill="[a-z]/i);
+  });
+
+  it('lays a Sankey: nodes sized by their flows, ribbons stacked on both sides', () => {
+    const lay = must(
+      chartFn('sankey')({
+        left: [
+          { key: 'a', label: 'A' },
+          { key: 'b', label: 'B' },
+          { key: 'unused', label: 'U' },
+        ],
+        right: [{ key: 'x', label: 'X' }],
+        flows: [
+          { from: 'a', to: 'x', value: 3 },
+          { from: 'b', to: 'x', value: 1 },
+        ],
+        width: 100,
+        height: 46,
+        nodeWidth: 8,
+        gap: 6,
+      }),
+      isSankey,
+    );
+    expect(lay.left.map((nd) => nd.key)).toEqual(['a', 'b']);
+    expect(lay.left[0]).toMatchObject({ value: 3, x: 0, y: 0, h: 30 });
+    expect(lay.left[1]).toMatchObject({ value: 1, y: 36, h: 10 });
+    expect(lay.right[0]).toMatchObject({ value: 4, x: 92, y: 0, h: 40 });
+    expect(lay.flows.map((f) => [f.y0, f.y1, f.h])).toEqual([
+      [0, 0, 30],
+      [36, 30, 10],
+    ]);
+    expect(lay.flows[0]?.d).toMatch(/^M8,0C50,0 50,0 92,0L92,30C/);
+  });
+
+  it('squarifies a treemap that fills its box with no overlap, biggest first', () => {
+    const items = [6, 6, 4, 3, 2, 2, 1, 0].map((value, i) => ({ key: `k${i}`, value }));
+    const cells = must(chartFn('squarify')(items, { width: 6, height: 4 }), isBoxes);
+    expect(cells).toHaveLength(7);
+    expect(cells[0]?.key).toBe('k0');
+    const area = cells.reduce((s, c) => s + c.width * c.height, 0);
+    expect(area).toBeCloseTo(24);
+    for (const c of cells) {
+      expect(c.width * c.height).toBeCloseTo(c.value);
+      expect(c.x).toBeGreaterThanOrEqual(-1e-9);
+      expect(c.y).toBeGreaterThanOrEqual(-1e-9);
+      expect(c.x + c.width).toBeLessThanOrEqual(6 + 1e-9);
+      expect(c.y + c.height).toBeLessThanOrEqual(4 + 1e-9);
+    }
+    for (let i = 0; i < cells.length; i++)
+      for (let j = i + 1; j < cells.length; j++) {
+        const a = cells[i]!;
+        const b = cells[j]!;
+        const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+        const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+        expect(ox > 1e-9 && oy > 1e-9).toBe(false);
+      }
+    expect(chartFn('squarify')([], { width: 6, height: 4 })).toEqual([]);
   });
 });
 

@@ -8,6 +8,7 @@
     "code": ["packages/bus/src/storage/opfs.ts"],
     "since": "0.1.0",
     "related": ["dur.group-commit", "dur.survives-reload"],
+    "keywords": ["memory-topic", "trust-boundary"],
     "events": [
       {
         "type": "decided",
@@ -37,6 +38,7 @@
     "code": ["packages/bus/src/storage/opfs.ts"],
     "since": "0.1.0",
     "related": ["dur.per-topic"],
+    "keywords": ["commits"],
     "events": [
       {
         "type": "decided",
@@ -92,6 +94,7 @@
     "code": ["packages/bus/src/storage/opfs.ts"],
     "since": "0.1.0",
     "related": ["dur.per-topic"],
+    "keywords": ["retention", "replay"],
     "events": [
       {
         "type": "decided",
@@ -120,6 +123,7 @@
     "code": ["packages/codec/src/codec/format.ts"],
     "since": "0.1.0",
     "related": ["dur.codec-one-encoding", "dur.codec-types", "dur.no-codec-library"],
+    "keywords": ["own-stack"],
     "events": [
       {
         "type": "decided",
@@ -177,6 +181,7 @@
     "code": ["packages/codec/src/codec/format.ts", "packages/bus/src/broker/broker.ts"],
     "since": "0.1.0",
     "related": ["dur.codec"],
+    "keywords": ["memory-topic", "errors"],
     "events": [
       {
         "type": "decided",
@@ -209,6 +214,7 @@
     "id": "dur.no-codec-library",
     "statement": "The codec isn't a MessagePack or CBOR library.",
     "status": "rejected",
+    "keywords": ["own-stack"],
     "events": [
       {
         "type": "rejected",
@@ -225,6 +231,7 @@
     "code": ["packages/host/src/bus/controller.ts"],
     "since": "0.1.0",
     "related": ["dur.resume-committed", "dur.memory-reset", "dur.publish-buffer"],
+    "keywords": ["bus-restart", "lifecycle"],
     "events": [
       {
         "type": "decided",
@@ -260,6 +267,7 @@
     "code": ["packages/runtime/src/bus/bus-client.ts", "packages/bus/src/broker/broker.ts"],
     "since": "0.1.0",
     "related": ["dur.reattach"],
+    "keywords": ["replay", "bus-restart", "commits", "restart"],
     "events": [
       {
         "type": "decided",
@@ -295,6 +303,7 @@
     "code": ["packages/bus/src/broker/broker.ts"],
     "since": "0.1.0",
     "related": ["dur.reattach", "dur.on-reset-restart"],
+    "keywords": ["memory-topic", "replay", "bus-restart", "frameworks"],
     "events": [
       {
         "type": "decided",
@@ -325,6 +334,7 @@
     "code": ["packages/host/src/kernel/kernel.ts"],
     "since": "0.1.0",
     "related": ["dur.memory-reset"],
+    "keywords": ["restart"],
     "events": [
       {
         "type": "decided",
@@ -355,6 +365,7 @@
     "code": ["packages/runtime/src/bus/bus-client.ts"],
     "since": "0.1.0",
     "related": ["dur.dedupe", "dur.host-resend"],
+    "keywords": ["back-pressure", "bus-restart", "errors", "restart"],
     "events": [
       {
         "type": "decided",
@@ -384,6 +395,7 @@
     "code": ["packages/bus/src/broker/broker.ts"],
     "since": "0.1.0",
     "related": ["dur.publish-buffer"],
+    "keywords": ["delivery", "memory-topic", "requests", "commits"],
     "events": [
       {
         "type": "decided",
@@ -413,6 +425,7 @@
     "code": ["packages/host/src/bus/controller.ts"],
     "since": "0.1.0",
     "related": ["dur.dedupe"],
+    "keywords": ["host-api"],
     "events": [
       {
         "type": "decided",
@@ -448,6 +461,7 @@
     "errors": ["bus:recovered"],
     "code": ["packages/bus/src/server/server.ts", "packages/bus/src/storage/safe-mode.ts"],
     "since": "0.1.0",
+    "keywords": ["bus-restart", "observability"],
     "events": [
       {
         "type": "decided",
@@ -477,6 +491,7 @@
     "code": ["packages/bus/src/storage/lock.ts"],
     "since": "0.1.0",
     "related": ["dur.no-sync-access", "dur.tab-own-bus"],
+    "keywords": ["tabs", "observability"],
     "events": [
       {
         "type": "decided",
@@ -506,6 +521,7 @@
     "code": ["packages/bus/src/server/server.ts"],
     "since": "0.1.0",
     "related": ["dur.one-tab", "dur.no-indexeddb"],
+    "keywords": ["browsers", "memory-topic", "lifecycle", "errors"],
     "events": [
       {
         "type": "decided",
@@ -540,6 +556,7 @@
     "status": "active",
     "since": "0.1.0",
     "related": ["dur.one-tab", "dur.no-replicas"],
+    "keywords": ["tabs", "own-stack"],
     "events": [
       {
         "type": "decided",
@@ -569,6 +586,7 @@
     "errors": ["bus:quota", "quota_exceeded"],
     "code": ["packages/host/src/kernel/kernel.ts", "packages/bus/src/broker/broker.ts"],
     "since": "0.1.0",
+    "keywords": ["memory-use", "memory-topic", "measurement", "observability"],
     "events": [
       {
         "type": "decided",
@@ -597,6 +615,7 @@
     "code": ["packages/host/src/bus/controller.ts", "packages/bus/src/server/server.ts"],
     "since": "0.1.0",
     "related": ["dur.survives-reload"],
+    "keywords": ["browsers", "trust-boundary"],
     "events": [
       {
         "type": "decided",
@@ -624,6 +643,7 @@
     "status": "active",
     "since": "0.1.0",
     "related": ["dur.per-topic", "dur.flush-on-freeze"],
+    "keywords": ["tabs", "memory-topic"],
     "events": [
       {
         "type": "decided",
@@ -675,6 +695,7 @@
     "id": "dur.no-main-thread-mirror",
     "statement": "The log isn't mirrored on the main thread.",
     "status": "rejected",
+    "keywords": ["main-thread"],
     "events": [
       {
         "type": "rejected",
