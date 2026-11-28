@@ -4909,8 +4909,8 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.rules-keywords-tab` | The Keywords tab holds the keyword glossary, each keyword with its definition and its rules by concept, and the keyword map, which joins keywords that tag the same rules. |  | active, repo | in force since [#514](https://github.com/isoloop/isoloop/issues/514) |
 | `tool.rules-timeline` | The Timeline tab shows every event in one lane per concept, by date, with release tags as lines, and a Churn heatmap counts `amended`, `clarified` and `corrected` events per concept and day. |  | active, repo | in force since [#512](https://github.com/isoloop/isoloop/issues/512) |
 | `tool.rules-sources` | The Sources tab shows which ADRs feed which concepts, a treemap of the `code` paths rules cite, and a Health list of where the registry is weak. |  | decided, repo |  |
-| `tool.rules-as-of` | Board, Agenda and Hive have an "as of" option that rebuilds each rule as it stood on a chosen date or release, and a diff that lists what changed between two points. |  | decided, repo |  |
-| `tool.rules-as-of-limits` | "As of" places a whole day at once, since events have no time; earlier wording comes from `prev`, which is free text; only the statement and the status have a history. |  | decided, repo |  |
+| `tool.rules-as-of` | Board, Agenda and Hive have an "as of" option that rebuilds each rule as it stood on a chosen date or release, and a diff that lists what changed between two points. |  | active, repo | in force since [#513](https://github.com/isoloop/isoloop/issues/513) |
+| `tool.rules-as-of-limits` | "As of" places a whole day at once, since events have no time; earlier wording comes from `prev`, which is free text; only the statement and the status have a history. |  | active, repo | in force since [#513](https://github.com/isoloop/isoloop/issues/513) |
 | `tool.rules-links` | Links between rules are derived when the page is built, in four kinds: `related` and `supersededBy`, the same ADR section, a shared symbol, and a shared `code` path. | `4 kinds` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
 | `tool.rules-link-cap` | A key shared by more than 12 rules makes no links; the page lists it instead. | `12 rules` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
 | `tool.rules-link-weight` | A link from a key shared by n rules weighs 1/(n−1), so a narrow key counts more than a broad one. | `1/(n−1)` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
@@ -5782,21 +5782,25 @@ History:
 
 ### `tool.rules-as-of`
 
+- **Code:** `scripts/rules/model.ts`, `scripts/rules/board/shell.js`
 - **Related:** `tool.rules-as-of-limits`
 - **Why:** Seeing what held at a release, and what changed since, answers what a release changed in facts rather than commits.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · Seeing what held at a release, and what changed since, answers what a release changed in facts rather than commits.
+- 2026-11-28 · built · [#513](https://github.com/isoloop/isoloop/issues/513) · The "as of" option and the Changes panel are built on Board, Agenda and Hive.
 
 ### `tool.rules-as-of-limits`
 
+- **Code:** `scripts/rules/model.ts`, `scripts/rules/board/shell.js`
 - **Related:** `tool.rules-as-of`
 - **Why:** Accepted for now: storing times and every field's earlier value is left for later.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · Accepted for now: storing times and every field's earlier value is left for later.
+- 2026-11-28 · built · [#513](https://github.com/isoloop/isoloop/issues/513) · "As of" is built within these limits: a day per step, wording from `prev`, history for the statement and the status only (`since` follows the shipped event).
 
 ### `tool.rules-links`
 

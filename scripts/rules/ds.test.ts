@@ -340,6 +340,56 @@ describe('components', () => {
     );
     expect(str(fn('Tooltip')({ content: 'Tip' }))).toContain('role="tooltip" data-static>Tip');
   });
+
+  it('Select marks the selected option and escapes labels', () => {
+    const s = str(
+      fn('Select')({
+        id: 'to',
+        label: 'To',
+        options: [
+          { id: 'a', label: 'A <b>' },
+          { id: 'b', label: 'B' },
+        ],
+        selected: 'b',
+      }),
+    );
+    expect(s).toContain('<label class="ar-field" for="to">');
+    expect(s).toContain('<select class="ar-field-input ar-select" id="to">');
+    expect(s).toContain('<option value="a">A &lt;b&gt;</option>');
+    expect(s).toContain('<option value="b" selected>B</option>');
+  });
+
+  it('Stepper ranges over the items, labels the current one and disables the ends', () => {
+    const items = [
+      { id: 'a', label: '3 Nov' },
+      { id: 'b', label: 'v0.1.0' },
+    ];
+    const first = str(fn('Stepper')({ id: 'p', label: 'As of', items, selected: 'a' }));
+    expect(first).toContain('role="group" aria-label="As of"');
+    expect(first).toContain('min="0" max="1" step="1" value="0"');
+    expect(first).toContain('aria-valuetext="3 Nov"');
+    expect(first).toContain('data-stepper="p" data-step="-1" aria-label="Earlier" disabled');
+    expect(first).not.toContain('aria-label="Later" disabled');
+    expect(first).toContain('<output class="ar-stepper-value" for="p">3 Nov</output>');
+    const last = str(fn('Stepper')({ id: 'p', label: 'As of', items, selected: 'b' }));
+    expect(last).toContain('aria-label="Later" disabled');
+    expect(last).toContain('value="1"');
+  });
+
+  it('Badge and BeforeAfter', () => {
+    expect(str(fn('Badge')({ text: 'changed since' }))).toBe(
+      '<span class="ar-badge" data-tone="accent">changed since</span>',
+    );
+    expect(str(fn('Badge')({ text: 'x', tone: 'warn' }))).toContain('data-tone="warn"');
+    const ba = str(fn('BeforeAfter')({ before: 'Old <i>', after: 'New' }));
+    expect(ba).toContain(
+      'data-side="before"><span class="ar-compare-label">Before</span><p class="ar-compare-text">Old &lt;i&gt;</p>',
+    );
+    expect(ba).toContain(
+      'data-side="after"><span class="ar-compare-label">After</span><p class="ar-compare-text">New</p>',
+    );
+  });
+
   it('ShareBar sizes each part by its value, in its slot, and skips empty parts', () => {
     const h = str(
       fn('ShareBar')({
@@ -366,6 +416,10 @@ describe('the chart toolkit', () => {
       'r="3" data-tone="warn"',
     );
     expect(str(chartFn('circle')({ cx: 1, cy: 2, r: 3, slot: 4 }))).toContain('data-slot="4"');
+    expect(str(chartFn('circle')({ cx: 1, cy: 2, r: 3, tone: 'ok', changed: true }))).toContain(
+      'data-tone="ok" data-changed',
+    );
+    expect(str(chartFn('circle')({ cx: 1, cy: 2, r: 3 }))).not.toContain('data-changed');
     expect(str(chartFn('path')({ d: 'M0,0', tone: 'ok' }))).toContain('data-tone="ok"');
   });
   it('places points in polar coordinates', () => {

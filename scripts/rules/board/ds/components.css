@@ -371,6 +371,93 @@
     min-width: 0;
   }
 
+  /* Select: a Field with a native select. */
+  .ar-select {
+    cursor: pointer;
+  }
+
+  /* Stepper: previous, a range, next, and the current item. */
+  .ar-stepper {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ar-space-3);
+    min-width: 0;
+  }
+  .ar-stepper-step {
+    width: var(--ar-control);
+    height: var(--ar-control);
+    border: var(--ar-hairline) solid var(--ar-field-border);
+    border-radius: var(--ar-radius-m);
+    background: var(--ar-field-bg);
+    color: var(--ar-fg);
+    font-size: var(--ar-text-l);
+    line-height: 1;
+    cursor: pointer;
+  }
+  .ar-stepper-step:disabled {
+    color: var(--ar-off);
+    cursor: default;
+  }
+  .ar-stepper-range {
+    flex: 1 1 var(--ar-stepper-min);
+    min-width: 0;
+    accent-color: var(--ar-accent);
+  }
+  .ar-stepper-value {
+    font-size: var(--ar-text-m);
+    font-weight: var(--ar-weight-medium);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* Badge: a dot and a short note in a tone. */
+  .ar-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ar-space-2);
+    font-size: var(--ar-badge-text);
+    font-weight: var(--ar-weight-medium);
+    color: var(--ar-tone, var(--ar-accent));
+    white-space: nowrap;
+  }
+  .ar-badge::before {
+    content: '';
+    width: var(--ar-dot);
+    height: var(--ar-dot);
+    border-radius: var(--ar-radius-round);
+    background: currentColor;
+  }
+
+  /* BeforeAfter: two versions side by side, stacked when narrow. */
+  .ar-compare {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--ar-col-min)), 1fr));
+    gap: var(--ar-space-4);
+  }
+  .ar-compare-side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ar-space-2);
+    padding: var(--ar-space-4) var(--ar-space-5);
+    background: var(--ar-compare-bg);
+    border-radius: var(--ar-radius-m);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .ar-compare-side[data-side='before'] {
+    color: var(--ar-compare-before);
+  }
+  .ar-compare-text {
+    font-size: var(--ar-text-s);
+  }
+  .ar-compare-label {
+    font-size: var(--ar-text-xs);
+    letter-spacing: var(--ar-tracking-caps);
+    text-transform: uppercase;
+    color: var(--ar-muted);
+  }
+
   /* Toolbar: a cluster of controls with role="toolbar". */
   .ar-toolbar {
     display: flex;
@@ -572,5 +659,11 @@
   .ar-chart-mark[data-tone] {
     fill: var(--ar-tone);
     stroke: var(--ar-tone);
+  }
+  /* The "changed since" mark on a chart dot: the same signal as Badge. */
+  .ar-chart-mark[data-changed] {
+    stroke: var(--ar-chart-changed);
+    stroke-width: var(--ar-chart-changed-width);
+    paint-order: stroke;
   }
 }

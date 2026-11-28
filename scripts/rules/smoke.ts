@@ -58,7 +58,9 @@ async function main(): Promise<void> {
             runs++;
           }
           if (!page.specimen) {
-            const card = tab.locator('[data-id]').first();
+            // From the Board, whose cards stay put; a hive dot can move under the pointer on hover.
+            await tab.click('[data-view="board"]');
+            const card = tab.locator('.ar-card[data-id]').first();
             if ((await card.count()) > 0) {
               await card.click();
               if ((await tab.locator('[role="dialog"]').count()) !== 1)
