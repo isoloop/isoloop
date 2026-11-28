@@ -30,11 +30,46 @@ export interface Model {
   tooCommon: CommonKey[];
   /** Each keyword's rule ids, in registry order. */
   keywordRules: Record<string, string[]>;
-<<<<<<< HEAD
   /** Each rule's states over time, oldest first, by rule id ("as of", amended 2026-11-28). */
   history: Record<string, Snapshot[]>;
   /** The points "as of" can show, oldest first; the last one is today. */
   points: Point[];
+  /** The keyword map: keywords placed on a plane, joined where they tag the same rules. */
+  keywordGraph: KeywordGraph;
+  /** For each rule with keywords, the rules in other concepts that share the most telling ones. */
+  keywordNeighbours: Record<string, KeywordNeighbour[]>;
+}
+
+/** A keyword on the map: its rule count, its place and its radius, in the graph's own units. */
+export interface KeywordNode {
+  id: string;
+  n: number;
+  x: number;
+  y: number;
+  r: number;
+}
+
+/** Two keywords that tag `shared` rules; `weight` is shared / √(n_a × n_b), from 0 to 1. */
+export interface KeywordEdge {
+  a: string;
+  b: string;
+  shared: number;
+  weight: number;
+}
+
+export interface KeywordGraph {
+  /** The plane's size; a view scales it to fit. */
+  width: number;
+  height: number;
+  nodes: KeywordNode[];
+  edges: KeywordEdge[];
+}
+
+/** A rule elsewhere that shares keywords with this one, ranked by how rare the shared keywords are. */
+export interface KeywordNeighbour {
+  id: string;
+  keywords: string[];
+  score: number;
 }
 
 /**
@@ -137,44 +172,6 @@ export function pointsOf(rules: readonly Rule[]): Point[] {
     const id = i === sorted.length - 1 ? 'today' : (tag ?? date);
     return tag ? { id, date, tag } : { id, date };
   });
-=======
-  /** The keyword map: keywords placed on a plane, joined where they tag the same rules. */
-  keywordGraph: KeywordGraph;
-  /** For each rule with keywords, the rules in other concepts that share the most telling ones. */
-  keywordNeighbours: Record<string, KeywordNeighbour[]>;
-}
-
-/** A keyword on the map: its rule count, its place and its radius, in the graph's own units. */
-export interface KeywordNode {
-  id: string;
-  n: number;
-  x: number;
-  y: number;
-  r: number;
-}
-
-/** Two keywords that tag `shared` rules; `weight` is shared / √(n_a × n_b), from 0 to 1. */
-export interface KeywordEdge {
-  a: string;
-  b: string;
-  shared: number;
-  weight: number;
-}
-
-export interface KeywordGraph {
-  /** The plane's size; a view scales it to fit. */
-  width: number;
-  height: number;
-  nodes: KeywordNode[];
-  edges: KeywordEdge[];
-}
-
-/** A rule elsewhere that shares keywords with this one, ranked by how rare the shared keywords are. */
-export interface KeywordNeighbour {
-  id: string;
-  keywords: string[];
-  score: number;
->>>>>>> origin/main
 }
 
 const BACKTICKS = /`([^`]+)`/g;
@@ -468,24 +465,17 @@ export function buildModel(
   const symbols: Record<string, string[]> = {};
   for (const r of rules) symbols[r.id] = symbolsOf(r, ignore);
   const { links, tooCommon } = deriveLinks(rules, { cap: opts.cap, symbols });
-<<<<<<< HEAD
+  const byKeyword = keywordRules(rules, vocab);
   const history: Record<string, Snapshot[]> = {};
   for (const r of rules) history[r.id] = historyOf(r);
-=======
-  const byKeyword = keywordRules(rules, vocab);
->>>>>>> origin/main
   return {
     symbols,
     links,
     tooCommon,
-<<<<<<< HEAD
-    keywordRules: keywordRules(rules, vocab),
-    history,
-    points: pointsOf(rules),
-=======
     keywordRules: byKeyword,
     keywordGraph: keywordGraph(byKeyword, vocab),
     keywordNeighbours: keywordNeighbours(rules, byKeyword),
->>>>>>> origin/main
+    history,
+    points: pointsOf(rules),
   };
 }

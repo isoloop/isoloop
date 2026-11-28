@@ -340,7 +340,6 @@ describe('components', () => {
     );
     expect(str(fn('Tooltip')({ content: 'Tip' }))).toContain('role="tooltip" data-static>Tip');
   });
-<<<<<<< HEAD
 
   it('Select marks the selected option and escapes labels', () => {
     const s = str(
@@ -389,7 +388,8 @@ describe('components', () => {
     expect(ba).toContain(
       'data-side="after"><span class="ar-compare-label">After</span><p class="ar-compare-text">New</p>',
     );
-=======
+  });
+
   it('ShareBar sizes each part by its value, in its slot, and skips empty parts', () => {
     const h = str(
       fn('ShareBar')({
@@ -405,7 +405,6 @@ describe('components', () => {
     expect(h).toContain('data-slot="1" style="--ar-share: 3" title="A &lt;b&gt;: 3 of 4"');
     expect(h).toContain('data-slot="other" style="--ar-share: 1" title="C: 1 of 4"');
     expect(h).not.toContain('data-slot="2"');
->>>>>>> origin/main
   });
 });
 

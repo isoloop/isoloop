@@ -14,9 +14,6 @@ const Rules = (() => {
     rules: [],
     refs: {},
     keywords: [],
-<<<<<<< HEAD
-    model: { symbols: {}, links: [], tooCommon: [], keywordRules: {}, history: {}, points: [] },
-=======
     model: {
       symbols: {},
       links: [],
@@ -24,8 +21,9 @@ const Rules = (() => {
       keywordRules: {},
       keywordGraph: { width: 1000, height: 600, nodes: [], edges: [] },
       keywordNeighbours: {},
+      history: {},
+      points: [],
     },
->>>>>>> origin/main
   };
   const CONCEPTS = DATA.concepts;
   const RULES = DATA.rules;
@@ -99,15 +97,20 @@ const Rules = (() => {
     } catch (e) {}
   };
 
-<<<<<<< HEAD
-  // Shared state: the status filters and the search apply to every view, and
-  // "as of" to every view that opts in with `asOf: true`.
+  // Shared state: the status filters, the search, the keywords and the symbol apply to every
+  // view, and "as of" to every view that opts in with `asOf: true`.
+  const KEYWORDS = DATA.keywords || [];
+  const kwLabel = Object.fromEntries(KEYWORDS.map((k) => [k.id, k.label]));
+  const SYMBOLS = [...new Set(Object.values(DATA.model.symbols || {}).flat())].sort((a, b) =>
+    a.localeCompare(b),
+  );
   const state = {
     query: '',
     on: new Set(['active', 'decided', 'proposed']),
+    keywords: new Set(),
+    symbol: '',
     asOf: { point: 'today', compare: false, from: null, to: 'today' },
   };
-
   // --- As of (ADR 0026, amended 2026-11-28) ------------------------------------
   // Each rule's snapshots come from the build (model.history), so a point in
   // time is a lookup. Limits accepted for now: a whole day is one step, earlier
@@ -196,23 +199,8 @@ const Rules = (() => {
     }
     return { from, to, items, counts };
   }
-  function matches(r) {
-=======
-  // Shared state: the status filters, the search, the keywords and the symbol apply to every view.
-  const KEYWORDS = DATA.keywords || [];
-  const kwLabel = Object.fromEntries(KEYWORDS.map((k) => [k.id, k.label]));
-  const SYMBOLS = [...new Set(Object.values(DATA.model.symbols || {}).flat())].sort((a, b) =>
-    a.localeCompare(b),
-  );
-  const state = {
-    query: '',
-    on: new Set(['active', 'decided', 'proposed']),
-    keywords: new Set(),
-    symbol: '',
-  };
   /** Whether a rule passes the shared filters; `ignoreKeywords` skips the keyword and symbol filters. */
   function matches(r, opts = {}) {
->>>>>>> origin/main
     if (!state.on.has(r.status)) return false;
     if (!opts.ignoreKeywords) {
       for (const k of state.keywords) if (!(r.keywords || []).includes(k)) return false;
@@ -300,7 +288,6 @@ const Rules = (() => {
     matches,
     render: () => render(),
     openRule: (id) => openRule(id),
-<<<<<<< HEAD
     asOf: {
       get on() {
         return asOfOn();
@@ -320,14 +307,13 @@ const Rules = (() => {
       },
       diff,
       set: (pointId) => setPoint(pointId),
-=======
+    },
     show: (id) => show(id, true),
     /** Filters every view to one keyword and shows the Board. */
     filterKeyword: (id) => {
       state.keywords = new Set([id]);
       closeRule();
       show('board', true);
->>>>>>> origin/main
     },
   };
 
@@ -377,9 +363,6 @@ const Rules = (() => {
                 : ''
             }`,
         })}
-<<<<<<< HEAD
-        <section class="ar-stack ar-shell-asof" id="as-of" aria-label="As of" hidden></section>
-=======
         ${
           KEYWORDS.some((k) => (DATA.model.keywordRules[k.id] || []).length)
             ? html`<details class="ar-shell-kw" id="kw-filter">
@@ -389,7 +372,7 @@ const Rules = (() => {
             : ''
         }
         <div class="ar-cluster" id="active-filters" hidden></div>
->>>>>>> origin/main
+        <section class="ar-stack ar-shell-asof" id="as-of" aria-label="As of" hidden></section>
         <main id="view"></main>
         <p class="ar-shell-note" id="note"></p>
       </div>`,
@@ -462,11 +445,8 @@ const Rules = (() => {
     controls.innerHTML = c;
     controls.hidden = !c;
     renderFilters();
-<<<<<<< HEAD
-    renderAsOf();
-=======
     renderKeywordFilters();
->>>>>>> origin/main
+    renderAsOf();
     $('view').innerHTML = String(current.render(ctx));
     if (current.mount) current.mount(ctx);
   }
@@ -703,7 +683,6 @@ const Rules = (() => {
       state.query = e.target.value.trim().toLowerCase();
       render();
     });
-<<<<<<< HEAD
     // "As of": while the range is dragged only its label follows; letting go
     // (or a key) shows the point. The selects pick the compared points.
     document.addEventListener('input', (e) => {
@@ -723,13 +702,11 @@ const Rules = (() => {
         render();
       }
     });
-=======
     const symField = $('sym');
     if (symField)
       symField.addEventListener('change', (e) => {
         if (SYMBOLS.includes(e.target.value) || e.target.value === '') setSymbol(e.target.value);
       });
->>>>>>> origin/main
     document.addEventListener('click', (e) => {
       if (e.target.closest('a')) return;
       const th = e.target.closest('[data-t]');

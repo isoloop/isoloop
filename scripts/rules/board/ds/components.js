@@ -223,7 +223,6 @@
     /></label>`;
 
   /**
-<<<<<<< HEAD
    * Select: { id, label, options: [{ id, label }], selected, hideLabel }. A
    * native select, so the keyboard and screen readers work as everywhere.
    */
@@ -298,7 +297,8 @@
         <p class="ar-compare-text">${after}</p>
       </div>
     </div>`;
-=======
+
+  /**
    * ShareBar: one bar split into parts by value, each in a chart slot.
    * { label, parts: [{ key, label, value, slot }] }. Each part's title names it.
    */
@@ -320,7 +320,6 @@
         )}
     </div>`;
   };
->>>>>>> origin/main
 
   /** Toolbar: { label, children }. */
   const Toolbar = ({ label, children, attrs: a }) =>
@@ -386,14 +385,11 @@
     Legend,
     EmptyState,
     Field,
-<<<<<<< HEAD
     Select,
     Stepper,
     Badge,
     BeforeAfter,
-=======
     ShareBar,
->>>>>>> origin/main
     Toolbar,
     ChartFrame,
     Tooltip,

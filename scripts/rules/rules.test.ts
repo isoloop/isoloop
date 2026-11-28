@@ -1,24 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { boardData, readBoardSources, renderBoard, renderReadme } from './build.ts';
-<<<<<<< HEAD
 import { parseConfig, REPO_ROOT } from './config.ts';
 import {
   buildModel,
   deriveLinks,
   historyOf,
-  keywordRules,
-  pointsOf,
-=======
-import { parseConfig } from './config.ts';
-import {
-  buildModel,
-  deriveLinks,
   keywordEdges,
   keywordGraph,
   keywordNeighbours,
   keywordRules,
   layoutKeywords,
->>>>>>> origin/main
+  pointsOf,
   sectionsOf,
   symbolsOf,
 } from './model.ts';
