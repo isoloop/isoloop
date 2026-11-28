@@ -1776,7 +1776,7 @@
   {
     "id": "tool.rules-as-of",
     "statement": "Board, Agenda and Hive have an \"as of\" option that rebuilds each rule as it stood on a chosen date or release, and a diff that lists what changed between two points.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "related": ["tool.rules-as-of-limits"],
     "events": [
@@ -1785,13 +1785,20 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "Seeing what held at a release, and what changed since, answers what a release changed in facts rather than commits."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#513",
+        "why": "The \"as of\" option and the Changes panel are in force on Board and Agenda from this PR."
       }
-    ]
+    ],
+    "code": ["scripts/rules/model.ts", "scripts/rules/board/shell.js"]
   },
   {
     "id": "tool.rules-as-of-limits",
     "statement": "\"As of\" places a whole day at once, since events have no time; earlier wording comes from `prev`, which is free text; only the statement and the status have a history.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "related": ["tool.rules-as-of"],
     "events": [
@@ -1800,8 +1807,15 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "Accepted for now: storing times and every field's earlier value is left for later."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#513",
+        "why": "\"As of\" is built with these limits: a day per step, wording from `prev`, history for the statement, status and `since` only."
       }
-    ]
+    ],
+    "code": ["scripts/rules/model.ts", "scripts/rules/board/shell.js"]
   },
   {
     "id": "tool.rules-links",
