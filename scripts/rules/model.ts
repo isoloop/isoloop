@@ -1,7 +1,7 @@
 // What the rules page derives from the registry when it's built (ADR 0026,
 // amended 2026-11-28): symbols, links between rules, and each keyword's rules.
 // The views read the result; nothing here is written back to the registry.
-import { parseRef, type Keyword, type Rule } from './registry.ts';
+import { type EventType, parseRef, type Keyword, type Rule, type Status } from './registry.ts';
 
 export type LinkKind = 'related' | 'section' | 'symbol' | 'code';
 
@@ -30,6 +30,10 @@ export interface Model {
   tooCommon: CommonKey[];
   /** Each keyword's rule ids, in registry order. */
   keywordRules: Record<string, string[]>;
+  /** Each rule's states over time, oldest first, by rule id ("as of", amended 2026-11-28). */
+  history: Record<string, Snapshot[]>;
+  /** The points "as of" can show, oldest first; the last one is today. */
+  points: Point[];
   /** The keyword map: keywords placed on a plane, joined where they tag the same rules. */
   keywordGraph: KeywordGraph;
   /** For each rule with keywords, the rules in other concepts that share the most telling ones. */
@@ -66,6 +70,108 @@ export interface KeywordNeighbour {
   id: string;
   keywords: string[];
   score: number;
+}
+
+/**
+ * A rule as it stood from the end of `date` on, until its next snapshot. Only
+ * the statement and the status have a history (ADR 0026, amended 2026-11-28):
+ * earlier wording comes from `prev`, and a whole day is one step. `since` isn't
+ * a history of its own: it's the release named by the `shipped` event that
+ * made the status active.
+ */
+export interface Snapshot {
+  date: string;
+  status: Status;
+  statement: string;
+  since?: string;
+}
+
+/** A point in time "as of" can show: a day with events, named after its release if one shipped that day. */
+export interface Point {
+  /** The release tag, `today` for the newest point, or the date. */
+  id: string;
+  date: string;
+  /** The release shipped that day, if any. */
+  tag?: string;
+}
+
+/** The status each event type leaves a rule in; `built` and `shipped` are handled apart. */
+const STATUS_AFTER: Partial<Record<EventType, Status>> = {
+  proposed: 'proposed',
+  decided: 'decided',
+  reopened: 'proposed',
+  rejected: 'rejected',
+  withdrawn: 'withdrawn',
+  removed: 'withdrawn',
+  superseded: 'superseded',
+};
+
+/**
+ * A rule's snapshots, one per day its status or statement changed. The
+ * statement on a day is the `prev` of the first amendment or clarification
+ * after it, or today's statement. The last snapshot always matches the rule as
+ * stored, so the newest point shows the registry exactly.
+ */
+export function historyOf(rule: Rule): Snapshot[] {
+  const events = [...rule.events];
+  events.sort((x, y) => x.date.localeCompare(y.date));
+  const wording = events.filter((e) => (e.type === 'amended' || e.type === 'clarified') && e.prev);
+  const statementOn = (date: string) => wording.find((e) => e.date > date)?.prev ?? rule.statement;
+  const out: Snapshot[] = [];
+  let status: Status | undefined;
+  let since: string | undefined;
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i]!;
+    const after = STATUS_AFTER[e.type];
+    if (after) status = after;
+    else if (e.type === 'built' && rule.repo) status = 'active';
+    else if (e.type === 'shipped') {
+      status = 'active';
+      since ??= e.ref.replace(/^v/, '');
+    }
+    if (events[i + 1]?.date === e.date) continue; // one snapshot per day
+    const snap: Snapshot = {
+      date: e.date,
+      status: status ?? rule.status,
+      statement: statementOn(e.date),
+    };
+    if (since !== undefined) snap.since = since;
+    const last = out[out.length - 1];
+    if (
+      last &&
+      last.status === snap.status &&
+      last.statement === snap.statement &&
+      last.since === snap.since
+    )
+      continue;
+    out.push(snap);
+  }
+  const last = out[out.length - 1];
+  if (last) {
+    last.status = rule.status;
+    last.statement = rule.statement;
+    if (rule.since !== undefined) last.since = rule.since;
+    else delete last.since;
+  }
+  return out;
+}
+
+/** Every day with an event, oldest first, named after the release shipped that day; the newest is `today`. */
+export function pointsOf(rules: readonly Rule[]): Point[] {
+  const tags = new Map<string, string>();
+  const days = new Set<string>();
+  for (const r of rules)
+    for (const e of r.events) {
+      days.add(e.date);
+      if (e.type === 'shipped' && !tags.has(e.date)) tags.set(e.date, e.ref);
+    }
+  const sorted = [...days];
+  sorted.sort();
+  return sorted.map((date, i) => {
+    const tag = tags.get(date);
+    const id = i === sorted.length - 1 ? 'today' : (tag ?? date);
+    return tag ? { id, date, tag } : { id, date };
+  });
 }
 
 const BACKTICKS = /`([^`]+)`/g;
@@ -168,6 +274,160 @@ export function keywordRules(
   for (const k of vocab) out[k.id] = [];
   for (const r of rules) for (const k of r.keywords ?? []) (out[k] ??= []).push(r.id);
   return out;
+}
+
+// --- Sources, code and health (the Sources tab) -------------------------------
+
+/** Where a rule's first ADR event points, or `null` when no event cites an ADR. */
+export function sourceOf(rule: Rule): { adr: string; type: string } | null {
+  for (const e of rule.events) {
+    const ref = parseRef(e.ref);
+    if (ref?.kind === 'adr') return { adr: ref.number, type: e.type };
+  }
+  return null;
+}
+
+/** Rules flowing from one ADR into one concept, split by the type of that first ADR event. */
+export interface Flow {
+  /** An ADR number, or '' for rules that cite no ADR. */
+  adr: string;
+  concept: string;
+  type: string;
+  rules: string[];
+}
+
+/** One flow per (ADR, concept, first event type), biggest first within each ADR. */
+export function sourceFlows(rules: readonly RuleIn[]): Flow[] {
+  const by = new Map<string, Flow>();
+  for (const { concept, rule } of rules) {
+    const src = sourceOf(rule);
+    const adr = src?.adr ?? '';
+    const type = src?.type ?? 'none';
+    const k = `${adr}\u0000${concept}\u0000${type}`;
+    const f = by.get(k) ?? { adr, concept, type, rules: [] };
+    f.rules.push(rule.id);
+    by.set(k, f);
+  }
+  const out = [...by.values()];
+  out.sort(
+    (a, b) =>
+      a.adr.localeCompare(b.adr) ||
+      b.rules.length - a.rules.length ||
+      a.concept.localeCompare(b.concept),
+  );
+  return out;
+}
+
+/** A code path and the rules citing it. Folders end in '/', as written in the registry. */
+export interface CodePath {
+  path: string;
+  rules: string[];
+}
+
+/** Every cited path with its rules, most cited first. */
+export function codePaths(rules: readonly Rule[]): CodePath[] {
+  const by = new Map<string, string[]>();
+  for (const r of rules)
+    for (const p of new Set(r.code ?? [])) {
+      const list = by.get(p) ?? [];
+      list.push(r.id);
+      by.set(p, list);
+    }
+  const out = [...by].map(([path, ids]) => ({ path, rules: ids }));
+  out.sort((a, b) => b.rules.length - a.rules.length || a.path.localeCompare(b.path));
+  return out;
+}
+
+/** One weakness in the registry: a title, what it means, and the rules or other items it lists. */
+export interface HealthCheck {
+  id: string;
+  title: string;
+  hint: string;
+  /** Rule ids, when the check is about rules. */
+  rules?: string[];
+  /** Other items (ADR files, concept ids), when it isn't. */
+  items?: string[];
+}
+
+/** A rule as the page gets it: with its concept. */
+export interface RuleIn {
+  concept: string;
+  rule: Rule;
+}
+
+const ENDED = new Set(['rejected', 'withdrawn', 'superseded']);
+
+/**
+ * Where the registry is weak, computed from the registry and the ADR files
+ * alone: nothing here knows about any one repo. Checks with nothing to list
+ * are kept, so the page can say they're clear.
+ */
+export function healthChecks(
+  rules: readonly RuleIn[],
+  adrs: readonly { file: string; hasRules: boolean }[],
+  tooCommon: readonly CommonKey[],
+  links: readonly Link[],
+): HealthCheck[] {
+  const live = rules.filter(({ rule }) => !ENDED.has(rule.status));
+  const coarse = new Set(tooCommon.filter((c) => c.kind === 'section').map((c) => c.key));
+  const conceptOf = new Map(rules.map(({ concept, rule }) => [rule.id, concept]));
+  const linked = new Set<string>();
+  for (const l of links)
+    if (l.kind === 'related' && conceptOf.get(l.a) !== conceptOf.get(l.b)) {
+      linked.add(conceptOf.get(l.a)!);
+      linked.add(conceptOf.get(l.b)!);
+    }
+  const concepts = [...new Set(rules.map((r) => r.concept))];
+  return [
+    {
+      id: 'no-code',
+      title: 'No code path',
+      hint: 'Active or decided rules that name no file or folder, so nobody can check them against the code.',
+      rules: live
+        .filter(
+          ({ rule }) =>
+            (rule.status === 'active' || rule.status === 'decided') && !rule.code?.length,
+        )
+        .map(({ rule }) => rule.id),
+    },
+    {
+      id: 'no-built',
+      title: 'Shipped with no built event',
+      hint: 'Active rules about the packages that go straight from decided to shipped, with no PR that built them.',
+      rules: live
+        .filter(
+          ({ rule }) =>
+            rule.status === 'active' && !rule.repo && !rule.events.some((e) => e.type === 'built'),
+        )
+        .map(({ rule }) => rule.id),
+    },
+    {
+      id: 'coarse-anchor',
+      title: 'Coarse ADR anchors',
+      hint: 'Rules citing an ADR section shared by more rules than the link cap, so the ref doesn’t point at one decision.',
+      rules: live
+        .filter(({ rule }) => sectionsOf(rule).some((s) => coarse.has(s)))
+        .map(({ rule }) => rule.id),
+    },
+    {
+      id: 'no-keywords',
+      title: 'No keywords',
+      hint: 'Rules not tagged with any keyword yet, so they don’t show on the Keywords tab.',
+      rules: live.filter(({ rule }) => !rule.keywords?.length).map(({ rule }) => rule.id),
+    },
+    {
+      id: 'adr-no-rules',
+      title: 'ADRs with no Rules: lines',
+      hint: 'ADRs that name no rule, so no fact on the board traces back to them.',
+      items: adrs.filter((a) => !a.hasRules).map((a) => a.file),
+    },
+    {
+      id: 'concept-unlinked',
+      title: 'Concepts with no written link to another concept',
+      hint: 'Every connection to other concepts is derived; no `related` link crosses over by hand.',
+      items: concepts.filter((c) => !linked.has(c)),
+    },
+  ];
 }
 
 /** The concept part of an id: rules in one concept share it. */
@@ -360,6 +620,8 @@ export function buildModel(
   for (const r of rules) symbols[r.id] = symbolsOf(r, ignore);
   const { links, tooCommon } = deriveLinks(rules, { cap: opts.cap, symbols });
   const byKeyword = keywordRules(rules, vocab);
+  const history: Record<string, Snapshot[]> = {};
+  for (const r of rules) history[r.id] = historyOf(r);
   return {
     symbols,
     links,
@@ -367,5 +629,26 @@ export function buildModel(
     keywordRules: byKeyword,
     keywordGraph: keywordGraph(byKeyword, vocab),
     keywordNeighbours: keywordNeighbours(rules, byKeyword),
+    history,
+    points: pointsOf(rules),
+  };
+}
+
+/** What the Sources tab reads: flows from ADRs into concepts, cited code paths, and the health checks. */
+export interface Sources {
+  flows: Flow[];
+  code: CodePath[];
+  health: HealthCheck[];
+}
+
+export function buildSources(
+  rules: readonly RuleIn[],
+  adrs: readonly { file: string; hasRules: boolean }[],
+  model: Pick<Model, 'links' | 'tooCommon'>,
+): Sources {
+  return {
+    flows: sourceFlows(rules),
+    code: codePaths(rules.map((r) => r.rule)),
+    health: healthChecks(rules, adrs, model.tooCommon, model.links),
   };
 }
