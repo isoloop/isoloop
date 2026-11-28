@@ -1716,7 +1716,7 @@
   {
     "id": "tool.rules-hive",
     "statement": "The Hive tab draws one axis per concept and a dot per rule, ordered by first event date and coloured by status, with links as curves between axes.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "related": ["tool.rules-links", "tool.rules-tabs"],
     "events": [
@@ -1725,8 +1725,15 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "It shows which concepts connect, and exploring one rule's links by hover reads well."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#511",
+        "why": "The Hive tab is on the board, built on the design system and the model's links."
       }
-    ]
+    ],
+    "code": ["scripts/rules/board/views/hive.js", "scripts/rules/board/views/hive.css"]
   },
   {
     "id": "tool.rules-keywords-tab",
