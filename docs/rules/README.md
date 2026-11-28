@@ -4829,7 +4829,7 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | Rule | Statement | Values | Status | Version |
 | --- | --- | --- | --- | --- |
 | `tool.rule-one-fact` | A rule holds one fact: one default or one behaviour, as it holds today. An ADR section with several facts becomes several rules, linked through `related`. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
-| `tool.rule-fields` | A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `repo`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy` and `aliases`. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rule-fields` | A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `repo`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy`, `aliases` and `keywords`. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.statement-form` | A statement is one or two sentences in the present tense that say what holds, with no why. It follows `docs/writing.md`. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.current-why` | A rule's current why is the `why` of its newest `decided`, `amended` or `clarified` event. There's no separate field for it. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.ids-never-change` | A rule id is `<prefix>.<slug>` in kebab-case and never changes. A renamed or moved rule gets a new id and keeps the old one in `aliases`. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
@@ -4850,7 +4850,7 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.rules-same-pr` | Whoever changes an ADR updates its rules in the same PR. The steward treats rules that don't match the ADR as a must-fix. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.rules-ship` | `pnpm rules:ship <version>` runs in the version PR. Each rule whose `target` is that version becomes `active`, with `since` set, a `shipped` event and no `target`. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.rules-readme` | `pnpm rules:build` writes `docs/rules/README.md`, which is committed: per concept, a table of rules, then each rule's history. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
-| `tool.rules-board` | `pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. It has the Board, a rule drawer and the Agenda by day or by version. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
+| `tool.rules-board` | `pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. The page is a shell with one tab per view, built from Archeion's design system; it has the Board, a rule drawer and the Agenda by day or by version. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.rules-backfill` | Rules for the existing ADRs are added one concept per PR, each reviewed by the maintainer. Supervision, Durability and Versioning & releases go first. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.agents-md-rules` | `AGENTS.md` sends agents to `docs/rules/README.md` for what holds today. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
 | `tool.rules-scope` | The registry covers this repo's ADRs only. |  | active, repo | in force since [#483](https://github.com/isoloop/isoloop/issues/483) |
@@ -4911,28 +4911,28 @@ Tools, source layout, checks and the repo's own process. Prefix `tool`.
 | `tool.rules-sources` | The Sources tab shows which ADRs feed which concepts, a treemap of the `code` paths rules cite, and a Health list of where the registry is weak. |  | decided, repo |  |
 | `tool.rules-as-of` | Board, Agenda and Hive have an "as of" option that rebuilds each rule as it stood on a chosen date or release, and a diff that lists what changed between two points. |  | decided, repo |  |
 | `tool.rules-as-of-limits` | "As of" places a whole day at once, since events have no time; earlier wording comes from `prev`, which is free text; only the statement and the status have a history. |  | decided, repo |  |
-| `tool.rules-links` | Links between rules are derived when the page is built, in four kinds: `related` and `supersededBy`, the same ADR section, a shared symbol, and a shared `code` path. | `4 kinds` | decided, repo |  |
-| `tool.rules-link-cap` | A key shared by more than 12 rules makes no links; the page lists it instead. | `12 rules` | decided, repo |  |
-| `tool.rules-link-weight` | A link from a key shared by n rules weighs 1/(n−1), so a narrow key counts more than a broad one. | `1/(n−1)` | decided, repo |  |
-| `tool.rules-keywords-file` | Keywords are a fixed vocabulary in `docs/rules/keywords.json`, each with an id, a label, a one-line definition and aliases. A rule names its keywords in an optional `keywords` field, and `rules:check` fails on an unknown one. | `42 keywords to start` | decided, repo |  |
+| `tool.rules-links` | Links between rules are derived when the page is built, in four kinds: `related` and `supersededBy`, the same ADR section, a shared symbol, and a shared `code` path. | `4 kinds` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-link-cap` | A key shared by more than 12 rules makes no links; the page lists it instead. | `12 rules` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-link-weight` | A link from a key shared by n rules weighs 1/(n−1), so a narrow key counts more than a broad one. | `1/(n−1)` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-keywords-file` | Keywords are a fixed vocabulary in `docs/rules/keywords.json`, each with an id, a label, a one-line definition and aliases. A rule names its keywords in an optional `keywords` field, and `rules:check` fails on an unknown one. | `42 keywords to start` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
 | `tool.rules-keyword-review` | The maintainer reviews the keywords on each concept's rules, one concept per PR. |  | decided, repo |  |
-| `tool.rules-symbols` | Symbols are derived from backticked names in statements, knobs and errors, feed search and the shared-symbol links, and are never written by hand. |  | decided, repo |  |
-| `tool.rules-config` | One config file holds what's particular to a repo: the title, the rules and ADR folders, the ADR number from which `Rules:` lines are required, the GitHub owner and repo for links, and where the page is written. |  | decided, repo |  |
-| `tool.rules-view-modules` | Each tab is its own module next to a small shell that holds the tabs, the shared filters, the theme and the rule drawer, and `rules:board` inlines them into one self-contained page. |  | decided, repo |  |
-| `tool.rules-product-neutral` | The rules registry runs on Archeion, a product-neutral tool with its own design system; nothing in Archeion's code, tokens or components is about Isoloop, and Isoloop uses it only as dev tooling. |  | decided, repo |  |
+| `tool.rules-symbols` | Symbols are derived from backticked names in statements, knobs and errors, feed search and the shared-symbol links, and are never written by hand. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-config` | One config file holds what's particular to a repo: the title, the rules and ADR folders, the ADR number from which `Rules:` lines are required, the GitHub owner and repo for links, and where the page is written. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-view-modules` | Each tab is its own module next to a small shell that holds the tabs, the shared filters, the theme and the rule drawer, and `rules:board` inlines them into one self-contained page. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-product-neutral` | The rules registry runs on Archeion, a product-neutral tool with its own design system; nothing in Archeion's code, tokens or components is about Isoloop, and Isoloop uses it only as dev tooling. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
 | `tool.rules-own-repo` | Archeion moves to a repo of its own later, and Isoloop's published packages never depend on it. |  | decided, repo |  |
-| `tool.rules-theme` | Isoloop's palette is one theme, chosen in `rules.config.json`; a theme sets only the semantic tokens and may bring a webfont. |  | decided, repo |  |
-| `tool.rules-tokens` | Design tokens come in three layers: primitives, semantic tokens and component tokens. Components read only semantic and component tokens, and themes change only the semantic layer. | `3 layers` | decided, repo |  |
-| `tool.rules-chart-slots` | Charts have 8 categorical colour slots, and a chart with more than 8 categories groups the rest. | `8 slots` | decided, repo |  |
-| `tool.rules-literal-ban` | `rules:check` fails on a colour, a font size, a font family or a spacing value written in a component or a view, outside the files on one allowlist. |  | decided, repo |  |
-| `tool.rules-components` | Components are plain functions that return HTML through an `html` tagged template, which escapes every value; `raw()` marks HTML that's already safe. There's no framework. |  | decided, repo |  |
-| `tool.rules-layout-primitives` | Layout uses four primitives, Stack, Cluster, Grid and Split, spaced with `gap`; a component never sets its own outer margin. | `4 primitives` | decided, repo |  |
-| `tool.rules-type-scale` | Type has a 5-step scale (xs, s, m, l, xl) with tabular numbers where digits line up; data views stay at the m step or below. The default font is the system stack, and a theme may swap in a webfont. | `5 steps` | decided, repo |  |
-| `tool.rules-chart-toolkit` | Charts share one toolkit: scales, axes, a legend, a tooltip and SVG helpers. |  | decided, repo |  |
-| `tool.rules-css-layers` | CSS uses `@layer` (reset, tokens, base, layout, components, views), each class is prefixed with its owner, a component or a view, and there are no utility classes. |  | decided, repo |  |
-| `tool.rules-css-prefix` | Tokens use the prefix `--ar-` and classes `.ar-`, from Archeion's name, used the same way everywhere so a rename stays one mechanical pass. | `--ar-`, `ar-` | decided, repo |  |
-| `tool.rules-specimen` | `rules:board --specimen` writes a page with every token, type step, layout primitive, component and chart part. |  | decided, repo |  |
-| `tool.rules-ds-tests` | The design system is tested for WCAG AA contrast in both themes, for the literal ban, with unit tests per component, and with a headless smoke test of every view and the specimen at 2 widths in both themes; there are no pixel snapshots. |  | decided, repo |  |
+| `tool.rules-theme` | Isoloop's palette is one theme, chosen in `rules.config.json`; a theme sets only the semantic tokens and may bring a webfont. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-tokens` | Design tokens come in three layers: primitives, semantic tokens and component tokens. Components read only semantic and component tokens, and themes change only the semantic layer. | `3 layers` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-chart-slots` | Charts have 8 categorical colour slots, and a chart with more than 8 categories groups the rest. | `8 slots` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-literal-ban` | `rules:check` fails on a colour, a font size, a font family or a spacing value written in a component or a view, outside the files on one allowlist. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-components` | Components are plain functions that return HTML through an `html` tagged template, which escapes every value; `raw()` marks HTML that's already safe. There's no framework. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-layout-primitives` | Layout uses four primitives, Stack, Cluster, Grid and Split, spaced with `gap`; a component never sets its own outer margin. | `4 primitives` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-type-scale` | Type has a 5-step scale (xs, s, m, l, xl) with tabular numbers where digits line up; data views stay at the m step or below. The default font is the system stack, and a theme may swap in a webfont. | `5 steps` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-chart-toolkit` | Charts share one toolkit: scales, axes, a legend, a tooltip and SVG helpers. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-css-layers` | CSS uses `@layer` (reset, tokens, base, layout, components, views), each class is prefixed with its owner, a component or a view, and there are no utility classes. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-css-prefix` | Tokens use the prefix `--ar-` and classes `.ar-`, from Archeion's name, used the same way everywhere so a rename stays one mechanical pass. | `--ar-`, `ar-` | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-specimen` | `rules:board --specimen` writes a page with every token, type step, layout primitive, component and chart part. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
+| `tool.rules-ds-tests` | The design system is tested for WCAG AA contrast in both themes, for the literal ban, with unit tests per component, and with a headless smoke test of every view and the specimen at 2 widths in both themes; there are no pixel snapshots. |  | active, repo | in force since [#510](https://github.com/isoloop/isoloop/issues/510) |
 
 ### `tool.rule-one-fact`
 
@@ -4946,13 +4946,15 @@ History:
 ### `tool.rule-fields`
 
 - **Code:** `docs/rules/schema.json`, `scripts/rules/check.ts`
-- **Why:** Rules about the repo need a flag, since they never ship in a version.
+- **Why:** Rules can name keywords from the vocabulary.
 
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · What a rule is](../adr/0026-rules-registry.md#what-a-rule-is) · Each field answers one question a reader asks about a fact: its value, how to change it, where it's built, since when.
 - 2026-11-27 · amended · [ADR 0026 · Amended 2026-11-27: rules about the repo](../adr/0026-rules-registry.md#amended-2026-11-27-rules-about-the-repo) · Rules about the repo need a flag, since they never ship in a version. Before: A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy` and `aliases`.
 - 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
+- 2026-11-28 · amended · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · Rules can name keywords from the vocabulary. Before: A rule has an `id`, a `statement`, a `status` and `events`. It may also have `experimental`, `repo`, `values`, `knob`, `errors`, `code`, `since`, `target`, `related`, `supersededBy` and `aliases`.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · The `keywords` field is checked from this PR on.
 
 ### `tool.statement-form`
 
@@ -5162,12 +5164,14 @@ History:
 
 - **Change it:** `pnpm rules:board`
 - **Code:** `scripts/rules/build.ts`, `scripts/rules/board/`
-- **Why:** The board is the view for reading across concepts and over time.
+- **Why:** The page is now a shell with view modules on Archeion's design system.
 
 History:
 
 - 2026-11-27 · decided · [ADR 0026 · Views](../adr/0026-rules-registry.md#views) · The board is the view for reading across concepts and over time.
 - 2026-11-27 · built · [#483](https://github.com/isoloop/isoloop/issues/483) · In force from the PR that built the rules registry.
+- 2026-11-28 · amended · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · The page is now a shell with view modules on Archeion's design system. Before: `pnpm rules:board` writes one self-contained page with the registry inlined to `.rules-board/index.html`, which is gitignored, and opens it. It has the Board, a rule drawer and the Agenda by day or by version.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · The shell and the design system are in force from this PR.
 
 ### `tool.rules-backfill`
 
@@ -5788,39 +5792,47 @@ History:
 
 ### `tool.rules-links`
 
+- **Code:** `scripts/rules/model.ts`
 - **Related:** `tool.rules-link-cap`, `tool.rules-link-weight`, `tool.rules-symbols`
 - **Why:** Written `related` links never cross concepts, so the links between concepts come from what rules already share.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · Written `related` links never cross concepts, so the links between concepts come from what rules already share.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-link-cap`
 
+- **Code:** `scripts/rules/model.ts`, `rules.config.json`
 - **Related:** `tool.rules-links`
 - **Why:** Without a cap, a file such as the kernel's links almost every rule to every other.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · Without a cap, a file such as the kernel's links almost every rule to every other.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-link-weight`
 
+- **Code:** `scripts/rules/model.ts`
 - **Related:** `tool.rules-links`
 - **Why:** Broad keys still connect rules, but a pair that shares a rare key is the stronger tie.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · Broad keys still connect rules, but a pair that shares a rare key is the stronger tie.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-keywords-file`
 
+- **Code:** `docs/rules/keywords.json`, `scripts/rules/check.ts`
 - **Related:** `tool.rules-keyword-review`, `tool.rule-fields`
 - **Why:** Free tags drift; a vocabulary with definitions doubles as a glossary.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · Free tags drift; a vocabulary with definitions doubles as a glossary.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-keyword-review`
 
@@ -5833,39 +5845,47 @@ History:
 
 ### `tool.rules-symbols`
 
+- **Code:** `scripts/rules/model.ts`
 - **Related:** `tool.rules-links`
 - **Why:** With hundreds of names, symbols work as search, not as filters.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · With hundreds of names, symbols work as search, not as filters.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-config`
 
+- **Code:** `rules.config.json`, `scripts/rules/config.ts`
 - **Related:** `tool.rules-view-modules`
 - **Why:** The scripts hold nothing about Isoloop, so the tooling can move to another repo unchanged.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · The scripts hold nothing about Isoloop, so the tooling can move to another repo unchanged.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-view-modules`
 
+- **Code:** `scripts/rules/board/shell.js`, `scripts/rules/board/views/`
 - **Related:** `tool.rules-tabs`, `tool.rules-board`
 - **Why:** Views are built and changed one at a time without touching the others.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: views, links, keywords and config](../adr/0026-rules-registry.md#amended-2026-11-28-views-links-keywords-and-config) · Views are built and changed one at a time without touching the others.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-product-neutral`
 
+- **Code:** `scripts/rules/board/ds/`
 - **Related:** `tool.rules-own-repo`, `tool.rules-theme`, `tool.rules-config`
 - **Why:** It's meant to work for any repo's ADRs, so Isoloop is one user of it, not its subject.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · It's meant to work for any repo's ADRs, so Isoloop is one user of it, not its subject.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-own-repo`
 
@@ -5878,111 +5898,135 @@ History:
 
 ### `tool.rules-theme`
 
+- **Code:** `scripts/rules/board/ds/themes/`, `rules.config.json`
 - **Related:** `tool.rules-tokens`, `tool.rules-config`
 - **Why:** Keeping the product's own look separate from Isoloop's lets another repo pick its own theme.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Keeping the product's own look separate from Isoloop's lets another repo pick its own theme.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-tokens`
 
+- **Code:** `scripts/rules/board/ds/tokens.css`
 - **Related:** `tool.rules-theme`, `tool.rules-literal-ban`
 - **Why:** One place per kind of decision: raw values, what a value is for, and what one component uses.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · One place per kind of decision: raw values, what a value is for, and what one component uses.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-chart-slots`
 
+- **Code:** `scripts/rules/board/ds/chart.js`
 - **Related:** `tool.rules-chart-toolkit`
 - **Why:** More than 8 colours can't be told apart reliably.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · More than 8 colours can't be told apart reliably.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-literal-ban`
 
+- **Code:** `scripts/rules/literals.ts`
 - **Related:** `tool.rules-tokens`, `tool.rules-ds-tests`
 - **Why:** Literals in components are how a design system drifts.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Literals in components are how a design system drifts.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-components`
 
+- **Code:** `scripts/rules/board/ds/html.js`, `scripts/rules/board/ds/components.js`
 - **Related:** `tool.rules-layout-primitives`
 - **Why:** Escaping by default closes the injection holes string building leaves, with no dependency.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Escaping by default closes the injection holes string building leaves, with no dependency.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-layout-primitives`
 
+- **Code:** `scripts/rules/board/ds/layout.css`, `scripts/rules/board/ds/components.js`
 - **Related:** `tool.rules-components`
 - **Why:** Spacing belongs to the parent, so components fit anywhere without margin fights.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Spacing belongs to the parent, so components fit anywhere without margin fights.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-type-scale`
 
+- **Code:** `scripts/rules/board/ds/tokens.css`
 - **Related:** `tool.rules-theme`
 - **Why:** Dense data reads better small and aligned, and a system font needs no download.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Dense data reads better small and aligned, and a system font needs no download.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-chart-toolkit`
 
+- **Code:** `scripts/rules/board/ds/chart.js`
 - **Related:** `tool.rules-chart-slots`
 - **Why:** Each view drawing its own axes would look and behave differently.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Each view drawing its own axes would look and behave differently.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-css-layers`
 
+- **Code:** `scripts/rules/board/ds/tokens.css`
 - **Related:** `tool.rules-css-prefix`
 - **Why:** Layers settle precedence without specificity fights, and owner prefixes show where a style comes from.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Layers settle precedence without specificity fights, and owner prefixes show where a style comes from.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-css-prefix`
 
+- **Code:** `scripts/rules/board/ds/tokens.css`
 - **Related:** `tool.rules-css-layers`
 - **Why:** Owner-prefixed names show at a glance which styles are the product's.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · Owner-prefixed names show at a glance which styles are the product's.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-specimen`
 
+- **Code:** `scripts/rules/board/specimen.js`
 - **Related:** `tool.rules-ds-tests`
 - **Why:** One page to review the design system without opening every view.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · One page to review the design system without opening every view.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ### `tool.rules-ds-tests`
 
+- **Code:** `scripts/rules/ds.test.ts`, `scripts/rules/smoke.ts`
 - **Related:** `tool.rules-literal-ban`, `tool.rules-specimen`
 - **Why:** These catch what breaks in practice (unreadable colours, drift, broken markup, overflow, errors) without snapshots that fail on every intended change.
 
 History:
 
 - 2026-11-28 · decided · [ADR 0026 · Amended 2026-11-28: design system](../adr/0026-rules-registry.md#amended-2026-11-28-design-system) · These catch what breaks in practice (unreadable colours, drift, broken markup, overflow, errors) without snapshots that fail on every intended change.
+- 2026-11-28 · built · [#510](https://github.com/isoloop/isoloop/issues/510) · In force from the PR that built Archeion's design system, the page shell and the build-time model.
 
 ## Derived topics
 
