@@ -1795,7 +1795,7 @@
   {
     "id": "tool.rules-sources",
     "statement": "The Sources tab shows which ADRs feed which concepts, a treemap of the `code` paths rules cite, and a Health list of where the registry is weak.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "related": ["tool.rules-tabs"],
     "events": [
@@ -1804,13 +1804,24 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "It shows where facts come from, where they live in the code, and what the registry is missing."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#515",
+        "why": "The Sources tab, with Code and Health, is in force from this PR."
       }
+    ],
+    "code": [
+      "scripts/rules/board/views/sources.js",
+      "scripts/rules/model.ts",
+      "scripts/rules/board/ds/chart.js"
     ]
   },
   {
     "id": "tool.rules-as-of",
     "statement": "Board, Agenda and Hive have an \"as of\" option that rebuilds each rule as it stood on a chosen date or release, and a diff that lists what changed between two points.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "related": ["tool.rules-as-of-limits"],
     "events": [
@@ -1819,13 +1830,20 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "Seeing what held at a release, and what changed since, answers what a release changed in facts rather than commits."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#513",
+        "why": "The \"as of\" option and the Changes panel are built on Board, Agenda and Hive."
       }
-    ]
+    ],
+    "code": ["scripts/rules/model.ts", "scripts/rules/board/shell.js"]
   },
   {
     "id": "tool.rules-as-of-limits",
     "statement": "\"As of\" places a whole day at once, since events have no time; earlier wording comes from `prev`, which is free text; only the statement and the status have a history.",
-    "status": "decided",
+    "status": "active",
     "repo": true,
     "related": ["tool.rules-as-of"],
     "events": [
@@ -1834,8 +1852,15 @@
         "date": "2026-11-28",
         "ref": "adr/0026#amended-2026-11-28-views-links-keywords-and-config",
         "why": "Accepted for now: storing times and every field's earlier value is left for later."
+      },
+      {
+        "type": "built",
+        "date": "2026-11-28",
+        "ref": "#513",
+        "why": "\"As of\" is built within these limits: a day per step, wording from `prev`, history for the statement and the status only (`since` follows the shipped event)."
       }
-    ]
+    ],
+    "code": ["scripts/rules/model.ts", "scripts/rules/board/shell.js"]
   },
   {
     "id": "tool.rules-links",

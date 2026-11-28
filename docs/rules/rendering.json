@@ -7,6 +7,7 @@
     "code": ["packages/dom/src/shared/records.ts"],
     "since": "0.1.0",
     "related": ["dom.remote-dom", "dom.no-vdom-reconciler", "dom.dom-subset"],
+    "keywords": ["own-stack"],
     "events": [
       {
         "type": "decided",
@@ -84,6 +85,7 @@
     "status": "active",
     "code": ["packages/dom/src/worker/"],
     "since": "0.1.0",
+    "keywords": ["trust-boundary"],
     "events": [
       {
         "type": "decided",
@@ -106,6 +108,7 @@
     "code": ["packages/dom/src/shared/records.ts"],
     "since": "0.1.0",
     "related": ["dom.one-record-moves", "dom.listen-records", "dom.comment-records"],
+    "keywords": ["compatibility", "placement", "releases"],
     "events": [
       {
         "type": "decided",
@@ -127,6 +130,7 @@
     "status": "active",
     "since": "0.1.0",
     "related": ["dom.records"],
+    "keywords": ["placement"],
     "events": [
       {
         "type": "decided",
@@ -175,6 +179,7 @@
     "status": "active",
     "since": "0.1.0",
     "related": ["dom.records"],
+    "keywords": ["own-stack"],
     "events": [
       {
         "type": "decided",
@@ -198,6 +203,7 @@
     "code": ["packages/host/src/kernel/kernel.ts", "packages/host/src/supervisor/machine.ts"],
     "since": "0.1.0",
     "related": ["dom.fmt-in-host-build"],
+    "keywords": ["compatibility", "lifecycle", "errors", "restart"],
     "events": [
       {
         "type": "decided",
@@ -219,6 +225,7 @@
     "status": "active",
     "since": "0.1.0",
     "related": ["dom.fmt-exact"],
+    "keywords": ["compatibility"],
     "events": [
       {
         "type": "decided",
@@ -240,6 +247,7 @@
     "status": "active",
     "since": "0.1.0",
     "related": ["dom.internal-package"],
+    "keywords": ["compatibility"],
     "events": [
       {
         "type": "decided",
@@ -262,6 +270,7 @@
     "code": ["packages/host/src/render/compositor.ts", "packages/host/src/render/isoloop-dom.ts"],
     "since": "0.1.0",
     "related": ["dom.sanitising-required"],
+    "keywords": ["toolchain"],
     "events": [
       {
         "type": "decided",
@@ -284,6 +293,7 @@
     "code": ["packages/host/src/render/registry.ts"],
     "since": "0.1.0",
     "related": ["dom.host-applies", "dom.style-cssom"],
+    "keywords": ["trust-boundary", "releases"],
     "events": [
       {
         "type": "decided",
@@ -336,6 +346,7 @@
     "code": ["packages/dom/src/host/applier.ts"],
     "since": "0.1.1",
     "related": ["dom.sanitising-required"],
+    "keywords": ["trust-boundary"],
     "events": [
       {
         "type": "decided",
@@ -392,6 +403,7 @@
     "status": "active",
     "repo": true,
     "related": ["dom.dom-subset", "dom.conformance-suite"],
+    "keywords": ["frameworks"],
     "events": [
       {
         "type": "decided",
@@ -435,6 +447,7 @@
     "status": "active",
     "since": "0.1.0",
     "related": ["dom.subset-additions"],
+    "keywords": ["dev-only", "frameworks", "releases"],
     "events": [
       {
         "type": "decided",
@@ -457,6 +470,7 @@
     "code": ["packages/dom/src/testing/index.ts"],
     "since": "0.1.0",
     "related": ["dom.subset-additions"],
+    "keywords": ["errors"],
     "events": [
       {
         "type": "decided",
@@ -480,6 +494,7 @@
     "code": ["packages/dom/src/worker/dom.ts"],
     "since": "0.1.0",
     "related": ["dom.dom-subset"],
+    "keywords": ["measurement", "errors"],
     "events": [
       {
         "type": "decided",
@@ -510,6 +525,7 @@
     "code": ["packages/react/package.json", "packages/preact/package.json"],
     "since": "0.1.0",
     "related": ["dom.majors-in-ci"],
+    "keywords": ["frameworks"],
     "events": [
       {
         "type": "decided",
@@ -532,6 +548,7 @@
     "repo": true,
     "code": ["pnpm-workspace.yaml", ".github/dependabot.yml"],
     "related": ["dom.frameworks"],
+    "keywords": ["ci", "frameworks", "placement"],
     "events": [
       {
         "type": "decided",
@@ -553,6 +570,7 @@
     "status": "decided",
     "target": "0.6.0",
     "related": ["dom.svelte-adapter", "dom.solid-adapter", "dom.html-parsing"],
+    "keywords": ["frameworks"],
     "events": [
       {
         "type": "proposed",
@@ -574,6 +592,7 @@
     "status": "decided",
     "target": "0.7.0",
     "related": ["dom.vue-adapter", "dom.solid-adapter", "dom.html-parsing"],
+    "keywords": ["frameworks"],
     "events": [
       {
         "type": "proposed",
@@ -595,6 +614,7 @@
     "status": "decided",
     "target": "0.8.0",
     "related": ["dom.vue-adapter", "dom.svelte-adapter", "dom.html-parsing"],
+    "keywords": ["frameworks"],
     "events": [
       {
         "type": "proposed",
@@ -655,6 +675,7 @@
     "statement": "There's no Angular adapter.",
     "status": "rejected",
     "related": ["dom.frameworks"],
+    "keywords": ["frameworks"],
     "events": [
       {
         "type": "rejected",
@@ -671,6 +692,7 @@
     "code": ["packages/dom/package.json"],
     "since": "0.1.0",
     "related": ["dom.internal-package"],
+    "keywords": ["source-layout"],
     "events": [
       {
         "type": "decided",
@@ -692,6 +714,7 @@
     "status": "active",
     "code": ["packages/dom/package.json"],
     "since": "0.1.0",
+    "keywords": ["own-stack", "toolchain"],
     "events": [
       {
         "type": "decided",
@@ -714,6 +737,7 @@
     "code": ["packages/dom/src/shared/records.ts"],
     "since": "0.1.0",
     "related": ["dom.records"],
+    "keywords": ["errors", "releases"],
     "events": [
       {
         "type": "decided",
@@ -736,6 +760,7 @@
     "code": ["packages/dom/README.md"],
     "since": "0.1.0",
     "related": ["dom.fmt-bumps"],
+    "keywords": ["compatibility", "frameworks", "releases"],
     "events": [
       {
         "type": "decided",
